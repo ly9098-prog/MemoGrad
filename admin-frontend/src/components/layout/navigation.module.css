@@ -1,8 +1,11 @@
 .shell {
+  position: relative;
   display: flex;
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
+  background: var(--background);
+  background: color-mix(in srgb, var(--background) 82%, var(--card));
 }
 
 .sidebar {
@@ -11,17 +14,17 @@
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid var(--sidebar-border);
-  background: var(--sidebar);
+  background: var(--background);
+  background: color-mix(in srgb, var(--background) 82%, var(--card));
   color: var(--sidebar-foreground);
 }
 
 .brand {
   display: flex;
-  height: 80px;
+  height: 88px;
   flex-shrink: 0;
   align-items: center;
-  padding-inline: 16px;
+  padding-inline: 20px;
 }
 
 .brandLink {
@@ -40,7 +43,7 @@
   height: 40px;
   flex-shrink: 0;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 14px;
   background: var(--primary);
   color: var(--primary-foreground);
   font-size: 13px;
@@ -52,32 +55,41 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity 140ms var(--ease-out-ui);
+  transition: opacity 200ms var(--ease-out-ui), transform 220ms var(--ease-out-ui);
+}
+
+.sidebar:not([data-collapsed="true"]) .copy {
+  transition-duration: 260ms, 280ms;
+  transition-delay: 80ms;
+}
+
+.labelText {
+  transition: transform 240ms var(--ease-out-ui);
 }
 
 .searchArea {
   flex-shrink: 0;
-  padding: 0 12px 8px;
+  padding: 0 16px 10px;
 }
 
 .searchField,
 .row {
   display: flex;
   min-width: 0;
-  min-height: 40px;
+  min-height: 46px;
   align-items: center;
-  gap: 12px;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 14px;
-  line-height: 20px;
+  gap: 13px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 15px;
+  line-height: 22px;
   text-align: left;
   outline: none;
   transition: background-color 140ms var(--ease-out-ui), color 140ms var(--ease-out-ui);
 }
 
 .searchField {
-  height: 40px;
+  height: 44px;
   color: var(--muted-foreground);
 }
 
@@ -98,7 +110,7 @@
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 0 12px 12px;
+  padding: 0 16px 16px;
   scrollbar-color: var(--border) transparent;
   scrollbar-width: thin;
 }
@@ -106,7 +118,7 @@
 .navigationItems {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .navigationGroup:first-of-type {
@@ -124,12 +136,13 @@
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 240ms var(--ease-out-ui), opacity 160ms var(--ease-out-ui);
+  transition: grid-template-rows 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms var(--ease-out-ui);
 }
 
 .groupPanel[data-expanded="true"] {
   grid-template-rows: 1fr;
   opacity: 1;
+  transition-duration: 520ms, 320ms;
 }
 
 .groupClip {
@@ -140,24 +153,105 @@
 .children {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 4px 0 4px 20px;
+  gap: 3px;
+  margin: 6px 0 8px 22px;
   border-left: 1px solid var(--sidebar-border);
-  padding-left: 12px;
+  padding-left: 14px;
 }
 
 .childRow {
-  min-height: 36px;
-  gap: 10px;
-  padding-block: 6px;
-  font-size: 13px;
+  min-height: 40px;
+  gap: 11px;
+  padding-block: 7px;
+  font-size: 13.5px;
 }
 
 .footer {
   flex-shrink: 0;
-  margin-inline: 12px;
+  margin-inline: 16px;
   border-top: 1px solid var(--sidebar-border);
-  padding-block: 12px;
+  padding-block: 14px;
+}
+
+.account {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+.avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.accountCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.accountName,
+.accountRole {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountName {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 19px;
+}
+
+.accountRole {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.logoutButton {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  outline: none;
+  transition: background-color 160ms var(--ease-out-ui), color 160ms var(--ease-out-ui);
+}
+
+.logoutButton:hover {
+  background: var(--destructive-light);
+  color: var(--destructive);
+}
+
+.logoutButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.row:hover .copy,
+.row:focus-visible .copy,
+.row:hover .labelText,
+.row:focus-visible .labelText {
+  transform: translateX(3px);
 }
 
 .sidebar[data-collapsed="true"] .brand {
@@ -168,37 +262,65 @@
 .sidebar[data-collapsed="true"] .chevron {
   visibility: hidden;
   opacity: 0;
+  transform: translateX(-6px);
 }
 
 .sidebar[data-collapsed="true"] .row {
   width: 48px;
   gap: 0;
-  padding-inline: 15px;
+  padding-inline: 13px;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  height: 64px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  padding-inline: 24px;
-  background: var(--background);
+.sidebar[data-collapsed="true"] .account {
+  width: 48px;
+  gap: 0;
+  justify-content: center;
+  padding-inline: 0;
 }
 
-.avatar {
+.sidebar[data-collapsed="true"] .logoutButton {
+  display: none;
+}
+
+.workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 20px 0 0 0;
+  background: var(--card);
+}
+
+.mobileNavigationButton {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 40;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--card);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
+  color: var(--muted-foreground);
+  box-shadow: var(--shadow-card);
+  transition: background-color 160ms var(--ease-out-ui), color 160ms var(--ease-out-ui);
+}
+
+.mobileNavigationButton:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.mobileNavigationButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .drawer[data-state="open"] {
@@ -226,27 +348,33 @@
 @media (min-width: 1024px) {
   .shell {
     display: grid;
-    grid-template-columns: 288px minmax(0, 1fr);
+    grid-template-columns: 72px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
-    transition: grid-template-columns 280ms var(--ease-out-ui);
+    transition: grid-template-columns 360ms cubic-bezier(0.32, 0.72, 0, 1);
   }
 
-  .shell[data-navigation-collapsed="true"] {
-    grid-template-columns: 72px minmax(0, 1fr);
+  .shell[data-navigation-expanded="true"] {
+    grid-template-columns: 288px minmax(0, 1fr);
+    transition-duration: 480ms;
+  }
+
+  .mobileNavigationButton {
+    display: none;
   }
 }
 
 @media (max-width: 639px) {
-  .topbar {
-    height: 56px;
-    padding-inline: 16px;
+  .workspace {
+    border-radius: 16px 0 0 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .shell,
   .groupPanel,
-  .chevron {
+  .chevron,
+  .copy,
+  .labelText {
     transition: none;
   }
 

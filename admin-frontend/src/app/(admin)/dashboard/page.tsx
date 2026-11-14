@@ -370,7 +370,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <ManagementPage className="max-w-[1680px] space-y-4 pb-2">
+    <ManagementPage className="space-y-4 pb-2">
       <style jsx global>{`
         @keyframes dashboard-card-in {
           from { opacity: 0; translate: 0 10px; scale: .985; }

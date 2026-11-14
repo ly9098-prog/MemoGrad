@@ -1,15 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement } from "react";
 import { Sidebar } from "./sidebar";
 
 type Element = ReactElement<Record<string, unknown>>;
-type AuthState = { role: { name: string }; permissions: string[] };
+type AuthState = { user: { username: string }; role: { name: string; display_name?: string }; permissions: string[] };
 
 const h = vi.hoisted(() => ({
   states: [] as unknown[],
   stateIndex: 0,
   pathname: "/questions",
-  auth: { role: { name: "super_admin" }, permissions: [] as string[] } as AuthState,
+  auth: { user: { username: "test-admin" }, role: { name: "super_admin" }, permissions: [] as string[] } as AuthState,
   logout: vi.fn(),
   replace: vi.fn(),
 }));
@@ -74,6 +74,38 @@ function groupButton(tree: unknown, key: string): Element {
   return found;
 }
 
+function groupContainer(tree: unknown, key: string): Element {
+  let found: Element | undefined;
+  walk(tree, (element) => {
+    const children = Array.isArray(element.props.children)
+      ? element.props.children
+      : [element.props.children];
+    if (children.some((child) =>
+      isValidElement<Record<string, unknown>>(child)
+      && child.props["aria-controls"] === `sidebar-group-${key}`)) {
+      found = element;
+    }
+  });
+  if (!found) throw new Error(`missing sidebar group container: ${key}`);
+  return found;
+}
+
+function hoverGroup(tree: unknown, key: string) {
+  (groupContainer(tree, key).props.onPointerEnter as () => void)();
+  vi.advanceTimersByTime(220);
+}
+
+function leaveGroup(tree: unknown, key: string) {
+  (groupContainer(tree, key).props.onPointerLeave as (event: unknown) => void)({
+    clientX: 0,
+    clientY: 0,
+    currentTarget: {
+      getBoundingClientRect: () => ({ left: 10, right: 100, top: 10, bottom: 100 }),
+    },
+  });
+  vi.advanceTimersByTime(140);
+}
+
 function logoLink(tree: unknown): Element {
   let found: Element | undefined;
   walk(tree, (element) => {
@@ -86,12 +118,17 @@ function logoLink(tree: unknown): Element {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   h.states = [];
   h.stateIndex = 0;
   h.pathname = "/questions";
-  h.auth = { role: { name: "super_admin" }, permissions: [] };
+  h.auth = { user: { username: "test-admin" }, role: { name: "super_admin" }, permissions: [] };
   h.logout.mockReset().mockResolvedValue(undefined);
   h.replace.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("sidebar reference layout behavior", () => {
@@ -104,7 +141,7 @@ describe("sidebar reference layout behavior", () => {
   }
 
   it("filters permission-restricted routes before searching", () => {
-    h.auth = { role: { name: "editor" }, permissions: ["question:read", "role:read"] };
+    h.auth = { user: { username: "test-admin" }, role: { name: "editor" }, permissions: ["question:read", "role:read"] };
     let tree = renderSidebar();
     expect(links(tree)).toContain("/questions");
     expect(links(tree)).not.toContain("/roles");
@@ -122,7 +159,7 @@ describe("sidebar reference layout behavior", () => {
     expect(links(tree)).toContain("/formulas/categories");
     expect(links(tree)).not.toContain("/questions");
     expect(groupExpansion(tree)["formula-management"]).toBe(true);
-    expect(h.states[0]).toBeNull();
+    expect(h.states[0]).toEqual({ hovered: null, open: null });
   });
 
   it("clears search and closes the mobile panel after choosing a route", () => {
@@ -168,9 +205,13 @@ describe("sidebar reference layout behavior", () => {
 });
 
 describe("sidebar disclosure continuity", () => {
-  it("keeps real content navigation visible on the dashboard instead of emptying the sidebar", () => {
+  it("opens the hovered parent group without a default open module", () => {
     h.pathname = "/dashboard";
-    expect(groupExpansion(renderSidebar())["question-management"]).toBe(true);
+    let tree = renderSidebar();
+    expect(Object.values(groupExpansion(tree)).some(Boolean)).toBe(false);
+    hoverGroup(tree, "question-management");
+    tree = renderSidebar();
+    expect(groupExpansion(tree)["question-management"]).toBe(true);
   });
 
   it("closes the previous group when another group opens", () => {
@@ -182,29 +223,90 @@ describe("sidebar disclosure continuity", () => {
     expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
   });
 
-  it("opens the active route group without an effect-driven second render", () => {
+  it("opens the hovered module on the active route", () => {
     h.pathname = "/audit-logs";
-    const expansion = groupExpansion(renderSidebar());
+    let tree = renderSidebar();
+    expect(Object.values(groupExpansion(tree)).some(Boolean)).toBe(false);
+    hoverGroup(tree, "system-management");
+    tree = renderSidebar();
+    const expansion = groupExpansion(tree);
     expect(expansion["system-management"]).toBe(true);
-    expect(expansion["question-management"]).toBe(false);
     expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
   });
 
-  it("switches exclusively to the route group after navigation", () => {
-    (groupButton(renderSidebar(), "formula-management").props.onClick as () => void)();
-    h.pathname = "/audit-logs";
-    const expansion = groupExpansion(renderSidebar());
+  it("switches exclusively to the module under the pointer", () => {
+    let tree = renderSidebar();
+    hoverGroup(tree, "formula-management");
+    tree = renderSidebar();
+    hoverGroup(tree, "system-management");
+    tree = renderSidebar();
+    const expansion = groupExpansion(tree);
     expect(expansion["system-management"]).toBe(true);
     expect(expansion["formula-management"]).toBe(false);
     expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
   });
 
-  it("reopens the active group on a new path after a manual collapse", () => {
-    (groupButton(renderSidebar(), "question-management").props.onClick as () => void)();
-    h.pathname = "/imports/123";
-    const expansion = groupExpansion(renderSidebar());
-    expect(expansion["question-management"]).toBe(true);
-    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
+  it("does not open modules while the pointer is passing through the rail", () => {
+    const tree = renderSidebar();
+    (groupContainer(tree, "system-management").props.onPointerEnter as () => void)();
+    vi.advanceTimersByTime(100);
+    expect(Object.values(groupExpansion(renderSidebar())).some(Boolean)).toBe(false);
+    leaveGroup(tree, "system-management");
+    vi.advanceTimersByTime(500);
+    expect(Object.values(groupExpansion(renderSidebar())).some(Boolean)).toBe(false);
+  });
+
+  it("restarts the hover intent while the pointer is still moving", () => {
+    const tree = renderSidebar();
+    const container = groupContainer(tree, "system-management");
+    (container.props.onPointerEnter as () => void)();
+    vi.advanceTimersByTime(100);
+    (container.props.onPointerMove as () => void)();
+    vi.advanceTimersByTime(100);
+    expect(Object.values(groupExpansion(renderSidebar())).some(Boolean)).toBe(false);
+    vi.advanceTimersByTime(120);
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+  });
+
+  it("keeps a hover-opened module open when it is clicked", () => {
+    const tree = renderSidebar();
+    hoverGroup(tree, "system-management");
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+    (groupButton(renderSidebar(), "system-management").props.onClick as () => void)();
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+  });
+
+  it("ignores a leave event while the pointer is still inside the moved module", () => {
+    const tree = renderSidebar();
+    hoverGroup(tree, "system-management");
+    (groupContainer(tree, "system-management").props.onPointerLeave as (event: unknown) => void)({
+      clientX: 50,
+      clientY: 50,
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 10, right: 100, top: 10, bottom: 100 }),
+      },
+    });
+    vi.advanceTimersByTime(500);
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+  });
+
+  it("does not let a stale leave event close the group opened afterwards", () => {
+    const tree = renderSidebar();
+    hoverGroup(tree, "system-management");
+    hoverGroup(renderSidebar(), "formula-management");
+    leaveGroup(tree, "system-management");
+    vi.advanceTimersByTime(500);
+    expect(groupExpansion(renderSidebar())["formula-management"]).toBe(true);
+  });
+
+  it("closes the module when the pointer leaves its label and children", () => {
+    let tree = renderSidebar();
+    hoverGroup(tree, "question-management");
+    tree = renderSidebar();
+    expect(groupExpansion(tree)["question-management"]).toBe(true);
+    leaveGroup(tree, "question-management");
+    tree = renderSidebar();
+    expect(Object.values(groupExpansion(tree)).some(Boolean)).toBe(false);
   });
 
   it("keeps only one matching group expanded during search", () => {
@@ -243,6 +345,8 @@ describe("sidebar disclosure continuity", () => {
 
   it("allows manually collapsing the active group on its current route", () => {
     (groupButton(renderSidebar(), "question-management").props.onClick as () => void)();
+    expect(groupExpansion(renderSidebar())["question-management"]).toBe(true);
+    (groupButton(renderSidebar(), "question-management").props.onClick as () => void)();
     expect(groupExpansion(renderSidebar())["question-management"]).toBe(false);
   });
 
@@ -257,11 +361,39 @@ describe("sidebar disclosure continuity", () => {
     });
   });
 
-  it("expands the full sidebar when selecting a group from the icon rail", () => {
-    const onExpand = vi.fn();
-    (groupButton(renderSidebar({ collapsed: true, onExpand }), "formula-management").props.onClick as () => void)();
-    expect(onExpand).toHaveBeenCalledOnce();
-    expect(groupExpansion(renderSidebar())["formula-management"]).toBe(true);
+  it("reports hover and keyboard focus so the shell can expand the rail", () => {
+    const onHoverChange = vi.fn();
+    const onFocusWithinChange = vi.fn();
+    const tree = renderSidebar({ collapsed: true, onHoverChange, onFocusWithinChange });
+    (tree.props.onPointerEnter as () => void)();
+    (tree.props.onPointerLeave as (event: unknown) => void)({
+      clientX: 400,
+      clientY: 0,
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 0, right: 288, top: 0, bottom: 900 }),
+      },
+    });
+    expect(onHoverChange.mock.calls).toEqual([[true], [false]]);
+    const focusEvent = { target: { matches: () => true } };
+    (tree.props.onFocusCapture as (event: unknown) => void)(focusEvent);
+    (tree.props.onBlurCapture as (event: unknown) => void)({
+      currentTarget: { contains: () => false },
+      relatedTarget: null,
+    });
+    expect(onFocusWithinChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("ignores a rail leave event while the pointer is still inside the expanded sidebar", () => {
+    const onHoverChange = vi.fn();
+    const tree = renderSidebar({ collapsed: true, onHoverChange });
+    (tree.props.onPointerLeave as (event: unknown) => void)({
+      clientX: 30,
+      clientY: 300,
+      currentTarget: {
+        getBoundingClientRect: () => ({ left: 0, right: 288, top: 0, bottom: 900 }),
+      },
+    });
+    expect(onHoverChange).not.toHaveBeenCalled();
   });
 
   it("keeps menu preferences when the logo returns to the dashboard", () => {
@@ -269,5 +401,26 @@ describe("sidebar disclosure continuity", () => {
     (logoLink(renderSidebar()).props.onClick as () => void)();
     h.pathname = "/dashboard";
     expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+  });
+
+  it("keeps the signed-in user and single logout entry in the sidebar footer", () => {
+    const tree = renderSidebar();
+    const footer = (tree.props.children as unknown[]).at(-1) as Element;
+    const footerText: string[] = [];
+    let logoutCount = 0;
+    walk(footer, (element) => {
+      if (typeof element.props.children === "string") footerText.push(element.props.children);
+      if (element.type === "button" && element.props["aria-label"] === "登出") logoutCount++;
+    });
+    expect(footerText).toContain("test-admin");
+    expect(footerText).toContain("super_admin");
+    expect(logoutCount).toBe(1);
+    const account = footer.props.children as Element;
+    expect(account.props.className).toContain("account");
+    let logoutInAccount = false;
+    walk(account, (element) => {
+      if (element.type === "button" && element.props["aria-label"] === "登出") logoutInAccount = true;
+    });
+    expect(logoutInAccount).toBe(true);
   });
 });

@@ -62,19 +62,26 @@ export function Sidebar({
   variant = "desktop",
   onNavigate,
   collapsed = false,
-  onExpand,
+  onHoverChange,
+  onFocusWithinChange,
 }: {
   variant?: "desktop" | "mobile";
   onNavigate?: () => void;
   collapsed?: boolean;
-  onExpand?: () => void;
+  onHoverChange?: (hovered: boolean) => void;
+  onFocusWithinChange?: (focused: boolean) => void;
 } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
   const permissions = useAuthStore((state) => state.permissions);
   const role = useAuthStore((state) => state.role);
   const isSuperAdmin = role?.name === "super_admin";
+  const userName = user && typeof user === "object" && "username" in user && typeof user.username === "string"
+    ? user.username
+    : "Admin";
+  const roleLabel = role?.display_name ?? role?.name ?? "管理员";
 
   const visibleNavigation = useMemo(
     () => filterNavigation(adminNavigation, permissions, isSuperAdmin),
@@ -84,9 +91,14 @@ export function Sidebar({
   const activeRoute = getActiveAdminRoute(pathname, adminRoutes);
   const activeGroupKey = findActiveGroupKey(activeRoute, visibleNavigation);
 
-  const [expandedGroup, setExpandedGroup] = useState<{ key: string | null; pathname: string } | null>(null);
+  const [groupInteraction, setGroupInteraction] = useState<{ hovered: string | null; open: string | null }>({
+    hovered: null,
+    open: null,
+  });
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const groupHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingGroupKey = useRef<string | null>(null);
   const isRail = variant === "desktop" && collapsed;
   const query = search.trim().toLocaleLowerCase();
   const searchedNavigation = visibleNavigation.flatMap<AdminNavigationItem>((item) => {
@@ -101,12 +113,11 @@ export function Sidebar({
     return children.length ? [{ ...item, children }] : [];
   });
 
-  const preferredGroupKey = expandedGroup && (expandedGroup.pathname === pathname || !activeGroupKey)
-    ? expandedGroup.key
-    : activeGroupKey ?? "question-management";
-  const expandedGroupKey = query && !searchedNavigation.some((item) => item.type === "group" && item.key === preferredGroupKey)
-    ? searchedNavigation.find((item) => item.type === "group")?.key ?? null
-    : preferredGroupKey;
+  const interactingGroupKey = groupInteraction.hovered ?? groupInteraction.open;
+  const searchingGroup = searchedNavigation.find(
+    (item): item is AdminNavigationGroup => item.type === "group" && item.key === interactingGroupKey,
+  ) ?? searchedNavigation.find((item): item is AdminNavigationGroup => item.type === "group");
+  const expandedGroupKey = query ? searchingGroup?.key ?? null : interactingGroupKey;
 
   async function handleLogout() {
     await logout().catch(() => undefined);
@@ -118,6 +129,43 @@ export function Sidebar({
     onNavigate?.();
   }
 
+  function clearGroupHoverTimer() {
+    if (groupHoverTimer.current) {
+      clearTimeout(groupHoverTimer.current);
+      groupHoverTimer.current = null;
+    }
+    pendingGroupKey.current = null;
+  }
+
+  function armGroupHoverTimer(key: string) {
+    if (groupHoverTimer.current) clearTimeout(groupHoverTimer.current);
+    groupHoverTimer.current = setTimeout(() => {
+      pendingGroupKey.current = null;
+      setGroupInteraction((current) => ({ ...current, hovered: key }));
+    }, 220);
+  }
+
+  function scheduleGroupHover(key: string) {
+    clearGroupHoverTimer();
+    pendingGroupKey.current = key;
+    armGroupHoverTimer(key);
+  }
+
+  function rescheduleGroupHover(key: string) {
+    if (pendingGroupKey.current === key) armGroupHoverTimer(key);
+  }
+
+  function scheduleGroupLeave(key: string) {
+    clearGroupHoverTimer();
+    groupHoverTimer.current = setTimeout(() => {
+      setGroupInteraction((current) => (
+        (current.hovered ?? current.open) === key
+          ? { hovered: null, open: null }
+          : current
+      ));
+    }, 140);
+  }
+
   const groupId = (key: string) => "sidebar-" + (variant === "mobile" ? "mobile-" : "") + "group-" + key;
   const rowClass = styles.row;
 
@@ -126,6 +174,26 @@ export function Sidebar({
       id={variant === "desktop" ? "admin-desktop-navigation" : undefined}
       data-collapsed={isRail ? "true" : undefined}
       data-variant={variant}
+      onPointerEnter={variant === "desktop" ? () => onHoverChange?.(true) : undefined}
+      onPointerLeave={variant === "desktop" ? (event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const pointerStillInside = event.clientX >= bounds.left
+          && event.clientX <= bounds.right
+          && event.clientY >= bounds.top
+          && event.clientY <= bounds.bottom;
+        if (!pointerStillInside) onHoverChange?.(false);
+      } : undefined}
+      onFocusCapture={variant === "desktop" ? (event) => {
+        const target = event.target as { matches?: (selector: string) => boolean } | null;
+        if (target?.matches?.(":focus-visible")) {
+          onFocusWithinChange?.(true);
+        }
+      } : undefined}
+      onBlurCapture={variant === "desktop" ? (event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          onFocusWithinChange?.(false);
+        }
+      } : undefined}
       className={cn(
         styles.sidebar,
         variant === "desktop" ? "hidden lg:flex" : "flex border-r-0 bg-card",
@@ -153,7 +221,6 @@ export function Sidebar({
       <div className={styles.searchArea}>
         {isRail ? (
           <button type="button" aria-label="搜索导航" title="搜索导航" className={rowClass} onClick={() => {
-            onExpand?.();
             requestAnimationFrame(() => searchRef.current?.focus());
           }}>
             <Search className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
@@ -191,7 +258,7 @@ export function Sidebar({
                   title={isRail ? route.label : undefined}
                   className={cn(rowClass, active ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-sidebar-foreground")}
                 >
-                  <Icon className="h-[18px] w-[18px] shrink-0" />
+                  <Icon className="h-5 w-5 shrink-0" />
                   <span className={styles.copy}>{route.label}</span>
                 </Link>
               );
@@ -201,15 +268,36 @@ export function Sidebar({
             const expanded = !isRail && expandedGroupKey === item.key;
             const groupActive = activeGroupKey === item.key;
             return (
-              <div key={item.key} className={styles.navigationGroup}>
+              <div
+                key={item.key}
+                className={styles.navigationGroup}
+                onPointerEnter={variant === "desktop" ? () => scheduleGroupHover(item.key) : undefined}
+                onPointerMove={variant === "desktop" ? () => rescheduleGroupHover(item.key) : undefined}
+                onPointerLeave={variant === "desktop" ? (event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const pointerStillInside = event.clientX >= bounds.left
+                    && event.clientX <= bounds.right
+                    && event.clientY >= bounds.top
+                    && event.clientY <= bounds.bottom;
+                  if (!pointerStillInside) scheduleGroupLeave(item.key);
+                } : undefined}
+              >
                 <button
                   type="button"
                   onClick={() => {
                     if (query) {
                       setSearch("");
                     }
-                    setExpandedGroup({ key: isRail || Boolean(query) || !expanded ? item.key : null, pathname });
-                    if (isRail) onExpand?.();
+                    clearGroupHoverTimer();
+                    setGroupInteraction((current) => {
+                      if (current.hovered === item.key) {
+                        return { hovered: null, open: item.key };
+                      }
+                      return {
+                        hovered: current.hovered,
+                        open: current.open === item.key ? null : item.key,
+                      };
+                    });
                   }}
                   aria-expanded={expanded}
                   aria-controls={groupId(item.key)}
@@ -217,7 +305,7 @@ export function Sidebar({
                   title={isRail ? item.label : undefined}
                   className={cn(rowClass, "w-full text-left", groupActive ? "font-medium text-primary" : "text-muted-foreground", "hover:bg-accent/60 hover:text-sidebar-foreground")}
                 >
-                  <GroupIcon className="h-[18px] w-[18px] shrink-0" />
+                  <GroupIcon className="h-5 w-5 shrink-0" />
                   <span className={cn(styles.copy, "flex-1")}>{item.label}</span>
                   <ChevronRight aria-hidden="true" className={cn(styles.chevron, expanded && "rotate-90")} />
                 </button>
@@ -236,8 +324,8 @@ export function Sidebar({
                           tabIndex={expanded ? undefined : -1}
                           className={cn(rowClass, styles.childRow, active ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-sidebar-foreground")}
                         >
-                          <Icon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{route.label}</span>
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className={cn(styles.labelText, "truncate")}>{route.label}</span>
                         </Link>
                       );
                     })}
@@ -252,10 +340,26 @@ export function Sidebar({
       </nav>
 
       <div className={styles.footer}>
-        <button type="button" onClick={handleLogout} aria-label="登出" title={isRail ? "退出登录" : undefined} className={cn(rowClass, "w-full text-muted-foreground hover:bg-accent/60 hover:text-sidebar-foreground")}>
-          <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-          <span className={styles.copy}>退出登录</span>
-        </button>
+        <div
+          className={styles.account}
+          title={isRail ? `${userName} · ${roleLabel}` : undefined}
+          aria-label={`当前用户：${userName}，${roleLabel}`}
+        >
+          <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
+          <span className={cn(styles.copy, styles.accountCopy)}>
+            <span className={styles.accountName}>{userName}</span>
+            <span className={styles.accountRole}>{roleLabel}</span>
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="登出"
+            title="退出登录"
+            className={styles.logoutButton}
+          >
+            <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </aside>
   );

@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Menu } from "lucide-react";
 import { Sidebar } from "./sidebar";
-import { Topbar } from "./topbar";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -11,42 +11,18 @@ import styles from "./navigation.module.css";
 
 function SidebarSkeleton() {
   return (
-      <aside className="hidden h-full shrink-0 border-r border-sidebar-border bg-sidebar px-3 py-4 lg:block">
-      {/* Logo skeleton */}
-      <div className="mb-7 flex items-center gap-2.5 px-2">
-          <div className="h-8 w-8 rounded-md bg-border" />
-        <div className="space-y-1.5">
-            <div className="h-5 w-28 rounded bg-border" />
-            <div className="h-3 w-20 rounded bg-border" />
-        </div>
+    <aside className={`${styles.sidebar} hidden lg:flex`} data-collapsed="true">
+      <div className={styles.brand}>
+        <div className={styles.brandMark}>MG</div>
       </div>
-      {/* Nav links skeleton */}
-      <div className="space-y-2">
+      <div className="space-y-2 px-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="flex h-9 items-center gap-2.5 rounded-md px-2.5">
-              <div className="h-5 w-5 rounded bg-border" />
-            <div className="space-y-1">
-                <div className="h-3.5 w-24 rounded bg-border" />
-                <div className="h-3 w-16 rounded bg-border" />
-            </div>
+          <div key={i} className="flex h-9 items-center justify-center">
+            <div className="h-5 w-5 rounded bg-border" />
           </div>
         ))}
       </div>
     </aside>
-  );
-}
-
-function TopbarSkeleton() {
-  return (
-    <header className={styles.topbar}>
-      <div className="flex h-full items-center justify-between gap-4">
-        <div className="h-4 w-36 rounded bg-border" />
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-border" />
-          <div className="h-3 w-16 rounded bg-border" />
-        </div>
-      </div>
-    </header>
   );
 }
 
@@ -89,7 +65,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const [mobileNavigationPath, setMobileNavigationPath] = useState<string | null>(null);
-  const [isDesktopNavigationCollapsed, setDesktopNavigationCollapsed] = useState(false);
+  const [isNavigationHovered, setNavigationHovered] = useState(false);
+  const [isNavigationFocused, setNavigationFocused] = useState(false);
   const navigationButtonRef = useRef<HTMLButtonElement | null>(null);
   useAuthBootstrap();
 
@@ -99,11 +76,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   // Formula create/edit pages provide their own sticky navigation/action header.
-  // Keep the global topbar out of those focused workspaces so sticky regions
-  // never stack, overlap the form, or reveal scrolled fields behind the header.
+  // Keep the floating mobile navigation trigger out of those focused workspaces
+  // so it never overlaps their header.
   const isFormulaEditRoute = /^\/formulas\/\d+$/.test(pathname);
   const isFocusedFormulaEditor = pathname === "/formulas/new" || pathname.startsWith("/formulas/new/") || isFormulaEditRoute;
   const isMobileNavigationOpen = mobileNavigationPath === pathname;
+  const isDesktopNavigationExpanded = isNavigationHovered || isNavigationFocused;
 
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {
@@ -116,12 +94,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return (
       <div className={styles.shell}>
         <SidebarSkeleton />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {!isFocusedFormulaEditor && <TopbarSkeleton />}
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            <MainContentSkeleton />
-          </main>
-        </div>
+        <main className={styles.workspace}>
+          <MainContentSkeleton />
+        </main>
       </div>
     );
   }
@@ -129,29 +104,35 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className={styles.shell} data-navigation-collapsed={isDesktopNavigationCollapsed && !isFocusedFormulaEditor ? "true" : undefined}>
-      <Sidebar collapsed={isDesktopNavigationCollapsed && !isFocusedFormulaEditor} onExpand={() => setDesktopNavigationCollapsed(false)} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {!isFocusedFormulaEditor && (
-          <Topbar
-            onOpenNavigation={() => setMobileNavigationPath(pathname)}
-            isNavigationOpen={isMobileNavigationOpen}
-            navigationButtonRef={navigationButtonRef}
-            isDesktopNavigationCollapsed={isDesktopNavigationCollapsed}
-            onToggleDesktopNavigation={() => setDesktopNavigationCollapsed((collapsed) => !collapsed)}
-          />
-        )}
-        <main
-          className={
-            isFocusedFormulaEditor
-              ? "min-h-0 flex-1 overflow-y-auto p-0"
-              : "min-h-0 flex-1 overflow-y-auto px-4 py-6 lg:px-8 [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[1680px]"
-          }
-          data-focused-editor={isFocusedFormulaEditor ? "true" : undefined}
+    <div className={styles.shell} data-navigation-expanded={isDesktopNavigationExpanded && !isFocusedFormulaEditor ? "true" : undefined}>
+      <Sidebar
+        collapsed={!isDesktopNavigationExpanded || isFocusedFormulaEditor}
+        onHoverChange={setNavigationHovered}
+        onFocusWithinChange={setNavigationFocused}
+      />
+      {!isFocusedFormulaEditor && (
+        <button
+          type="button"
+          ref={navigationButtonRef}
+          aria-label="打开后台导航"
+          aria-controls="admin-mobile-navigation"
+          aria-expanded={isMobileNavigationOpen}
+          onClick={() => setMobileNavigationPath(pathname)}
+          className={styles.mobileNavigationButton}
         >
-          {children}
-        </main>
-      </div>
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
+      )}
+      <main
+        className={`${styles.workspace} ${
+          isFocusedFormulaEditor
+            ? "p-0"
+            : "px-4 pb-6 pt-16 lg:px-8 lg:py-8 [&>*]:min-w-0 [&>*]:w-full"
+        }`}
+        data-focused-editor={isFocusedFormulaEditor ? "true" : undefined}
+      >
+        {children}
+      </main>
       <Dialog
         open={isMobileNavigationOpen}
         onOpenChange={(nextOpen) => {
