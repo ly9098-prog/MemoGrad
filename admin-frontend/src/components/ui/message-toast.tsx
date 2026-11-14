@@ -40,26 +40,26 @@ export function MessageToast({
         role={isDanger ? "alert" : "status"}
         aria-live={isDanger ? "assertive" : "polite"}
         className={cn(
-          "flex max-w-md items-start gap-3 rounded-2xl border bg-white/94 py-2.5 pl-4 pr-2 text-sm font-medium shadow-[var(--shadow-floating)] backdrop-blur-xl",
+          "flex max-w-md items-start gap-3 rounded-2xl border bg-card/95 py-2.5 pl-4 pr-2 text-sm font-medium shadow-[var(--shadow-floating)] backdrop-blur-xl",
           isDanger
-            ? "border-[var(--color-danger)]/35 text-[var(--color-danger)]"
-            : "border-[var(--color-success)]/30 text-[var(--ink)]",
+            ? "border-destructive/35 text-destructive"
+            : "border-success/30 text-foreground",
         )}
       >
         {isDanger ? (
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         ) : (
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-success)]" aria-hidden="true" />
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
         )}
         <span className="min-w-0 flex-1 leading-5">{message}</span>
         <button
           type="button"
           onClick={onClose}
           className={cn(
-            "grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--color-text-hint)] transition",
+            "grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground/70 transition",
             isDanger
-              ? "hover:bg-[var(--color-danger-light)] hover:text-[var(--color-danger)]"
-              : "hover:bg-[var(--color-success-light)] hover:text-[var(--color-success)]",
+              ? "hover:bg-destructive-light hover:text-destructive"
+              : "hover:bg-success-light hover:text-success",
           )}
           aria-label="关闭提示"
         >

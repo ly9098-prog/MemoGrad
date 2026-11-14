@@ -57,7 +57,13 @@ function findActiveGroupKey(
   return group?.key ?? null;
 }
 
-export function Sidebar() {
+export function Sidebar({
+  variant = "desktop",
+  onNavigate,
+}: {
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
+} = {}) {
   const pathname = usePathname();
   const permissions = useAuthStore((state) => state.permissions);
   const role = useAuthStore((state) => state.role);
@@ -88,18 +94,28 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden sticky top-0 h-full w-72 shrink-0 overflow-y-auto border-r border-[var(--color-border)] bg-[rgba(255,253,248,0.82)] px-5 py-6 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:block">
+    <aside
+      className={cn(
+        "h-full w-72 shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar px-5 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        variant === "desktop"
+          ? "sticky top-0 hidden py-6 lg:block"
+          : "flex w-full max-w-none flex-col bg-card py-16",
+      )}
+    >
       <Link
         href="/dashboard"
-        onClick={() => setExpandedGroupKey(null)}
+        onClick={() => {
+          setExpandedGroupKey(null);
+          onNavigate?.();
+        }}
         className="mb-8 flex items-center gap-3"
       >
-        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[var(--color-primary)] bg-[var(--color-primary)] font-display text-xl font-black text-white shadow-[var(--shadow-crisp)]">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-primary bg-primary font-display text-xl font-black text-primary-foreground shadow-[var(--shadow-crisp)]">
           MG
         </div>
         <div>
-          <div className="font-display text-xl font-bold tracking-tight text-[var(--ink)]">MemoGrad</div>
-          <div className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--color-text-hint)]">Admin Lab</div>
+          <div className="font-display text-xl font-bold tracking-tight text-sidebar-foreground">MemoGrad</div>
+          <div className="font-mono text-xs uppercase tracking-[0.28em] text-muted-foreground">Admin Lab</div>
         </div>
       </Link>
 
@@ -114,18 +130,19 @@ export function Sidebar() {
               <Link
                 key={route.href}
                 href={route.href}
+                onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group flex items-center gap-3 rounded-2xl border px-4 py-3 transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/35 focus-visible:ring-offset-2 motion-reduce:transition-none",
+                  "group flex items-center gap-3 rounded-2xl border px-4 py-3 transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar motion-reduce:transition-none",
                   active
-                    ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] shadow-[var(--shadow-crisp)]"
-                    : "border-transparent text-[var(--ink)] hover:-translate-y-px hover:border-[var(--color-border)] hover:bg-white/70 active:translate-y-0",
+                    ? "border-primary bg-accent text-accent-foreground shadow-[var(--shadow-crisp)]"
+                    : "border-transparent text-sidebar-foreground hover:-translate-y-px hover:border-sidebar-border hover:bg-card/70 active:translate-y-0",
                 )}
               >
                 <Icon className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-105 motion-reduce:transition-none" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{route.label}</span>
-                  <span className="block truncate text-xs text-[var(--color-text-hint)]">{route.description}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{route.description}</span>
                 </span>
               </Link>
             );
@@ -140,7 +157,7 @@ export function Sidebar() {
               key={item.key}
               className={cn(
                 "rounded-2xl transition-[background-color] duration-300 motion-reduce:transition-none",
-                expanded && "bg-white/20",
+                expanded && "bg-card/20",
               )}
             >
               <button
@@ -149,18 +166,18 @@ export function Sidebar() {
                 aria-expanded={expanded}
                 aria-controls={`sidebar-group-${item.key}`}
                 className={cn(
-                  "group relative flex w-full items-center justify-between gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/35 focus-visible:ring-offset-2 active:scale-[0.99] motion-reduce:transition-none",
+                  "group relative flex w-full items-center justify-between gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar active:scale-[0.99] motion-reduce:transition-none",
                   groupActive
-                    ? "border-[var(--color-primary)]/45 bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] shadow-sm"
+                    ? "border-primary/45 bg-accent text-accent-foreground shadow-sm"
                     : expanded
-                      ? "border-[var(--color-border)] bg-white/75 text-[var(--ink)] shadow-sm"
-                      : "border-transparent text-[var(--ink)] hover:border-[var(--color-border)] hover:bg-white/70",
+                      ? "border-sidebar-border bg-card/75 text-sidebar-foreground shadow-sm"
+                      : "border-transparent text-sidebar-foreground hover:border-sidebar-border hover:bg-card/70",
                 )}
               >
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "absolute inset-y-2 left-0 w-0.5 origin-center rounded-r-full bg-[var(--color-primary)] transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none",
+                    "absolute inset-y-2 left-0 w-0.5 origin-center rounded-r-full bg-primary transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none",
                     groupActive ? "scale-y-100 opacity-100" : "scale-y-50 opacity-0",
                   )}
                 />
@@ -170,17 +187,17 @@ export function Sidebar() {
                     className={cn(
                       "grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-[background-color,color,transform] duration-200 ease-out motion-reduce:transition-none",
                       groupActive
-                        ? "bg-white/75 text-[var(--color-primary)]"
+                        ? "bg-card/75 text-primary"
                         : expanded
-                          ? "bg-[var(--color-primary-light)]/55 text-[var(--ink)]"
-                          : "text-current group-hover:bg-white/70 group-hover:scale-105",
+                          ? "bg-accent/55 text-sidebar-foreground"
+                          : "text-current group-hover:bg-card/70 group-hover:scale-105",
                     )}
                   >
                     <GroupIcon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{item.label}</span>
-                    <span className="block truncate text-xs text-[var(--color-text-hint)]">{item.description}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
                   </span>
                 </span>
 
@@ -188,14 +205,14 @@ export function Sidebar() {
                   className={cn(
                     "grid h-7 w-7 shrink-0 place-items-center rounded-lg border transition-[background-color,border-color,transform] duration-200 ease-out motion-reduce:transition-none",
                     expanded
-                      ? "border-[var(--color-primary)]/20 bg-[var(--color-primary-light)]"
-                      : "border-transparent bg-white/35 group-hover:border-[var(--color-border)] group-hover:bg-white/80",
+                      ? "border-primary/20 bg-accent"
+                      : "border-transparent bg-card/35 group-hover:border-sidebar-border group-hover:bg-card/80",
                   )}
                 >
                   <ChevronRight
                     className={cn(
-                      "h-4 w-4 text-[var(--color-text-hint)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-                      expanded && "rotate-90 text-[var(--color-primary-dark)]",
+                      "h-4 w-4 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                      expanded && "rotate-90 text-accent-foreground",
                     )}
                   />
                 </span>
@@ -219,7 +236,7 @@ export function Sidebar() {
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "absolute bottom-3 left-0 top-2 w-px origin-top bg-[var(--color-border)] transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none",
+                        "absolute bottom-3 left-0 top-2 w-px origin-top bg-sidebar-border transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none",
                         expanded ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0",
                       )}
                     />
@@ -233,17 +250,18 @@ export function Sidebar() {
                           <Link
                             key={route.href}
                             href={route.href}
+                            onClick={onNavigate}
                             tabIndex={expanded ? undefined : -1}
                             aria-current={active ? "page" : undefined}
                             style={{
                               transitionDelay: expanded ? `${45 + index * 28}ms` : "0ms",
                             }}
                             className={cn(
-                              "group/child relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/30 focus-visible:ring-offset-1 motion-reduce:transition-none motion-reduce:delay-0",
+                              "group/child relative flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar motion-reduce:transition-none motion-reduce:delay-0",
                               expanded ? "translate-x-0 opacity-100" : "-translate-x-1.5 opacity-0",
                               active
-                                ? "border-[var(--color-primary)]/35 bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] shadow-sm"
-                                : "border-transparent text-[var(--color-text-secondary)] hover:translate-x-0.5 hover:border-[var(--color-border)] hover:bg-white/80 hover:text-[var(--ink)]",
+                                ? "border-primary/35 bg-accent text-accent-foreground shadow-sm"
+                                : "border-transparent text-muted-foreground hover:translate-x-0.5 hover:border-sidebar-border hover:bg-card/80 hover:text-sidebar-foreground",
                             )}
                           >
                             <span
@@ -251,17 +269,17 @@ export function Sidebar() {
                               className={cn(
                                 "absolute -left-5 top-1/2 h-px w-5 -translate-y-1/2 transition-colors duration-200 motion-reduce:transition-none",
                                 active
-                                  ? "bg-[var(--color-primary)]"
-                                  : "bg-[var(--color-border)] group-hover/child:bg-[var(--color-primary)]/35",
+                                  ? "bg-primary"
+                                  : "bg-sidebar-border group-hover/child:bg-primary/35",
                               )}
                             />
                             <span
                               aria-hidden="true"
                               className={cn(
-                                "absolute -left-[22px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full border bg-[var(--color-bg)] transition-[background-color,border-color,box-shadow,transform] duration-200 motion-reduce:transition-none",
+                                "absolute -left-[22px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full border bg-background transition-[background-color,border-color,box-shadow,transform] duration-200 motion-reduce:transition-none",
                                 active
-                                  ? "scale-125 border-[var(--color-primary)] bg-[var(--color-primary)] shadow-[0_0_0_3px_var(--color-primary-light)]"
-                                  : "border-[var(--color-border)] group-hover/child:scale-110 group-hover/child:border-[var(--color-primary)]/55",
+                                  ? "scale-125 border-primary bg-primary shadow-[0_0_0_3px_var(--accent)]"
+                                  : "border-sidebar-border group-hover/child:scale-110 group-hover/child:border-primary/55",
                               )}
                             />
 
@@ -269,8 +287,8 @@ export function Sidebar() {
                               className={cn(
                                 "grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-[background-color,color,transform] duration-200 ease-out motion-reduce:transition-none",
                                 active
-                                  ? "bg-white/75 text-[var(--color-primary)]"
-                                  : "text-current group-hover/child:bg-white group-hover/child:scale-105",
+                                  ? "bg-card/75 text-primary"
+                                  : "text-current group-hover/child:bg-card group-hover/child:scale-105",
                               )}
                             >
                               <Icon className="h-4 w-4" />
@@ -278,7 +296,7 @@ export function Sidebar() {
 
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-semibold">{route.label}</span>
-                              <span className="block truncate text-[11px] text-[var(--color-text-hint)]">{route.description}</span>
+                              <span className="block truncate text-[11px] text-muted-foreground">{route.description}</span>
                             </span>
                           </Link>
                         );

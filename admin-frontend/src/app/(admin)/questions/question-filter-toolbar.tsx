@@ -70,26 +70,26 @@ export function QuestionFilterToolbar({
 }: QuestionFilterToolbarProps) {
   return (
     <div className="space-y-3">
-      <div className="rounded-[1.35rem] border border-[var(--color-border)] bg-white/90 px-5 py-3 shadow-[0_8px_24px_rgba(40,60,90,0.055)]">
+      <div className="rounded-[1.35rem] border border-border bg-card/90 px-5 py-3 shadow-[0_8px_24px_rgba(40,60,90,0.055)]">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <label className="flex h-11 w-full min-w-0 items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-white px-4 shadow-sm transition-all duration-200 hover:border-[var(--color-primary-light)] focus-within:border-[var(--color-primary)] focus-within:shadow-[0_0_0_3px_var(--color-primary-light)] xl:w-[38%] xl:min-w-[440px] xl:max-w-[600px]">
-            <Search className="h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
+          <label className="flex h-11 w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-card px-4 shadow-sm transition-all duration-200 hover:border-primary/25 focus-within:border-primary focus-within:shadow-[0_0_0_3px_var(--accent)] xl:w-[38%] xl:min-w-[440px] xl:max-w-[600px]">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground/70" />
             <input
               type="text"
-              className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-hint)] focus:outline-none"
+              className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:outline-none"
               placeholder="搜索题干 / 科目 / 题目编号"
               value={keywordInput}
               onChange={(event) => onKeywordChange(event.target.value)}
             />
             <div className="flex shrink-0 items-center gap-1">
               {searchDebouncing || (listFetching && Boolean(filters.keyword)) ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-text-hint)]" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/70" />
               ) : null}
               {keywordInput ? (
                 <button
                   type="button"
                   onClick={() => onKeywordChange("")}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-[var(--color-text-hint)] transition hover:bg-[var(--color-primary-light)] hover:text-[var(--ink)]"
+                  className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-accent hover:text-foreground"
                   aria-label="清空搜索"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -99,10 +99,10 @@ export function QuestionFilterToolbar({
           </label>
 
           <span
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white px-4 text-sm font-semibold text-[var(--ink)] shadow-sm"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm"
             aria-label="筛选条件"
           >
-            <Filter className="h-4 w-4 text-[var(--color-primary)]" />
+            <Filter className="h-4 w-4 text-primary" />
             筛选
           </span>
 
@@ -110,13 +110,13 @@ export function QuestionFilterToolbar({
             variant="ghost"
             onClick={onResetFilters}
             disabled={!hasActiveFilters}
-            className="h-11 shrink-0 rounded-2xl border border-[var(--color-border)] bg-white px-4 text-sm text-[var(--color-text-secondary)] shadow-sm hover:border-[var(--color-primary-light)] hover:bg-[var(--porcelain)] disabled:opacity-45"
+            className="h-11 shrink-0 rounded-2xl border border-border bg-card px-4 text-sm text-muted-foreground shadow-sm hover:border-primary/25 hover:bg-muted/40 disabled:opacity-45"
           >
             <RotateCcw className="h-4 w-4" />
             重置
           </Button>
 
-          <div className="hidden h-7 w-px shrink-0 bg-[var(--color-border)] xl:block" />
+          <div className="hidden h-7 w-px shrink-0 bg-border xl:block" />
 
           <div ref={commonFilterRef} className="relative shrink-0">
             <button
@@ -124,41 +124,41 @@ export function QuestionFilterToolbar({
               onClick={() => onToggleMenu("isCommonFilterOpen")}
               aria-expanded={commonFilterOpen}
               aria-haspopup="menu"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white px-4 text-sm font-medium text-[var(--ink)] shadow-sm transition hover:border-[var(--color-primary-light)] hover:bg-[var(--porcelain)]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/25 hover:bg-muted/40"
             >
               常用筛选
               <ChevronDown
-                className={`h-4 w-4 text-[var(--color-text-hint)] transition ${commonFilterOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 text-muted-foreground/70 transition ${commonFilterOpen ? "rotate-180" : ""}`}
               />
             </button>
             {commonFilterOpen ? (
-              <div className="absolute left-0 top-full z-30 mt-2 min-w-[176px] animate-drop-in overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-floating)]">
+              <div className="absolute left-0 top-full z-30 mt-2 min-w-[176px] animate-drop-in overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]">
                 <button
                   type="button"
                   onClick={() => onApplyFilterPreset({})}
-                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/40"
                 >
                   全部有效题目
                 </button>
                 <button
                   type="button"
                   onClick={() => onApplyFilterPreset({ is_active: "true" })}
-                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/40"
                 >
                   仅看已启用
                 </button>
                 <button
                   type="button"
                   onClick={() => onApplyFilterPreset({ difficulty: "5" })}
-                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/40"
                 >
                   困难题目
                 </button>
-                <div className="my-1 border-t border-[var(--color-border)]" />
+                <div className="my-1 border-t border-border" />
                 <button
                   type="button"
                   onClick={onApplySavedFilters}
-                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-foreground transition hover:bg-muted/40"
                 >
                   已保存筛选
                 </button>
@@ -169,21 +169,21 @@ export function QuestionFilterToolbar({
           <button
             type="button"
             onClick={() => onSaveCurrentFilters(filters)}
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white px-4 text-sm font-medium text-[var(--ink)] shadow-sm transition hover:border-[var(--color-primary-light)] hover:bg-[var(--porcelain)]"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/25 hover:bg-muted/40"
           >
-            <Star className="h-4 w-4 text-[var(--color-text-secondary)]" />
+            <Star className="h-4 w-4 text-muted-foreground" />
             保存筛选
           </button>
         </div>
       </div>
 
       {filters.knowledge_point_id ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-2 text-sm text-blue-800">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-accent px-4 py-2 text-sm text-accent-foreground">
           <span className="font-semibold">覆盖率跳转筛选</span>
           <span>知识点 #{filters.knowledge_point_id}</span>
           <button
             type="button"
-            className="rounded-lg px-2 py-1 text-xs font-semibold hover:bg-blue-100"
+            className="rounded-lg px-2 py-1 text-xs font-semibold hover:bg-accent/70"
             onClick={() => onFilterChange("knowledge_point_id", "")}
           >
             清除
@@ -191,10 +191,10 @@ export function QuestionFilterToolbar({
         </div>
       ) : null}
 
-      <div className="rounded-[1.35rem] border border-[var(--color-border)] bg-white/90 px-5 py-3 shadow-[0_8px_24px_rgba(40,60,90,0.05)]">
+      <div className="rounded-[1.35rem] border border-border bg-card/90 px-5 py-3 shadow-[0_8px_24px_rgba(40,60,90,0.05)]">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.16fr_1fr_1fr_0.92fr_1fr_auto] xl:items-center">
-          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-[var(--color-border)] bg-white px-3 shadow-sm">
-            <span className="mr-2 shrink-0 text-xs font-semibold text-[var(--color-text-secondary)]">科目</span>
+          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border bg-card px-3 shadow-sm">
+            <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">科目</span>
             <div className="min-w-0 flex-1">
               <CustomSelect
                 className="h-9 rounded-xl !border-0 !bg-transparent pl-0 pr-1 shadow-none !ring-0 hover:!border-transparent"
@@ -211,8 +211,8 @@ export function QuestionFilterToolbar({
             </div>
           </div>
 
-          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-[var(--color-border)] bg-white px-3 shadow-sm">
-            <span className="mr-2 shrink-0 text-xs font-semibold text-[var(--color-text-secondary)]">题型</span>
+          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border bg-card px-3 shadow-sm">
+            <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">题型</span>
             <div className="min-w-0 flex-1">
               <CustomSelect
                 className="h-9 rounded-xl !border-0 !bg-transparent pl-0 pr-1 shadow-none !ring-0 hover:!border-transparent"
@@ -224,8 +224,8 @@ export function QuestionFilterToolbar({
             </div>
           </div>
 
-          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-[var(--color-border)] bg-white px-3 shadow-sm">
-            <span className="mr-2 shrink-0 text-xs font-semibold text-[var(--color-text-secondary)]">状态</span>
+          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border bg-card px-3 shadow-sm">
+            <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">状态</span>
             <div className="min-w-0 flex-1">
               <CustomSelect
                 className="h-9 rounded-xl !border-0 !bg-transparent pl-0 pr-1 shadow-none !ring-0 hover:!border-transparent"
@@ -236,11 +236,11 @@ export function QuestionFilterToolbar({
             </div>
           </div>
 
-          <label className="flex h-11 min-w-0 items-center rounded-2xl border border-[var(--color-border)] bg-white px-3 shadow-sm">
-            <span className="mr-3 shrink-0 text-xs font-semibold text-[var(--color-text-secondary)]">年份</span>
+          <label className="flex h-11 min-w-0 items-center rounded-2xl border border-border bg-card px-3 shadow-sm">
+            <span className="mr-3 shrink-0 text-xs font-semibold text-muted-foreground">年份</span>
             <input
               inputMode="numeric"
-              className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-[var(--color-text-primary)] outline-none shadow-none placeholder:text-[var(--color-text-hint)] focus:border-0 focus:outline-none focus:ring-0"
+              className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground outline-none shadow-none placeholder:text-muted-foreground/70 focus:border-0 focus:outline-none focus:ring-0"
               placeholder="选择年份"
               value={filters.year}
               maxLength={4}
@@ -250,8 +250,8 @@ export function QuestionFilterToolbar({
             />
           </label>
 
-          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-[var(--color-border)] bg-white px-3 shadow-sm">
-            <span className="mr-2 shrink-0 text-xs font-semibold text-[var(--color-text-secondary)]">难度</span>
+          <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border bg-card px-3 shadow-sm">
+            <span className="mr-2 shrink-0 text-xs font-semibold text-muted-foreground">难度</span>
             <div className="min-w-0 flex-1">
               <CustomSelect
                 className="h-9 rounded-xl !border-0 !bg-transparent pl-0 pr-1 shadow-none !ring-0 hover:!border-transparent"
@@ -268,16 +268,16 @@ export function QuestionFilterToolbar({
               onClick={() => onToggleMenu("isMoreFilterOpen")}
               aria-expanded={moreFilterOpen}
               aria-haspopup="dialog"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white px-4 text-sm font-medium text-[var(--ink)] shadow-sm transition hover:border-[var(--color-primary-light)] hover:bg-[var(--porcelain)]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/25 hover:bg-muted/40"
             >
-              <SlidersHorizontal className="h-4 w-4 text-[var(--color-text-secondary)]" />
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
               更多条件
             </button>
             {moreFilterOpen ? (
-              <div className="absolute right-0 top-full z-30 mt-2 w-[320px] animate-drop-in rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-[var(--shadow-floating)]">
-                <p className="text-xs font-semibold text-[var(--color-text-secondary)]">导入批次 ID</p>
+              <div className="absolute right-0 top-full z-30 mt-2 w-[320px] animate-drop-in rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-floating)]">
+                <p className="text-xs font-semibold text-muted-foreground">导入批次 ID</p>
                 <Input
-                  className="mt-2 h-10 rounded-xl border-[var(--color-border)] bg-white px-3"
+                  className="mt-2 h-10 rounded-xl border-border bg-card px-3"
                   placeholder="输入批次 ID 片段"
                   value={importBatchInput}
                   onChange={(event) => onImportBatchChange(event.target.value)}

@@ -31,9 +31,9 @@ export function RawJsonViewer({ data }: { data: unknown }) {
     <details
       open={open}
       onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-      className="group rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] transition-colors"
+      className="group rounded-lg border border-border bg-muted/50 transition-colors"
     >
-      <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-xs font-medium text-[var(--color-text-hint)] hover:text-[var(--ink)] transition-colors">
+      <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-xs font-medium text-muted-foreground/70 hover:text-foreground transition-colors">
         <span>原始数据</span>
         <ChevronDown
           className={cn(
@@ -42,17 +42,17 @@ export function RawJsonViewer({ data }: { data: unknown }) {
           )}
         />
       </summary>
-      <div className="border-t border-[var(--color-border)]">
+      <div className="border-t border-border">
         <div className="relative">
-          <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-[var(--color-text-secondary)]">
+          <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed text-muted-foreground">
             {jsonStr}
           </pre>
           <button
             onClick={handleCopy}
-            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-hint)] transition-colors hover:bg-white hover:text-[var(--ink)]"
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
             aria-label={copied ? "已复制" : "复制 JSON"}
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>

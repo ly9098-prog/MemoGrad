@@ -29,7 +29,7 @@ function StemWithBlankMarkers({ text }: { text: string }) {
           return (
             <span
               key={i}
-              className="mx-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[11px] font-bold text-[var(--color-primary-dark)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+              className="mx-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-accent-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
             >
               {part}
             </span>
@@ -63,17 +63,17 @@ function SlotCard({
   let bgHint: string;
 
   if (!hasAnswer) {
-    accentColor = "bg-amber-400/60";
-    borderColor = "border-amber-200/70";
-    bgHint = "bg-amber-50/40";
+    accentColor = "bg-warning/60";
+    borderColor = "border-warning/30";
+    bgHint = "bg-warning-light/40";
   } else if (validAnswer) {
-    accentColor = "bg-emerald-400/60";
-    borderColor = "border-emerald-200/70";
-    bgHint = "bg-emerald-50/40";
+    accentColor = "bg-success/60";
+    borderColor = "border-success/30";
+    bgHint = "bg-success-light/40";
   } else {
-    accentColor = "bg-red-400/60";
-    borderColor = "border-red-200/70";
-    bgHint = "bg-red-50/40";
+    accentColor = "bg-destructive/60";
+    borderColor = "border-destructive/30";
+    bgHint = "bg-destructive-light/40";
   }
 
   return (
@@ -87,10 +87,10 @@ function SlotCard({
 
       {/* Header: group ID + answer status */}
       <div className="mb-1.5 flex items-center gap-2">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-[var(--color-primary)]/8 text-[10px] font-semibold text-[var(--color-primary-dark)]">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/[0.08] text-[10px] font-semibold text-accent-foreground">
           {group.id}
         </span>
-        <span className="text-[10px] font-medium text-[var(--color-text-hint)] tracking-wide">
+        <span className="text-[10px] font-medium text-muted-foreground/70 tracking-wide">
           空位
         </span>
       </div>
@@ -98,19 +98,19 @@ function SlotCard({
       {/* Answer region */}
       {hasAnswer && !validAnswer ? (
         <div className="mt-1 flex items-center gap-1.5">
-          <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded bg-red-100 px-1 text-[11px] font-bold text-red-600">
+          <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded bg-destructive-light px-1 text-[11px] font-bold text-destructive">
             {answer.join(",")}
           </span>
-          <span className="text-[11px] text-red-500">— 非法答案</span>
+          <span className="text-[11px] text-destructive">— 非法答案</span>
         </div>
       ) : hasAnswer && answerOptions.length > 0 ? (
         <div className="mt-1 space-y-0.5">
           {answerOptions.map((opt) => (
             <div key={opt.key} className="flex items-center gap-1.5">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-[var(--color-success)]/10 text-[11px] font-bold text-[var(--color-success)]">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-success/10 text-[11px] font-bold text-success">
                 {opt.key}
               </span>
-              <span className="text-sm text-[var(--color-text-secondary)]">
+              <span className="text-sm text-muted-foreground">
                 <MathFormula text={opt.text} />
               </span>
             </div>
@@ -118,7 +118,7 @@ function SlotCard({
         </div>
       ) : (
         <div className="mt-1 flex items-center gap-1.5">
-          <span className="inline-flex h-5 items-center justify-center rounded bg-amber-100 px-1.5 text-[10px] font-medium text-amber-600">
+          <span className="inline-flex h-5 items-center justify-center rounded bg-warning-light px-1.5 text-[10px] font-medium text-warning-foreground">
             待确认
           </span>
         </div>
@@ -143,30 +143,30 @@ export function MultiBlankChoicePreview({
   stem,
 }: MultiBlankChoicePreviewProps) {
   if (groups.length === 0) {
-    return <p className="text-sm text-[var(--color-text-hint)]">（无分组选项数据）</p>;
+    return <p className="text-sm text-muted-foreground/70">（无分组选项数据）</p>;
   }
 
   return (
     <div className="space-y-4">
       {/* Shared options — "选项速查" reference key */}
       {usesSharedOptions && sharedOptions.length > 0 ? (
-        <div className="relative overflow-hidden rounded-xl border border-[var(--color-border)]/50 bg-white/70 p-4">
+        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/70 p-4">
           {/* Subtle header bar */}
-          <div className="mb-3 flex items-center gap-2 border-b border-[var(--color-border)]/30 pb-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-[var(--color-primary)]/8 text-[10px] font-semibold text-[var(--color-primary-dark)]">
+          <div className="mb-3 flex items-center gap-2 border-b border-border/30 pb-2">
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/[0.08] text-[10px] font-semibold text-accent-foreground">
               ☰
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-hint)]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
               选项 · {groups.length} 个空共用
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
             {sharedOptions.map((opt) => (
               <div key={opt.key} className="flex items-center gap-2.5">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]/8 text-[11px] font-bold text-[var(--color-primary-dark)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/[0.08] text-[11px] font-bold text-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
                   {opt.key}
                 </span>
-                <span className="text-sm leading-snug text-[var(--color-text-secondary)]">
+                <span className="text-sm leading-snug text-muted-foreground">
                   <MathFormula text={opt.text} />
                 </span>
               </div>
@@ -201,11 +201,11 @@ export function MultiBlankChoicePreview({
 
       {/* Stem with highlighted blanks */}
       {stem ? (
-        <div className="rounded-xl border border-[var(--color-border)]/40 bg-white/50 p-4">
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-hint)]">
+        <div className="rounded-xl border border-border/40 bg-card/50 p-4">
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             题干
           </div>
-          <div className="text-[15px] leading-8 text-[var(--ink)]">
+          <div className="text-[15px] leading-8 text-foreground">
             <StemWithBlankMarkers text={stem} />
           </div>
         </div>

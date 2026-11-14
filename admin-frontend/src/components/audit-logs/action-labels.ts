@@ -113,6 +113,15 @@ export function statusLabel(status: string): string {
   return STATUS_LABELS[status] || status;
 }
 
+export function operatorLabel(
+  operatorName: string | null | undefined,
+  operatorId: number | null | undefined,
+): string {
+  const name = operatorName?.trim();
+  if (name) return name;
+  return operatorId != null ? `#${operatorId}` : "system";
+}
+
 export function resourceTypeLabel(type: string): string {
   return RESOURCE_TYPE_LABELS[type] || type;
 }

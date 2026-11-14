@@ -50,7 +50,7 @@ function ListLoading() {
       {Array.from({ length: 5 }, (_, index) => (
         <div
           key={index}
-          className="h-28 animate-pulse rounded-[1.2rem] border border-[var(--color-border)] bg-white/60"
+          className="h-28 animate-pulse rounded-[1.2rem] border border-border bg-card/60"
         />
       ))}
     </div>
@@ -81,8 +81,8 @@ function QuestionListItem({
       onMouseEnter={onPrefetch}
       className={`group rounded-[1.2rem] border transition-all duration-200 ${
         selected
-          ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]/30 shadow-sm ring-2 ring-[var(--color-primary-light)]"
-          : "border-[var(--color-border)] bg-white/85 shadow-sm hover:border-[var(--color-primary)]/45 hover:bg-white hover:shadow-[var(--shadow-card)]"
+          ? "border-primary bg-accent/30 shadow-sm ring-2 ring-accent"
+          : "border-border bg-card/85 shadow-sm hover:border-primary/45 hover:bg-card hover:shadow-[var(--shadow-card)]"
       }`}
     >
       <div className="flex items-start gap-3 px-4 py-3">
@@ -91,7 +91,7 @@ function QuestionListItem({
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onSelect} className="w-full text-left">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-[var(--color-primary-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary-dark)]">
+              <span className="inline-flex items-center rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground">
                 #{String(question.id).padStart(4, "0")}
               </span>
               <TypeBadge type={question.question_type} />
@@ -99,19 +99,19 @@ function QuestionListItem({
               <span
                 className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                   question.is_active
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 text-slate-500"
+                    ? "border-success/30 bg-success-light text-success"
+                    : "border-border bg-muted text-muted-foreground"
                 }`}
               >
                 {question.is_active ? "已启用" : "已停用"}
               </span>
             </div>
 
-            <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[var(--ink)]">
+            <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-foreground">
               {looksLikeProgrammingCode(stemText) ? stemText : <MathFormula text={stemText} />}
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--color-text-hint)]">
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
               {question.subject_name || question.subject_code ? (
                 <span className="inline-flex items-center gap-1">
                   <BookOpen className="h-3 w-3" />
@@ -137,7 +137,7 @@ function QuestionListItem({
         <Button
           variant="ghost"
           onClick={onOpenDetail}
-          className="mt-1 h-9 rounded-full px-3 text-xs text-[var(--color-text-secondary)] transition-all duration-200 group-hover:bg-[var(--porcelain)] group-hover:text-[var(--ink)]"
+          className="mt-1 h-9 rounded-full px-3 text-xs text-muted-foreground transition-all duration-200 group-hover:bg-muted/40 group-hover:text-foreground"
         >
           详情
         </Button>

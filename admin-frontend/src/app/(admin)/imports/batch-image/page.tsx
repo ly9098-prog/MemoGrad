@@ -409,23 +409,23 @@ export default function BatchImagePage() {
   const renderStatusBadge = (task: ImageTask) => {
     const base = "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold";
     if (task.status === "failed") {
-      return <span className={`${base} border-[rgba(196,77,77,0.25)] bg-[var(--color-danger-light)] text-[var(--color-danger)]`}>失败</span>;
+      return <span className={`${base} border-destructive/25 bg-destructive-light text-destructive`}>失败</span>;
     }
     if (task.status === "succeeded") {
-      return <span className={`${base} border-[rgba(91,140,91,0.25)] bg-[var(--color-success-light)] text-[var(--color-success)]`}>成功 · {task.questionCount} 题</span>;
+      return <span className={`${base} border-success/25 bg-success-light text-success`}>成功 · {task.questionCount} 题</span>;
     }
     if (task.status === "processing") {
       return (
-        <span className={`${base} border-[rgba(196,154,107,0.3)] bg-[var(--color-warning-light)] text-[var(--color-text-primary)]`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] import-status-active" aria-hidden="true" />
+        <span className={`${base} border-warning/30 bg-warning-light text-warning-foreground`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-warning import-status-active" aria-hidden="true" />
           识别中
         </span>
       );
     }
     if (task.status === "uploading") {
-      return <span className={`${base} border-[rgba(74,111,138,0.24)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]`}>上传中</span>;
+      return <span className={`${base} border-primary/25 bg-accent text-accent-foreground`}>上传中</span>;
     }
-    return <span className={`${base} border-[var(--color-border)] bg-white/70 text-[var(--color-text-secondary)]`}>等待中</span>;
+    return <span className={`${base} border-border bg-card/70 text-muted-foreground`}>等待中</span>;
   };
 
   const concurrencyOptions = [
@@ -450,9 +450,9 @@ export default function BatchImagePage() {
         title="批量图片导题"
         description="面向连续截图与扫描题目的批处理工作台。集中配置 OCR、科目与并发数，并在同一视图追踪每张图片的识别状态与事件轨迹。"
         meta={
-          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/70 px-3 text-xs text-[var(--color-text-secondary)]">
+          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
             <span className="font-mono tabular-nums">0–{MAX_FILES}</span>
-            <span className="text-[var(--color-text-hint)]">张 / 批</span>
+            <span className="text-muted-foreground/70">张 / 批</span>
           </div>
         }
       />
@@ -465,24 +465,24 @@ export default function BatchImagePage() {
         onDismiss={() => setMessage(null)}
       />
 
-      <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.82)] shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
+      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
         <ImportPanelHeader
           title="识别工作台"
           description="文件选择、识别参数与任务进度保持在一个操作上下文中。"
           trailing={
             <span className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
-              phaseTone === "success" && "border-[rgba(91,140,91,0.25)] bg-[var(--color-success-light)] text-[var(--color-success)]",
-              phaseTone === "danger" && "border-[rgba(196,77,77,0.25)] bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-              phaseTone === "warning" && "border-[rgba(196,154,107,0.3)] bg-[var(--color-warning-light)] text-[var(--color-text-primary)]",
-              phaseTone === "neutral" && "border-[var(--color-border)] bg-white/70 text-[var(--color-text-secondary)]",
+              phaseTone === "success" && "border-success/25 bg-success-light text-success",
+              phaseTone === "danger" && "border-destructive/25 bg-destructive-light text-destructive",
+              phaseTone === "warning" && "border-warning/30 bg-warning-light text-warning-foreground",
+              phaseTone === "neutral" && "border-border bg-card/70 text-muted-foreground",
             )}>
               <span className={cn(
                 "h-1.5 w-1.5 rounded-full",
-                phaseTone === "success" && "bg-[var(--color-success)]",
-                phaseTone === "danger" && "bg-[var(--color-danger)]",
-                phaseTone === "warning" && "import-status-active bg-[var(--color-warning)]",
-                phaseTone === "neutral" && "bg-[var(--color-text-hint)]",
+                phaseTone === "success" && "bg-success",
+                phaseTone === "danger" && "bg-destructive",
+                phaseTone === "warning" && "import-status-active bg-warning",
+                phaseTone === "neutral" && "bg-muted-foreground/70",
               )} aria-hidden="true" />
               {phaseLabel}
             </span>
@@ -490,7 +490,7 @@ export default function BatchImagePage() {
         />
 
         <div className="grid min-h-[590px] lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="flex min-w-0 flex-col gap-5 border-b border-[var(--color-border-light)] bg-[rgba(239,235,229,0.25)] p-4 sm:p-5 lg:border-b-0 lg:border-r">
+          <aside className="flex min-w-0 flex-col gap-5 border-b border-border/60 bg-muted/25 p-4 sm:p-5 lg:border-b-0 lg:border-r">
             <label htmlFor={fileInputId} className="block">
               <div
                 onDragOver={onDragOver}
@@ -500,17 +500,17 @@ export default function BatchImagePage() {
                   "relative flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 py-5 text-center transition-[border-color,background-color,box-shadow] import-interactive",
                   (dragActive || files.length > 0) && "import-drop-active",
                   isJobActive
-                    ? "cursor-not-allowed border-[var(--color-border)] bg-[var(--color-bg-input)] opacity-60"
+                    ? "cursor-not-allowed border-border bg-muted opacity-60"
                     : dragActive || files.length > 0
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
-                      : "border-[var(--color-border)] bg-white/60 hover:border-[var(--color-primary)] hover:bg-white",
+                      ? "border-primary bg-accent shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
+                      : "border-border bg-card/60 hover:border-primary hover:bg-card",
                 )}
               >
-                <div className="grid h-11 w-11 place-items-center rounded-xl border border-[rgba(74,111,138,0.16)] bg-white/80 text-[var(--color-primary-dark)] import-drop-icon">
+                <div className="grid h-11 w-11 place-items-center rounded-xl border border-primary/15 bg-card/80 text-accent-foreground import-drop-icon">
                   <Images className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
                 </div>
-                <p className="mt-3 text-sm font-semibold text-[var(--ink)]">{files.length > 0 ? `${files.length} 张图片已就绪` : "添加题目图片"}</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--color-text-hint)]">拖拽、粘贴或点击选择 JPG / PNG / WebP</p>
+                <p className="mt-3 text-sm font-semibold text-foreground">{files.length > 0 ? `${files.length} 张图片已就绪` : "添加题目图片"}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground/70">拖拽、粘贴或点击选择 JPG / PNG / WebP</p>
                 <input
                   id={fileInputId}
                   type="file"
@@ -526,20 +526,20 @@ export default function BatchImagePage() {
             {files.length > 0 && queuePhase === "idle" ? (
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)]">待上传文件</span>
-                  <button type="button" disabled={isJobActive} onClick={clearFiles} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-[var(--color-text-hint)] import-interactive hover:bg-white hover:text-[var(--color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-40">
+                  <span className="text-xs font-semibold text-muted-foreground">待上传文件</span>
+                  <button type="button" disabled={isJobActive} onClick={clearFiles} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-muted-foreground/70 import-interactive hover:bg-card hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                     清空
                   </button>
                 </div>
-                <div className="max-h-32 overflow-y-auto rounded-xl border border-[var(--color-border-light)] bg-white/55">
+                <div className="max-h-32 overflow-y-auto rounded-xl border border-border/60 bg-card/55">
                   {files.map((file, index) => (
-                    <div key={`${file.name}_${file.size}_${index}`} className="flex min-h-11 items-center gap-2 border-b border-[var(--color-border-light)] px-3 last:border-b-0 import-list-item" style={{ animationDelay: `${Math.min(index, 8) * 24}ms` }}>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--color-text-secondary)]" title={file.name}>{file.name}</span>
+                    <div key={`${file.name}_${file.size}_${index}`} className="flex min-h-11 items-center gap-2 border-b border-border/60 px-3 last:border-b-0 import-list-item" style={{ animationDelay: `${Math.min(index, 8) * 24}ms` }}>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={file.name}>{file.name}</span>
                       <button
                         type="button"
                         disabled={isJobActive}
                         onClick={() => removeFile(index)}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[var(--color-text-hint)] import-interactive hover:bg-[var(--color-danger-light)] hover:text-[var(--color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-40"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground/70 import-interactive hover:bg-destructive-light hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                         aria-label={`移除 ${file.name}`}
                         title="移除文件"
                       >
@@ -551,9 +551,9 @@ export default function BatchImagePage() {
               </div>
             ) : null}
 
-            <div className="space-y-4 border-t border-[var(--color-border-light)] pt-4">
+            <div className="space-y-4 border-t border-border/60 pt-4">
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--color-text-secondary)]">科目</span>
+                <span className="text-xs font-semibold text-muted-foreground">科目</span>
                 <div className="relative" ref={subjectSelectRef}>
                   <button
                     type="button"
@@ -563,24 +563,24 @@ export default function BatchImagePage() {
                     onClick={() => setSubjectSelectOpen((prev) => !prev)}
                     className={cn(
                       "flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm outline-none transition-[border-color,background-color,box-shadow]",
-                      isJobActive ? "cursor-not-allowed border-[var(--color-border)] bg-[var(--color-bg-input)] opacity-60"
-                        : subjectSelectOpen ? "border-[var(--color-primary)] bg-white ring-4 ring-[rgba(91,123,154,0.12)]"
-                          : "border-[var(--color-border)] bg-white/75 hover:border-[var(--color-primary)]",
+                      isJobActive ? "cursor-not-allowed border-border bg-muted opacity-60"
+                        : subjectSelectOpen ? "border-primary bg-card ring-4 ring-ring/15"
+                          : "border-border bg-card/75 hover:border-primary",
                     )}
                   >
-                    <span className={cn("truncate", subjectId ? "font-semibold text-[var(--ink)]" : "text-[var(--color-text-hint)]")}>
+                    <span className={cn("truncate", subjectId ? "font-semibold text-foreground" : "text-muted-foreground/70")}>
                       {subjectId ? (subjectOptions.find((s) => String(s.id) === subjectId)?.name || subjectId) : "选择科目（可选）"}
                     </span>
-                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--color-text-hint)] import-chevron", subjectSelectOpen && "rotate-180")} aria-hidden="true" />
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 import-chevron", subjectSelectOpen && "rotate-180")} aria-hidden="true" />
                   </button>
                   {subjectSelectOpen ? (
-                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 import-popover overflow-y-auto rounded-xl border border-[var(--color-border-light)] bg-[var(--color-bg-card)] p-1 shadow-[var(--shadow-floating)]">
-                      <button type="button" role="option" aria-selected={!subjectId} onClick={() => { setSubjectId(""); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", !subjectId ? "bg-[var(--color-primary-light)] font-semibold text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]")}>
+                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 import-popover overflow-y-auto rounded-xl border border-border/60 bg-card p-1 shadow-[var(--shadow-floating)]">
+                      <button type="button" role="option" aria-selected={!subjectId} onClick={() => { setSubjectId(""); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", !subjectId ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
                         未指定科目
                         {!subjectId ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                       </button>
                       {subjectOptions.map((s) => (
-                        <button key={s.id} type="button" role="option" aria-selected={subjectId === String(s.id)} onClick={() => { setSubjectId(String(s.id)); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", subjectId === String(s.id) ? "bg-[var(--color-primary-light)] font-semibold text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]")}>
+                        <button key={s.id} type="button" role="option" aria-selected={subjectId === String(s.id)} onClick={() => { setSubjectId(String(s.id)); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", subjectId === String(s.id) ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
                           <span className="truncate">{s.name}</span>
                           {subjectId === String(s.id) ? <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
                         </button>
@@ -591,7 +591,7 @@ export default function BatchImagePage() {
               </div>
 
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--color-text-secondary)]">并发数</span>
+                <span className="text-xs font-semibold text-muted-foreground">并发数</span>
                 <div className="relative" ref={selectRef}>
                   <button
                     type="button"
@@ -601,22 +601,22 @@ export default function BatchImagePage() {
                     onClick={() => setSelectOpen((prev) => !prev)}
                     className={cn(
                       "flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm outline-none transition-[border-color,background-color,box-shadow]",
-                      isJobActive ? "cursor-not-allowed border-[var(--color-border)] bg-[var(--color-bg-input)] opacity-60"
-                        : selectOpen ? "border-[var(--color-primary)] bg-white ring-4 ring-[rgba(91,123,154,0.12)]"
-                          : "border-[var(--color-border)] bg-white/75 hover:border-[var(--color-primary)]",
+                      isJobActive ? "cursor-not-allowed border-border bg-muted opacity-60"
+                        : selectOpen ? "border-primary bg-card ring-4 ring-ring/15"
+                          : "border-border bg-card/75 hover:border-primary",
                     )}
                   >
                     <span className="flex items-center gap-2">
-                      <strong className="text-[var(--ink)]">{concurrency}</strong>
-                      {concurrencyOptions.find((o) => o.value === concurrency)?.tag ? <span className="rounded-full bg-[var(--color-primary-light)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-dark)]">{concurrencyOptions.find((o) => o.value === concurrency)?.tag}</span> : null}
+                      <strong className="text-foreground">{concurrency}</strong>
+                      {concurrencyOptions.find((o) => o.value === concurrency)?.tag ? <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">{concurrencyOptions.find((o) => o.value === concurrency)?.tag}</span> : null}
                     </span>
-                    <ChevronDown className={cn("h-4 w-4 text-[var(--color-text-hint)] import-chevron", selectOpen && "rotate-180")} aria-hidden="true" />
+                    <ChevronDown className={cn("h-4 w-4 text-muted-foreground/70 import-chevron", selectOpen && "rotate-180")} aria-hidden="true" />
                   </button>
                   {selectOpen ? (
-                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden import-popover rounded-xl border border-[var(--color-border-light)] bg-[var(--color-bg-card)] p-1 shadow-[var(--shadow-floating)]">
+                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden import-popover rounded-xl border border-border/60 bg-card p-1 shadow-[var(--shadow-floating)]">
                       {concurrencyOptions.map((opt) => (
-                        <button key={opt.value} type="button" role="option" aria-selected={concurrency === opt.value} onClick={() => { setConcurrency(opt.value); setSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-xs import-interactive", concurrency === opt.value ? "bg-[var(--color-primary-light)] font-semibold text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]")}>
-                          <span className="flex items-center gap-2"><strong>{opt.label}</strong>{opt.tag ? <span className="text-[10px] text-[var(--color-text-hint)]">{opt.tag}</span> : null}</span>
+                        <button key={opt.value} type="button" role="option" aria-selected={concurrency === opt.value} onClick={() => { setConcurrency(opt.value); setSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-xs import-interactive", concurrency === opt.value ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
+                          <span className="flex items-center gap-2"><strong>{opt.label}</strong>{opt.tag ? <span className="text-[10px] text-muted-foreground/70">{opt.tag}</span> : null}</span>
                           {concurrency === opt.value ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                         </button>
                       ))}
@@ -628,7 +628,7 @@ export default function BatchImagePage() {
               <OcrModeSelector value={ocrMode} onChange={setOcrMode} disabled={isJobActive} />
             </div>
 
-            <div className="mt-auto border-t border-[var(--color-border-light)] pt-4">
+            <div className="mt-auto border-t border-border/60 pt-4">
               {queuePhase === "done" ? (
                 <Button onClick={resetQueue} className="h-11 w-full import-interactive" variant="secondary">
                   <RefreshCw className="h-4 w-4" aria-hidden="true" />重新导入
@@ -650,23 +650,23 @@ export default function BatchImagePage() {
             </div>
           </aside>
 
-          <div className="min-w-0 bg-white/30">
+          <div className="min-w-0 bg-card/30">
             {queuePhase === "idle" && imageTasks.length === 0 ? (
               <div className="flex min-h-[590px] items-center justify-center px-6 py-14 import-panel-swap">
                 <div className="max-w-md text-center">
-                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] text-[var(--color-primary-dark)] import-soft-pop">
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop">
                     <UploadCloud className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
                   </div>
-                  <p className="mt-4 text-sm font-semibold text-[var(--ink)]">等待批量任务</p>
-                  <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-hint)]">添加图片并设置识别参数后开始导入。提交后，这里会实时显示总体进度、单图状态与处理轨迹。</p>
-                  <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--color-border-light)] border-y border-[var(--color-border-light)] py-2.5 text-[11px] text-[var(--color-text-secondary)]">
+                  <p className="mt-4 text-sm font-semibold text-foreground">等待批量任务</p>
+                  <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">添加图片并设置识别参数后开始导入。提交后，这里会实时显示总体进度、单图状态与处理轨迹。</p>
+                  <div className="mt-5 grid grid-cols-3 divide-x divide-border/60 border-y border-border/60 py-2.5 text-[11px] text-muted-foreground">
                     <span>上传</span><span>OCR / AI</span><span>待审核</span>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="p-4 sm:p-5 import-panel-swap">
-                <div className="grid grid-cols-2 divide-x divide-y divide-[var(--color-border-light)] overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/60 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card/60 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
                   <ImportMetric label="总图片" value={totalImages} />
                   <ImportMetric label="上传中" value={uploadingCount} tone={uploadingCount > 0 ? "primary" : "neutral"} />
                   <ImportMetric label="识别中" value={processingCount} tone={processingCount > 0 ? "warning" : "neutral"} />
@@ -675,10 +675,10 @@ export default function BatchImagePage() {
                   <ImportMetric label="识别题目" value={totalQuestions} tone={totalQuestions > 0 ? "primary" : "neutral"} />
                 </div>
 
-                <div className="mt-5 rounded-xl border border-[var(--color-border-light)] bg-white/60 px-4 py-3.5">
+                <div className="mt-5 rounded-xl border border-border/60 bg-card/60 px-4 py-3.5">
                   <div className="flex items-center justify-between gap-4 text-xs">
-                    <span className="font-semibold text-[var(--color-text-secondary)]">总体进度</span>
-                    <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">{progressPct}%</span>
+                    <span className="font-semibold text-muted-foreground">总体进度</span>
+                    <span className="font-mono font-semibold tabular-nums text-foreground">{progressPct}%</span>
                   </div>
                   <ImportProgressBar
                     value={progressPct}
@@ -689,15 +689,15 @@ export default function BatchImagePage() {
                   />
                 </div>
 
-                <section className="mt-5 overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/65">
+                <section className="mt-5 overflow-hidden rounded-xl border border-border/60 bg-card/65">
                   <ImportPanelHeader title="任务明细" description={`${imageTasks.length} 个图片任务 · 按提交顺序展示`} />
                   <div className="max-h-[430px] overflow-y-auto">
                     {imageTasks.map((task) => (
-                      <article key={task.id} className={cn("border-b border-[var(--color-border-light)] last:border-b-0 import-list-item import-interactive hover:bg-white/55", task.status === "failed" && "bg-[rgba(196,77,77,0.025)]")} style={{ animationDelay: `${Math.min(task.seq - 1, 8) * 26}ms` }}>
+                      <article key={task.id} className={cn("border-b border-border/60 last:border-b-0 import-list-item import-interactive hover:bg-card/55", task.status === "failed" && "bg-destructive/[0.03]")} style={{ animationDelay: `${Math.min(task.seq - 1, 8) * 26}ms` }}>
                         <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
-                          <span className="w-7 shrink-0 font-mono text-[10px] tabular-nums text-[var(--color-text-hint)]">#{task.seq}</span>
+                          <span className="w-7 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70">#{task.seq}</span>
                           <div className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-medium text-[var(--ink)]" title={task.file.name}>{task.file.name}</span>
+                            <span className="block truncate text-xs font-medium text-foreground" title={task.file.name}>{task.file.name}</span>
                             {(task.status === "uploading" || task.status === "processing" || task.status === "pending") ? (
                               <ImportProgressBar value={taskProgress(task)} label={`图片 ${task.seq} 处理进度`} active className="mt-1.5 h-1" />
                             ) : null}
@@ -705,14 +705,14 @@ export default function BatchImagePage() {
                           {renderStatusBadge(task)}
                         </div>
                         {task.traceEvents.length > 0 ? (
-                          <div className="border-t border-[var(--color-border-light)] bg-[rgba(239,235,229,0.24)] px-4 py-2.5 import-panel-swap">
+                          <div className="border-t border-border/60 bg-muted/25 px-4 py-2.5 import-panel-swap">
                             <div className="space-y-1.5">
                               {task.traceEvents.map((ev, idx) => (
                                 <div key={idx} className="grid grid-cols-[52px_10px_minmax(0,1fr)_auto] items-center gap-2 text-[10px] leading-5">
-                                  <span className="truncate font-mono text-[var(--color-text-hint)]">{ev.step}</span>
-                                  <span className={cn("h-1.5 w-1.5 rounded-full", ev.status === "success" ? "bg-[var(--color-success)]" : ev.status === "failed" ? "bg-[var(--color-danger)]" : ev.status === "running" ? "import-status-active bg-[var(--color-warning)]" : "bg-[var(--color-text-hint)]")} aria-hidden="true" />
-                                  <span className="min-w-0 truncate text-[var(--color-text-secondary)]" title={ev.message}>{ev.message}</span>
-                                  {ev.duration_ms != null && ev.duration_ms > 0 ? <span className="font-mono tabular-nums text-[var(--color-text-hint)]">{ev.duration_ms}ms</span> : null}
+                                  <span className="truncate font-mono text-muted-foreground/70">{ev.step}</span>
+                                  <span className={cn("h-1.5 w-1.5 rounded-full", ev.status === "success" ? "bg-success" : ev.status === "failed" ? "bg-destructive" : ev.status === "running" ? "import-status-active bg-warning" : "bg-muted-foreground/70")} aria-hidden="true" />
+                                  <span className="min-w-0 truncate text-muted-foreground" title={ev.message}>{ev.message}</span>
+                                  {ev.duration_ms != null && ev.duration_ms > 0 ? <span className="font-mono tabular-nums text-muted-foreground/70">{ev.duration_ms}ms</span> : null}
                                 </div>
                               ))}
                             </div>
@@ -725,7 +725,7 @@ export default function BatchImagePage() {
 
                 {queuePhase === "done" && succeededCount > 0 ? (
                   <div className="mt-4 flex justify-end">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-4 text-xs font-semibold text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2" href="/imports/review">
+                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href="/imports/review">
                       <ClipboardCheck className="h-4 w-4" aria-hidden="true" />前往待审核
                     </a>
                   </div>

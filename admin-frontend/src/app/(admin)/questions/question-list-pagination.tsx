@@ -33,16 +33,16 @@ export function QuestionListPagination({
   if (!visible) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-[1.2rem] border border-[var(--color-border)] bg-white px-3 py-2.5 shadow-sm">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--color-text-secondary)]">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-[1.2rem] border border-border bg-card px-3 py-2.5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>
-          共 <span className="font-semibold text-[var(--ink)]">{total}</span> 条
+          共 <span className="font-semibold text-foreground">{total}</span> 条
         </span>
         <span>
-          第 <span className="font-semibold text-[var(--ink)]">{page}</span> / {totalPages} 页
+          第 <span className="font-semibold text-foreground">{page}</span> / {totalPages} 页
         </span>
         <CustomSelect
-          className="h-10 min-w-[116px] rounded-full border-[var(--color-border)] bg-white px-3"
+          className="h-10 min-w-[116px] rounded-full border-border bg-card px-3"
           value={String(pageSize)}
           onChange={onPageSizeChange}
           options={pageSizeOptions}
@@ -54,7 +54,7 @@ export function QuestionListPagination({
         <button
           disabled={page <= 1 || isFetching}
           onClick={() => onSetPage(Math.max(1, page - 1))}
-          className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white px-3 text-xs font-semibold text-[var(--color-text-secondary)] shadow-sm transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)] disabled:pointer-events-none disabled:opacity-40"
+          className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground shadow-sm transition hover:border-primary hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40"
         >
           上一页
         </button>
@@ -67,8 +67,8 @@ export function QuestionListPagination({
               onClick={() => onSetPage(item)}
               className={
                 isActive
-                  ? "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-primary-dark)] bg-[var(--color-primary)] text-sm font-bold text-white shadow-sm"
-                  : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white text-sm font-medium text-[var(--color-text-secondary)] shadow-sm transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)]"
+                  ? "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary bg-primary text-sm font-bold text-primary-foreground shadow-sm"
+                  : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-sm font-medium text-muted-foreground shadow-sm transition hover:border-primary hover:bg-accent hover:text-accent-foreground"
               }
             >
               {item}
@@ -78,7 +78,7 @@ export function QuestionListPagination({
         <button
           disabled={page >= totalPages || isFetching}
           onClick={() => onSetPage(page + 1)}
-          className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white px-3 text-xs font-semibold text-[var(--color-text-secondary)] shadow-sm transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)] disabled:pointer-events-none disabled:opacity-40"
+          className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground shadow-sm transition hover:border-primary hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-40"
         >
           下一页
         </button>

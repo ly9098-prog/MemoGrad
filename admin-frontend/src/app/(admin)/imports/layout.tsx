@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardCheck, FileQuestion, FileText, Images, UploadCloud, Wrench } from "lucide-react";
+import { ManagementPage } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
 
 const importTabs = [
@@ -18,8 +19,8 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <div className="space-y-6">
-      <nav className="flex flex-wrap gap-2 rounded-3xl border border-[var(--color-border)] bg-white/70 p-2 shadow-[var(--shadow-crisp)]">
+    <ManagementPage className="space-y-6">
+      <nav className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card/80 p-2 shadow-[var(--shadow-card)]">
         {importTabs.map((tab) => {
           const Icon = tab.icon;
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -30,8 +31,8 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
               className={cn(
                 "inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition",
                 active
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                  : "border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-white hover:text-[var(--ink)]",
+                  ? "border-primary/35 bg-accent text-accent-foreground shadow-sm"
+                  : "border-transparent text-muted-foreground hover:border-border hover:bg-card hover:text-foreground",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -41,6 +42,6 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
         })}
       </nav>
       {children}
-    </div>
+    </ManagementPage>
   );
 }

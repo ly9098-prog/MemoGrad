@@ -2,8 +2,17 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-type TableColumn<TData> = {
+export type TableColumn<TData> = {
   id?: string;
   header?: ReactNode | (() => ReactNode);
   accessorKey?: keyof TData | string;
@@ -20,47 +29,47 @@ export function DataTable<TData>({
   emptyText?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white/70">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="bg-[var(--color-primary-light)] text-left text-xs uppercase tracking-[0.16em] text-[var(--color-primary-dark)]">
-            <tr>
+    <div className="overflow-hidden rounded-2xl border border-border bg-card/75 shadow-[0_4px_20px_rgba(27,39,51,0.035)]">
+      <TableContainer>
+        <Table className="min-w-[720px]">
+          <TableHeader className="bg-secondary/65">
+            <TableRow className="hover:bg-transparent">
               {columns.map((column, index) => (
-                <th key={column.id ?? index} className="px-4 py-3 font-bold">
+                <TableHead key={column.id ?? index} className="py-3 font-semibold uppercase tracking-[0.12em]">
                   {typeof column.header === "function" ? column.id : column.header}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.length ? (
               data.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-t border-[var(--color-border)] transition hover:bg-[rgba(237,241,245,0.55)]">
+                <TableRow key={rowIndex}>
                   {columns.map((column, cellIndex) => {
                     const accessorKey = column.accessorKey ? String(column.accessorKey) : undefined;
                     const value = accessorKey ? (row as Record<string, unknown>)[accessorKey] : undefined;
                     return (
-                      <td key={`${rowIndex}-${cellIndex}`} className={cn("px-4 py-3 align-middle text-[var(--color-text-primary)]")}>
+                      <TableCell key={`${rowIndex}-${cellIndex}`} className={cn("text-foreground")}>
                         {column.cell
                           ? column.cell({ row: { original: row } })
                           : value === undefined || value === null
                             ? "—"
                             : String(value)}
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))
             ) : (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-14 text-center text-[var(--color-text-hint)]">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={columns.length} className="py-14 text-center text-muted-foreground">
                   {emptyText}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
     </div>
   );
 }

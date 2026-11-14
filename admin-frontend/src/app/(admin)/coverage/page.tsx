@@ -179,7 +179,7 @@ export default function CoveragePage() {
         description="切换考纲、科目、题量阈值与年份范围，报告会自动重新计算。"
         icon={<Filter className="h-4 w-4" />}
         actions={hasScopeFilters ? (
-          <Button variant="ghost" size="sm" onClick={resetScope} className="text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--mgmt-steel)] hover:text-[var(--ink)]">
+          <Button variant="ghost" size="sm" onClick={resetScope} className="text-muted-foreground transition-colors hover:bg-[var(--mgmt-steel)] hover:text-foreground">
             <RotateCcw className="h-3.5 w-3.5" />
             重置范围
           </Button>
@@ -224,8 +224,8 @@ export default function CoveragePage() {
             <Input inputMode="numeric" placeholder="自动" value={yearTo} onChange={(event) => setYearTo(event.target.value.replace(/\D/g, "").slice(0, 4))} />
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--mgmt-line)] pt-3 text-[11px] leading-5 text-[var(--color-text-tertiary)]">
-          <span className="rounded-md bg-[var(--mgmt-steel)] px-2 py-1 font-medium text-[var(--color-primary-dark)]">自动范围</span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--mgmt-line)] pt-3 text-[11px] leading-5 text-muted-foreground/70">
+          <span className="rounded-md bg-[var(--mgmt-steel)] px-2 py-1 font-medium text-accent-foreground">自动范围</span>
           <span>年份留空时使用系统已知真题卷区间；填写起止年份后，会把缺失年份直接纳入完整性检查。</span>
         </div>
       </ManagementPanel>
@@ -284,16 +284,16 @@ export default function CoveragePage() {
                   type="button"
                   key={value}
                   onClick={() => setStatus((current) => current === value ? "" : value)}
-                  className={`min-w-0 bg-[var(--mgmt-paper)] px-5 py-4 text-left transition-[background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] ${active ? "bg-[var(--mgmt-steel)] shadow-[inset_0_-2px_0_var(--color-primary)]" : "hover:bg-white"}`}
+                  className={`min-w-0 bg-[var(--mgmt-paper)] px-5 py-4 text-left transition-[background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-[var(--mgmt-steel)] shadow-[inset_0_-2px_0_var(--primary)]" : "hover:bg-card"}`}
                   aria-pressed={active}
                   title={active ? `取消“${label}”筛选` : `只看“${label}”知识点`}
                 >
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <StatusBadge tone={tone}>{label}</StatusBadge>
-                    <span className={`text-sm font-semibold tabular-nums ${active ? "text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)]"}`}>{amount}</span>
+                    <span className={`text-sm font-semibold tabular-nums ${active ? "text-accent-foreground" : "text-muted-foreground"}`}>{amount}</span>
                   </div>
                   <ManagementProgress value={amount} max={total} tone={tone === "success" ? "success" : "warning"} />
-                  <p className="mt-2 text-[10px] text-[var(--color-text-tertiary)]">{active ? "已作为矩阵筛选条件" : "点击聚焦此状态"}</p>
+                  <p className="mt-2 text-[10px] text-muted-foreground/70">{active ? "已作为矩阵筛选条件" : "点击聚焦此状态"}</p>
                 </button>
               );
             })}
@@ -301,7 +301,7 @@ export default function CoveragePage() {
 
           {integrityIssueCount > 0 ? (
             <ManagementPanel variant="quiet" title="完整性诊断" description="仅在存在结构问题时展示，避免正常的 0 值占用整块页面。" contentClassName="p-0">
-              <div className="grid divide-y divide-[var(--color-border-light)] sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+              <div className="grid divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
                 {[
                   ["题目版本缺口", summary.unversioned_questions, "已审核且启用的题目缺少 current_version_id"],
                   ["考纲快照缺口", summary.syllabus_snapshot_missing_questions, "题目版本知识点关联缺少 syllabus snapshot"],
@@ -310,11 +310,11 @@ export default function CoveragePage() {
                 ].filter(([, value]) => Number(value) > 0).map(([label, value, hint]) => (
                   <div key={String(label)} className="px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold text-[var(--ink)]">{String(label)}</p>
+                      <p className="text-xs font-semibold text-foreground">{String(label)}</p>
                       <StatusBadge tone="warning">需处理</StatusBadge>
                     </div>
-                    <p className="mt-1.5 text-2xl font-semibold tabular-nums text-[var(--ink)]">{Number(value)}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-secondary)]">{String(hint)}</p>
+                    <p className="mt-1.5 text-2xl font-semibold tabular-nums text-foreground">{Number(value)}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{String(hint)}</p>
                   </div>
                 ))}
               </div>
@@ -330,7 +330,7 @@ export default function CoveragePage() {
         actions={
           <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">
             <label className="relative block w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input className="pl-9" placeholder="搜索知识点" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
             </label>
             <CustomSelect
@@ -347,7 +347,7 @@ export default function CoveragePage() {
               placeholder="全部状态"
             />
             {hasLocalFilters ? (
-              <Button variant="ghost" size="sm" className="h-10 px-3 text-[var(--color-text-secondary)] hover:bg-[var(--mgmt-steel)]" onClick={() => { setKeyword(""); setStatus(""); }}>
+              <Button variant="ghost" size="sm" className="h-10 px-3 text-muted-foreground hover:bg-[var(--mgmt-steel)]" onClick={() => { setKeyword(""); setStatus(""); }}>
                 <RotateCcw className="h-3.5 w-3.5" />
                 清除
               </Button>
@@ -358,13 +358,13 @@ export default function CoveragePage() {
       >
         <div className="max-h-[680px] overflow-auto">
           <table className="w-full min-w-[1260px] text-sm">
-            <thead className="sticky top-0 z-10 bg-[rgba(244,247,249,0.97)] text-left text-[11px] font-semibold text-[var(--color-text-secondary)] shadow-[0_1px_0_var(--color-border-light)] backdrop-blur-md">
-              <tr className="border-b border-[rgba(221,229,234,0.72)] text-[10px] tracking-[0.04em] text-[var(--color-text-tertiary)]">
-                <th rowSpan={2} className="sticky left-0 z-20 min-w-[360px] bg-[#f4f7f9] px-5 py-3 align-bottom text-[11px] tracking-normal text-[var(--color-text-secondary)]">知识点</th>
+            <thead className="sticky top-0 z-10 bg-secondary/95 text-left text-[11px] font-semibold text-muted-foreground shadow-[0_1px_0_var(--border)] backdrop-blur-md">
+              <tr className="border-b border-border/60 text-[10px] tracking-[0.04em] text-muted-foreground/70">
+                <th rowSpan={2} className="sticky left-0 z-20 min-w-[360px] bg-secondary px-5 py-3 align-bottom text-[11px] tracking-normal text-muted-foreground">知识点</th>
                 <th colSpan={3} className="px-3 py-2 text-center">题源</th>
                 <th colSpan={3} className="px-3 py-2 text-center">难度</th>
                 <th colSpan={2} className="px-3 py-2 text-center">质量</th>
-                <th rowSpan={2} className="px-5 py-3 text-right align-bottom text-[11px] tracking-normal text-[var(--color-text-secondary)]">处理</th>
+                <th rowSpan={2} className="px-5 py-3 text-right align-bottom text-[11px] tracking-normal text-muted-foreground">处理</th>
               </tr>
               <tr>
                 <th className="px-3 py-2.5 text-right">总题数</th>
@@ -379,20 +379,20 @@ export default function CoveragePage() {
             </thead>
             <tbody>
               {filteredItems.map((item: CoverageMatrixItem) => (
-                <tr key={item.syllabus_knowledge_point_id} className="group border-b border-[var(--color-border-light)] align-top transition-[background-color,box-shadow] duration-200 hover:bg-[rgba(74,111,138,0.035)] hover:shadow-[inset_3px_0_0_rgba(74,111,138,0.28)]">
-                  <td className="sticky left-0 z-[1] border-r border-[rgba(221,229,234,0.72)] bg-[var(--mgmt-paper)] px-5 py-4 shadow-[10px_0_18px_-18px_rgba(31,49,61,0.35)] transition-colors duration-200 group-hover:bg-[#fbfcfc]">
-                    <p className="font-semibold text-[var(--ink)]">{item.name}</p>
-                    <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{item.subject_name} · KP #{item.knowledge_point_id}</p>
+                <tr key={item.syllabus_knowledge_point_id} className="group border-b border-border/60 align-top transition-[background-color,box-shadow] duration-200 hover:bg-[rgba(74,111,138,0.035)] hover:shadow-[inset_3px_0_0_rgba(74,111,138,0.28)]">
+                  <td className="sticky left-0 z-[1] border-r border-border/60 bg-[var(--mgmt-paper)] px-5 py-4 shadow-[10px_0_18px_-18px_rgba(31,49,61,0.35)] transition-colors duration-200 group-hover:bg-card">
+                    <p className="font-semibold text-foreground">{item.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">{item.subject_name} · KP #{item.knowledge_point_id}</p>
                     {item.years.length || Object.keys(item.question_type_counts).length || item.sources.length ? (
-                      <div className="mt-1 flex max-w-lg flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-5 text-[var(--color-text-secondary)]">
+                      <div className="mt-1 flex max-w-lg flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-5 text-muted-foreground">
                         {item.years.length ? <span>年份 {item.years.slice(0, 6).join("/")}</span> : null}
                         {Object.keys(item.question_type_counts).length ? <span>题型 {Object.entries(item.question_type_counts).map(([type, count]) => `${type}:${count}`).join(" / ")}</span> : null}
                         {item.sources.length ? <span className="max-w-full truncate" title={item.sources.join(" / ")}>来源 {item.sources.join(" / ")}</span> : null}
                       </div>
                     ) : null}
-                    {item.issues.length ? <p className="mt-2 max-w-lg text-xs leading-5 text-amber-700">{item.issues.join("；")}</p> : null}
+                    {item.issues.length ? <p className="mt-2 max-w-lg text-xs leading-5 text-warning-foreground">{item.issues.join("；")}</p> : null}
                   </td>
-                  <td className="px-3 py-4 text-right font-semibold tabular-nums text-[var(--ink)]">{item.total_question_count}</td>
+                  <td className="px-3 py-4 text-right font-semibold tabular-nums text-foreground">{item.total_question_count}</td>
                   <td className="px-3 py-4 text-right tabular-nums">{item.past_exam_choice_count}</td>
                   <td className="px-3 py-4 text-right tabular-nums">{item.mock_choice_count}</td>
                   <td className="px-3 py-4 text-right tabular-nums">{item.difficulty_easy_count}</td>
@@ -402,15 +402,15 @@ export default function CoveragePage() {
                   <td className="px-3 py-4"><StatusBadge tone={coverageTone(item.status)}>{STATUS_LABEL[item.status]}</StatusBadge></td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-2">
-                      <Link href={questionBankHref(item.knowledge_point_id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--mgmt-line)] bg-white px-3 text-xs font-semibold !text-[var(--color-primary-dark)] transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-[rgba(74,111,138,0.34)] hover:bg-[var(--mgmt-steel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.22)] active:translate-y-0 motion-reduce:transform-none"><FileQuestion className="h-3.5 w-3.5" />看题库</Link>
-                      <Link href="/imports/text-import" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#315f7a] bg-[#315f7a] px-3 text-xs font-semibold !text-white shadow-[0_4px_12px_rgba(45,80,104,0.15)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:bg-[#284e65] hover:shadow-[0_6px_16px_rgba(45,80,104,0.19)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.28)] active:translate-y-0 motion-reduce:transform-none"><Import className="h-3.5 w-3.5" />去导题</Link>
+                      <Link href={questionBankHref(item.knowledge_point_id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--mgmt-line)] bg-card px-3 text-xs font-semibold !text-accent-foreground transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-[rgba(74,111,138,0.34)] hover:bg-[var(--mgmt-steel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.22)] active:translate-y-0 motion-reduce:transform-none"><FileQuestion className="h-3.5 w-3.5" />看题库</Link>
+                      <Link href="/imports/text-import" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-xs font-semibold !text-primary-foreground shadow-[0_4px_12px_rgba(45,80,104,0.15)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:bg-primary-hover hover:shadow-[0_6px_16px_rgba(45,80,104,0.19)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.28)] active:translate-y-0 motion-reduce:transform-none"><Import className="h-3.5 w-3.5" />去导题</Link>
                     </div>
                   </td>
                 </tr>
               ))}
               {!reportQuery.isLoading && filteredItems.length === 0 ? <tr><td colSpan={10}><EmptyState>当前筛选没有知识点。</EmptyState></td></tr> : null}
               {reportQuery.isLoading ? Array.from({ length: 5 }).map((_, index) => (
-                <tr key={`loading-${index}`} className="border-b border-[var(--color-border-light)]">
+                <tr key={`loading-${index}`} className="border-b border-border/60">
                   <td className="sticky left-0 bg-[var(--mgmt-paper)] px-5 py-5"><div className="mgmt-skeleton h-4 w-48 rounded-full" /><div className="mgmt-skeleton mt-2 h-2.5 w-32 rounded-full" /></td>
                   {Array.from({ length: 9 }).map((__, cell) => <td key={cell} className="px-3 py-5"><div className="mgmt-skeleton ml-auto h-3 w-10 rounded-full" /></td>)}
                 </tr>
@@ -429,7 +429,7 @@ export default function CoveragePage() {
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[940px] text-sm">
-            <thead className="bg-[rgba(74,111,138,0.045)] text-left text-xs font-medium text-[var(--color-text-secondary)]">
+            <thead className="bg-[rgba(74,111,138,0.045)] text-left text-xs font-medium text-muted-foreground">
               <tr>
                 <th className="px-5 py-3">年份</th>
                 <th className="px-4 py-3">状态</th>
@@ -442,24 +442,24 @@ export default function CoveragePage() {
             </thead>
             <tbody>
               {examYears.map((item) => (
-                <tr key={item.year} className="group border-t border-[var(--color-border-light)] align-top transition-colors duration-200 hover:bg-[rgba(74,111,138,0.025)]">
-                  <td className="px-5 py-4 font-semibold tabular-nums text-[var(--ink)]">{item.year}</td>
+                <tr key={item.year} className="group border-t border-border/60 align-top transition-colors duration-200 hover:bg-[rgba(74,111,138,0.025)]">
+                  <td className="px-5 py-4 font-semibold tabular-nums text-foreground">{item.year}</td>
                   <td className="px-4 py-4"><StatusBadge tone={examStatusTone(item.status)}>{EXAM_STATUS_LABEL[item.status]}</StatusBadge></td>
                   <td className="px-4 py-4">
-                    <p className="font-medium text-[var(--ink)]">{item.paper_title ?? "暂无试卷"}</p>
-                    {item.paper_version ? <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">v{item.paper_version} · {item.paper_status}</p> : null}
+                    <p className="font-medium text-foreground">{item.paper_title ?? "暂无试卷"}</p>
+                    {item.paper_version ? <p className="mt-1 text-xs text-muted-foreground/70">v{item.paper_version} · {item.paper_status}</p> : null}
                   </td>
                   <td className="px-4 py-4 text-right tabular-nums">{item.question_count}</td>
                   <td className="px-4 py-4 text-right tabular-nums">{item.total_choice_score}</td>
                   <td className="px-4 py-4">
                     <div className="max-w-xl space-y-1 text-xs leading-5">
-                      {item.validation_errors.map((message) => <p key={`e-${message}`} className="text-red-700">{message}</p>)}
-                      {item.quality_warnings.map((message) => <p key={`w-${message}`} className="text-amber-700">{message}</p>)}
-                      {!item.validation_errors.length && !item.quality_warnings.length ? <span className="text-emerald-700">完整性检查通过</span> : null}
+                      {item.validation_errors.map((message) => <p key={`e-${message}`} className="text-destructive">{message}</p>)}
+                      {item.quality_warnings.map((message) => <p key={`w-${message}`} className="text-warning-foreground">{message}</p>)}
+                      {!item.validation_errors.length && !item.quality_warnings.length ? <span className="text-success">完整性检查通过</span> : null}
                     </div>
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <Link href={item.paper_ref ? `/exams/${item.paper_ref}` : "/exams"} className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-primary-dark)] transition-[color,transform] hover:translate-x-0.5 hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.25)] motion-reduce:transform-none">
+                    <Link href={item.paper_ref ? `/exams/${item.paper_ref}` : "/exams"} className="inline-flex items-center gap-1 text-sm font-semibold text-accent-foreground transition-[color,transform] hover:translate-x-0.5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.25)] motion-reduce:transform-none">
                       {item.paper_ref ? "查看试卷" : "去建卷"}<ArrowUpRight className="h-3.5 w-3.5" />
                     </Link>
                   </td>
@@ -489,25 +489,25 @@ export default function CoveragePage() {
                 return (
                   <div key={label as string} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
                     <div>
-                      <p className="text-sm font-medium text-[var(--ink)]">{label as string}</p>
-                      <p className="mt-0.5 text-[11px] text-[var(--color-text-secondary)]">样本 {values.length}</p>
+                      <p className="text-sm font-medium text-foreground">{label as string}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">样本 {values.length}</p>
                     </div>
                     <div className="flex min-h-7 flex-wrap gap-1.5">
-                      {values.slice(0, 12).map((id) => <Link key={id} href={questionIdHref(id)} className="rounded-md border border-[var(--color-border-light)] bg-white px-2 py-1 text-[11px] font-semibold text-[var(--color-primary-dark)] transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-[rgba(74,111,138,0.28)] hover:bg-[var(--color-primary-light)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.22)] motion-reduce:transform-none">#{id}</Link>)}
+                      {values.slice(0, 12).map((id) => <Link key={id} href={questionIdHref(id)} className="rounded-md border border-border/60 bg-card px-2 py-1 text-[11px] font-semibold text-accent-foreground transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-[rgba(74,111,138,0.28)] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.22)] motion-reduce:transform-none">#{id}</Link>)}
                     </div>
                   </div>
                 );
               })}
 
               {quality.duplicate_groups.length > 0 ? (
-                <div className="border-t border-[var(--color-border-light)] pt-4">
-                  <p className="text-sm font-medium text-[var(--ink)]">重复疑似 hash 组</p>
+                <div className="border-t border-border/60 pt-4">
+                  <p className="text-sm font-medium text-foreground">重复疑似 hash 组</p>
                   <div className="mt-2 space-y-2">
                     {quality.duplicate_groups.slice(0, 8).map((group) => (
-                      <div key={group.question_hash} className="rounded-xl border border-[var(--color-border-light)] bg-white px-3 py-2.5">
-                        <p className="truncate font-mono text-[10px] text-[var(--color-text-tertiary)]">{group.question_hash}</p>
+                      <div key={group.question_hash} className="rounded-xl border border-border/60 bg-card px-3 py-2.5">
+                        <p className="truncate font-mono text-[10px] text-muted-foreground/70">{group.question_hash}</p>
                         <div className="mt-1.5 flex flex-wrap gap-2">
-                          {group.question_ids.map((id) => <Link key={id} href={questionIdHref(id)} className="text-xs font-semibold text-[var(--color-primary-dark)] hover:underline">#{id}</Link>)}
+                          {group.question_ids.map((id) => <Link key={id} href={questionIdHref(id)} className="text-xs font-semibold text-accent-foreground hover:underline">#{id}</Link>)}
                         </div>
                       </div>
                     ))}
@@ -525,20 +525,20 @@ export default function CoveragePage() {
             {(graph?.warnings ?? []).length ? (
               <div className="space-y-2">
                 {(graph?.warnings ?? []).map((warning) => (
-                  <div key={warning} className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-sm leading-5 text-amber-900">
+                  <div key={warning} className="flex gap-2 rounded-xl border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{warning}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-sm leading-5 text-amber-900">
+              <div className="rounded-xl border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
                 图谱存在结构异常：孤立点 {Number(graph?.summary?.isolated_count ?? 0)}，循环 {Number(graph?.summary?.cycle_count ?? 0)}。
               </div>
             )}
-            <div className="flex flex-wrap gap-2 border-t border-[var(--color-border-light)] pt-4">
-              <Link href="/knowledge-graph" className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-4 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"><Filter className="h-4 w-4" />进入知识图谱治理<ArrowUpRight className="h-3.5 w-3.5" /></Link>
-              <Link href="/syllabus" className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-4 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"><BookOpen className="h-4 w-4" />考纲版本<ArrowUpRight className="h-3.5 w-3.5" /></Link>
+            <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+              <Link href="/knowledge-graph" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition hover:border-primary hover:bg-accent"><Filter className="h-4 w-4" />进入知识图谱治理<ArrowUpRight className="h-3.5 w-3.5" /></Link>
+              <Link href="/syllabus" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition hover:border-primary hover:bg-accent"><BookOpen className="h-4 w-4" />考纲版本<ArrowUpRight className="h-3.5 w-3.5" /></Link>
             </div>
           </div>
             </ManagementPanel>

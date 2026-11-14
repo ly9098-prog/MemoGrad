@@ -26,14 +26,14 @@ function OptionSegment({ segment, onRemove }: {
   if (!isImage && type !== "newline") return null;
   const label = type === "math_image" ? "公式" : type === "table_image" ? "表格" : type === "code_image" ? "代码" : type === "newline" ? "换行" : "图片";
   return (
-    <div className="flex items-center gap-1 rounded-md border border-[var(--color-border)]/50 bg-white/70 px-2 py-1">
+    <div className="flex items-center gap-1 rounded-md border border-border/50 bg-card/70 px-2 py-1">
       {isImage && segment.url ? (
         <img src={String(segment.url)} alt="" className="h-8 w-8 rounded object-cover" />
       ) : null}
-      <span className="text-[10px] text-[var(--color-text-hint)]">{label}</span>
+      <span className="text-[10px] text-muted-foreground/70">{label}</span>
       <button
         type="button"
-        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-[9px] text-red-400 hover:bg-red-50 hover:text-red-600"
+        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-[9px] text-destructive/70 hover:bg-destructive-light hover:text-destructive"
         onClick={onRemove}
         title="移除该片段"
       >✕</button>
@@ -44,13 +44,13 @@ function OptionSegment({ segment, onRemove }: {
 function RegularOptions({ options, onOptionsChange }: Pick<EditorProps, "options" | "onOptionsChange">) {
   return (
     <div className="space-y-2">
-      {options.length === 0 ? <p className="text-sm text-[var(--color-text-hint)]">暂无可编辑选项</p> : null}
+      {options.length === 0 ? <p className="text-sm text-muted-foreground/70">暂无可编辑选项</p> : null}
       {options.map((option, index) => (
         <div key={index} className="flex items-start gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center option-chip mt-1">{option.key}</span>
           <div className="flex-1 space-y-1.5">
             <input
-              className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+              className="h-9 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               value={option.text}
               onChange={(event) => onOptionsChange(updateReviewOptionText(options, index, event.target.value))}
             />
@@ -105,12 +105,12 @@ function OptionEditorContent(props: EditorProps) {
 
 export function ReviewOptionEditor(props: EditorProps) {
   return (
-    <section className="animate-fade-up drawer-section-delay-3 rounded-xl border border-[var(--color-border)]/60 bg-white/80 p-4 shadow-sm">
+    <section className="animate-fade-up drawer-section-delay-3 rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ backgroundColor: "rgba(196,154,107,0.12)" }}>
-          <span className="text-[10px] font-bold" style={{ color: "#c49a6b" }}>选</span>
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-warning-light">
+          <span className="text-[10px] font-bold text-warning-foreground">选</span>
         </span>
-        <p className="text-xs font-semibold text-[var(--color-text-secondary)]">选项</p>
+        <p className="text-xs font-semibold text-muted-foreground">选项</p>
       </div>
       <OptionEditorContent {...props} />
     </section>

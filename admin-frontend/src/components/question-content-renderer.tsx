@@ -175,7 +175,7 @@ function ProgrammingStem({ text, supportingText = "" }: { text: string; supporti
     <div className="min-w-0 space-y-3">
       {prose ? <div className="whitespace-pre-wrap">{prose}</div> : null}
       {formattedCode ? (
-        <pre className="max-w-full overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-2.5 font-mono text-[0.92em] leading-7 text-slate-800 [tab-size:2]">
+        <pre className="max-w-full overflow-x-auto rounded-lg border border-border/60 bg-muted/50 px-3 py-2.5 font-mono text-[0.92em] leading-7 text-foreground [tab-size:2]">
           <code>{formattedCode}</code>
         </pre>
       ) : null}
@@ -338,7 +338,7 @@ export function QuestionContentRenderer({
       ? (renderStemAsCode
           ? <ProgrammingStem text={directText} />
           : <MathFormula text={directText} />)
-      : <span className="italic text-[var(--color-text-hint)]">（空）</span>;
+      : <span className="italic text-muted-foreground/70">（空）</span>;
   }
 
   return (
@@ -367,24 +367,24 @@ export function QuestionContentRenderer({
           return (
             <figure
               key={block.key}
-              className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70"
+              className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-muted/40"
             >
               {caption || language ? (
-                <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
+                <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
                   {caption ? <span className="min-w-0 break-words">{caption}</span> : <span />}
                   {language ? (
-                    <span className="shrink-0 rounded bg-white px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-slate-400">
+                    <span className="shrink-0 rounded bg-card px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
                       {language}
                     </span>
                   ) : null}
                 </figcaption>
               ) : null}
               {code ? (
-                <pre className="max-w-full overflow-x-auto px-3 py-3 font-mono text-[0.92em] leading-7 text-slate-800 [tab-size:2]">
+                <pre className="max-w-full overflow-x-auto px-3 py-3 font-mono text-[0.92em] leading-7 text-foreground [tab-size:2]">
                   <code>{code}</code>
                 </pre>
               ) : (
-                <div className="px-3 py-3 text-xs text-amber-700">代码块内容为空</div>
+                <div className="px-3 py-3 text-xs text-warning-foreground">代码块内容为空</div>
               )}
             </figure>
           );
@@ -393,15 +393,15 @@ export function QuestionContentRenderer({
           const url = resolveAssetUrl(String(segment.url ?? ""));
           if (!url) {
             const alt = String(segment.alt ?? "");
-            return alt ? <p key={block.key} className="text-xs text-[var(--color-text-hint)]">{alt}</p> : null;
+            return alt ? <p key={block.key} className="text-xs text-muted-foreground/70">{alt}</p> : null;
           }
           return (
-            <figure key={block.key} className="overflow-hidden rounded-xl border border-[var(--color-border)]/60 bg-white p-2">
+            <figure key={block.key} className="overflow-hidden rounded-xl border border-border/60 bg-card p-2">
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block max-w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300"
+                className="inline-block max-w-full rounded-lg focus:outline-none focus:ring-2 focus:ring-ring/40"
                 aria-label="在新窗口查看题目图片"
               >
                 <img
@@ -411,7 +411,7 @@ export function QuestionContentRenderer({
                 />
               </a>
               {showTableMetadata && segment.requires_review ? (
-                <figcaption className="mt-1 text-[10px] text-amber-700">该视觉片段需要人工核对</figcaption>
+                <figcaption className="mt-1 text-[10px] text-warning-foreground">该视觉片段需要人工核对</figcaption>
               ) : null}
             </figure>
           );

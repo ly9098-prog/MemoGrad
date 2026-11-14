@@ -11,9 +11,9 @@ import { apiRequest } from "@/lib/api/client";
 import type { PipelinesListResponse, CleanupResponse, AlertItem } from "@/lib/api/types";
 
 const levelDot: Record<string, string> = {
-  error: "bg-red-500",
-  warning: "bg-amber-400",
-  info: "bg-blue-400",
+  error: "bg-destructive",
+  warning: "bg-warning",
+  info: "bg-primary",
 };
 
 export default function ImportMaintenancePage() {
@@ -107,91 +107,91 @@ export default function ImportMaintenancePage() {
 
       {/* ===== Message Banner ===== */}
       {message ? (
-        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--color-border)] bg-white/80 px-4 py-3 text-sm shadow-sm">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card/80 px-4 py-3 text-sm shadow-sm">
           {message.includes("失败") || message.includes("error") ? (
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
           ) : (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
           )}
-          <span className="text-[var(--ink)]">{message}</span>
+          <span className="text-foreground">{message}</span>
         </div>
       ) : null}
 
       {/* ===== Unified card with tabs ===== */}
-      <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
 
         {/* Tab bar */}
-        <div className="flex items-center border-b border-[var(--color-border)] bg-[var(--color-bg-input)]/40">
+        <div className="flex items-center border-b border-border bg-muted/40">
           <button
             onClick={() => setTab("alerts")}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "alerts"
-                ? "text-[var(--ink)]"
-                : "text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]"
+                ? "text-foreground"
+                : "text-muted-foreground/70 hover:text-muted-foreground"
             }`}
           >
             <ShieldAlert className="h-3.5 w-3.5" />
             告警
             {recentAlerts.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+              <span className="rounded-full bg-warning-light px-1.5 py-0.5 text-[9px] font-bold text-warning-foreground">
                 {recentAlerts.length}
               </span>
             )}
             {tab === "alerts" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--ink)]" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
             )}
           </button>
           <button
             onClick={() => setTab("cleanup")}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "cleanup"
-                ? "text-[var(--ink)]"
-                : "text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]"
+                ? "text-foreground"
+                : "text-muted-foreground/70 hover:text-muted-foreground"
             }`}
           >
             <Database className="h-3.5 w-3.5" />
             存储清理
             {tab === "cleanup" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--ink)]" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
             )}
           </button>
         </div>
 
         {/* ── Alerts tab ── */}
         {tab === "alerts" && (
-          <div className="divide-y divide-[var(--color-border)]/50">
+          <div className="divide-y divide-border/50">
             {recentAlerts.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-center">
-                <div className="mb-3 rounded-full bg-emerald-100 p-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                <div className="mb-3 rounded-full bg-success-light p-3">
+                  <CheckCircle2 className="h-6 w-6 text-success" />
                 </div>
-                <p className="text-sm font-medium text-[var(--color-text-secondary)]">暂无告警</p>
-                <p className="mt-1 text-xs text-[var(--color-text-hint)]">最近 5 条已完成导入均未触发告警规则</p>
+                <p className="text-sm font-medium text-muted-foreground">暂无告警</p>
+                <p className="mt-1 text-xs text-muted-foreground/70">最近 5 条已完成导入均未触发告警规则</p>
               </div>
             ) : (
               recentAlerts.map((alert, i) => (
                 <div
                   key={`${alert.pipeline_id}-${i}`}
-                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--color-bg-input)]/30"
+                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
                 >
-                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${levelDot[alert.level] ?? "bg-slate-300"}`} />
+                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${levelDot[alert.level] ?? "bg-muted-foreground"}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-[var(--ink)] leading-snug">{alert.message}</p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--color-text-secondary)]">
+                    <p className="text-sm text-foreground leading-snug">{alert.message}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                       {alert.value !== undefined && (
                         <span>
-                          当前值 <span className="font-semibold text-[var(--ink)]">{String(alert.value)}</span>
+                          当前值 <span className="font-semibold text-foreground">{String(alert.value)}</span>
                         </span>
                       )}
                       {alert.threshold !== undefined && (
                         <span>
-                          阈值 <span className="font-semibold text-[var(--ink)]">{String(alert.threshold)}</span>
+                          阈值 <span className="font-semibold text-foreground">{String(alert.threshold)}</span>
                         </span>
                       )}
                       {alert.suggested_action && (
-                        <span className="text-[var(--color-text-hint)]">{alert.suggested_action}</span>
+                        <span className="text-muted-foreground/70">{alert.suggested_action}</span>
                       )}
-                      <span className="ml-auto font-mono text-[10px] text-[var(--color-text-hint)]">
+                      <span className="ml-auto font-mono text-[10px] text-muted-foreground/70">
                         {alert.pipeline_id.slice(0, 8)}
                       </span>
                     </div>
@@ -206,7 +206,7 @@ export default function ImportMaintenancePage() {
         {tab === "cleanup" && (
           <div className="space-y-5 p-5">
             {/* Description */}
-            <p className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               清理过期 pipeline artifact 和 OCR 缓存文件，释放磁盘空间。建议先运行 Dry-Run 预览可清理量，确认后再执行。
             </p>
 
@@ -219,19 +219,19 @@ export default function ImportMaintenancePage() {
                 return (
                   <div key={label} className="flex items-center gap-0">
                     {i > 0 && (
-                      <div className={`h-px w-8 ${active ? "bg-[var(--color-border)]" : "bg-[var(--color-border)]/40"}`} />
+                      <div className={`h-px w-8 ${active ? "bg-border" : "bg-border/40"}`} />
                     )}
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
                           active
-                            ? "bg-[var(--ink)] text-white"
-                            : "bg-[var(--color-bg-input)] text-[var(--color-text-hint)]"
+                            ? "bg-foreground text-background"
+                            : "bg-muted text-muted-foreground/70"
                         }`}
                       >
                         {i + 1}
                       </div>
-                      <span className={`text-xs ${active ? "font-semibold text-[var(--ink)]" : "text-[var(--color-text-hint)]"}`}>
+                      <span className={`text-xs ${active ? "font-semibold text-foreground" : "text-muted-foreground/70"}`}>
                         {label}
                       </span>
                     </div>
@@ -247,7 +247,7 @@ export default function ImportMaintenancePage() {
                 {isDryRunning ? "扫描中..." : cleanupResult ? "重新 Dry-Run" : "运行 Dry-Run"}
               </Button>
               {cleanupResult && !cleanupResult.dry_run ? (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                <div className="flex items-center gap-2 rounded-lg bg-success-light px-3 py-1.5 text-xs font-medium text-success">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   清理完成
                 </div>
@@ -274,13 +274,13 @@ export default function ImportMaintenancePage() {
             {/* Results table */}
             {(cleanupResult || isDryRunning) ? (
               <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-hint)]">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {isDryRunning ? "正在扫描..." : cleanupResult?.dry_run ? "Dry-Run 结果（未删除任何文件）" : "清理结果"}
                 </p>
-                <div className="overflow-hidden rounded-lg border border-[var(--color-border)]">
+                <div className="overflow-hidden rounded-lg border border-border">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-[var(--color-bg-input)] text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      <tr className="bg-muted text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         <th className="px-3 py-2.5 text-left">目标</th>
                         <th className="px-3 py-2.5 text-right">扫描数</th>
                         <th className="px-3 py-2.5 text-right">可清理</th>
@@ -288,29 +288,29 @@ export default function ImportMaintenancePage() {
                         <th className="px-3 py-2.5 text-right">跳过</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[var(--color-border)]">
+                    <tbody className="divide-y divide-border">
                       {isDryRunning && !cleanupResult ? (
                         <tr>
-                          <td className="px-3 py-8 text-center text-[var(--color-text-hint)]" colSpan={5}>扫描中...</td>
+                          <td className="px-3 py-8 text-center text-muted-foreground/70" colSpan={5}>扫描中...</td>
                         </tr>
                       ) : (
                         Object.entries(cleanupResult?.targets || {}).map(([target, data]) => {
                           const d = data as Record<string, unknown>;
                           return (
-                            <tr key={target} className="transition-colors hover:bg-[var(--color-bg-input)]/30">
-                              <td className="px-3 py-2.5 font-medium text-[var(--ink)]">
+                            <tr key={target} className="transition-colors hover:bg-muted/30">
+                              <td className="px-3 py-2.5 font-medium text-foreground">
                                 <span className="inline-flex items-center gap-1.5">
-                                  <Database className="h-3.5 w-3.5 text-[var(--color-text-hint)]" />
+                                  <Database className="h-3.5 w-3.5 text-muted-foreground/70" />
                                   {target}
                                 </span>
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-text-secondary)]">
+                              <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                                 {typeof d.scanned_count === "number" ? d.scanned_count.toLocaleString() : String(d.status || "—")}
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-text-secondary)]">
+                              <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                                 {typeof d.deleted_count === "number" ? d.deleted_count.toLocaleString() : "—"}
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-text-secondary)]">
+                              <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                                 {typeof d.freed_bytes === "number"
                                   ? d.freed_bytes > 1048576
                                     ? `${(d.freed_bytes / 1048576).toFixed(1)} MB`
@@ -319,7 +319,7 @@ export default function ImportMaintenancePage() {
                                       : `${d.freed_bytes} B`
                                   : "—"}
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-text-secondary)]">
+                              <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                                 {typeof d.skipped_running_count === "number"
                                   ? d.skipped_running_count.toLocaleString()
                                   : typeof d.skipped_count === "number"
@@ -334,7 +334,7 @@ export default function ImportMaintenancePage() {
                   </table>
                 </div>
                 {cleanupResult?.dry_run ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                  <div className="flex items-center gap-2 rounded-lg bg-warning-light px-3 py-2 text-[11px] text-warning-foreground">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     Dry-Run 仅扫描不删除，请检查后确认执行
                   </div>

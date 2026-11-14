@@ -36,28 +36,28 @@ export function QuestionListToolbar({
   onExport,
 }: QuestionListToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-[var(--color-border)] bg-white px-3 py-2.5 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-card px-3 py-2.5 shadow-sm">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--color-primary-light)] px-3 text-xs font-semibold text-[var(--color-primary-dark)]">
+        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3 text-xs font-semibold text-accent-foreground">
           <Layers className="h-3.5 w-3.5" />
           题目总览
         </span>
-        <span className="inline-flex h-9 items-center rounded-full bg-[var(--porcelain)] px-3 text-xs font-semibold text-[var(--ink)]">
+        <span className="inline-flex h-9 items-center rounded-full bg-card px-3 text-xs font-semibold text-foreground">
           当前页 {itemCount} 题
         </span>
         {isFetching && !isLoading ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-xs font-medium text-[var(--color-text-hint)]">
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-xs font-medium text-muted-foreground/70">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             更新中
           </span>
         ) : null}
         {typeof total === "number" ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-white px-4 text-sm font-medium text-[var(--color-text-secondary)]">
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-sm font-medium text-muted-foreground">
             共 {total} 题
           </span>
         ) : null}
         {hasActiveFilters ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-white px-4 text-sm font-medium text-[var(--color-text-secondary)]">
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-sm font-medium text-muted-foreground">
             已启用筛选
           </span>
         ) : null}
@@ -65,7 +65,7 @@ export function QuestionListToolbar({
 
       <div className="flex flex-wrap items-center gap-2">
         {selectedCount > 0 ? (
-          <span className="inline-flex h-9 items-center rounded-full bg-[var(--color-primary-light)] px-4 text-sm font-semibold text-[var(--color-primary-dark)]">
+          <span className="inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground">
             已选 {selectedCount} 项
           </span>
         ) : null}
@@ -74,14 +74,14 @@ export function QuestionListToolbar({
           role="checkbox"
           aria-checked={allChecked}
           onClick={onToggleAll}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-4 text-sm text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary-light)] hover:bg-[var(--porcelain)]"
+          className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition hover:border-primary/25 hover:bg-muted/40"
         >
           <span
             aria-hidden="true"
             className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
               allChecked
-                ? "border-[var(--color-primary)] bg-[var(--color-primary)]"
-                : "border-[var(--color-border)] bg-white"
+                ? "border-primary bg-primary"
+                : "border-border bg-card"
             }`}
           >
             {allChecked ? (
@@ -110,18 +110,18 @@ export function QuestionListToolbar({
             />
           </Button>
           {exportOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-2 min-w-[160px] animate-drop-in overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white p-1.5 shadow-[var(--shadow-floating)]">
+            <div className="absolute right-0 top-full z-20 mt-2 min-w-[160px] animate-drop-in overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]">
               <button
                 type="button"
                 onClick={() => onExport("csv")}
-                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/40"
               >
                 导出 CSV
               </button>
               <button
                 type="button"
                 onClick={() => onExport("docx")}
-                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-[var(--ink)] transition hover:bg-[var(--porcelain)]"
+                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/40"
               >
                 导出 Word
               </button>

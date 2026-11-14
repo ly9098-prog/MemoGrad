@@ -149,23 +149,23 @@ function SectionCard({
   action?: ReactNode;
 }) {
   return (
-    <section className="group overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.92)] shadow-[var(--shadow-card)] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_6px_32px_rgba(27,39,51,0.08)]">
-      <div className="relative flex flex-wrap items-start justify-between gap-4 border-b border-[var(--color-border-light)] px-5 py-4 lg:px-6">
+    <section className="group overflow-hidden rounded-2xl border border-border/60 bg-card/92 shadow-[var(--shadow-card)] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_6px_32px_rgba(27,39,51,0.08)]">
+      <div className="relative flex flex-wrap items-start justify-between gap-4 border-b border-border/60 px-5 py-4 lg:px-6">
         <div className="flex min-w-0 items-start gap-3.5">
-          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--color-primary)] text-xs font-bold text-white shadow-sm transition-transform duration-200 group-hover:scale-105">
+          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-xs font-bold text-white shadow-sm transition-transform duration-200 group-hover:scale-105">
             <span className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
             <span className="relative">{step}</span>
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">{title}</h2>
+              <h2 className="font-display text-lg font-bold tracking-tight text-foreground">{title}</h2>
               {optional && (
-                <span className="rounded-full border border-[var(--color-border)] bg-white/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--color-text-hint)]">
+                <span className="rounded-full border border-border bg-card/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground/70">
                   可选
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-secondary)]">{description}</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>
           </div>
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -186,11 +186,11 @@ function FieldLabel({
 }) {
   return (
     <div className="mb-1.5 flex items-center justify-between gap-3">
-      <label className="text-sm font-semibold text-[var(--color-text-primary)]">
+      <label className="text-sm font-semibold text-foreground">
         {children}
-        {required && <span className="ml-1 text-[var(--color-danger)]">*</span>}
+        {required && <span className="ml-1 text-destructive">*</span>}
       </label>
-      {hint && <span className="text-[11px] text-[var(--color-text-hint)]">{hint}</span>}
+      {hint && <span className="text-[11px] text-muted-foreground/70">{hint}</span>}
     </div>
   );
 }
@@ -216,14 +216,14 @@ function MathTextAreaField({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <label className="text-sm font-semibold text-[var(--color-text-primary)]">{label}</label>
-          {helper && <p className="mt-0.5 text-[11px] text-[var(--color-text-hint)]">{helper}</p>}
+          <label className="text-sm font-semibold text-foreground">{label}</label>
+          {helper && <p className="mt-0.5 text-[11px] text-muted-foreground/70">{helper}</p>}
         </div>
         {value.trim() && (
           <button
             type="button"
             onClick={() => onChange(normalizeFormulaText(value) ?? "")}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[var(--color-primary)] transition hover:bg-[var(--color-primary-light)]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-primary transition hover:bg-accent"
           >
             <Sparkles className="h-3.5 w-3.5" />
             规范格式
@@ -231,14 +231,14 @@ function MathTextAreaField({
         )}
       </div>
       <textarea
-        className={`${minHeight} w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]`}
+        className={`${minHeight} w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
       {value.trim() && (
-        <div className="rounded-xl border border-[var(--color-border-light)] bg-white/70 px-3 py-2.5 text-sm leading-6 text-[var(--color-text-secondary)]">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">
+        <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-2.5 text-sm leading-6 text-muted-foreground">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
             <Eye className="h-3 w-3" /> 预览
           </div>
           <div className="max-w-full overflow-x-auto whitespace-pre-wrap break-words">
@@ -270,14 +270,14 @@ function FormulaBlockEditor({
   canDuplicate: boolean;
 }) {
   return (
-    <div className="group/block overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm transition-all duration-200 focus-within:border-[var(--color-primary)] focus-within:shadow-[0_8px_28px_rgba(27,39,51,0.10)] hover:shadow-[0_4px_16px_rgba(27,39,51,0.06)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-border-light)] bg-gradient-to-r from-[rgba(239,235,229,0.5)] to-white px-4 py-2.5">
+    <div className="group/block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 focus-within:border-primary focus-within:shadow-[0_8px_28px_rgba(27,39,51,0.10)] hover:shadow-[0_4px_16px_rgba(27,39,51,0.06)]">
+      <div className="flex items-center justify-between border-b border-border/60 bg-gradient-to-r from-muted/50 to-card px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--color-primary-light)] bg-white text-xs font-bold text-[var(--color-primary-dark)] shadow-sm">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-accent bg-card text-xs font-bold text-accent-foreground shadow-sm">
             {index + 1}
           </span>
           <div>
-            <p className="text-sm font-semibold text-[var(--ink)]">公式块</p>
+            <p className="text-sm font-semibold text-foreground">公式块</p>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover/block:opacity-100">
@@ -285,7 +285,7 @@ function FormulaBlockEditor({
             <button
               type="button"
               onClick={onDuplicate}
-              className="rounded-lg p-2 text-[var(--color-text-hint)] transition hover:bg-white hover:text-[var(--color-primary)]"
+              className="rounded-lg p-2 text-muted-foreground/70 transition hover:bg-card hover:text-primary"
               aria-label="复制公式块"
               title="复制公式块"
             >
@@ -296,7 +296,7 @@ function FormulaBlockEditor({
             <button
               type="button"
               onClick={onRemove}
-              className="rounded-lg p-2 text-[var(--color-text-hint)] transition hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg p-2 text-muted-foreground/70 transition hover:bg-destructive-light hover:text-destructive"
               aria-label="删除公式块"
               title="删除公式块"
             >
@@ -320,7 +320,7 @@ function FormulaBlockEditor({
           <div>
             <FieldLabel required>LaTeX 公式</FieldLabel>
             <textarea
-              className="min-h-36 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3.5 font-mono text-sm leading-6 outline-none transition placeholder:font-sans placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+              className="min-h-36 w-full resize-y rounded-xl border border-border bg-muted p-3.5 font-mono text-sm leading-6 outline-none transition placeholder:font-sans placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
               value={block.latex}
               onChange={(event) => onChange("latex", event.target.value)}
               placeholder="例如：y = ax^2 + bx + c"
@@ -330,13 +330,13 @@ function FormulaBlockEditor({
 
           <div>
             <FieldLabel>预览</FieldLabel>
-            <div className="flex min-h-36 items-center justify-center overflow-x-auto rounded-xl border border-dashed border-[var(--color-border)] bg-gradient-to-br from-[var(--porcelain)] to-white px-4 py-5 text-center transition-colors duration-200 group-focus-within/block:border-[var(--color-primary)]/30">
+            <div className="flex min-h-36 items-center justify-center overflow-x-auto rounded-xl border border-dashed border-border bg-gradient-to-br from-[var(--porcelain)] to-card px-4 py-5 text-center transition-colors duration-200 group-focus-within/block:border-primary/30">
               {block.latex.trim() ? (
                 <div className="w-full max-w-full overflow-x-auto py-2">
                   <LatexRenderer latex={normalizeLatexExpression(block.latex)} displayMode={true} />
                 </div>
               ) : (
-                <div className="text-[var(--color-text-hint)]">
+                <div className="text-muted-foreground/70">
                   <Eye className="mx-auto mb-2 h-5 w-5 opacity-40" />
                   <p className="text-xs">实时渲染</p>
                 </div>
@@ -348,13 +348,13 @@ function FormulaBlockEditor({
         <div>
           <FieldLabel hint="可混排文字与行内公式">说明</FieldLabel>
           <textarea
-            className="min-h-20 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+            className="min-h-20 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
             value={block.note || ""}
             onChange={(event) => onChange("note", event.target.value)}
             placeholder="解释该公式的用途、变量关系或使用方法（可选）"
           />
           {!!block.note?.trim() && (
-            <div className="mt-2 rounded-lg border border-[var(--color-border-light)] bg-[var(--color-primary-light)]/40 px-3 py-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+            <div className="mt-2 rounded-lg border border-border/60 bg-accent/40 px-3 py-2 text-sm leading-6 text-muted-foreground">
               <MixedLatexRenderer text={block.note} />
             </div>
           )}
@@ -927,38 +927,38 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
         Keeping the header at top:0 inside that container prevents the 24px
         gap that previously exposed scrolled form fields above the action bar.
       */}
-      <div className="sticky top-0 z-50 isolate -mx-4 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 shadow-[0_10px_28px_rgba(27,39,51,0.10)] lg:-mx-8 lg:px-8">
+      <div className="sticky top-0 z-50 isolate -mx-4 border-b border-border bg-background px-4 py-2.5 shadow-[0_10px_28px_rgba(27,39,51,0.10)] lg:-mx-8 lg:px-8">
         <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               onClick={handleCancel}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-[var(--color-text-secondary)] transition hover:border-[var(--color-border)] hover:bg-white hover:text-[var(--ink)]"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent text-muted-foreground transition hover:border-border hover:bg-card hover:text-foreground"
               aria-label="返回公式列表"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[11px] font-medium text-[var(--color-text-hint)]">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground/70">
                 <span>公式库</span>
                 <ChevronRight className="h-3 w-3" />
                 <span>{mode === "create" ? "新建" : `编辑 #${cardId}`}</span>
               </div>
-              <h1 className="truncate font-display text-xl font-bold text-[var(--ink)] lg:text-2xl">
+              <h1 className="truncate font-display text-xl font-bold text-foreground lg:text-2xl">
                 {mode === "create" ? "创建公式卡片" : "编辑公式卡片"}
               </h1>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden min-w-36 rounded-xl border border-[var(--color-border-light)] bg-white/80 px-3 py-2 shadow-sm lg:block">
-              <div className="flex items-center justify-between text-[10px] font-semibold tracking-wide text-[var(--color-text-hint)]">
+            <div className="hidden min-w-36 rounded-xl border border-border/60 bg-card/80 px-3 py-2 shadow-sm lg:block">
+              <div className="flex items-center justify-between text-[10px] font-semibold tracking-wide text-muted-foreground/70">
                 <span>必填进度</span>
                 <span>{completedRequired}/{requiredItems.length}</span>
               </div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-bg-input)]">
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] transition-all duration-500 ease-out"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent-foreground transition-all duration-500 ease-out"
                   style={{ width: `${completionPercent}%` }}
                 />
               </div>
@@ -976,12 +976,12 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
 
       {/* Recover local draft */}
       {mode === "create" && recoverableDraft && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/85 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-warning/40 bg-warning-light/85 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
             <div>
-              <p className="text-sm font-semibold text-amber-900">发现未完成的本地草稿</p>
-              <p className="mt-0.5 text-xs text-amber-700">
+              <p className="text-sm font-semibold text-warning-foreground">发现未完成的本地草稿</p>
+              <p className="mt-0.5 text-xs text-warning-foreground">
                 保存于 {formatChinaDateTime(recoverableDraft.savedAt)}（北京时间），可恢复后继续编辑。
               </p>
             </div>
@@ -997,8 +997,8 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
       {message && (
         <div className={`flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm ${
           messageType === "success"
-            ? "border-green-200 bg-[var(--color-success-light)] text-green-900"
-            : "border-red-200 bg-red-50 text-red-800"
+            ? "border-success/30 bg-success-light text-success"
+            : "border-destructive/30 bg-destructive-light text-destructive"
         }`}>
           <div className="flex items-center gap-2">
             {messageType === "success" ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4 fill-current" />}
@@ -1023,7 +1023,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                 <div>
                   <FieldLabel required hint={`${title.length}/80`}>标题</FieldLabel>
                   <Input
-                    className={`h-10 text-sm ${titleError ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-100" : ""}`}
+                    className={`h-10 text-sm ${titleError ? "border-destructive/40 bg-destructive-light/50 focus:border-destructive focus:ring-destructive/20" : ""}`}
                     value={title}
                     maxLength={80}
                     onChange={(event) => {
@@ -1032,9 +1032,9 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                     }}
                     placeholder="例如：二次函数 y=ax^2+bx+c"
                   />
-                  {titleError && <p className="mt-1.5 text-xs font-medium text-red-600">{titleError}</p>}
+                  {titleError && <p className="mt-1.5 text-xs font-medium text-destructive">{titleError}</p>}
                   {title.trim() && (
-                    <div className="mt-1.5 rounded-lg border border-[var(--color-border-light)] bg-white/65 px-3 py-1.5 text-sm font-semibold text-[var(--ink)]">
+                    <div className="mt-1.5 rounded-lg border border-border/60 bg-card/65 px-3 py-1.5 text-sm font-semibold text-foreground">
                       <MixedLatexRenderer text={title} />
                     </div>
                   )}
@@ -1069,12 +1069,12 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                           onClick={() => setCardType(key)}
                           className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-left transition-all duration-150 ${
                             cardType === key
-                              ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] shadow-xs"
-                              : "border-[var(--color-border)] bg-white/70 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30 hover:bg-white"
+                              ? "border-primary bg-accent text-accent-foreground shadow-xs"
+                              : "border-border bg-card/70 text-muted-foreground hover:border-primary/30 hover:bg-card"
                           }`}
                         >
                           <Icon className={`h-3.5 w-3.5 shrink-0 ${
-                            cardType === key ? "text-[var(--color-primary)]" : "text-[var(--color-text-hint)]"
+                            cardType === key ? "text-primary" : "text-muted-foreground/70"
                           }`} />
                           <span className="min-w-0 leading-tight">
                             <span className="block text-xs font-semibold">{label}</span>
@@ -1096,18 +1096,18 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                         setStudyCardType(next);
                         setTemplateType(DEFAULT_TEMPLATE_BY_STUDY_TYPE[next] ?? "standard");
                       }}
-                      className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm outline-none focus:border-[var(--color-primary)]"
+                      className="h-10 w-full rounded-xl border border-border bg-muted px-3 text-sm outline-none focus:border-primary"
                     >
                       {STUDY_CARD_TYPES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
-                    <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">公式 / 定义 / 复杂度 / 协议规则 / 高频结论 / 易混 / 陷阱 / 对比统一使用 Formula Card 领域。</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground/70">公式 / 定义 / 复杂度 / 协议规则 / 高频结论 / 易混 / 陷阱 / 对比统一使用 Formula Card 领域。</p>
                   </div>
                   <div>
                     <FieldLabel required>展示模板</FieldLabel>
                     <select
                       value={templateType}
                       onChange={(event) => setTemplateType(event.target.value)}
-                      className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm outline-none focus:border-[var(--color-primary)]"
+                      className="h-10 w-full rounded-xl border border-border bg-muted px-3 text-sm outline-none focus:border-primary"
                     >
                       {TEMPLATE_TYPES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
@@ -1125,12 +1125,12 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                     />
                   </div>
                   <div className="hidden md:flex md:items-end md:pb-1.5">
-                    <span className="text-[var(--color-text-hint)] text-[11px]">|</span>
+                    <span className="text-muted-foreground/70 text-[11px]">|</span>
                   </div>
                   <div>
                     <FieldLabel>标签</FieldLabel>
                     {tags.isLoading ? (
-                      <div className="flex h-9 items-center text-xs text-[var(--color-text-hint)]">正在加载标签...</div>
+                      <div className="flex h-9 items-center text-xs text-muted-foreground/70">正在加载标签...</div>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {TAG_CODES.map((code) => {
@@ -1142,8 +1142,8 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                               onClick={() => toggleTag(code)}
                               className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition ${
                                 active
-                                  ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                                  : "border-[var(--color-border)] bg-white/70 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40 hover:bg-white"
+                                  ? "border-primary bg-accent text-accent-foreground"
+                                  : "border-border bg-card/70 text-muted-foreground hover:border-primary/40 hover:bg-card"
                               }`}
                             >
                               {active && <Check className="h-3 w-3" />}
@@ -1159,14 +1159,14 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                 {/* ── Image upload (inline, create mode only) ── */}
                 {mode === "create" && cardType !== "pure_formula" && (
                   <div>
-                    <div className="flex items-center gap-3 rounded-lg border border-dashed border-[var(--color-border)] bg-white/40 px-3 py-2.5 transition-all duration-150 hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-primary-light)]/20">
+                    <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-card/40 px-3 py-2.5 transition-all duration-150 hover:border-primary/30 hover:bg-accent/20">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <ImageIcon className="h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
-                        <span className="text-xs text-[var(--color-text-secondary)] truncate">
+                        <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                        <span className="text-xs text-muted-foreground truncate">
                           {pendingImage ? pendingImage.name : "函数图像 · 保存后自动上传"}
                         </span>
                         {pendingImage && (
-                          <span className="text-[10px] text-[var(--color-text-hint)] shrink-0">
+                          <span className="text-[10px] text-muted-foreground/70 shrink-0">
                             ({(pendingImage.size / 1024 / 1024).toFixed(2)} MB)
                           </span>
                         )}
@@ -1184,14 +1184,14 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                             <button
                               type="button"
                               onClick={() => imageFileInputRef.current?.click()}
-                              className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--color-primary)] transition hover:bg-[var(--color-primary-light)]"
+                              className="rounded-md px-2 py-1 text-[11px] font-medium text-primary transition hover:bg-accent"
                             >
                               换一个
                             </button>
                             <button
                               type="button"
                               onClick={clearPendingImage}
-                              className="rounded-md px-2 py-1 text-[11px] font-medium text-[var(--color-text-hint)] transition hover:bg-red-50 hover:text-red-500"
+                              className="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground/70 transition hover:bg-destructive-light hover:text-destructive"
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -1205,12 +1205,12 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                     </div>
                     {pendingImage && pendingImagePreview && (
                       <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                        <div className="overflow-hidden rounded-lg border bg-white">
+                        <div className="overflow-hidden rounded-lg border bg-card">
                           <img src={pendingImagePreview} alt="预览" className="max-h-36 w-full object-contain" />
                         </div>
                       </div>
                     )}
-                    <p className="mt-1 text-[10px] text-[var(--color-text-hint)]">
+                    <p className="mt-1 text-[10px] text-muted-foreground/70">
                       支持 PNG/JPEG/WebP，单张不超过 10MB。可拖拽图片到此处。
                     </p>
                   </div>
@@ -1219,14 +1219,14 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                 <div>
                   <FieldLabel hint={`${summary.length}/300`}>摘要</FieldLabel>
                   <textarea
-                    className="min-h-20 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                    className="min-h-20 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                     value={summary}
                     maxLength={300}
                     onChange={(event) => setSummary(event.target.value)}
                     placeholder="用一两句话说明该公式解决什么问题、关键变量或使用场景。"
                   />
                   {summary.trim() && (
-                    <div className="mt-1.5 rounded-lg border border-[var(--color-border-light)] bg-white/65 px-3 py-1.5 text-sm leading-6 text-[var(--color-text-secondary)]">
+                    <div className="mt-1.5 rounded-lg border border-border/60 bg-card/65 px-3 py-1.5 text-sm leading-6 text-muted-foreground">
                       <MixedLatexRenderer text={summary} />
                     </div>
                   )}
@@ -1249,7 +1249,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
             >
               <div className="space-y-4">
                 {blocksError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  <div className="rounded-xl border border-destructive/30 bg-destructive-light px-3 py-2 text-xs font-medium text-destructive">
                     {blocksError}
                   </div>
                 )}
@@ -1269,7 +1269,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                   <button
                     type="button"
                     onClick={addBlock}
-                    className="group flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--color-border)] bg-white/40 px-4 py-3.5 text-sm font-semibold text-[var(--color-text-secondary)] transition-all duration-200 hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary-light)]/40 hover:text-[var(--color-primary-dark)]"
+                    className="group flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-card/40 px-4 py-3.5 text-sm font-semibold text-muted-foreground transition-all duration-200 hover:border-primary/40 hover:bg-accent/40 hover:text-accent-foreground"
                   >
                     <Plus className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
                     再添加一个公式块
@@ -1336,7 +1336,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                   <div className="md:col-span-2">
                     <FieldLabel>导数与临界点</FieldLabel>
                     <textarea
-                      className="min-h-20 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                      className="min-h-20 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                       value={funcDerivative}
                       onChange={(event) => setFuncDerivative(event.target.value)}
                       placeholder="例如：y' = 2ax+b，临界点 x=-b/(2a)"
@@ -1345,7 +1345,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                   <div className="md:col-span-2">
                     <FieldLabel>一行特征描述</FieldLabel>
                     <textarea
-                      className="min-h-20 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                      className="min-h-20 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                       value={funcFeature}
                       onChange={(event) => setFuncFeature(event.target.value)}
                       placeholder="例如：抛物线关于 x=-b/(2a) 对称，顶点由系数 a、b、c 决定。"
@@ -1362,28 +1362,28 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
           )}
 
           {/* Supplement */}
-          <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.78)] shadow-[var(--shadow-card)]">
+          <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/78 shadow-[var(--shadow-card)]">
             <button
               type="button"
               onClick={() => setShowSupplement((value) => !value)}
-              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-white/60 lg:px-6"
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-card/60 lg:px-6"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-bg-input)] text-[var(--color-primary-dark)]">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-accent-foreground">
                   <ListChecks className="h-4 w-4" />
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-display text-lg font-bold text-[var(--ink)]">补充说明</h2>
-                    <span className="rounded-full bg-[var(--color-bg-input)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-hint)]">可选</span>
+                    <h2 className="font-display text-lg font-bold text-foreground">补充说明</h2>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground/70">可选</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">适用条件、符号说明、二级结论与易错提醒。</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">适用条件、符号说明、二级结论与易错提醒。</p>
                 </div>
               </div>
               {showSupplement ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
             {showSupplement && (
-              <div className="grid gap-5 border-t border-[var(--color-border-light)] p-5 lg:grid-cols-2 lg:p-6">
+              <div className="grid gap-5 border-t border-border/60 p-5 lg:grid-cols-2 lg:p-6">
                 <MathTextAreaField
                   label="适用条件"
                   value={conditions}
@@ -1417,8 +1417,8 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
           </section>
 
           {/* Examples */}
-          <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.78)] shadow-[var(--shadow-card)]">
-            <div className="flex items-center gap-2 px-5 py-4 transition hover:bg-white/60 lg:px-6">
+          <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/78 shadow-[var(--shadow-card)]">
+            <div className="flex items-center gap-2 px-5 py-4 transition hover:bg-card/60 lg:px-6">
               <button
                 type="button"
                 onClick={() => setShowExamples((value) => !value)}
@@ -1426,15 +1426,15 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                 aria-expanded={showExamples}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-bg-input)] text-[var(--color-primary-dark)]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-accent-foreground">
                     <Lightbulb className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="font-display text-lg font-bold text-[var(--ink)]">典型例题</h2>
-                      <span className="rounded-full bg-[var(--color-bg-input)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-text-hint)]">{examples.length}/{EXAMPLES_MAX}</span>
+                      <h2 className="font-display text-lg font-bold text-foreground">典型例题</h2>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground/70">{examples.length}/{EXAMPLES_MAX}</span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-[var(--color-text-secondary)]">添加少量代表性例题，帮助理解公式的实际用法。</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">添加少量代表性例题，帮助理解公式的实际用法。</p>
                   </div>
                 </div>
                 {showExamples ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
@@ -1443,7 +1443,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                 <button
                   type="button"
                   onClick={addExample}
-                  className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-[var(--color-border)] bg-white px-2.5 text-xs font-semibold text-[var(--color-primary-dark)] transition hover:border-[var(--color-primary)]"
+                  className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-accent-foreground transition hover:border-primary"
                 >
                   <Plus className="h-3.5 w-3.5" /> 添加
                 </button>
@@ -1451,25 +1451,25 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
             </div>
 
             {showExamples && (
-              <div className="space-y-4 border-t border-[var(--color-border-light)] p-5 lg:p-6">
+              <div className="space-y-4 border-t border-border/60 p-5 lg:p-6">
                 {examples.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/45 px-4 py-8 text-center">
-                    <Lightbulb className="mx-auto mb-2 h-6 w-6 text-[var(--color-text-hint)]" />
-                    <p className="text-sm font-medium text-[var(--color-text-secondary)]">暂未添加例题</p>
-                    <p className="mt-1 text-xs text-[var(--color-text-hint)]">最多可添加 {EXAMPLES_MAX} 道典型例题</p>
+                  <div className="rounded-xl border border-dashed border-border bg-card/45 px-4 py-8 text-center">
+                    <Lightbulb className="mx-auto mb-2 h-6 w-6 text-muted-foreground/70" />
+                    <p className="text-sm font-medium text-muted-foreground">暂未添加例题</p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">最多可添加 {EXAMPLES_MAX} 道典型例题</p>
                     <Button variant="secondary" size="sm" className="mt-3" onClick={addExample}>
                       <Plus className="h-3.5 w-3.5" /> 添加第一道例题
                     </Button>
                   </div>
                 ) : (
                   examples.map((example, index) => (
-                    <div key={index} className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm">
-                      <div className="flex items-center justify-between border-b border-[var(--color-border-light)] bg-[rgba(239,235,229,0.4)] px-4 py-2.5">
-                        <span className="text-sm font-semibold text-[var(--ink)]">例题 {index + 1}</span>
+                    <div key={index} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                      <div className="flex items-center justify-between border-b border-border/60 bg-[rgba(239,235,229,0.4)] px-4 py-2.5">
+                        <span className="text-sm font-semibold text-foreground">例题 {index + 1}</span>
                         <button
                           type="button"
                           onClick={() => removeExample(index)}
-                          className="rounded-lg p-1.5 text-[var(--color-text-hint)] transition hover:bg-red-50 hover:text-red-600"
+                          className="rounded-lg p-1.5 text-muted-foreground/70 transition hover:bg-destructive-light hover:text-destructive"
                           aria-label="删除例题"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1479,7 +1479,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                         <div className="md:col-span-2">
                           <FieldLabel>题目</FieldLabel>
                           <textarea
-                            className="min-h-20 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                            className="min-h-20 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                             value={example.question}
                             onChange={(event) => updateExample(index, "question", event.target.value)}
                             placeholder="输入题目，可包含数学公式"
@@ -1488,7 +1488,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                         <div>
                           <FieldLabel>简要解法</FieldLabel>
                           <textarea
-                            className="min-h-24 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                            className="min-h-24 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                             value={example.short_solution}
                             onChange={(event) => updateExample(index, "short_solution", event.target.value)}
                             placeholder="写出核心步骤"
@@ -1497,7 +1497,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
                         <div>
                           <FieldLabel>答案</FieldLabel>
                           <textarea
-                            className="min-h-24 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+                            className="min-h-24 w-full resize-y rounded-xl border border-border bg-muted p-3 text-sm leading-6 outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
                             value={example.answer}
                             onChange={(event) => updateExample(index, "answer", event.target.value)}
                             placeholder="输入最终答案"
@@ -1536,16 +1536,16 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
             tabIndex={0}
             aria-label="公式编辑辅助侧栏，可独立上下滚动"
           >
-          <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-gradient-to-b from-[var(--porcelain)] to-white shadow-[var(--shadow-floating)]">
-            <div className="flex items-center justify-between border-b border-[var(--color-border-light)] bg-white/60 px-4 py-3">
+          <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-[var(--porcelain)] to-card shadow-[var(--shadow-floating)]">
+            <div className="flex items-center justify-between border-b border-border/60 bg-card/60 px-4 py-3">
               <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-[var(--color-primary)]" />
-                <span className="text-sm font-semibold text-[var(--ink)]">实时预览</span>
+                <Eye className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">实时预览</span>
               </div>
               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                 cardType === "function_graph"
-                  ? "border-[var(--color-primary-light)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                  : "border-[var(--color-border)] bg-white/70 text-[var(--color-text-hint)]"
+                  ? "border-accent bg-accent text-accent-foreground"
+                  : "border-border bg-card/70 text-muted-foreground/70"
               }`}>
                 {cardType === "function_graph" ? "函数图像" : cardType === "pure_formula" ? "纯公式" : "自动识别"}
               </span>
@@ -1553,17 +1553,17 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
 
             <div className="space-y-4 p-4">
               <div>
-                <h3 className="font-display text-xl font-bold leading-8 text-[var(--ink)]">
-                  {title.trim() ? <MixedLatexRenderer text={title} /> : <span className="text-[var(--color-text-hint)]">公式标题</span>}
+                <h3 className="font-display text-xl font-bold leading-8 text-foreground">
+                  {title.trim() ? <MixedLatexRenderer text={title} /> : <span className="text-muted-foreground/70">公式标题</span>}
                 </h3>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {categoryId ? (
-                    <span className="rounded-md bg-[var(--color-primary-light)] px-2 py-1 text-[10px] font-semibold text-[var(--color-primary-dark)]">已选择分类</span>
+                    <span className="rounded-md bg-accent px-2 py-1 text-[10px] font-semibold text-accent-foreground">已选择分类</span>
                   ) : (
-                    <span className="rounded-md border border-dashed border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-text-hint)]">未选择分类</span>
+                    <span className="rounded-md border border-dashed border-border px-2 py-1 text-[10px] text-muted-foreground/70">未选择分类</span>
                   )}
                   {selectedTags.map((code) => (
-                    <span key={code} className="rounded-md bg-[var(--color-bg-input)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                    <span key={code} className="rounded-md bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">
                       {TAG_NAMES[code]}
                     </span>
                   ))}
@@ -1571,7 +1571,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
               </div>
 
               {summary.trim() && (
-                <div className="rounded-xl bg-[var(--color-primary-light)]/55 px-3 py-2.5 text-xs leading-5 text-[var(--color-text-secondary)]">
+                <div className="rounded-xl bg-accent/55 px-3 py-2.5 text-xs leading-5 text-muted-foreground">
                   <MixedLatexRenderer text={summary} />
                 </div>
               )}
@@ -1579,70 +1579,70 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
               <div className="space-y-3">
                 {blocks.some((block) => block.latex.trim()) ? (
                   blocks.filter((block) => block.latex.trim()).map((block, index) => (
-                    <div key={index} className="rounded-xl border border-[var(--color-border-light)] bg-white px-3 py-3">
-                      {block.label?.trim() && <p className="mb-2 text-[10px] font-semibold text-[var(--color-text-hint)]">{block.label}</p>}
+                    <div key={index} className="rounded-xl border border-border/60 bg-card px-3 py-3">
+                      {block.label?.trim() && <p className="mb-2 text-[10px] font-semibold text-muted-foreground/70">{block.label}</p>}
                       <div className="overflow-x-auto text-center">
                         <LatexRenderer latex={normalizeLatexExpression(block.latex)} displayMode={true} />
                       </div>
                       {block.note?.trim() && (
-                        <div className="mt-2 border-t border-[var(--color-border-light)] pt-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+                        <div className="mt-2 border-t border-border/60 pt-2 text-xs leading-5 text-muted-foreground">
                           <MixedLatexRenderer text={block.note} />
                         </div>
                       )}
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--color-border)] px-3 py-8 text-center text-xs text-[var(--color-text-hint)]">
+                  <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center text-xs text-muted-foreground/70">
                     公式内容将显示在这里
                   </div>
                 )}
               </div>
 
               {cardType === "function_graph" && (funcExpression.trim() || funcDomain.trim() || funcRange.trim()) && (
-                <div className="space-y-1.5 rounded-xl border border-[var(--color-primary-light)] bg-[var(--color-primary-light)]/35 px-3 py-2.5 text-xs text-[var(--color-text-secondary)]">
+                <div className="space-y-1.5 rounded-xl border border-accent bg-accent/35 px-3 py-2.5 text-xs text-muted-foreground">
                   {funcExpression.trim() && (
-                    <p><span className="font-semibold text-[var(--ink)]">表达式：</span><MixedLatexRenderer text={funcExpression} /></p>
+                    <p><span className="font-semibold text-foreground">表达式：</span><MixedLatexRenderer text={funcExpression} /></p>
                   )}
                   {funcDomain.trim() && (
-                    <p><span className="font-semibold text-[var(--ink)]">定义域：</span><MixedLatexRenderer text={funcDomain} /></p>
+                    <p><span className="font-semibold text-foreground">定义域：</span><MixedLatexRenderer text={funcDomain} /></p>
                   )}
                   {funcRange.trim() && (
-                    <p><span className="font-semibold text-[var(--ink)]">值域：</span><MixedLatexRenderer text={funcRange} /></p>
+                    <p><span className="font-semibold text-foreground">值域：</span><MixedLatexRenderer text={funcRange} /></p>
                   )}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--color-border-light)] bg-white/75 p-4 shadow-sm">
+          <div className="rounded-2xl border border-border/60 bg-card/75 p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-[var(--color-primary)]" />
-              <p className="text-sm font-semibold text-[var(--ink)]">提交前检查</p>
+              <ListChecks className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold text-foreground">提交前检查</p>
             </div>
             <div className="space-y-2.5">
               {requiredItems.map((item) => (
                 <div key={item.label} className="flex items-center gap-2 text-xs">
                   {item.done ? (
-                    <CheckCircle2 className="h-4 w-4 text-[var(--color-success)]" />
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                   ) : (
-                    <Circle className="h-4 w-4 text-[var(--color-border)]" />
+                    <Circle className="h-4 w-4 text-border" />
                   )}
-                  <span className={item.done ? "text-[var(--color-text-secondary)]" : "font-medium text-[var(--ink)]"}>{item.label}</span>
+                  <span className={item.done ? "text-muted-foreground" : "font-medium text-foreground"}>{item.label}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--color-bg-input)]">
-              <div className="h-full rounded-full bg-[var(--color-primary)] transition-all duration-300" style={{ width: `${completionPercent}%` }} />
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${completionPercent}%` }} />
             </div>
-            <p className="mt-2 text-[10px] text-[var(--color-text-hint)]">完成必填项后即可保存为草稿。</p>
+            <p className="mt-2 text-[10px] text-muted-foreground/70">完成必填项后即可保存为草稿。</p>
           </div>
 
-          <div className="rounded-2xl border border-[var(--color-border-light)] bg-white/65 p-4 text-xs leading-5 text-[var(--color-text-secondary)]">
+          <div className="rounded-2xl border border-border/60 bg-card/65 p-4 text-xs leading-5 text-muted-foreground">
             <div className="flex items-start gap-2.5">
-              <Tags className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary)]" />
+              <Tags className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <div>
-                <p className="font-semibold text-[var(--ink)]">编辑提示</p>
-                <p className="mt-1">使用 <kbd className="rounded border bg-white px-1.5 py-0.5 font-mono text-[10px]">Ctrl / ⌘ + S</kbd> 可快速保存。</p>
+                <p className="font-semibold text-foreground">编辑提示</p>
+                <p className="mt-1">使用 <kbd className="rounded border bg-card px-1.5 py-0.5 font-mono text-[10px]">Ctrl / ⌘ + S</kbd> 可快速保存。</p>
                 {mode === "create" && (
                   <p className="mt-1">
                     {lastAutoSavedAt
@@ -1658,7 +1658,7 @@ export function FormulaEditorForm({ mode, cardId, initialData, onSaveSuccess }: 
       </div>
 
       {/* Mobile save bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-[rgba(254,252,249,0.94)] px-4 py-3 shadow-[0_-8px_28px_rgba(27,39,51,0.08)] backdrop-blur-xl sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/94 px-4 py-3 shadow-[0_-8px_28px_rgba(27,39,51,0.08)] backdrop-blur-xl sm:hidden">
         <div className="flex items-center gap-2">
           <Button variant="secondary" className="flex-1" onClick={handleCancel}>
             取消

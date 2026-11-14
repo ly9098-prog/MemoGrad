@@ -37,8 +37,8 @@ describe("QuestionListPagination", () => {
   it("renders the existing totals, page state, and page-size selector", () => {
     const pagination = renderPagination();
 
-    expect(pagination.html).toContain("共 <span class=\"font-semibold text-[var(--ink)]\">42</span> 条");
-    expect(pagination.html).toContain("第 <span class=\"font-semibold text-[var(--ink)]\">3</span> / 5 页");
+    expect(pagination.html).toContain("共 <span class=\"font-semibold text-foreground\">42</span> 条");
+    expect(pagination.html).toContain("第 <span class=\"font-semibold text-foreground\">3</span> / 5 页");
     expect(pagination.html).toContain("20 条/页");
     expect(pagination.html).toContain("上一页");
     expect(pagination.html).toContain("下一页");

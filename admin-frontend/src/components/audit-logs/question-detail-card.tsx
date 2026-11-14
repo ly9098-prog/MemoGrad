@@ -33,22 +33,22 @@ export function QuestionDetailCard({ qd }: { qd: QuestionAuditDetail }) {
 
   return (
     <section className="space-y-3">
-      <h4 className="text-sm font-semibold text-[var(--ink)]">题目详情</h4>
+      <h4 className="text-sm font-semibold text-foreground">题目详情</h4>
 
       {isCurrentDb ? (
-        <p className="rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning-light)] px-3 py-2 text-xs text-[#9b6f3b]">
+        <p className="rounded-lg border border-warning/40 bg-warning-light px-3 py-2 text-xs text-warning-foreground">
           该内容来自当前题目数据，可能与日志发生时的内容不同。
         </p>
       ) : dataSourceLabel ? (
-        <p className="rounded-lg border border-[var(--color-primary)]/30 bg-[var(--color-primary-light)] px-3 py-1.5 text-xs text-[var(--color-primary-dark)]">
+        <p className="rounded-lg border border-primary/30 bg-accent px-3 py-1.5 text-xs text-primary">
           {dataSourceLabel}
         </p>
       ) : null}
 
       {/* Content / Stem — visually prominent */}
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] p-4">
-        <p className="mb-2 text-xs font-medium text-[var(--color-text-hint)]">题干</p>
-        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-primary)]">
+      <div className="rounded-lg border border-border bg-muted/50 p-4">
+        <p className="mb-2 text-xs font-medium text-muted-foreground/70">题干</p>
+        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
           <QuestionContentRenderer content={qd.content} fallbackText={qd.content_text || renderValue(qd.content)} showTableMetadata />
         </div>
       </div>
@@ -69,8 +69,8 @@ export function QuestionDetailCard({ qd }: { qd: QuestionAuditDetail }) {
 
       {/* Options */}
       {hasOptions(qd.options) && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-white p-4">
-          <p className="mb-2 text-xs font-medium text-[var(--color-text-hint)]">选项</p>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-2 text-xs font-medium text-muted-foreground/70">选项</p>
           <div className="space-y-1">
             {renderOptionsLines(qd.options)}
           </div>
@@ -80,8 +80,8 @@ export function QuestionDetailCard({ qd }: { qd: QuestionAuditDetail }) {
       {/* Answer */}
       {qd.answer != null && (
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-[var(--color-text-hint)]">答案</span>
-          <span className="inline-flex items-center rounded-full border border-[var(--color-success)] bg-[var(--color-success-light)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-success)]">
+          <span className="text-xs font-medium text-muted-foreground/70">答案</span>
+          <span className="inline-flex items-center rounded-full border border-success bg-success-light px-2.5 py-0.5 text-xs font-semibold text-success">
             {renderValue(qd.answer)}
           </span>
         </div>
@@ -114,9 +114,9 @@ function FieldBlock({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2.5">
-      <p className="text-xs font-medium text-[var(--color-text-hint)]">{label}</p>
-      <p className={cn("mt-0.5 text-sm text-[var(--color-text-primary)]", mono && "font-mono text-xs")}>
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5">
+      <p className="text-xs font-medium text-muted-foreground/70">{label}</p>
+      <p className={cn("mt-0.5 text-sm text-foreground", mono && "font-mono text-xs")}>
         {value}
       </p>
     </div>
@@ -125,12 +125,12 @@ function FieldBlock({
 
 function CollapsibleBlock({ label, content }: { label: string; content: string }) {
   return (
-    <details className="group rounded-lg border border-[var(--color-border)] bg-white">
-      <summary className="cursor-pointer px-3 py-2.5 text-xs font-medium text-[var(--color-text-hint)] transition-colors hover:text-[var(--ink)]">
+    <details className="group rounded-lg border border-border bg-card">
+      <summary className="cursor-pointer px-3 py-2.5 text-xs font-medium text-muted-foreground/70 transition-colors hover:text-foreground">
         {label}
       </summary>
-      <div className="border-t border-[var(--color-border)] px-3 py-2.5">
-        <pre className="whitespace-pre-wrap break-words font-sans text-sm text-[var(--color-text-secondary)]">
+      <div className="border-t border-border px-3 py-2.5">
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm text-muted-foreground">
           {content}
         </pre>
       </div>
@@ -141,7 +141,7 @@ function CollapsibleBlock({ label, content }: { label: string; content: string }
 function renderOptionsLines(options: unknown): ReactNode {
   if (!options) return null;
   if (typeof options === "string") {
-    return <p className="text-sm text-[var(--color-text-secondary)]">{options}</p>;
+    return <p className="text-sm text-muted-foreground">{options}</p>;
   }
   if (typeof options === "object") {
     if (Array.isArray(options)) {
@@ -160,13 +160,13 @@ function renderOptionsLines(options: unknown): ReactNode {
       <OptionLine key={key} label={key} text={typeof val === "string" ? val : JSON.stringify(val)} />
     ));
   }
-  return <p className="text-sm text-[var(--color-text-secondary)]">{String(options)}</p>;
+  return <p className="text-sm text-muted-foreground">{String(options)}</p>;
 }
 
 function OptionLine({ label, text }: { label: string; text: string }) {
   return (
-    <p className="text-sm text-[var(--color-text-secondary)]">
-      <span className="font-mono text-xs font-semibold text-[var(--ink)]">{label}.</span> {text}
+    <p className="text-sm text-muted-foreground">
+      <span className="font-mono text-xs font-semibold text-foreground">{label}.</span> {text}
     </p>
   );
 }

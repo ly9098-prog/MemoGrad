@@ -21,10 +21,10 @@ export function QuestionEditSubmitFooter({
   emptyCodeCount,
 }: QuestionEditSubmitFooterProps) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-7 -mb-24 mt-8 flex justify-end gap-2 border-t border-slate-200 bg-white/96 px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl">
+    <div className="sticky bottom-0 z-10 -mx-7 -mb-24 mt-8 flex justify-end gap-2 border-t border-border bg-card/96 px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.04)] backdrop-blur-xl">
       <Button
         variant="secondary"
-        className="min-w-24 border-slate-200 bg-white shadow-none"
+        className="min-w-24 border-border bg-card shadow-none"
         onClick={cancelEditing}
       >
         <X className="h-4 w-4" />

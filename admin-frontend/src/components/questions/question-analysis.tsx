@@ -129,10 +129,10 @@ function StructuredValue({ value }: { value: unknown }) {
       <ol className="space-y-2.5">
         {value.map((item, index) => (
           <li key={index} className="grid grid-cols-[22px_minmax(0,1fr)] items-start gap-2.5">
-            <span className="mt-[3px] grid h-[22px] w-[22px] place-items-center rounded-md bg-[var(--color-bg-input)] text-[10px] font-semibold tabular-nums text-[var(--color-text-hint)]">
+            <span className="mt-[3px] grid h-[22px] w-[22px] place-items-center rounded-md bg-muted text-[10px] font-semibold tabular-nums text-muted-foreground/70">
               {index + 1}
             </span>
-            <div className="min-w-0 leading-7 text-[var(--color-text-secondary)]">
+            <div className="min-w-0 leading-7 text-muted-foreground">
               <MathFormula text={renderScalar(item)} />
             </div>
           </li>
@@ -143,11 +143,11 @@ function StructuredValue({ value }: { value: unknown }) {
 
   if (value && typeof value === "object") {
     return (
-      <dl className="divide-y divide-[var(--color-border-light)]">
+      <dl className="divide-y divide-border/60">
         {Object.entries(value as AnalysisObject).map(([key, item]) => (
           <div key={key} className="grid gap-1 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-4">
-            <dt className="text-xs font-medium text-[var(--color-text-hint)]">{titleFromKey(key)}</dt>
-            <dd className="min-w-0 leading-7 text-[var(--color-text-secondary)]">
+            <dt className="text-xs font-medium text-muted-foreground/70">{titleFromKey(key)}</dt>
+            <dd className="min-w-0 leading-7 text-muted-foreground">
               <MathFormula text={renderScalar(item)} />
             </dd>
           </div>
@@ -215,17 +215,17 @@ function AnalysisSectionRow({
 
   return (
     <article
-      className={`group relative ${compact ? "py-3" : "py-4.5"} ${!isLast ? "border-b border-[var(--color-border-light)]" : ""}`}
+      className={`group relative ${compact ? "py-3" : "py-4.5"} ${!isLast ? "border-b border-border/60" : ""}`}
     >
       <div className={`grid ${compact ? "grid-cols-[30px_minmax(0,1fr)] gap-2.5" : "grid-cols-[38px_minmax(0,1fr)] gap-3.5"}`}>
         <div className="relative">
           <span
-            className={`grid ${compact ? "h-7 w-7" : "h-9 w-9"} place-items-center rounded-xl border border-[#dbe5ef] bg-[#f4f8fc] text-[#527496] transition-colors duration-200 group-hover:border-[#cbd9e6] group-hover:bg-[#edf4fa] group-hover:text-[#365f87]`}
+            className={`grid ${compact ? "h-7 w-7" : "h-9 w-9"} place-items-center rounded-xl border border-primary/20 bg-accent/60 text-primary transition-colors duration-200 group-hover:border-primary/30 group-hover:bg-accent group-hover:text-accent-foreground`}
           >
             <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={1.8} />
           </span>
           {!compact ? (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border border-white bg-[#e9f0f6] px-1 text-[9px] font-semibold tabular-nums text-[#6f879d]">
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border border-card bg-accent px-1 text-[9px] font-semibold tabular-nums text-accent-foreground">
               {String(index + 1).padStart(2, "0")}
             </span>
           ) : null}
@@ -233,15 +233,15 @@ function AnalysisSectionRow({
 
         <div className="min-w-0">
           <div className={compact ? "mb-1.5" : "mb-2.5"}>
-            <h4 className={`${compact ? "text-[13px]" : "text-[15px]"} font-semibold tracking-[0.01em] text-[var(--ink)]`}>
+            <h4 className={`${compact ? "text-[13px]" : "text-[15px]"} font-semibold tracking-[0.01em] text-foreground`}>
               {section.title}
             </h4>
             {!compact ? (
-              <p className="mt-0.5 text-[11px] leading-5 text-[var(--color-text-hint)]">{section.description}</p>
+              <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground/70">{section.description}</p>
             ) : null}
           </div>
 
-          <div className={`${compact ? "text-[13px]" : "text-sm"} text-[var(--color-text-secondary)]`}>
+          <div className={`${compact ? "text-[13px]" : "text-sm"} text-muted-foreground`}>
             <StructuredValue value={section.value} />
           </div>
         </div>
@@ -253,7 +253,7 @@ function AnalysisSectionRow({
 function PlainAnalysis({ value, compact }: { value: string; compact: boolean }) {
   return (
     <div
-      className={`${compact ? "px-3.5 py-3" : "px-4 py-3.5"} rounded-xl border border-[var(--color-border-light)] bg-white/55 text-[var(--color-text-secondary)]`}
+      className={`${compact ? "px-3.5 py-3" : "px-4 py-3.5"} rounded-xl border border-border/60 bg-card/55 text-muted-foreground`}
     >
       <div className={`${compact ? "text-[13px]" : "text-sm"} whitespace-pre-wrap break-words leading-7`}>
         <MathFormula text={value || "—"} />
@@ -287,7 +287,7 @@ export function QuestionAnalysis({
 
   return (
     <div
-      className={`${compact ? "px-3.5" : "px-4.5"} rounded-xl border border-[var(--color-border-light)] bg-[#fbfcfd]/70 ${className}`}
+      className={`${compact ? "px-3.5" : "px-4.5"} rounded-xl border border-border/60 bg-card/70 ${className}`}
     >
       {sections.map((section, index) => (
         <AnalysisSectionRow

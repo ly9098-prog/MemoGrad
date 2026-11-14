@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ManagementPage } from "@/components/admin/management-ui";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { buildVersionLabels } from "./question-version-labels";
@@ -283,15 +284,15 @@ export default function QuestionsPage() {
   });
 
   return (
-    <div className="space-y-4 pb-10">
-      <Card className="overflow-visible border border-[var(--color-border)] bg-white/90 shadow-[var(--shadow-card)]">
+    <ManagementPage className="space-y-4 pb-10">
+      <Card className="overflow-visible border border-border bg-card/90 shadow-[var(--shadow-card)]">
         <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-2xl font-bold text-[var(--ink)]">
+              <h3 className="font-display text-2xl font-bold text-foreground">
                 正式题库
               </h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-sm text-muted-foreground">
                 点击题目查看题干、选项、答案与解析；详情面板用于编辑、版本对比或删除。
               </p>
             </div>
@@ -355,7 +356,7 @@ export default function QuestionsPage() {
 
             <aside className="hidden xl:block xl:min-h-0 xl:self-stretch">
               <div className="xl:sticky xl:top-0 xl:h-dvh xl:min-h-0 xl:overflow-hidden">
-              <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-slate-200 bg-white p-5">
+              <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-border bg-card p-5">
                 <QuestionSideDetailPanel
                   questionId={selectedQuestionId}
                   question={selectedQuestion}
@@ -476,6 +477,6 @@ export default function QuestionsPage() {
         onCancel={cancelDelete}
         onConfirm={confirmDelete}
       />
-    </div>
+    </ManagementPage>
   );
 }

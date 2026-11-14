@@ -39,7 +39,7 @@ import {
   statusTone,
 } from "@/lib/syllabus-utils";
 
-const selectClass = "h-11 w-full rounded-xl border border-[var(--color-border)] bg-white px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[rgba(74,111,138,0.12)] disabled:cursor-not-allowed disabled:opacity-50";
+const selectClass = "h-11 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-[rgba(74,111,138,0.12)] disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function SyllabusPage() {
   const queryClient = useQueryClient();
@@ -282,22 +282,22 @@ export default function SyllabusPage() {
                   <button
                     key={item.id}
                     onClick={() => setSelectedVersionId(item.id)}
-                    className={`group relative flex w-full items-center gap-3 rounded-[13px] border px-3 py-2.5 text-left transition-[background-color,border-color,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] active:scale-[0.99] motion-reduce:transition-none ${selected ? "border-[rgba(74,111,138,0.32)] bg-[var(--mgmt-steel)] shadow-[0_8px_20px_rgba(45,80,104,0.07)]" : "border-transparent hover:border-[var(--mgmt-line)] hover:bg-white"}`}
+                    className={`group relative flex w-full items-center gap-3 rounded-[13px] border px-3 py-2.5 text-left transition-[background-color,border-color,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] motion-reduce:transition-none ${selected ? "border-[rgba(74,111,138,0.32)] bg-[var(--mgmt-steel)] shadow-[0_8px_20px_rgba(45,80,104,0.07)]" : "border-transparent hover:border-[var(--mgmt-line)] hover:bg-card"}`}
                     aria-pressed={selected}
                   >
-                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[11px] border text-[13px] font-bold tabular-nums transition-colors ${selected ? "border-[rgba(74,111,138,0.26)] bg-white text-[var(--color-primary-dark)]" : "border-[var(--mgmt-line)] bg-[rgba(237,243,246,0.52)] text-[var(--color-text-secondary)] group-hover:bg-[var(--mgmt-steel)]"}`}>{item.effective_year}</span>
+                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[11px] border text-[13px] font-bold tabular-nums transition-colors ${selected ? "border-[rgba(74,111,138,0.26)] bg-card text-accent-foreground" : "border-[var(--mgmt-line)] bg-[rgba(237,243,246,0.52)] text-muted-foreground group-hover:bg-[var(--mgmt-steel)]"}`}>{item.effective_year}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm font-semibold text-[var(--ink)]">{item.name}</span>
+                        <span className="min-w-0 truncate text-sm font-semibold text-foreground">{item.name}</span>
                         <StatusBadge tone={statusTone(item.status)}>{STATUS_LABEL[item.status]}</StatusBadge>
                       </span>
-                      <span className="mt-1.5 flex items-center gap-2 text-[10px] text-[var(--color-text-tertiary)]">
+                      <span className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground/70">
                         <span className="min-w-0 truncate">{item.code}</span>
                         <span aria-hidden="true">·</span>
                         <span className="shrink-0 tabular-nums">{item.knowledge_point_count} KP</span>
                       </span>
                     </span>
-                    {selected ? <span aria-hidden="true" className="absolute inset-y-3 left-0 w-[2px] rounded-r-full bg-[var(--color-primary)]" /> : null}
+                    {selected ? <span aria-hidden="true" className="absolute inset-y-3 left-0 w-[2px] rounded-r-full bg-primary" /> : null}
                   </button>
                 );
               })}
@@ -375,10 +375,10 @@ export default function SyllabusPage() {
           >
             {!detail ? <EmptyState>请选择一个考纲版本。</EmptyState> : (
               <>
-                <div className="border-b border-[var(--color-border-light)] bg-[rgba(74,111,138,0.025)]">
+                <div className="border-b border-border/60 bg-[rgba(74,111,138,0.025)]">
                   <div className="flex flex-col gap-3 px-5 py-3.5 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-                      <span>已选择 <b className="text-[var(--ink)]">{selectedKnowledgePointIds.size}</b> 个知识点</span>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span>已选择 <b className="text-foreground">{selectedKnowledgePointIds.size}</b> 个知识点</span>
                       {detail.status === "draft" ? <StatusBadge tone={membershipDirty ? "warning" : "success"}>{membershipDirty ? "有未保存变更" : "范围已保存"}</StatusBadge> : <StatusBadge tone="neutral">只读</StatusBadge>}
                     </div>
                     {detail.status === "draft" && canWrite ? (
@@ -393,9 +393,9 @@ export default function SyllabusPage() {
                   </div>
                   <div className="flex flex-col gap-2 border-t border-[var(--mgmt-line)]/70 bg-[rgba(255,254,250,0.84)] px-5 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
                     <label className="relative block w-full sm:max-w-sm">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                       <Input
-                        className="h-10 bg-white pl-9 pr-9 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)]"
+                        className="h-10 bg-card pl-9 pr-9 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)]"
                         value={catalogKeyword}
                         onChange={(event) => setCatalogKeyword(event.target.value)}
                         placeholder="搜索知识点或科目"
@@ -405,7 +405,7 @@ export default function SyllabusPage() {
                         <button
                           type="button"
                           onClick={() => setCatalogKeyword("")}
-                          className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[var(--color-text-hint)] transition hover:bg-[var(--mgmt-steel)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                          className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/70 transition hover:bg-[var(--mgmt-steel)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           aria-label="清空知识点搜索"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -413,7 +413,7 @@ export default function SyllabusPage() {
                       ) : null}
                     </label>
                     <div className="flex flex-wrap items-center justify-end gap-2.5">
-                      <span className="mr-1 text-xs tabular-nums text-[var(--color-text-tertiary)]">{groupedCatalog.length} 个科目 · 显示 {visibleCatalog.length} / {catalog.length}</span>
+                      <span className="mr-1 text-xs tabular-nums text-muted-foreground/70">{groupedCatalog.length} 个科目 · 显示 {visibleCatalog.length} / {catalog.length}</span>
                       <Button variant="ghost" size="sm" onClick={expandAllSubjects} disabled={groupedCatalog.length === 0 || collapsedSubjects.size === 0}>
                         全部展开
                       </Button>
@@ -432,29 +432,29 @@ export default function SyllabusPage() {
                     const selectedCount = items.filter((item) => selectedKnowledgePointIds.has(item.knowledge_point_id)).length;
                     const collapsed = collapsedSubjects.has(subjectKey);
                     return (
-                      <section key={subjectKey} className="overflow-hidden rounded-[15px] border border-[var(--mgmt-line)] bg-white shadow-[0_6px_18px_rgba(31,49,61,0.02)] transition-[border-color,box-shadow] duration-200 hover:border-[rgba(74,111,138,0.27)] hover:shadow-[0_10px_24px_rgba(31,49,61,0.035)] motion-reduce:transition-none">
+                      <section key={subjectKey} className="overflow-hidden rounded-[15px] border border-[var(--mgmt-line)] bg-card shadow-[0_6px_18px_rgba(31,49,61,0.02)] transition-[border-color,box-shadow] duration-200 hover:border-[rgba(74,111,138,0.27)] hover:shadow-[0_10px_24px_rgba(31,49,61,0.035)] motion-reduce:transition-none">
                         <button
                           type="button"
                           onClick={() => toggleSubjectGroup(subjectKey)}
                           aria-expanded={!collapsed}
-                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-[rgba(237,243,246,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-[rgba(237,243,246,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
                         >
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[rgba(74,111,138,0.16)] bg-[var(--mgmt-steel)] text-[var(--color-primary-dark)]">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[rgba(74,111,138,0.16)] bg-[var(--mgmt-steel)] text-accent-foreground">
                             <Layers3 className="h-4 w-4" />
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-bold leading-5 tracking-[-0.01em] text-[var(--ink)]">{subjectName}</span>
+                              <span className="text-sm font-bold leading-5 tracking-[-0.01em] text-foreground">{subjectName}</span>
                               <StatusBadge tone={isCoreSubject ? "accent" : "neutral"}>{isCoreSubject ? "核心科目" : "扩展科目"}</StatusBadge>
                             </span>
-                            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-[var(--color-text-tertiary)]">
+                            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-4 text-muted-foreground/70">
                               <span>{subjectCode}</span>
-                              <span aria-hidden="true" className="text-slate-300">·</span>
+                              <span aria-hidden="true" className="text-muted-foreground/60">·</span>
                               <span className="tabular-nums">已选 {selectedCount} / {items.length}</span>
                             </span>
                             <ManagementProgress className="mt-2 max-w-sm" value={selectedCount} max={items.length} tone={selectedCount === items.length ? "success" : "accent"} />
                           </span>
-                          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--color-text-hint)] transition-transform duration-200 group-hover:text-[var(--color-primary-dark)] motion-reduce:transition-none ${collapsed ? "-rotate-90" : "rotate-0"}`} />
+                          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:text-accent-foreground motion-reduce:transition-none ${collapsed ? "-rotate-90" : "rotate-0"}`} />
                         </button>
                         <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}>
                           <div className="overflow-hidden">
@@ -467,14 +467,14 @@ export default function SyllabusPage() {
                                     key={item.knowledge_point_id}
                                     disabled={disabled}
                                     onClick={() => toggleKnowledgePoint(item.knowledge_point_id)}
-                                    className={`flex min-h-[72px] items-start gap-3 rounded-[11px] border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] active:scale-[0.99] disabled:cursor-default disabled:active:scale-100 motion-reduce:transition-none ${checked ? "border-[rgba(74,111,138,0.30)] bg-[var(--mgmt-steel)] shadow-[inset_2px_0_0_var(--color-primary),0_5px_16px_rgba(45,80,104,0.035)]" : "border-[var(--mgmt-line)] bg-white hover:border-[rgba(74,111,138,0.28)] hover:bg-slate-50/55"}`}
+                                    className={`flex min-h-[72px] items-start gap-3 rounded-[11px] border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:cursor-default disabled:active:scale-100 motion-reduce:transition-none ${checked ? "border-[rgba(74,111,138,0.30)] bg-[var(--mgmt-steel)] shadow-[inset_2px_0_0_var(--primary),0_5px_16px_rgba(45,80,104,0.035)]" : "border-[var(--mgmt-line)] bg-card hover:border-[rgba(74,111,138,0.28)] hover:bg-muted/40"}`}
                                   >
-                                    <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-[background-color,border-color,transform] duration-200 ${checked ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white" : "border-[var(--color-border)] bg-white text-transparent"}`}>
+                                    <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-[background-color,border-color,transform] duration-200 ${checked ? "border-primary bg-primary text-white" : "border-border bg-card text-transparent"}`}>
                                       <Check className="h-3 w-3" strokeWidth={3} />
                                     </span>
                                     <span className="min-w-0">
-                                      <span className="block text-sm font-medium leading-5 text-[var(--ink)]">{item.name}</span>
-                                      <span className="mt-1 block text-[11px] leading-4 text-[var(--color-text-tertiary)]">难度 {item.difficulty_level} · KP #{item.knowledge_point_id}</span>
+                                      <span className="block text-sm font-medium leading-5 text-foreground">{item.name}</span>
+                                      <span className="mt-1 block text-[11px] leading-4 text-muted-foreground/70">难度 {item.difficulty_level} · KP #{item.knowledge_point_id}</span>
                                     </span>
                                   </button>
                                 );
@@ -497,8 +497,8 @@ export default function SyllabusPage() {
               <ManagementPanel variant="quiet" title="基础覆盖" description="至少有 1 道已审核且启用的题目即视为覆盖。">
                 <div className="flex items-end justify-between gap-4">
                   <div>
-                    <p className="text-3xl font-semibold tracking-[-0.03em] tabular-nums text-[var(--ink)]">{coverageQuery.data?.covered_knowledge_points ?? 0}<span className="text-base font-medium text-[var(--color-text-tertiary)]"> / {coverageQuery.data?.total_knowledge_points ?? 0}</span></p>
-                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">覆盖率 {coveragePct}%</p>
+                    <p className="text-3xl font-semibold tracking-[-0.03em] tabular-nums text-foreground">{coverageQuery.data?.covered_knowledge_points ?? 0}<span className="text-base font-medium text-muted-foreground/70"> / {coverageQuery.data?.total_knowledge_points ?? 0}</span></p>
+                    <p className="mt-1 text-xs text-muted-foreground">覆盖率 {coveragePct}%</p>
                   </div>
                   <StatusBadge tone={coveragePct >= 90 ? "success" : "warning"}>{coveragePct >= 90 ? "覆盖良好" : "仍有缺口"}</StatusBadge>
                 </div>
@@ -512,8 +512,8 @@ export default function SyllabusPage() {
                 ) : null}
               </ManagementPanel>
               <ManagementPanel variant="quiet" title="跨版本映射" description="自动关系与手工关系统一在当前版本下查看。" icon={<GitMerge className="h-4 w-4" />}>
-                <p className="text-3xl font-semibold tracking-[-0.03em] tabular-nums text-[var(--ink)]">{mappingsQuery.data?.length ?? 0}</p>
-                <p className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)]">激活时自动生成 unchanged、renamed、added、removed；合并、拆分、替换关系可手工补充。</p>
+                <p className="text-3xl font-semibold tracking-[-0.03em] tabular-nums text-foreground">{mappingsQuery.data?.length ?? 0}</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">激活时自动生成 unchanged、renamed、added、removed；合并、拆分、替换关系可手工补充。</p>
               </ManagementPanel>
             </div>
           ) : null}
@@ -562,15 +562,15 @@ export default function SyllabusPage() {
 
           {detail && (mappingsQuery.data?.length ?? 0) > 0 ? (
             <ManagementPanel title="映射明细" description={`展示当前版本前 ${Math.min(mappingsQuery.data?.length ?? 0, 60)} 条映射关系。`} contentClassName="p-0">
-              <div className="divide-y divide-[var(--color-border-light)]">
+              <div className="divide-y divide-border/60">
                 {(mappingsQuery.data ?? []).slice(0, 60).map((item) => (
                   <div key={item.id} className="grid gap-2 px-4 py-3.5 text-sm transition-colors hover:bg-[rgba(237,243,246,0.38)] md:grid-cols-[110px_minmax(0,1fr)_30px_minmax(0,1fr)_40px] md:items-center md:px-5">
                     <StatusBadge tone={["merged", "split", "replaced"].includes(item.relation_type) ? "accent" : "neutral"}>{RELATION_LABEL[item.relation_type] ?? item.relation_type}</StatusBadge>
-                    <span className="truncate text-[var(--ink)]">{item.from_name ?? "无"}</span>
-                    <span className="hidden place-items-center text-[var(--color-text-tertiary)] md:grid"><ArrowRight className="h-4 w-4" /></span>
-                    <span className="min-w-0 truncate text-[var(--ink)]">{item.to_name ?? "无"}{item.note ? <span className="ml-2 text-xs text-[var(--color-text-tertiary)]">{item.note}</span> : null}</span>
+                    <span className="truncate text-foreground">{item.from_name ?? "无"}</span>
+                    <span className="hidden place-items-center text-muted-foreground/70 md:grid"><ArrowRight className="h-4 w-4" /></span>
+                    <span className="min-w-0 truncate text-foreground">{item.to_name ?? "无"}{item.note ? <span className="ml-2 text-xs text-muted-foreground/70">{item.note}</span> : null}</span>
                     {detail.status === "draft" && canWrite && ["merged", "split", "replaced"].includes(item.relation_type) ? (
-                      <Button className="h-8 w-8 px-0 text-red-600 hover:bg-red-50 hover:text-red-700" size="sm" variant="ghost" disabled={deleteMappingMutation.isPending} onClick={() => deleteMappingMutation.mutate(item.id)} aria-label="删除映射">
+                      <Button className="h-8 w-8 px-0 text-destructive hover:bg-destructive-light hover:text-destructive" size="sm" variant="ghost" disabled={deleteMappingMutation.isPending} onClick={() => deleteMappingMutation.mutate(item.id)} aria-label="删除映射">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     ) : <span />}

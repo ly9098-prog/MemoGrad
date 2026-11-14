@@ -23,6 +23,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ManagementPage } from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type {
   KnowledgeGraphEdge,
@@ -635,8 +636,8 @@ function RelationDonut({ counts }: { counts: Record<string, number> }) {
       >
         <div className="absolute inset-[13px] grid place-items-center rounded-full bg-[var(--porcelain)] text-center">
           <div>
-            <div className="text-lg font-bold text-[var(--ink)]">{total}</div>
-            <div className="text-[9px] text-[var(--color-text-hint)]">关系</div>
+            <div className="text-lg font-bold text-foreground">{total}</div>
+            <div className="text-[9px] text-muted-foreground/70">关系</div>
           </div>
         </div>
       </div>
@@ -645,11 +646,11 @@ function RelationDonut({ counts }: { counts: Record<string, number> }) {
           const value = Number(counts[key] ?? 0);
           return (
             <div key={key} className="flex items-center justify-between gap-3 text-[11px]">
-              <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="h-2 w-2 rounded-full" style={{ background: RELATIONS[key].color }} />
                 {RELATIONS[key].label}
               </span>
-              <span className="font-mono text-[var(--color-text-hint)]">
+              <span className="font-mono text-muted-foreground/70">
                 {value} {total ? `· ${((value / total) * 100).toFixed(0)}%` : ""}
               </span>
             </div>
@@ -1039,25 +1040,25 @@ export default function KnowledgeGraphPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-[1580px] flex-col gap-3.5 [overflow-anchor:none]">
+    <ManagementPage className="flex flex-col gap-3.5 space-y-0 [overflow-anchor:none]">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-display text-[28px] font-bold tracking-tight text-[var(--ink)]">知识图谱</h1>
-            <span className="rounded-full bg-[var(--color-primary-light)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-dark)]">Graph</span>
+            <h1 className="font-display text-[28px] font-bold tracking-tight text-foreground">知识图谱</h1>
+            <span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">Graph</span>
           </div>
-          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">探索知识点关系、定位学习路径，并检查图谱连接质量。</p>
+          <p className="mt-1 text-xs text-muted-foreground">探索知识点关系、定位学习路径，并检查图谱连接质量。</p>
         </div>
         {summary && (
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-lg border border-[var(--color-border-light)] bg-white/68 px-2.5 py-1.5 text-[var(--color-text-secondary)]">
-              <b className="mr-1 text-[var(--ink)]">{summary.total_nodes}</b>知识点
+            <span className="rounded-lg border border-border/60 bg-card/68 px-2.5 py-1.5 text-muted-foreground">
+              <b className="mr-1 text-foreground">{summary.total_nodes}</b>知识点
             </span>
-            <span className="rounded-lg border border-[var(--color-border-light)] bg-white/68 px-2.5 py-1.5 text-[var(--color-text-secondary)]">
-              <b className="mr-1 text-[var(--ink)]">{summary.total_edges}</b>关系边
+            <span className="rounded-lg border border-border/60 bg-card/68 px-2.5 py-1.5 text-muted-foreground">
+              <b className="mr-1 text-foreground">{summary.total_edges}</b>关系边
             </span>
-            <span className="rounded-lg border border-[var(--color-border-light)] bg-white/68 px-2.5 py-1.5 text-[var(--color-text-secondary)]">
-              平均置信度 <b className="ml-1 text-[var(--ink)]">{(summary.avg_confidence * 100).toFixed(0)}%</b>
+            <span className="rounded-lg border border-border/60 bg-card/68 px-2.5 py-1.5 text-muted-foreground">
+              平均置信度 <b className="ml-1 text-foreground">{(summary.avg_confidence * 100).toFixed(0)}%</b>
             </span>
           </div>
         )}
@@ -1066,21 +1067,21 @@ export default function KnowledgeGraphPage() {
       <section className="surface-card rounded-2xl p-3.5">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative min-w-[300px] flex-1 lg:max-w-[560px]">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
             <Input
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
-              className="h-10 bg-white/80 pl-10 pr-20"
+              className="h-10 bg-card/80 pl-10 pr-20"
               placeholder="搜索名称、别名或 ID，输入后自动定位"
               aria-label="搜索知识点名称、别名或 ID"
             />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
-              {(searchDebouncing || (graph.isFetching && !!searchTerm)) && <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--color-text-hint)]" />}
+              {(searchDebouncing || (graph.isFetching && !!searchTerm)) && <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground/70" />}
               {searchDraft && (
                 <button
                   type="button"
                   onClick={() => setSearchDraft("")}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-[var(--color-text-hint)] transition hover:bg-[var(--color-primary-light)] hover:text-[var(--ink)]"
+                  className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-accent hover:text-foreground"
                   title="清空搜索"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1099,7 +1100,7 @@ export default function KnowledgeGraphPage() {
               setZoom(1);
               setPan({ x: 0, y: 0 });
             })}
-            className="h-10 min-w-[150px] border-[var(--color-border)]"
+            className="h-10 min-w-[150px] border-border"
             options={(subjects.data ?? []).map((subject) => ({
               value: String(subject.id),
               label: subject.name,
@@ -1110,7 +1111,7 @@ export default function KnowledgeGraphPage() {
           <Select
             value={relationType}
             onChange={(value) => preserveScroll(() => setRelationType(value))}
-            className="h-10 min-w-[128px] border-[var(--color-border)]"
+            className="h-10 min-w-[128px] border-border"
             options={[
               { value: "", label: "全部关系" },
               ...Object.entries(RELATIONS).map(([value, config]) => ({ value, label: config.label })),
@@ -1119,7 +1120,7 @@ export default function KnowledgeGraphPage() {
           <Select
             value={depth}
             onChange={(value) => preserveScroll(() => setDepth(value))}
-            className="h-10 min-w-[92px] border-[var(--color-border)]"
+            className="h-10 min-w-[92px] border-border"
             options={[1, 2, 3].map((value) => ({ value: String(value), label: `深度 ${value}` }))}
           />
 
@@ -1161,35 +1162,35 @@ export default function KnowledgeGraphPage() {
           />
 
           {!isDefaultOverview ? (
-            <div className="absolute left-4 top-4 z-10 w-[148px] rounded-xl border border-[var(--color-border-light)] bg-white/94 p-3 shadow-[0_6px_18px_rgba(27,39,51,0.06)] backdrop-blur-md">
-              <div className="mb-2 text-[11px] font-semibold text-[var(--ink)]">关系类型</div>
-              <div className="mb-2 flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
-                <span className="grid h-5 w-5 place-items-center rounded-full border border-[var(--color-primary)] bg-[var(--color-primary-light)]"><Network className="h-3 w-3" /></span>
+            <div className="absolute left-4 top-4 z-10 w-[148px] rounded-xl border border-border/60 bg-card/94 p-3 shadow-[0_6px_18px_rgba(27,39,51,0.06)] backdrop-blur-md">
+              <div className="mb-2 text-[11px] font-semibold text-foreground">关系类型</div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span className="grid h-5 w-5 place-items-center rounded-full border border-primary bg-accent"><Network className="h-3 w-3" /></span>
                 知识点节点
               </div>
-              <div className="space-y-1.5 border-t border-[var(--color-border-light)] pt-2">
+              <div className="space-y-1.5 border-t border-border/60 pt-2">
                 {(Object.keys(RELATIONS) as RelationKey[]).map((key) => (
-                  <div key={key} className="flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
+                  <div key={key} className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <span className="h-[2px] w-6 rounded-full" style={{ background: RELATIONS[key].color }} />
                     {RELATIONS[key].label}
                     <ArrowRight className="ml-auto h-3 w-3" style={{ color: RELATIONS[key].color }} />
                   </div>
                 ))}
-                <div className="pt-1 text-[9px] leading-4 text-[var(--color-text-hint)]">虚线表示 inferred 自动推断边</div>
+                <div className="pt-1 text-[9px] leading-4 text-muted-foreground/70">虚线表示 inferred 自动推断边</div>
               </div>
             </div>
           ) : null}
 
           <div className="absolute right-4 top-4 z-10 flex gap-2">
             {graph.isFetching && (
-              <span className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-white/85 px-3 py-2 text-[10px] text-[var(--color-text-hint)]">
+              <span className="flex items-center gap-1.5 rounded-xl border border-border bg-card/85 px-3 py-2 text-[10px] text-muted-foreground/70">
                 <RefreshCw className="h-3 w-3 animate-spin" />刷新中
               </span>
             )}
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border-light)] bg-white/94 text-[var(--color-text-secondary)] shadow-sm transition hover:border-[#cbd8e0] hover:bg-white hover:text-[var(--color-primary-dark)]"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-border/60 bg-card/94 text-muted-foreground shadow-sm transition hover:border-primary/30 hover:bg-card hover:text-accent-foreground"
               title={fullscreenMode !== "none" ? "退出全屏" : "全屏查看"}
               aria-label={fullscreenMode !== "none" ? "退出全屏" : "全屏查看"}
             >
@@ -1198,26 +1199,26 @@ export default function KnowledgeGraphPage() {
           </div>
 
           {!isDefaultOverview ? (
-            <div className="absolute bottom-5 right-5 z-10 overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/95 shadow-[0_6px_18px_rgba(27,39,51,0.06)]">
-              <button type="button" onClick={() => setZoom((value) => clamp(value + 0.12, 0.68, 1.5))} className="grid h-9 w-10 place-items-center text-[var(--color-text-secondary)] transition hover:bg-[var(--color-primary-light)] disabled:cursor-default disabled:opacity-35" disabled={zoom >= 1.5} title="放大" aria-label="放大图谱"><Plus className="h-4 w-4" /></button>
-              <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="grid h-9 w-10 place-items-center border-y border-[var(--color-border-light)] text-[10px] font-semibold tabular-nums text-[var(--color-text-secondary)] transition hover:bg-[var(--color-primary-light)]" title="重置缩放与位置" aria-label="重置缩放与位置">{Math.round(zoom * 100)}%</button>
-              <button type="button" onClick={() => setZoom((value) => clamp(value - 0.12, 0.68, 1.5))} className="grid h-9 w-10 place-items-center text-[var(--color-text-secondary)] transition hover:bg-[var(--color-primary-light)] disabled:cursor-default disabled:opacity-35" disabled={zoom <= 0.68} title="缩小" aria-label="缩小图谱"><Minus className="h-4 w-4" /></button>
+            <div className="absolute bottom-5 right-5 z-10 overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-[0_6px_18px_rgba(27,39,51,0.06)]">
+              <button type="button" onClick={() => setZoom((value) => clamp(value + 0.12, 0.68, 1.5))} className="grid h-9 w-10 place-items-center text-muted-foreground transition hover:bg-accent disabled:cursor-default disabled:opacity-35" disabled={zoom >= 1.5} title="放大" aria-label="放大图谱"><Plus className="h-4 w-4" /></button>
+              <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="grid h-9 w-10 place-items-center border-y border-border/60 text-[10px] font-semibold tabular-nums text-muted-foreground transition hover:bg-accent" title="重置缩放与位置" aria-label="重置缩放与位置">{Math.round(zoom * 100)}%</button>
+              <button type="button" onClick={() => setZoom((value) => clamp(value - 0.12, 0.68, 1.5))} className="grid h-9 w-10 place-items-center text-muted-foreground transition hover:bg-accent disabled:cursor-default disabled:opacity-35" disabled={zoom <= 0.68} title="缩小" aria-label="缩小图谱"><Minus className="h-4 w-4" /></button>
             </div>
           ) : null}
 
           <div className="relative h-full min-h-0">
             {graph.isLoading ? (
               <div className="absolute inset-0 grid place-items-center">
-                <div className="text-center text-sm text-[var(--color-text-hint)]">
+                <div className="text-center text-sm text-muted-foreground/70">
                   <RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin" />正在加载知识图谱…
                 </div>
               </div>
             ) : graph.isError ? (
               <div className="absolute inset-0 grid place-items-center p-8 text-center">
                 <div>
-                  <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-[var(--color-danger)]" />
-                  <div className="font-semibold text-[var(--ink)]">知识图谱加载失败</div>
-                  <p className="mt-1 text-sm text-[var(--color-text-hint)]">请确认后端已部署管理端 /knowledge/graph 接口并检查当前账号权限。</p>
+                  <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-destructive" />
+                  <div className="font-semibold text-foreground">知识图谱加载失败</div>
+                  <p className="mt-1 text-sm text-muted-foreground/70">请确认后端已部署管理端 /knowledge/graph 接口并检查当前账号权限。</p>
                 </div>
               </div>
             ) : graph.data && isDefaultOverview ? (
@@ -1252,17 +1253,17 @@ export default function KnowledgeGraphPage() {
                 onPanChange={setPan}
               />
             ) : (
-              <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-[var(--color-text-hint)]">
+              <div className="absolute inset-0 grid place-items-center px-8 text-center text-sm text-muted-foreground/70">
                 {searchTerm ? `未找到与「${searchTerm}」匹配的知识点（已检索名称、aliases 别名与 ID）` : "当前筛选条件下没有可展示的知识点关系"}
               </div>
             )}
           </div>
 
           {summary && !isDefaultOverview && (
-            <div className="absolute bottom-5 left-5 z-10 flex flex-wrap gap-1.5 text-[10px] text-[var(--color-text-hint)]">
-              <span className="rounded-lg border border-[var(--color-border-light)] bg-white/92 px-2 py-1.5 shadow-[0_2px_8px_rgba(27,39,51,0.035)]">{summary.visible_nodes} 节点 · {summary.visible_edges} 边</span>
-              <span className="rounded-lg border border-[var(--color-border-light)] bg-white/92 px-2 py-1.5 shadow-[0_2px_8px_rgba(27,39,51,0.035)]">单击查看 · 双击聚焦 · Ctrl/⌘ + 滚轮缩放</span>
-              {summary.isolated_nodes > 0 && <span className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning-light)] px-2.5 py-1.5 text-[#8a6846]">孤立节点 {summary.isolated_nodes}</span>}
+            <div className="absolute bottom-5 left-5 z-10 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground/70">
+              <span className="rounded-lg border border-border/60 bg-card/92 px-2 py-1.5 shadow-[0_2px_8px_rgba(27,39,51,0.035)]">{summary.visible_nodes} 节点 · {summary.visible_edges} 边</span>
+              <span className="rounded-lg border border-border/60 bg-card/92 px-2 py-1.5 shadow-[0_2px_8px_rgba(27,39,51,0.035)]">单击查看 · 双击聚焦 · Ctrl/⌘ + 滚轮缩放</span>
+              {summary.isolated_nodes > 0 && <span className="rounded-lg border border-warning/30 bg-warning-light px-2.5 py-1.5 text-warning-foreground">孤立节点 {summary.isolated_nodes}</span>}
             </div>
           )}
         </section>
@@ -1275,32 +1276,32 @@ export default function KnowledgeGraphPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-display text-xl font-bold text-[var(--ink)]">{selectedNode.name}</h2>
-                      <span className="rounded-full bg-[var(--color-primary-light)] px-2 py-0.5 text-[9px] font-bold text-[var(--color-primary-dark)]">知识点</span>
+                      <h2 className="font-display text-xl font-bold text-foreground">{selectedNode.name}</h2>
+                      <span className="rounded-full bg-accent px-2 py-0.5 text-[9px] font-bold text-accent-foreground">知识点</span>
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
                       {selectedNode.description || "暂无知识点描述，可通过关系结构与关联题量判断其在学习路径中的位置。"}
                     </p>
                     {!!selectedNode.aliases?.length && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {selectedNode.aliases.slice(0, 6).map((alias) => (
-                          <span key={alias} className="rounded-full border border-[var(--color-border-light)] bg-white/70 px-2 py-0.5 text-[9px] text-[var(--color-text-secondary)]">
+                          <span key={alias} className="rounded-full border border-border/60 bg-card/70 px-2 py-0.5 text-[9px] text-muted-foreground">
                             {alias}
                           </span>
                         ))}
-                        {selectedNode.aliases.length > 6 && <span className="px-1 py-0.5 text-[9px] text-[var(--color-text-hint)]">+{selectedNode.aliases.length - 6}</span>}
+                        {selectedNode.aliases.length > 6 && <span className="px-1 py-0.5 text-[9px] text-muted-foreground/70">+{selectedNode.aliases.length - 6}</span>}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border border-[var(--color-border-light)] bg-white/52 p-3 text-[11px]">
-                  <div><span className="text-[var(--color-text-hint)]">知识点 ID</span><div className="mt-0.5 font-mono font-semibold text-[var(--ink)]">#{selectedNode.id}</div></div>
-                  <div><span className="text-[var(--color-text-hint)]">难度</span><div className="mt-0.5 font-semibold text-[var(--ink)]">{difficultyText(selectedNode.difficulty_level)} · L{selectedNode.difficulty_level}</div></div>
-                  <div><span className="text-[var(--color-text-hint)]">关联题目</span><div className="mt-0.5 font-semibold text-[var(--ink)]">{selectedNode.question_count} 题</div></div>
-                  <div><span className="text-[var(--color-text-hint)]">连接度</span><div className="mt-0.5 font-semibold text-[var(--ink)]">{selectedNode.degree} 条</div></div>
-                  <div><span className="text-[var(--color-text-hint)]">入边</span><div className="mt-0.5 font-semibold text-[var(--ink)]">{selectedNode.in_degree}</div></div>
-                  <div><span className="text-[var(--color-text-hint)]">出边</span><div className="mt-0.5 font-semibold text-[var(--ink)]">{selectedNode.out_degree}</div></div>
+                <div className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl border border-border/60 bg-card/52 p-3 text-[11px]">
+                  <div><span className="text-muted-foreground/70">知识点 ID</span><div className="mt-0.5 font-mono font-semibold text-foreground">#{selectedNode.id}</div></div>
+                  <div><span className="text-muted-foreground/70">难度</span><div className="mt-0.5 font-semibold text-foreground">{difficultyText(selectedNode.difficulty_level)} · L{selectedNode.difficulty_level}</div></div>
+                  <div><span className="text-muted-foreground/70">关联题目</span><div className="mt-0.5 font-semibold text-foreground">{selectedNode.question_count} 题</div></div>
+                  <div><span className="text-muted-foreground/70">连接度</span><div className="mt-0.5 font-semibold text-foreground">{selectedNode.degree} 条</div></div>
+                  <div><span className="text-muted-foreground/70">入边</span><div className="mt-0.5 font-semibold text-foreground">{selectedNode.in_degree}</div></div>
+                  <div><span className="text-muted-foreground/70">出边</span><div className="mt-0.5 font-semibold text-foreground">{selectedNode.out_degree}</div></div>
                 </div>
 
                 {centerId !== selectedNode.id && (
@@ -1321,10 +1322,10 @@ export default function KnowledgeGraphPage() {
                 )}
               </section>
 
-              <section className="border-t border-[var(--color-border-light)] pt-4">
+              <section className="border-t border-border/60 pt-4">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-[var(--ink)]">相邻知识点 <span className="font-normal text-[var(--color-text-hint)]">({selectedNeighbors.length})</span></h3>
-                  {selectedNeighbors.length > 0 && <span className="text-[9px] text-[var(--color-text-hint)]">按最高置信度排序</span>}
+                  <h3 className="text-xs font-bold text-foreground">相邻知识点 <span className="font-normal text-muted-foreground/70">({selectedNeighbors.length})</span></h3>
+                  {selectedNeighbors.length > 0 && <span className="text-[9px] text-muted-foreground/70">按最高置信度排序</span>}
                 </div>
                 <div className="space-y-1.5">
                   {selectedNeighbors.length ? visibleSelectedNeighbors.map(({ node, relations, maxConfidence }) => {
@@ -1335,10 +1336,10 @@ export default function KnowledgeGraphPage() {
                         key={node.id}
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => preserveScroll(() => setSelectedId(node.id))}
-                        className="flex w-full items-center gap-2 rounded-xl border border-transparent px-2.5 py-2 text-left transition hover:border-[var(--color-border-light)] hover:bg-white/70"
+                        className="flex w-full items-center gap-2 rounded-xl border border-transparent px-2.5 py-2 text-left transition hover:border-border/60 hover:bg-card/70"
                       >
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: relationColor(leadRelation.edge.relation_type) }} />
-                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--ink)]">{node.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{node.name}</span>
                         <span className="flex shrink-0 items-center gap-1">
                           {relations.slice(0, 2).map(({ edge, outgoing }) => (
                             <span
@@ -1349,29 +1350,29 @@ export default function KnowledgeGraphPage() {
                               {outgoing ? "→" : "←"}{relationLabel(edge.relation_type)}
                             </span>
                           ))}
-                          {relations.length > 2 && <span className="text-[9px] text-[var(--color-text-hint)]">+{relations.length - 2}</span>}
+                          {relations.length > 2 && <span className="text-[9px] text-muted-foreground/70">+{relations.length - 2}</span>}
                         </span>
-                        <span className="w-8 shrink-0 text-right font-mono text-[9px] text-[var(--color-text-hint)]">{Math.round(maxConfidence * 100)}%</span>
+                        <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted-foreground/70">{Math.round(maxConfidence * 100)}%</span>
                       </button>
                     );
                   }) : (
-                    <div className="rounded-xl border border-dashed border-[var(--color-border)] p-4 text-center text-[11px] text-[var(--color-text-hint)]">当前视图中没有相邻关系</div>
+                    <div className="rounded-xl border border-dashed border-border p-4 text-center text-[11px] text-muted-foreground/70">当前视图中没有相邻关系</div>
                   )}
                   {selectedNeighbors.length > visibleSelectedNeighbors.length && (
-                    <div className="px-2 pt-1 text-[10px] text-[var(--color-text-hint)]">
+                    <div className="px-2 pt-1 text-[10px] text-muted-foreground/70">
                       仅展示置信度最高的 {visibleSelectedNeighbors.length} 个，当前视图共 {selectedNeighbors.length} 个相邻知识点
                     </div>
                   )}
                 </div>
               </section>
 
-              <section className="border-t border-[var(--color-border-light)] pt-4">
-                <h3 className="mb-3 text-xs font-bold text-[var(--ink)]">关系类型分布</h3>
+              <section className="border-t border-border/60 pt-4">
+                <h3 className="mb-3 text-xs font-bold text-foreground">关系类型分布</h3>
                 <RelationDonut counts={selectedNode.relation_counts} />
               </section>
 
-              <section className="border-t border-[var(--color-border-light)] pt-4">
-                <h3 className="mb-3 flex items-center gap-1.5 text-xs font-bold text-[var(--ink)]"><GitBranch className="h-3.5 w-3.5" />图谱质量</h3>
+              <section className="border-t border-border/60 pt-4">
+                <h3 className="mb-3 flex items-center gap-1.5 text-xs font-bold text-foreground"><GitBranch className="h-3.5 w-3.5" />图谱质量</h3>
                 <div className="space-y-2.5 text-[11px]">
                   {(Object.keys(RELATIONS) as RelationKey[]).map((key) => {
                     const count = Number(relationCounts[key] ?? 0);
@@ -1379,8 +1380,8 @@ export default function KnowledgeGraphPage() {
                     if (!count) return null;
                     return (
                       <div key={key}>
-                        <div className="mb-1 flex justify-between text-[var(--color-text-secondary)]"><span>{RELATIONS[key].label} · {count}</span><span>{Math.round(confidence * 100)}% 置信度</span></div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-border-light)]"><div className="h-full rounded-full" style={{ width: `${clamp(confidence * 100, 3, 100)}%`, background: RELATIONS[key].color }} /></div>
+                        <div className="mb-1 flex justify-between text-muted-foreground"><span>{RELATIONS[key].label} · {count}</span><span>{Math.round(confidence * 100)}% 置信度</span></div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full" style={{ width: `${clamp(confidence * 100, 3, 100)}%`, background: RELATIONS[key].color }} /></div>
                       </div>
                     );
                   })}
@@ -1390,15 +1391,15 @@ export default function KnowledgeGraphPage() {
           ) : (
             <div className="grid min-h-[620px] place-items-center text-center">
               <div>
-                <BookOpen className="mx-auto mb-3 h-7 w-7 text-[var(--color-text-hint)]" />
-                <p className="text-sm font-semibold text-[var(--ink)]">选择一个知识点</p>
-                <p className="mt-1 text-xs text-[var(--color-text-hint)]">点击图中节点查看关系与题量详情</p>
+                <BookOpen className="mx-auto mb-3 h-7 w-7 text-muted-foreground/70" />
+                <p className="text-sm font-semibold text-foreground">选择一个知识点</p>
+                <p className="mt-1 text-xs text-muted-foreground/70">点击图中节点查看关系与题量详情</p>
               </div>
             </div>
           )}
         </aside>
         ) : null}
       </div>
-    </div>
+    </ManagementPage>
   );
 }

@@ -23,6 +23,7 @@ export type PermissionKey =
   | "role:read"
   | "role:write"
   | "permission:read"
+  | "system:read"
   | "ai_setting:read"
   | "ai_setting:write"
   | "import:read"

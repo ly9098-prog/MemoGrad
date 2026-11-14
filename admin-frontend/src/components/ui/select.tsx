@@ -87,7 +87,7 @@ export function Select({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "inline-flex h-8 items-center gap-1.5 rounded-lg border bg-white pl-3 pr-2 text-xs font-medium outline-none transition-all duration-150",
+          "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card pl-3 pr-2 text-xs font-medium text-foreground outline-none transition-all duration-150",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
           open && "ring-2",
           className,
@@ -97,15 +97,15 @@ export function Select({
           ...(open && color ? { boxShadow: `0 0 0 3px ${color}15` } : {}),
         }}
       >
-        <span className="flex-1 truncate text-left text-[var(--ink)]">
+        <span className="flex-1 truncate text-left text-foreground">
           {selected ? selected.label : placeholder}
         </span>
         {selected?.suffix && (
-          <span className="shrink-0 text-[10px] text-[var(--color-text-hint)]">{selected.suffix}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground/70">{selected.suffix}</span>
         )}
         <svg
           className={cn(
-            "h-3.5 w-3.5 shrink-0 text-[var(--color-text-hint)] transition-transform duration-200",
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200",
             open && "rotate-180",
           )}
           viewBox="0 0 24 24"
@@ -207,13 +207,13 @@ function PortalDropdown({
       ref={listRef}
       role="listbox"
       className={cn(
-        "rounded-xl border border-[var(--color-border)]/80 bg-white py-1 shadow-lg",
+        "rounded-xl border border-border/80 bg-card py-1 shadow-lg",
         optionClassName,
       )}
       style={style}
     >
       {options.length === 0 ? (
-        <div className="px-4 py-3 text-xs text-[var(--color-text-hint)]">无可用选项</div>
+        <div className="px-4 py-3 text-xs text-muted-foreground/70">无可用选项</div>
       ) : (
         options.map((opt) => {
           const isSelected = opt.value === value;
@@ -228,8 +228,8 @@ function PortalDropdown({
               className={cn(
                 "flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs transition-colors",
                 isSelected
-                  ? "font-semibold text-[var(--ink)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-light)]",
+                  ? "font-semibold text-foreground"
+                  : "text-muted-foreground hover:bg-accent",
                 opt.disabled && "cursor-not-allowed opacity-40",
               )}
             >
@@ -242,7 +242,7 @@ function PortalDropdown({
               />
               <span className="flex-1">{opt.label}</span>
               {opt.suffix && (
-                <span className="shrink-0 text-[10px] text-[var(--color-text-hint)]">{opt.suffix}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground/70">{opt.suffix}</span>
               )}
             </button>
           );

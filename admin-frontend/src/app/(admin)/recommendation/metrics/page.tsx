@@ -6,6 +6,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+} from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -23,8 +27,8 @@ function daysAgoISO(days: number): string {
 
 function showToast(msg: string, error = false) {
   const el = document.createElement("div");
-  el.className = `fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in bg-white ${
-    error ? "border-[var(--color-danger)]/30 text-[var(--color-danger)]" : "border-[var(--color-success)]/30 text-[var(--color-success)]"
+  el.className = `fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-popover px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in ${
+    error ? "border-destructive/30 text-destructive" : "border-success/30 text-success"
   }`;
   el.textContent = msg;
   document.body.appendChild(el);
@@ -75,38 +79,38 @@ export default function RecommendationMetricsPage() {
   const rows = metrics.data ?? [];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">推荐每日指标</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            按 (日期, 科目, 场景, 策略) 聚合自 recommendation_logs；重点比较正确率、完成率与掌握度提升
-          </p>
-        </div>
-        {canWrite && (
-          <div className="flex gap-2">
-            <Button variant="secondary" className="min-w-28" onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending}>
-              <Play className="h-4 w-4" />
-              {aggregateMutation.isPending ? "聚合中…" : "聚合今天"}
-            </Button>
-            <Button variant="secondary" className="min-w-28" onClick={() => backfillMutation.mutate()} disabled={backfillMutation.isPending}>
-              <RotateCcw className="h-4 w-4" />
-              {backfillMutation.isPending ? "补跑中…" : `补跑区间`}
-            </Button>
-          </div>
-        )}
-      </div>
+    <ManagementPage className="space-y-6">
+      <ManagementPageHeader
+        icon={<BarChart3 className="h-5 w-5" />}
+        title="推荐每日指标"
+        description="按日期、科目、场景与策略聚合推荐日志；重点比较正确率、完成率与掌握度提升。"
+        actions={
+          canWrite ? (
+            <>
+              <Button variant="secondary" className="min-w-28" onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending}>
+                <Play className="h-4 w-4" />
+                {aggregateMutation.isPending ? "聚合中…" : "聚合今天"}
+              </Button>
+              <Button variant="secondary" className="min-w-28" onClick={() => backfillMutation.mutate()} disabled={backfillMutation.isPending}>
+                <RotateCcw className="h-4 w-4" />
+                {backfillMutation.isPending ? "补跑中…" : "补跑区间"}
+              </Button>
+            </>
+          ) : null
+        }
+        meta={<span>平均推荐分适合观察同一策略调参前后的变化；跨策略效果优先比较正确率、完成率和掌握度提升。</span>}
+      />
 
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-4">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <label className="text-xs font-semibold text-muted-foreground">
               起始日期
-              <input type="date" className="ml-2 rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <input type="date" className="ml-2 rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </label>
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <label className="text-xs font-semibold text-muted-foreground">
               结束日期
-              <input type="date" className="ml-2 rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <input type="date" className="ml-2 rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </label>
           </div>
         </CardHeader>
@@ -162,17 +166,17 @@ export default function RecommendationMetricsPage() {
         </CardContent>
       </Card>
 
-      <div className="text-xs leading-5 text-[var(--color-text-hint)]">
+      <div className="text-xs leading-5 text-muted-foreground/70">
         注：平均推荐分的量纲可能因策略不同而不同，适合观察同一策略调参前后的变化；跨策略效果优先比较正确率、完成率和掌握度提升。
       </div>
 
-      <div className="flex h-5 items-center gap-2 text-xs text-[var(--color-text-hint)]">
+      <div className="flex h-5 items-center gap-2 text-xs text-muted-foreground/70">
         {metrics.isFetching && (
           <>
             <BarChart3 className="h-3.5 w-3.5 animate-pulse" /> 加载中…
           </>
         )}
       </div>
-    </div>
+    </ManagementPage>
   );
 }

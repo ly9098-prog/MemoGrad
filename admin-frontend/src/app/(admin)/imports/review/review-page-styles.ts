@@ -40,7 +40,7 @@ export const reviewPageStyles = `
 .section-scroll-ink::before { background: linear-gradient(180deg, transparent, rgba(91, 123, 154, 0.35), rgba(91, 123, 154, 0.15), transparent); }
 .section-scroll-jade::before { background: linear-gradient(180deg, transparent, rgba(107, 155, 107, 0.35), rgba(107, 155, 107, 0.15), transparent); }
 .section-scroll-purple::before { background: linear-gradient(180deg, transparent, rgba(154, 122, 186, 0.3), rgba(154, 122, 186, 0.12), transparent); }
-.stem-text { font-size: 0.9375rem; line-height: 1.75; color: var(--ink); white-space: pre-wrap; }
+.stem-text { font-size: 0.9375rem; line-height: 1.75; color: var(--foreground); white-space: pre-wrap; }
 .stem-text code { font-family: var(--font-mono); font-size: 0.8125rem; background: rgba(91,123,154,0.08); padding: 1px 5px; border-radius: 4px; }
 .stem-text pre { font-family: var(--font-mono); font-size: 0.8125rem; background: rgba(45,62,80,0.04); border: 1px solid rgba(232,229,224,0.6); border-radius: 10px; padding: 12px 14px; overflow-x: auto; white-space: pre-wrap; margin: 8px 0; line-height: 1.6; }
 .option-chip { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 8px; font-size: 11px; font-weight: 700; background: rgba(196,154,107,0.12); color: #8a6a3a; flex-shrink: 0; }
@@ -53,8 +53,8 @@ export const reviewPageStyles = `
 .seg-card { transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, background-color 0.18s ease; }
 .seg-card:hover { transform: translateY(-1px); }
 .seg-card.dragging { transform: scale(0.97); opacity: 0.6; filter: grayscale(0.1); }
-.seg-card.drop-target { transform: translateY(0); border-color: var(--color-warning); background: rgba(196,154,107,0.04); box-shadow: 0 0 0 2px rgba(196,154,107,0.15), 0 4px 16px rgba(196,154,107,0.08); }
-.seg-card.drop-target::before { content: ""; position: absolute; top: -2px; left: 8px; right: 8px; height: 2px; background: linear-gradient(90deg, transparent, var(--color-warning), transparent); border-radius: 1px; }
+.seg-card.drop-target { transform: translateY(0); border-color: var(--warning); background: rgba(196,154,107,0.04); box-shadow: 0 0 0 2px rgba(196,154,107,0.15), 0 4px 16px rgba(196,154,107,0.08); }
+.seg-card.drop-target::before { content: ""; position: absolute; top: -2px; left: 8px; right: 8px; height: 2px; background: linear-gradient(90deg, transparent, var(--warning), transparent); border-radius: 1px; }
 .seg-image-preview { transition: all 0.25s ease; }
 .seg-image-preview:hover { transform: scale(1.02); box-shadow: 0 4px 20px rgba(27,39,51,0.1), 0 1px 4px rgba(27,39,51,0.06); }
 .seg-section-header { position: relative; }

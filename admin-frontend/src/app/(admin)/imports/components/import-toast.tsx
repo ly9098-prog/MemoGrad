@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,28 +39,28 @@ export function ImportToast({
   const settings = {
     success: {
       icon: CheckCircle2,
-      shell: "border-emerald-200/90 bg-emerald-50/95 text-emerald-900",
-      iconWrap: "border-emerald-200 bg-white/80 text-emerald-700",
+      shell: "border-success/30 bg-success-light/95 text-success",
+      iconWrap: "border-success/30 bg-card/80 text-success",
     },
     error: {
       icon: AlertCircle,
-      shell: "border-red-200/90 bg-red-50/95 text-red-900",
-      iconWrap: "border-red-200 bg-white/80 text-red-700",
+      shell: "border-destructive/30 bg-destructive-light/95 text-destructive",
+      iconWrap: "border-destructive/30 bg-card/80 text-destructive",
     },
     warning: {
       icon: AlertTriangle,
-      shell: "border-amber-200/90 bg-amber-50/95 text-amber-950",
-      iconWrap: "border-amber-200 bg-white/80 text-amber-700",
+      shell: "border-warning/30 bg-warning-light/95 text-warning-foreground",
+      iconWrap: "border-warning/30 bg-card/80 text-warning-foreground",
     },
     info: {
       icon: Info,
-      shell: "border-[rgba(74,111,138,0.24)] bg-[rgba(239,246,249,0.96)] text-[var(--color-primary-dark)]",
-      iconWrap: "border-[rgba(74,111,138,0.20)] bg-white/80 text-[var(--color-primary-dark)]",
+      shell: "border-primary/25 bg-accent/95 text-accent-foreground",
+      iconWrap: "border-primary/20 bg-card/80 text-accent-foreground",
     },
   }[tone];
   const Icon = settings.icon;
 
-  return (
+  const toast = (
     <div
       role={tone === "error" ? "alert" : "status"}
       aria-live={tone === "error" ? "assertive" : "polite"}
@@ -86,11 +87,14 @@ export function ImportToast({
       <button
         type="button"
         onClick={onDismiss}
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-current/60 transition hover:bg-white/70 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/30"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-current/60 transition hover:bg-card/70 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/30"
         aria-label="关闭提示"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
   );
+
+  if (typeof document === "undefined") return toast;
+  return createPortal(toast, document.body);
 }

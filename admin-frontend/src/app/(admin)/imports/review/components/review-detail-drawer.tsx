@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Check,
@@ -132,23 +133,24 @@ export function ReviewDetailDrawer({
 }: ReviewDetailDrawerProps) {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-[rgba(16,24,40,0.38)] backdrop-blur-[1px]" role="presentation" onClick={onClose}>
+  const drawer = (
+    <div className="fixed inset-0 z-40 flex justify-end bg-overlay/70 backdrop-blur-[1px]" role="presentation" onClick={onClose}>
       <aside role="dialog" aria-modal="true" aria-labelledby="drawer-title"
             className="flex h-full w-full max-w-3xl flex-col overflow-y-auto shadow-[var(--shadow-floating)] animate-slide-in bg-noise"
             style={{
-              background: 'var(--color-bg)',
+              background: 'var(--background)',
               backgroundImage: 'linear-gradient(var(--blueprint-line) 1px, transparent 1px), linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px), url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.025\'/%3E%3C/svg%3E")',
               backgroundSize: '24px 24px, 24px 24px, 128px 128px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            <h2 id="drawer-title" className="sr-only">审核导入题目</h2>
             {/* ===== Compact Status Bar ===== */}
-            <div className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-bg)]/90 px-4 py-2 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 border-b border-border bg-background/90 px-4 py-2 backdrop-blur-xl">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="shrink-0 font-mono text-[11px] text-[var(--color-text-hint)]">#{item.id}</span>
-                  <span className="h-3 w-px bg-[var(--color-border)]" />
+                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground/70">#{item.id}</span>
+                  <span className="h-3 w-px bg-border" />
                   <StatusBadge tone={statusTone(item.status)}>{item.status}</StatusBadge>
                   {item.risk_level === "high" ? (
                     <span className="risk-seal risk-seal-high !py-0 !text-[10px]"><span className="text-current opacity-60">◉</span> 高风险</span>
@@ -158,11 +160,11 @@ export function ReviewDetailDrawer({
                     <span className="risk-seal risk-seal-low !py-0 !text-[10px]"><span className="text-current opacity-60">◉</span> 低风险</span>
                   ) : null}
                   {editState.subject_id ? (
-                    <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-primary-light)] px-2 py-0.5 text-[10px] font-semibold text-[var(--color-primary-dark)]">{subjectOptions.find((s) => s.id === editState.subject_id)?.name || `#${editState.subject_id}`}</span>
+                    <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-border bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">{subjectOptions.find((s) => s.id === editState.subject_id)?.name || `#${editState.subject_id}`}</span>
                   ) : null}
                   {/* ── 原题定位 ── */}
                   {item.source_question_no || item.source_image_seq != null ? (
-                    <span className="hidden md:inline-flex items-center gap-1 rounded border border-[var(--color-border)] bg-[var(--color-bg-input)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-secondary)]">
+                    <span className="hidden md:inline-flex items-center gap-1 rounded border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {item.source_image_seq != null ? `图${item.source_image_seq}` : null}
                       {item.source_image_seq != null && item.source_page_start != null ? " · " : null}
                       {item.source_page_start != null ? `第${item.source_page_start}页` : null}
@@ -171,18 +173,23 @@ export function ReviewDetailDrawer({
                     </span>
                   ) : null}
                   {item.risk_reasons && item.risk_reasons.length > 0 ? (
-                    <span className="hidden md:inline-block max-w-[200px] truncate text-[10px] text-red-600" title={item.risk_reasons.join("；")}>
+                    <span className="hidden md:inline-block max-w-[200px] truncate text-[10px] text-destructive" title={item.risk_reasons.join("；")}>
                       {item.risk_reasons[0]}
                     </span>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {/* View toggle */}
-                  <div className="flex overflow-hidden rounded-md border border-[var(--color-border)] bg-white/70">
-                    <button type="button" className={`px-2 py-1 text-[10px] font-semibold transition ${detailView === "formatted" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-secondary)] hover:text-[var(--color-primary-dark)]"}`} onClick={() => onDetailViewChange("formatted")}>文本</button>
-                    <button type="button" className={`px-2 py-1 text-[10px] font-semibold transition ${detailView === "json" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-secondary)] hover:text-[var(--color-primary-dark)]"}`} onClick={() => onDetailViewChange("json")}>JSON</button>
+                  <div className="flex overflow-hidden rounded-md border border-border bg-card/70">
+                    <button type="button" className={`px-2 py-1 text-[10px] font-semibold transition ${detailView === "formatted" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-accent-foreground"}`} onClick={() => onDetailViewChange("formatted")}>文本</button>
+                    <button type="button" className={`px-2 py-1 text-[10px] font-semibold transition ${detailView === "json" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-accent-foreground"}`} onClick={() => onDetailViewChange("json")}>JSON</button>
                   </div>
-                  <button className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--ink)]" onClick={onClose}>
+                  <button
+                    type="button"
+                    aria-label="关闭审核详情"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+                    onClick={onClose}
+                  >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -192,19 +199,19 @@ export function ReviewDetailDrawer({
             {/* ===== Content (main focus) ===== */}
             <div className="relative flex-1 px-6 py-5 space-y-5">
               {completePending ? (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--color-bg)]/70 backdrop-blur-sm">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-sm">
                   <div className="flex flex-col items-center gap-5">
                     {/* Ink spread animation */}
                     <div className="relative flex items-center justify-center">
-                      <div className="absolute h-20 w-20 rounded-full border border-[var(--color-primary)]/10 animate-ink-spread" />
-                      <div className="absolute h-14 w-14 rounded-full border border-[var(--color-primary)]/20 animate-ink-spread" style={{ animationDelay: "0.3s" }} />
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-[0_0_20px_rgba(91,123,154,0.15)]">
-                        <Sparkles className="h-5 w-5 text-[var(--color-primary)]" />
+                      <div className="absolute h-20 w-20 rounded-full border border-primary/10 animate-ink-spread" />
+                      <div className="absolute h-14 w-14 rounded-full border border-primary/20 animate-ink-spread" style={{ animationDelay: "0.3s" }} />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-[0_0_20px_rgba(91,123,154,0.15)]">
+                        <Sparkles className="h-5 w-5 text-primary" />
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-[var(--color-text-secondary)]">AI 正在审校</p>
-                      <p className="mt-0.5 text-xs text-[var(--color-text-hint)]">分析题目结构，生成补全建议</p>
+                      <p className="text-sm font-semibold text-muted-foreground">AI 正在审校</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground/70">分析题目结构，生成补全建议</p>
                     </div>
                   </div>
                 </div>
@@ -227,15 +234,15 @@ export function ReviewDetailDrawer({
 
                   {/* ── AI Suggestion Stamp ── */}
                   {completeSuggestion ? (
-                    <section className="animate-fade-up drawer-section-delay-5 section-scroll section-scroll-ink rounded-2xl border border-[var(--color-primary)]/20 bg-gradient-to-br from-[var(--color-primary-light)]/60 to-white/90 p-5 shadow-sm">
+                    <section className="animate-fade-up drawer-section-delay-5 section-scroll section-scroll-ink rounded-2xl border border-primary/20 bg-gradient-to-br from-accent/60 to-card/90 p-5 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-primary)] shadow-sm">
-                            <Sparkles className="h-4 w-4 text-white" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-sm">
+                            <Sparkles className="h-4 w-4 text-primary-foreground" />
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-[var(--color-primary-dark)]">AI 补全建议</p>
-                            <p className="text-[10px] text-[var(--color-text-hint)]">由语言模型自动生成，请复核后采纳</p>
+                            <p className="text-sm font-bold text-accent-foreground">AI 补全建议</p>
+                            <p className="text-[10px] text-muted-foreground/70">由语言模型自动生成，请复核后采纳</p>
                           </div>
                         </div>
                         {answerSuggestion ? (
@@ -249,8 +256,8 @@ export function ReviewDetailDrawer({
                             className={cn(
                               "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm transition",
                               answerSuggestionApplied
-                                ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-700 opacity-80"
-                                : "border-[var(--color-primary)]/30 bg-white text-[var(--color-primary-dark)] hover:bg-[var(--color-primary)] hover:text-white",
+                                ? "cursor-not-allowed border-success/30 bg-success-light text-success opacity-80"
+                                : "border-primary/30 bg-card text-accent-foreground hover:bg-primary hover:text-primary-foreground",
                             )}
                           >
                             {answerSuggestionApplied ? <Check className="h-3 w-3" /> : null}
@@ -258,8 +265,8 @@ export function ReviewDetailDrawer({
                           </button>
                         ) : null}
                       </div>
-                      <div className="mt-3 rounded-xl border border-[var(--color-primary)]/10 bg-white/80 p-3">
-                        <pre className="max-h-36 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-[var(--color-text-secondary)]">{renderJson(completeSuggestion)}</pre>
+                      <div className="mt-3 rounded-xl border border-primary/10 bg-card/80 p-3">
+                        <pre className="max-h-36 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">{renderJson(completeSuggestion)}</pre>
                       </div>
                     </section>
                   ) : null}
@@ -299,7 +306,7 @@ export function ReviewDetailDrawer({
               )}
               {/* ===== Sticky Bottom Footer ===== */}
               {!editing ? (
-                <div className="sticky bottom-0 z-10 border-t border-[var(--color-border)] bg-[var(--color-bg)]/90 px-4 py-3 backdrop-blur-xl">
+                <div className="sticky bottom-0 z-10 border-t border-border bg-background/90 px-4 py-3 backdrop-blur-xl">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <Button variant="primary" className="h-8 px-3.5 text-xs" disabled={!canWrite || item.status === "published" || isBlockedByVisualIssues} onClick={() => onApprove()}>
@@ -317,18 +324,23 @@ export function ReviewDetailDrawer({
                         onClick={() => {
                           if (canWrite) onComplete();
                         }}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold tracking-wider transition-all ${
+                        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] font-bold tracking-wider transition-all ${
                           completePending
-                            ? "bg-[var(--color-primary)]/10 text-[var(--color-primary-dark)] cursor-wait"
-                            : "bg-[var(--color-primary)]/10 text-[var(--color-primary-dark)] hover:bg-[var(--color-primary)] hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                            ? "bg-primary/10 text-accent-foreground cursor-wait"
+                            : "bg-primary/10 text-accent-foreground hover:bg-primary hover:text-primary-foreground disabled:opacity-40 disabled:pointer-events-none"
                         }`}
                       >
                         {completePending ? (
-                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                         ) : (
                           <Sparkles className="h-3 w-3" />
                         )}
-                        {completePending ? "审校中" : "AI 审校"}
+                        {completePending ? "审校中" : (
+                          <>
+                            <span className="sm:hidden">审校</span>
+                            <span className="hidden sm:inline">AI 审校</span>
+                          </>
+                        )}
                       </button>
                       <Button className="h-8 px-3 text-xs" variant="secondary" disabled={!canWrite || !previewDetailReady || segmentUploading >= 0} onClick={onStartEditing}>
                         <FileText className="h-3.5 w-3.5" />
@@ -344,24 +356,24 @@ export function ReviewDetailDrawer({
                   : null;
                 const canSave = saveState ? saveState.canSave : true;
                 return (
-                <div className="sticky bottom-0 z-10 border-t border-[var(--color-border)] bg-[var(--color-bg)]/90 px-4 py-3 backdrop-blur-xl">
+                <div className="sticky bottom-0 z-10 border-t border-border bg-background/90 px-4 py-3 backdrop-blur-xl">
                   {saveState && saveState.errors.length > 0 ? (
-                    <div className="mb-3 rounded-xl border border-red-200/50 bg-red-50/70 p-3">
+                    <div className="mb-3 rounded-xl border border-destructive/30 bg-destructive-light/70 p-3">
                       <div className="flex items-start gap-2">
-                        <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-400"><AlertTriangle className="h-3 w-3" /></span>
+                        <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive-light text-destructive"><AlertTriangle className="h-3 w-3" /></span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-medium text-red-700">无法保存，请先处理以下问题</p>
+                          <p className="text-[11px] font-medium text-destructive">无法保存，请先处理以下问题</p>
                           <ol className="mt-1.5 list-inside list-decimal space-y-0.5">
                             {saveState.errors.map((err, i) => (
-                              <li key={i} className="text-[10px] text-red-600">{err}</li>
+                              <li key={i} className="text-[10px] text-destructive">{err}</li>
                             ))}
                           </ol>
                         </div>
                       </div>
                       {saveState.warnings.length > 0 ? (
-                        <div className="mt-2 border-t border-red-200/30 pt-2">
+                        <div className="mt-2 border-t border-destructive/30 pt-2">
                           {saveState.warnings.map((w, i) => (
-                            <p key={i} className="text-[10px] text-amber-600">{w}</p>
+                            <p key={i} className="text-[10px] text-warning-foreground">{w}</p>
                           ))}
                         </div>
                       ) : null}
@@ -386,4 +398,10 @@ export function ReviewDetailDrawer({
       </aside>
     </div>
   );
+
+  // ManagementPage establishes an isolated stacking context. Portal the
+  // full-screen review drawer so it covers the global sidebar/topbar and is
+  // not clipped to the page content box.
+  if (typeof document === "undefined") return drawer;
+  return createPortal(drawer, document.body);
 }

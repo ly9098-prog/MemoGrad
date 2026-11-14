@@ -27,7 +27,7 @@ function CellContent({ cell }: { cell: StructuredTableCell }) {
               key={index}
               src={url}
               alt={String(block.alt ?? "表格单元格图片")}
-              className="max-h-40 max-w-full rounded border border-[var(--color-border)]/50 object-contain"
+              className="max-h-40 max-w-full rounded border border-border/50 object-contain"
             />
           ) : null;
         }
@@ -58,17 +58,17 @@ export function StructuredTable({
   const sourceImageUrl = resolveAssetUrl(table.source_image_url || table.fallback_image_url);
 
   return (
-    <figure className={`overflow-hidden rounded-xl border bg-white ${table.requires_review ? "border-amber-300" : "border-[var(--color-border)]/70"}`}>
+    <figure className={`overflow-hidden rounded-xl border bg-card ${table.requires_review ? "border-warning/40" : "border-border/70"}`}>
       {(table.caption || showMetadata) ? (
-        <figcaption className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/45 px-3 py-2">
-          <span className="text-xs font-semibold text-[var(--ink)]">{table.caption || "结构化表格"}</span>
-          {table.requires_review ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">需核对</span> : null}
+        <figcaption className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/45 px-3 py-2">
+          <span className="text-xs font-semibold text-foreground">{table.caption || "结构化表格"}</span>
+          {table.requires_review ? <span className="rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-bold text-warning-foreground">需核对</span> : null}
           {showMetadata ? (
             <>
-              <span className="text-[10px] text-[var(--color-text-hint)]">{table.row_count} 行 × {table.column_count} 列</span>
-              <span className="text-[10px] text-[var(--color-text-hint)]">置信度 {(table.confidence * 100).toFixed(0)}%</span>
-              {pageLabel ? <span className="text-[10px] text-[var(--color-text-hint)]">{pageLabel}</span> : null}
-              {table.source_format ? <span className="text-[10px] text-[var(--color-text-hint)]">{table.source_format}</span> : null}
+              <span className="text-[10px] text-muted-foreground/70">{table.row_count} 行 × {table.column_count} 列</span>
+              <span className="text-[10px] text-muted-foreground/70">置信度 {(table.confidence * 100).toFixed(0)}%</span>
+              {pageLabel ? <span className="text-[10px] text-muted-foreground/70">{pageLabel}</span> : null}
+              {table.source_format ? <span className="text-[10px] text-muted-foreground/70">{table.source_format}</span> : null}
             </>
           ) : null}
         </figcaption>
@@ -85,7 +85,7 @@ export function StructuredTable({
                       key={`${rowIndex}-${cellIndex}`}
                       rowSpan={cell.row_span}
                       colSpan={cell.col_span}
-                      className={`${compact ? "px-2 py-1.5" : "px-3 py-2.5"} min-w-24 border border-[var(--color-border)]/70 align-top leading-6 text-[var(--color-text-secondary)] ${cell.is_header ? "bg-[var(--color-primary-light)]/35 font-semibold text-[var(--ink)]" : "bg-white"}`}
+                      className={`${compact ? "px-2 py-1.5" : "px-3 py-2.5"} min-w-24 border border-border/70 align-top leading-6 text-muted-foreground ${cell.is_header ? "bg-accent/35 font-semibold text-foreground" : "bg-card"}`}
                       style={{ textAlign: cell.alignment }}
                     >
                       <CellContent cell={cell} />
@@ -98,17 +98,17 @@ export function StructuredTable({
         </table>
       </div>
       {layout.issues.length > 0 ? (
-        <div className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+        <div className="border-t border-warning/30 bg-warning-light px-3 py-2 text-[11px] text-warning-foreground">
           {layout.issues.join("；")}
         </div>
       ) : null}
       {table.requires_review && sourceImageUrl ? (
-        <details className="border-t border-[var(--color-border)]/60 px-3 py-2">
-          <summary className="cursor-pointer text-[11px] font-medium text-[var(--color-text-secondary)]">查看原始表格截图</summary>
+        <details className="border-t border-border/60 px-3 py-2">
+          <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">查看原始表格截图</summary>
           <img
             src={sourceImageUrl}
             alt="原始表格截图"
-            className="mt-2 max-h-80 max-w-full rounded-lg border border-[var(--color-border)] object-contain"
+            className="mt-2 max-h-80 max-w-full rounded-lg border border-border object-contain"
           />
         </details>
       ) : null}

@@ -11,18 +11,18 @@ function list(item: Partial<ImportQuestionItem>) {
 
 describe("review queue badges", () => {
   it.each([
-    ["missing", "缺失", "答案缺失", "#b03a3a", 700],
-    ["ai_filled", "AI", "AI补全", "#c46a3a", 600],
+    ["missing", "缺失", "答案缺失", "var(--destructive)", 700],
+    ["ai_filled", "AI", "AI补全", "var(--warning-foreground)", 600],
     ["imported", "导入", "已导入", null, null],
     ["manual_filled", "已填", "已填写", null, null],
     ["manual_verified", "已验", "已验证", null, null],
-    ["abnormal", "异常", "答案异常", "#b03a3a", 700],
+    ["abnormal", "异常", "答案异常", "var(--destructive)", 700],
   ])("retains both labels and emphasis for %s", (status, short, full, color, weight) => {
     const item = { answer_status: status as string };
     expect(table(item).answerStatusLabel).toBe(short);
     expect(table(item).answerStatusStyle).toEqual(color ? { color, fontWeight: weight } : {});
     expect(list(item).answerStatusLabel).toBe(full);
-    expect(list(item).answerStatusColor).toBe(color ?? "var(--color-text-hint)");
+    expect(list(item).answerStatusColor).toBe(color ?? "var(--muted-foreground)");
   });
 
   it.each([undefined, null, "", "unknown", "MISSING", " missing ", "__proto__", "constructor"])(
@@ -30,17 +30,17 @@ describe("review queue badges", () => {
       expect(table({ answer_status: status }).answerStatusLabel).toBe("—");
       expect(table({ answer_status: status }).answerStatusStyle).toEqual({});
       expect(list({ answer_status: status }).answerStatusLabel).toBeNull();
-      expect(list({ answer_status: status }).answerStatusColor).toBe("var(--color-text-hint)");
+      expect(list({ answer_status: status }).answerStatusColor).toBe("var(--muted-foreground)");
     },
   );
 
   it.each([
-    ["high", "高", "#b03a3a", 700, "#b03a3a"],
-    ["medium", "中", "#b87a30", 600, "#b87a30"],
-    ["low", "低", "#3a7a5a", undefined, "#3a7a5a"],
-    ["unknown", "低", "#3a7a5a", undefined, "var(--color-border)"],
-    ["HIGH", "低", "#3a7a5a", undefined, "var(--color-border)"],
-    ["", "低", "#3a7a5a", undefined, "var(--color-border)"],
+    ["high", "高", "var(--destructive)", 700, "var(--destructive)"],
+    ["medium", "中", "var(--warning-foreground)", 600, "var(--warning-foreground)"],
+    ["low", "低", "var(--success)", undefined, "var(--success)"],
+    ["unknown", "低", "var(--success)", undefined, "var(--border)"],
+    ["HIGH", "低", "var(--success)", undefined, "var(--border)"],
+    ["", "低", "var(--success)", undefined, "var(--border)"],
   ])("keeps table and list risk fallbacks distinct: %s", (risk, label, color, weight, dot) => {
     expect(table({ risk_level: risk as string }).riskLabel).toBe(label);
     expect(table({ risk_level: risk as string }).riskStyle).toEqual(

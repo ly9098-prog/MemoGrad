@@ -332,7 +332,7 @@ export default function ExamPapersPage() {
         description={query.isLoading ? "正在读取试卷数据" : `显示 ${filteredPapers.length} / ${papers.length} 份试卷，点击任意一行进入组卷详情。`}
         actions={
           <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center">
-            <div className="hidden items-center rounded-[11px] border border-[var(--mgmt-line)] bg-[rgba(237,243,246,0.48)] p-1 sm:flex" role="group" aria-label="按状态筛选试卷">
+            <div className="hidden items-center rounded-[11px] border border-border bg-secondary/50 p-1 sm:flex" role="group" aria-label="按状态筛选试卷">
               {statusSegments.map((segment) => {
                 const active = statusFilter === segment.value;
                 return (
@@ -340,20 +340,20 @@ export default function ExamPapersPage() {
                     key={segment.value || "all"}
                     type="button"
                     onClick={() => setStatusFilter(segment.value)}
-                    className={`flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-xs font-semibold transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.28)] active:scale-[0.98] motion-reduce:transform-none ${active ? "bg-white text-[var(--ink)] shadow-[0_2px_8px_rgba(31,49,61,0.08)]" : "text-[var(--color-text-secondary)] hover:bg-white/70 hover:text-[var(--ink)]"}`}
+                    className={`flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-xs font-semibold transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] motion-reduce:transform-none ${active ? "bg-card text-foreground shadow-[0_2px_8px_rgba(31,49,61,0.08)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
                     aria-pressed={active}
                   >
                     {segment.label}
-                    <span className={`text-[10px] tabular-nums ${active ? "text-[var(--color-primary-dark)]" : "text-[var(--color-text-tertiary)]"}`}>{segment.count}</span>
+                    <span className={`text-[10px] tabular-nums ${active ? "text-primary" : "text-muted-foreground/70"}`}>{segment.count}</span>
                   </button>
                 );
               })}
             </div>
             <label className="relative block w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
-              <Input className="h-10 bg-white pl-9 pr-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索名称、来源或年份" aria-label="搜索试卷" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input className="h-10 bg-card pl-9 pr-3 shadow-none" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索名称、来源或年份" aria-label="搜索试卷" />
             </label>
-            <CustomSelect className="h-10 w-full bg-white sm:hidden" value={statusFilter} onChange={setStatusFilter} options={statusOptions} placeholder="全部状态" />
+            <CustomSelect className="h-10 w-full bg-card sm:hidden" value={statusFilter} onChange={setStatusFilter} options={statusOptions} placeholder="全部状态" />
           </div>
         }
         contentClassName="p-0"
@@ -390,7 +390,7 @@ export default function ExamPapersPage() {
             >
               {filteredPapers.length > 0 ? (
                 <table className="w-full min-w-[920px] text-sm">
-                  <thead className="sticky top-0 z-10 bg-[rgba(244,247,249,0.96)] text-left text-[11px] font-semibold tracking-[0.015em] text-[var(--color-text-secondary)] shadow-[0_1px_0_var(--mgmt-line)] backdrop-blur-md">
+                  <thead className="sticky top-0 z-10 bg-secondary/95 text-left text-[11px] font-semibold tracking-[0.015em] text-muted-foreground shadow-[0_1px_0_var(--border)] backdrop-blur-md">
                     <tr>
                       <th className="px-5 py-3">试卷</th>
                       <th className="px-4 py-3">类型</th>
@@ -413,21 +413,21 @@ export default function ExamPapersPage() {
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") router.push(`/exams/${paper.public_id}`);
                           }}
-                          className="group relative border-t border-[var(--color-border-light)] transition-[background-color,box-shadow] duration-200 hover:bg-[rgba(74,111,138,0.04)] hover:shadow-[inset_3px_0_0_rgba(74,111,138,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+                          className="group relative border-t border-border transition-[background-color,box-shadow] duration-200 hover:bg-accent/40 hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none"
                         >
                           <td className="px-5 py-4">
                             <div className="flex min-w-0 items-center gap-2">
-                              {paper.year ? <span className="shrink-0 rounded-md border border-[var(--mgmt-line)] bg-[var(--mgmt-steel)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[var(--color-primary-dark)]">{paper.year}</span> : null}
-                              <p className="max-w-[430px] truncate font-semibold leading-5 text-[var(--ink)]">{paper.title}</p>
+                              {paper.year ? <span className="shrink-0 rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{paper.year}</span> : null}
+                              <p className="max-w-[430px] truncate font-semibold leading-5 text-foreground">{paper.title}</p>
                             </div>
-                            <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-tertiary)]">版本 v{paper.version}{paper.source ? ` · ${paper.source}` : ""}</p>
+                            <p className="mt-1 text-[11px] leading-5 text-muted-foreground/70">版本 v{paper.version}{paper.source ? ` · ${paper.source}` : ""}</p>
                           </td>
-                          <td className="px-4 py-4 text-[var(--color-text-secondary)]">{paperKindLabel(paper)}</td>
-                          <td className="px-4 py-4 text-right tabular-nums"><span className="font-semibold text-[var(--ink)]">{paper.question_count}</span><span className="text-[var(--color-text-tertiary)]"> / {paper.total_choice_score} 分</span></td>
-                          <td className="px-4 py-4 text-right tabular-nums text-[var(--color-text-secondary)]">{paper.duration_sec ? `${Math.round(paper.duration_sec / 60)} 分钟` : "不限时"}</td>
-                          <td className="px-4 py-4 text-right tabular-nums text-[var(--color-text-secondary)]">{paper.attempt_count}</td>
+                          <td className="px-4 py-4 text-muted-foreground">{paperKindLabel(paper)}</td>
+                          <td className="px-4 py-4 text-right tabular-nums"><span className="font-semibold text-foreground">{paper.question_count}</span><span className="text-muted-foreground/70"> / {paper.total_choice_score} 分</span></td>
+                          <td className="px-4 py-4 text-right tabular-nums text-muted-foreground">{paper.duration_sec ? `${Math.round(paper.duration_sec / 60)} 分钟` : "不限时"}</td>
+                          <td className="px-4 py-4 text-right tabular-nums text-muted-foreground">{paper.attempt_count}</td>
                           <td className="px-4 py-4"><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
-                          <td className="px-4 py-4 text-[var(--color-text-tertiary)]"><ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none" /></td>
+                          <td className="px-4 py-4 text-muted-foreground/70"><ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none" /></td>
                         </tr>
                       );
                     })}
@@ -441,22 +441,22 @@ export default function ExamPapersPage() {
             </div>
 
             <div
-              className="divide-y divide-[var(--color-border-light)] md:hidden"
+              className="divide-y divide-border md:hidden"
               style={{ minHeight: stableMobileHeight }}
             >
               {filteredPapers.length > 0 ? filteredPapers.map((paper) => {
                 const status = statusMeta(paper.status);
                 return (
-                  <button key={paper.id} className="group flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-[rgba(74,111,138,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]" onClick={() => router.push(`/exams/${paper.public_id}`)}>
+                  <button key={paper.id} className="group flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" onClick={() => router.push(`/exams/${paper.public_id}`)}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <p className="font-semibold leading-5 text-[var(--ink)]">{paper.title}</p>
+                        <p className="font-semibold leading-5 text-foreground">{paper.title}</p>
                         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{paperKindLabel(paper)} · {paper.question_count} 题 · {paper.total_choice_score} 分</p>
-                      <p className="mt-2 text-[11px] text-[var(--color-text-tertiary)]">v{paper.version} · 历史作答 {paper.attempt_count} 次</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{paperKindLabel(paper)} · {paper.question_count} 题 · {paper.total_choice_score} 分</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground/70">v{paper.version} · 历史作答 {paper.attempt_count} 次</p>
                     </div>
-                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-tertiary)] transition-transform duration-200 group-hover:translate-x-1" />
+                    <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-1" />
                   </button>
                 );
               }) : (

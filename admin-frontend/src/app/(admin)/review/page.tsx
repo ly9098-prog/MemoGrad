@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MessageToast } from "@/components/ui/message-toast";
+import { ManagementPage } from "@/components/admin/management-ui";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { hasPermission } from "@/lib/permissions/permissions";
@@ -419,22 +420,22 @@ export default function ReviewPage() {
     reasonAction === "rollback" ? "回滚原因" : "拒绝原因";
 
   return (
-    <div
+    <ManagementPage
       className={`space-y-4 ${
         canBatchReview && validSelectedIds.size > 0 ? "pb-28" : "pb-10"
       }`}
     >
-      <Card className="overflow-visible border border-[var(--color-border)] bg-white/90 shadow-[var(--shadow-card)]">
+      <Card className="overflow-visible border border-border bg-card/90 shadow-[var(--shadow-card)]">
         <CardHeader className="space-y-4 pb-4">
           <div>
-            <h2 className="font-display text-2xl font-bold text-[var(--ink)]">
+            <h2 className="font-display text-2xl font-bold text-foreground">
               审核工作台
             </h2>
-            <p className="mt-1 max-w-3xl text-sm text-[var(--color-text-secondary)]">
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               处理已入库题目的重审、驳回恢复与版本回滚。首次导入审核请前往{" "}
               <Link
                 href="/imports/review"
-                className="font-semibold text-[var(--color-primary-dark)] underline decoration-[var(--color-primary)]/35 underline-offset-2 transition hover:decoration-[var(--color-primary)]"
+                className="font-semibold text-accent-foreground underline decoration-primary/35 underline-offset-2 transition hover:decoration-primary"
               >
                 待审核题目
               </Link>
@@ -583,7 +584,7 @@ export default function ReviewPage() {
       >
         {showReasonInput ? (
           <label className="block">
-            <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <span className="text-xs font-semibold text-muted-foreground">
               {reasonLabel}（必填）
             </span>
             <textarea
@@ -598,19 +599,19 @@ export default function ReviewPage() {
                   : "说明拒绝原因，便于后续追溯"
               }
               aria-invalid={Boolean(reasonError)}
-              className="mt-2 w-full resize-y rounded-xl border border-[var(--color-border)] bg-white p-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+              className="mt-2 w-full resize-y rounded-xl border border-border bg-card p-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
             />
             <span className="mt-1 flex items-center justify-between gap-3 text-[11px]">
               <span
                 className={
                   reasonError
-                    ? "font-medium text-[var(--color-danger)]"
-                    : "text-[var(--color-text-hint)]"
+                    ? "font-medium text-destructive"
+                    : "text-muted-foreground/70"
                 }
               >
                 {reasonError || "将记录到审核日志，便于后续追溯。"}
               </span>
-              <span className="shrink-0 text-[var(--color-text-hint)]">
+              <span className="shrink-0 text-muted-foreground/70">
                 {reason.length}/{REVIEW_REASON_MAX_LENGTH}
               </span>
             </span>
@@ -623,6 +624,6 @@ export default function ReviewPage() {
         tone={message?.tone}
         onClose={clearMessage}
       />
-    </div>
+    </ManagementPage>
   );
 }

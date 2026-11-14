@@ -73,11 +73,11 @@ export function StructuredTableEditor({
   }
 
   return (
-    <section className="rounded-2xl border border-violet-200 bg-violet-50/25 p-4">
+    <section className="rounded-2xl border border-primary/20 bg-accent/25 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-[var(--ink)]">结构化表格编辑</p>
-          <p className="text-[10px] text-[var(--color-text-hint)]">支持单元格文本、表头、对齐和跨行跨列校正</p>
+          <p className="text-xs font-bold text-foreground">结构化表格编辑</p>
+          <p className="text-[10px] text-muted-foreground/70">支持单元格文本、表头、对齐和跨行跨列校正</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -102,10 +102,10 @@ export function StructuredTableEditor({
         </div>
       </div>
 
-      <label className="mb-3 block text-[11px] text-[var(--color-text-secondary)]">
+      <label className="mb-3 block text-[11px] text-muted-foreground">
         表题
         <input
-          className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-white px-2 py-1.5 text-xs"
+          className="mt-1 w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground"
           value={table.caption}
           onChange={(event) => onChange({
             ...table,
@@ -118,28 +118,28 @@ export function StructuredTableEditor({
       </label>
 
       {layout.issues.length > 0 ? (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{layout.issues.join("；")}</div>
+        <div className="mb-3 rounded-lg border border-warning/30 bg-warning-light px-3 py-2 text-[11px] text-warning-foreground">{layout.issues.join("；")}</div>
       ) : null}
 
       <div className="space-y-3">
         {table.rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="rounded-xl border border-[var(--color-border)]/70 bg-white p-3">
+          <div key={rowIndex} className="rounded-xl border border-border/70 bg-card p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[var(--color-text-secondary)]">第 {rowIndex + 1} 行</span>
+              <span className="text-[11px] font-semibold text-muted-foreground">第 {rowIndex + 1} 行</span>
               <div className="flex gap-2">
-                <button type="button" className="text-[10px] text-[var(--color-primary)]" onClick={() => addCell(rowIndex)}>新增单元格</button>
-                {table.rows.length > 1 ? <button type="button" className="text-[10px] text-red-600" onClick={() => deleteRow(rowIndex)}>删除行</button> : null}
+                <button type="button" className="text-[10px] text-primary" onClick={() => addCell(rowIndex)}>新增单元格</button>
+                {table.rows.length > 1 ? <button type="button" className="text-[10px] text-destructive" onClick={() => deleteRow(rowIndex)}>删除行</button> : null}
               </div>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {row.cells.map((cell, cellIndex) => (
-                <div key={cellIndex} className="rounded-lg border border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/35 p-2">
+                <div key={cellIndex} className="rounded-lg border border-border/60 bg-muted/35 p-2">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="text-[10px] text-[var(--color-text-hint)]">单元格 {cellIndex + 1}</span>
-                    {row.cells.length > 1 ? <button type="button" className="text-[10px] text-red-500" onClick={() => deleteCell(rowIndex, cellIndex)}>删除</button> : null}
+                    <span className="text-[10px] text-muted-foreground/70">单元格 {cellIndex + 1}</span>
+                    {row.cells.length > 1 ? <button type="button" className="text-[10px] text-destructive" onClick={() => deleteCell(rowIndex, cellIndex)}>删除</button> : null}
                   </div>
                   <textarea
-                    className="min-h-20 w-full rounded-md border border-[var(--color-border)] bg-white px-2 py-1.5 text-xs"
+                    className="min-h-20 w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                     value={cell.text}
                     onChange={(event) => updateCell(rowIndex, cellIndex, { text: event.target.value })}
                   />
@@ -147,7 +147,7 @@ export function StructuredTableEditor({
                     <label>跨行<input type="number" min={1} max={100} className="ml-1 w-14 rounded border px-1 py-0.5" value={cell.row_span} onChange={(event) => updateCell(rowIndex, cellIndex, { row_span: Math.max(1, Number(event.target.value) || 1) })} /></label>
                     <label>跨列<input type="number" min={1} max={100} className="ml-1 w-14 rounded border px-1 py-0.5" value={cell.col_span} onChange={(event) => updateCell(rowIndex, cellIndex, { col_span: Math.max(1, Number(event.target.value) || 1) })} /></label>
                     <label className="flex items-center gap-1"><input type="checkbox" checked={cell.is_header} onChange={(event) => updateCell(rowIndex, cellIndex, { is_header: event.target.checked })} />表头</label>
-                    <select className="rounded border bg-white px-1 py-0.5" value={cell.alignment} onChange={(event) => updateCell(rowIndex, cellIndex, { alignment: event.target.value as StructuredTableCell["alignment"] })}>
+                    <select className="rounded border border-border bg-card px-1 py-0.5 text-foreground" value={cell.alignment} onChange={(event) => updateCell(rowIndex, cellIndex, { alignment: event.target.value as StructuredTableCell["alignment"] })}>
                       <option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option>
                     </select>
                   </div>

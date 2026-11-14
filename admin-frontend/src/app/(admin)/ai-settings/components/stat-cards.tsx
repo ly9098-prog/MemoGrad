@@ -73,27 +73,27 @@ function StatCard({
   })();
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
       <div
         className="absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
         style={{ background: `radial-gradient(circle, ${gradient.replace("from-", "").replace("to-", "")}, transparent)` }}
       />
       <div className="relative z-10">
         <div className="flex items-start justify-between">
-          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">{label}</p>
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-[var(--color-border)]/60 bg-white/60 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
-            <Icon className="h-5 w-5" style={{ color: gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || "var(--color-primary)" }} />
+          <p className="text-sm font-semibold text-muted-foreground">{label}</p>
+          <div className="grid h-10 w-10 place-items-center rounded-xl border border-border/60 bg-card/60 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
+            <Icon className="h-5 w-5" style={{ color: gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || "var(--primary)" }} />
           </div>
         </div>
         <div className="mt-3 flex items-baseline gap-1.5">
           <span className={cn(
             "font-display text-3xl font-bold tracking-tight tabular-nums",
-            loading ? "text-[var(--color-border)]" : "text-[var(--ink)]",
+            loading ? "text-border" : "text-foreground",
           )}>
             {formatted}
           </span>
-          {!loading && <span className="text-sm font-medium text-[var(--color-text-hint)]">{suffix}</span>}
-          {loading && <span className="text-sm text-[var(--color-border)]">{suffix}</span>}
+          {!loading && <span className="text-sm font-medium text-muted-foreground/70">{suffix}</span>}
+          {loading && <span className="text-sm text-border">{suffix}</span>}
         </div>
       </div>
     </div>

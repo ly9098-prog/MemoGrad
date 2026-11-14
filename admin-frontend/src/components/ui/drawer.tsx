@@ -81,7 +81,7 @@ export function Drawer({
 
   // Escape key
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape" && isTopModalSurface(drawerRef.current)) onClose();
+    if (e.key === "Escape" && !e.defaultPrevented && isTopModalSurface(drawerRef.current)) onClose();
   }, [onClose]);
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export function Drawer({
     <div
       className={cn(
         "fixed inset-0 z-50 flex justify-end transition-all duration-250 ease-out",
-        visible ? "bg-[rgba(16,24,40,0.32)]" : "bg-transparent",
+        visible ? "bg-overlay/70" : "bg-transparent",
       )}
       onClick={onClose}
       role="dialog"
@@ -122,7 +122,7 @@ export function Drawer({
         ref={drawerRef}
         tabIndex={-1}
         className={cn(
-          "flex h-full flex-col bg-white shadow-xl outline-none transition-all duration-250 ease-out",
+          "flex h-full flex-col bg-card shadow-xl outline-none transition-all duration-250 ease-out",
           "motion-reduce:transition-none",
           visible ? "translate-x-0" : "translate-x-full",
           className || "w-full max-w-2xl",
@@ -131,11 +131,11 @@ export function Drawer({
       >
         {/* Header */}
         {title && (
-          <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div className="min-w-0 flex-1">{title}</div>
             <button
               onClick={onClose}
-              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-hint)] transition-colors hover:bg-[var(--color-primary-light)] hover:text-[var(--ink)]"
+              className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
               aria-label="关闭"
             >
               <X className="h-5 w-5" />

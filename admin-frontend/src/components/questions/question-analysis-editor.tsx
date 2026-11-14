@@ -219,7 +219,7 @@ export function QuestionAnalysisEditor({
   };
 
   return (
-    <section className="border-t border-slate-200 pt-6">
+    <section className="border-t border-border pt-6">
       <style>{`
         @keyframes questionAnalysisModuleEnter {
           from { opacity: 0; transform: translateY(-8px) scale(.985); }
@@ -237,40 +237,40 @@ export function QuestionAnalysisEditor({
       `}</style>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-950">解析</p>
-          <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
+          <p className="text-sm font-semibold text-foreground">解析</p>
+          <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground/60">
             将解析拆分为独立模块，保持内容结构清晰、便于维护。
           </p>
         </div>
         {modules.length > 0 ? (
-          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-medium tabular-nums text-slate-500">
+          <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-[10px] font-medium tabular-nums text-muted-foreground">
             {modules.length} 个模块
           </span>
         ) : null}
       </div>
 
       {modules.length > 0 ? (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           {modules.map((module, index) => {
             const preset = findPreset(module.key);
             return (
               <section
                 key={`${module.key}-${index}`}
-                className={`border-b border-slate-200 p-4 last:border-b-0 transition-colors hover:bg-slate-50/40 ${
+                className={`border-b border-border p-4 last:border-b-0 transition-colors hover:bg-muted/40 ${
                   enteringKey === module.key ? "question-analysis-module-enter" : ""
                 } ${removingKey === module.key ? "question-analysis-module-exit" : ""}`}
               >
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900">
+                      <p className="text-sm font-semibold text-foreground">
                         {titleFromKey(module.key)}
                       </p>
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-400">
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground/60">
                         {module.key}
                       </code>
                     </div>
-                    <p className="mt-1 text-[11px] leading-5 text-slate-400">
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground/60">
                       {preset?.description ?? "自定义解析模块"}
                     </p>
                   </div>
@@ -278,7 +278,7 @@ export function QuestionAnalysisEditor({
                     type="button"
                     onClick={() => deleteModule(module.key)}
                     disabled={removingKey !== null}
-                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-default disabled:opacity-40"
+                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground/60 transition hover:bg-destructive-light hover:text-destructive disabled:cursor-default disabled:opacity-40"
                     aria-label={`删除${titleFromKey(module.key)}`}
                     title="删除模块"
                   >
@@ -287,7 +287,7 @@ export function QuestionAnalysisEditor({
                   </button>
                 </div>
                 <textarea
-                  className="min-h-28 w-full resize-y rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-sm leading-6 text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100"
+                  className="min-h-28 w-full resize-y rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-primary focus:bg-card focus:ring-2 focus:ring-ring/20"
                   value={valueAsText(module.value)}
                   placeholder={preset?.placeholder ?? "填写该模块内容……"}
                   onChange={(event) => updateModule(module.key, event.target.value)}
@@ -297,14 +297,14 @@ export function QuestionAnalysisEditor({
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center">
-          <p className="text-sm font-medium text-slate-600">暂无解析模块</p>
-          <p className="mt-1 text-xs text-slate-400">可在下方添加失误诊断、知识补丁、复盘任务等模块。</p>
+        <div className="rounded-xl border border-dashed border-border bg-muted/60 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-muted-foreground">暂无解析模块</p>
+          <p className="mt-1 text-xs text-muted-foreground/60">可在下方添加失误诊断、知识补丁、复盘任务等模块。</p>
         </div>
       )}
 
-      <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-3.5">
-        <p className="mb-2 text-xs font-semibold text-slate-600">添加模块</p>
+      <div className="mt-3 rounded-xl border border-dashed border-border bg-muted/50 p-3.5">
+        <p className="mb-2 text-xs font-semibold text-muted-foreground">添加模块</p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="min-w-0 flex-1">
             <CustomSelect
@@ -314,13 +314,13 @@ export function QuestionAnalysisEditor({
               placeholder={availablePresets.length > 0 ? "选择要添加的模块" : "预设模块已全部添加"}
               disabled={availablePresets.length === 0}
               clearable={false}
-              className="h-10 border-slate-200 bg-white shadow-none"
+              className="h-10 border-border bg-card shadow-none"
             />
           </div>
           <Button
             type="button"
             variant="secondary"
-            className="shrink-0 border-slate-200 bg-white shadow-none"
+            className="shrink-0 border-border bg-card shadow-none"
             onClick={addPreset}
             disabled={availablePresets.length === 0 || !selectedPresetKey}
           >
@@ -329,15 +329,15 @@ export function QuestionAnalysisEditor({
           </Button>
         </div>
 
-        <div className="my-3 flex items-center gap-3 text-[10px] text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" />
+        <div className="my-3 flex items-center gap-3 text-[10px] text-muted-foreground/60">
+          <span className="h-px flex-1 bg-border" />
           或自定义模块
-          <span className="h-px flex-1 bg-slate-200" />
+          <span className="h-px flex-1 bg-border" />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
-            className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 font-mono text-xs text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+            className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-card px-3 font-mono text-xs text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-ring/20"
             value={customKey}
             placeholder="自定义模块标识，例如 common_mistake"
             onChange={(event) => setCustomKey(event.target.value)}
@@ -351,7 +351,7 @@ export function QuestionAnalysisEditor({
           <Button
             type="button"
             variant="secondary"
-            className="shrink-0 border-slate-200 bg-white shadow-none"
+            className="shrink-0 border-border bg-card shadow-none"
             onClick={addCustomModule}
             disabled={
               !customKey.trim() || existingKeys.has(canonicalKey(customKey.trim()))
@@ -362,7 +362,7 @@ export function QuestionAnalysisEditor({
           </Button>
         </div>
         {customKey.trim() && existingKeys.has(canonicalKey(customKey.trim())) ? (
-          <p className="mt-1.5 text-[11px] text-red-500">该模块标识已存在，请换一个名称。</p>
+          <p className="mt-1.5 text-[11px] text-destructive">该模块标识已存在，请换一个名称。</p>
         ) : null}
       </div>
     </section>

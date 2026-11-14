@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement } from "react";
 import DashboardPage from "./page";
 import { DashboardTrendChart } from "./components/dashboard-trend-chart";
+import { BodyPortal } from "@/components/ui/body-portal";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -12,6 +13,7 @@ const h = vi.hoisted(() => ({
   states: [] as unknown[], index: 0, setters: [] as ReturnType<typeof vi.fn>[],
   queries: [] as Query[], refetches: [] as ReturnType<typeof vi.fn>[],
   authenticated: true, bootstrapping: false,
+  permissions: ["dashboard:read", "system:read"] as string[],
   request: vi.fn(), toQuery: vi.fn((query: Record<string, unknown>) => {
     void query;
     return "?fixture";
@@ -38,6 +40,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: unknown) => unknown) => select({
     isAuthenticated: h.authenticated, isBootstrapping: h.bootstrapping,
+    permissions: h.permissions,
   }),
 }));
 vi.mock("@/lib/api/client", () => ({ apiRequest: h.request, toQuery: h.toQuery }));
@@ -56,6 +59,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-29T18:00:00Z"));
   h.states = []; h.index = 0; h.setters = []; h.queries = []; h.refetches = [];
   h.authenticated = true; h.bootstrapping = false;
+  h.permissions = ["dashboard:read", "system:read"];
   h.request.mockReset().mockResolvedValue({});
 });
 afterEach(() => {
@@ -90,6 +94,13 @@ describe("dashboard page request ownership", () => {
       30_000, 30_000, 60_000, 30_000, 60_000, 30_000,
     ]);
     expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false]);
+  });
+
+  it("does not request shared task diagnostics without system:read", () => {
+    h.permissions = ["dashboard:read"];
+    DashboardPage();
+    const diagnostics = h.queries.find((query) => query.queryKey.join("|") === "dashboard|task-diagnostics");
+    expect(diagnostics?.enabled).toBe(false);
   });
 
   it.each([
@@ -134,6 +145,8 @@ describe("dashboard page request ownership", () => {
     const root = DashboardPage();
     const button = find(root, (element) => element.type === "button")!;
     expect(button.props.disabled).toBe(true);
-    expect(find(root, (element) => element.props["aria-label"] === "正在刷新仪表盘数据")).toBeDefined();
+    const portal = find(root, (element) => element.type === BodyPortal)!;
+    expect(portal).toBeDefined();
+    expect(find(portal, (element) => element.props["aria-label"] === "正在刷新仪表盘数据")).toBeDefined();
   });
 });

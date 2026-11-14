@@ -205,11 +205,11 @@ export function ReviewStatusChart({ data, animationKey }: { data: ReviewStatusDa
     <div className="grid h-full min-h-[230px] grid-cols-1 items-center gap-1 px-4 pb-4 pt-2 sm:grid-cols-[minmax(250px,1fr)_minmax(210px,0.82fr)] sm:px-5">
       <div className="relative min-w-0">
         {activeEntry ? (
-          <div className="pointer-events-none absolute left-3 top-3 z-10 translate-y-0 rounded-xl border border-[var(--color-border-light)] bg-white/96 px-3.5 py-2.5 text-xs shadow-[0_12px_26px_rgba(37,61,89,0.12)] backdrop-blur transition-all duration-200">
-            <p className="font-semibold text-[var(--ink)]">{activeEntry.name}</p>
-            <p className="mt-1 text-[var(--color-text-secondary)]">
+          <div className="pointer-events-none absolute left-3 top-3 z-10 translate-y-0 rounded-xl border border-border/60 bg-card/95 px-3.5 py-2.5 text-xs shadow-[0_12px_26px_rgba(37,61,89,0.12)] backdrop-blur transition-all duration-200">
+            <p className="font-semibold text-foreground">{activeEntry.name}</p>
+            <p className="mt-1 text-muted-foreground">
               {formatValue(activeEntry.count)}
-              <span className="mx-1.5 text-[#b4c0cc]">•</span>
+              <span className="mx-1.5 text-border">•</span>
               {activeEntry.pct.toFixed(1)}%
             </p>
           </div>
@@ -348,7 +348,7 @@ export function ReviewStatusChart({ data, animationKey }: { data: ReviewStatusDa
         </svg>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 text-center">
-          <span className="rounded-full border border-[var(--color-border-light)] bg-white/94 px-4 py-1 text-[11px] font-semibold text-[var(--color-text-hint)] shadow-sm">
+          <span className="rounded-full border border-border/60 bg-card/95 px-4 py-1 text-[11px] font-semibold text-muted-foreground/70 shadow-sm">
             总题目 {formatValue(total)}
           </span>
         </div>
@@ -367,8 +367,8 @@ export function ReviewStatusChart({ data, animationKey }: { data: ReviewStatusDa
                 onMouseLeave={() => setActiveName(null)}
                 className={`grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 rounded-xl border px-2.5 py-2 text-left outline-none transition-all duration-200 ${
                   active
-                    ? "border-[#cbd9e2] bg-[var(--color-primary-light)]/70 shadow-[0_5px_16px_rgba(45,80,104,0.07)]"
-                    : "border-transparent hover:border-[var(--color-border-light)] hover:bg-white/65"
+                    ? "border-primary/30 bg-accent/70 shadow-[0_5px_16px_rgba(45,80,104,0.07)]"
+                    : "border-transparent hover:border-border/60 hover:bg-card/65"
                 }`}
                 style={{ opacity: dimmed ? 0.48 : 1 }}
               >
@@ -376,17 +376,17 @@ export function ReviewStatusChart({ data, animationKey }: { data: ReviewStatusDa
                   className="h-2.5 w-2.5 rounded-full shadow-sm transition-transform duration-200"
                   style={{ backgroundColor: PALETTE[entry.paletteIndex].dot, transform: active ? "scale(1.25)" : "scale(1)" }}
                 />
-                <span className="truncate text-sm font-semibold text-[var(--color-text-secondary)]">{entry.name}</span>
-                <span className="whitespace-nowrap text-sm tabular-nums text-[var(--color-text-hint)]">
+                <span className="truncate text-sm font-semibold text-muted-foreground">{entry.name}</span>
+                <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground/70">
                   {formatValue(entry.count)}
-                  <span className="mx-1.5 text-[#b4c0cc]">•</span>
+                  <span className="mx-1.5 text-border">•</span>
                   {entry.pct.toFixed(1)}%
                 </span>
               </button>
             );
           })
         ) : (
-          <div className="rounded-xl border border-dashed border-[var(--color-border)] px-4 py-5 text-center text-xs text-[var(--color-text-hint)]">
+          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground/70">
             正在加载审核状态…
           </div>
         )}

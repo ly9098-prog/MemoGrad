@@ -38,15 +38,15 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
 
   return (
     <div className="question-drawer-detail px-7 py-6 text-sm">
-      <section className="border-b border-slate-200 pb-6">
+      <section className="border-b border-border pb-6">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-950">题干</p>
+          <p className="text-sm font-semibold text-foreground">题干</p>
           <div className="flex flex-wrap items-center gap-2">
             <TypeBadge type={question.question_type} />
             <DifficultyBadge difficulty={question.difficulty} />
           </div>
         </div>
-        <div className="whitespace-pre-wrap text-[15px] leading-7 text-slate-700">
+        <div className="whitespace-pre-wrap text-[15px] leading-7 text-foreground">
           <QuestionContentRenderer
             content={question.content}
             fallbackText={textFromContent(question.content)}
@@ -57,8 +57,8 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
       </section>
 
       {fallbackUrls.length > 0 ? (
-        <section className="border-b border-slate-200 py-6">
-          <p className="mb-3 text-sm font-semibold text-slate-950">其他题目图片</p>
+        <section className="border-b border-border py-6">
+          <p className="mb-3 text-sm font-semibold text-foreground">其他题目图片</p>
           <div className="grid gap-3">
             {fallbackUrls.map((raw, index) => {
               const src = resolveAssetUrl(raw) || raw;
@@ -68,7 +68,7 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
                   href={src}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group/img relative block overflow-hidden rounded-xl border border-[var(--color-border)]/50 bg-[var(--color-bg-input)]/30 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  className="group/img relative block overflow-hidden rounded-xl border border-border/50 bg-muted/30 focus:outline-none focus:ring-2 focus:ring-ring"
                   aria-label={`在新窗口查看题目图片 ${index + 1}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- legacy image mirror */}
@@ -91,8 +91,8 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
         </section>
       ) : null}
 
-      <section className="border-b border-slate-200 py-6">
-        <p className="text-sm font-semibold text-slate-950">选项</p>
+      <section className="border-b border-border py-6">
+        <p className="text-sm font-semibold text-foreground">选项</p>
         <div className="mt-3">
           {isMultiBlankChoice(question.question_type) ? (
             <MultiBlankQuestionOptions
@@ -106,9 +106,9 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
         </div>
       </section>
 
-      <section className="border-b border-slate-200 py-6">
-        <p className="text-sm font-semibold text-slate-950">答案</p>
-        <div className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[15px] font-semibold leading-6 text-slate-800">
+      <section className="border-b border-border py-6">
+        <p className="text-sm font-semibold text-foreground">答案</p>
+        <div className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-border bg-muted px-3 py-2 text-[15px] font-semibold leading-6 text-foreground">
           <QuestionAnswerDisplay
             questionType={question.question_type}
             answer={question.answer}
@@ -116,16 +116,16 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
         </div>
       </section>
 
-      <section className="border-b border-slate-200 py-6">
-        <p className="text-sm font-semibold text-slate-950">解析</p>
+      <section className="border-b border-border py-6">
+        <p className="text-sm font-semibold text-foreground">解析</p>
         <div className="mt-3">
           <QuestionAnalysis value={question.analysis} />
         </div>
       </section>
 
-      <section className="border-b border-slate-200 py-6">
+      <section className="border-b border-border py-6">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-slate-950">知识点与难度</p>
+          <p className="text-sm font-semibold text-foreground">知识点与难度</p>
           <DifficultyBadge difficulty={question.difficulty} />
         </div>
         <QuestionKnowledgePointsDisplay value={question.knowledge_points} />

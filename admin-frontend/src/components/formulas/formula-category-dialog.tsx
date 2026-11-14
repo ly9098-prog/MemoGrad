@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
     return null;
   }
 
-  return (
+  const dialog = (
     <div
       className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-[rgba(16,24,40,0.42)] backdrop-blur-[2px] pt-[15vh]"
       onClick={onClose}
@@ -80,19 +81,19 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md animate-drop-in rounded-2xl border border-[var(--color-border)] bg-white p-6 shadow-xl"
+        className="w-full max-w-md animate-drop-in rounded-2xl border border-border bg-card p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-lg font-bold text-[var(--ink)]">{title}</h3>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-[var(--color-bg-input)]">
+          <h3 className="font-display text-lg font-bold text-foreground">{title}</h3>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-muted">
             <X className="h-4 w-4 mx-auto" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">编码（英文）*</label>
+            <label className="text-xs font-semibold text-muted-foreground">编码（英文）*</label>
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -100,7 +101,7 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">名称 *</label>
+            <label className="text-xs font-semibold text-muted-foreground">名称 *</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -108,13 +109,13 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
             />
           </div>
 
-          <div className="inline-flex items-center gap-1.5 rounded-lg border bg-gray-50 px-3 py-1.5 text-xs text-[var(--color-text-secondary)]">
+          <div className="inline-flex items-center gap-1.5 rounded-lg border bg-muted px-3 py-1.5 text-xs text-muted-foreground">
             <span className="font-semibold">类型：</span>
             {nodeType === "subject" ? "科目" : nodeType === "chapter" ? "章节" : "分组"}
           </div>
 
           {error && (
-            <p className="text-sm text-red-500">{error}</p>
+            <p className="text-sm text-destructive">{error}</p>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
@@ -130,4 +131,7 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return dialog;
+  return createPortal(dialog, document.body);
 }

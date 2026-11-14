@@ -6,6 +6,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { Drawer } from "@/components/ui/drawer";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+} from "@/components/admin/management-ui";
 import { apiRequest } from "@/lib/api/client";
 import type {
   HealthReportResponse,
@@ -50,12 +54,12 @@ function percent(v: number | undefined | null): string {
 function KVCard({ title, items }: { title: string; items: [string, string][] }) {
   return (
     <Card>
-      <CardHeader className="text-sm font-bold text-[var(--color-text-primary)]">{title}</CardHeader>
+      <CardHeader className="text-sm font-bold text-foreground">{title}</CardHeader>
       <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-3">
         {items.map(([k, v]) => (
           <div key={k} className="flex flex-col">
-            <span className="text-xs text-[var(--color-text-secondary)]">{k}</span>
-            <span className="text-lg font-bold text-[var(--color-text-primary)]">{v}</span>
+            <span className="text-xs text-muted-foreground">{k}</span>
+            <span className="text-lg font-bold text-foreground">{v}</span>
           </div>
         ))}
       </CardContent>
@@ -66,9 +70,9 @@ function KVCard({ title, items }: { title: string; items: [string, string][] }) 
 function Warnings({ warnings }: { warnings: string[] }) {
   if (!warnings || warnings.length === 0) return null;
   return (
-    <div className="rounded-2xl border border-[var(--color-danger)]/20 bg-[#fdf3f3] p-4">
-      <div className="mb-2 text-xs font-bold text-[var(--color-danger)]">告警（{warnings.length}）</div>
-      <ul className="list-disc pl-5 text-sm text-[var(--color-text-secondary)]">
+    <div className="rounded-2xl border border-destructive/20 bg-destructive-light/60 p-4">
+      <div className="mb-2 text-xs font-bold text-destructive">告警（{warnings.length}）</div>
+      <ul className="list-disc pl-5 text-sm text-muted-foreground">
         {warnings.map((w, i) => (
           <li key={i}>{w}</li>
         ))}
@@ -82,7 +86,7 @@ function DictRows({ rows, label }: { rows: Record<string, unknown>[] | undefined
   const columns = Object.keys(rows[0] ?? {}).map((key) => ({ id: key, header: key, accessorKey: key }));
   return (
     <div className="mt-4">
-      <div className="mb-2 text-xs font-bold text-[var(--color-text-secondary)]">{label}</div>
+      <div className="mb-2 text-xs font-bold text-muted-foreground">{label}</div>
       <DataTable<Record<string, unknown>> data={rows} columns={columns} emptyText="无数据" />
     </div>
   );
@@ -107,18 +111,20 @@ export default function RecommendationReportsPage() {
   const h = health.data;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">推荐报表</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">推荐健康度 / 推荐质量 / 知识图谱质量</p>
-        </div>
-        {(health.isFetching || quality.isFetching || knowledge.isFetching) && (
-          <div className="flex items-center gap-2 text-xs text-[var(--color-text-hint)]">
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> 加载中…
-          </div>
-        )}
-      </div>
+    <ManagementPage className="space-y-6">
+      <ManagementPageHeader
+        icon={<FileSearch className="h-5 w-5" />}
+        title="推荐报表"
+        description="推荐健康度、推荐质量与知识图谱质量的只读诊断视图。"
+        actions={
+          health.isFetching || quality.isFetching || knowledge.isFetching ? (
+            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> 加载中…
+            </span>
+          ) : null
+        }
+        meta={<span>报表数据来自现有健康检查与质量报告接口，不提供写操作。</span>}
+      />
 
       {h && (
         <>
@@ -147,7 +153,7 @@ export default function RecommendationReportsPage() {
           <Warnings warnings={quality.data.warnings} />
           {quality.data.hot_questions && quality.data.hot_questions.length > 0 && (
             <div className="mt-4">
-              <div className="mb-2 text-xs font-bold text-[var(--color-text-secondary)]">热门题目</div>
+              <div className="mb-2 text-xs font-bold text-muted-foreground">热门题目</div>
               <DataTable<Record<string, unknown>>
                 data={quality.data.hot_questions}
                 emptyText="无数据"
@@ -164,7 +170,7 @@ export default function RecommendationReportsPage() {
                         <button
                           type="button"
                           onClick={() => setViewQuestion(row.original)}
-                          className="block max-w-[320px] truncate text-left text-sm text-[var(--color-primary-dark)] underline-offset-2 hover:underline"
+                          className="block max-w-[320px] truncate text-left text-sm text-primary underline-offset-2 hover:underline"
                           title={title || fallback}
                         >
                           {title || fallback}
@@ -196,7 +202,7 @@ export default function RecommendationReportsPage() {
 
       {!health.isLoading && !health.data && (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-[var(--color-text-hint)]">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground/70">
             <FileSearch className="mx-auto mb-2 h-6 w-6" />
             暂无健康报告数据（可能推荐日志为空）
           </CardContent>
@@ -209,13 +215,13 @@ export default function RecommendationReportsPage() {
         title="题目详情"
         ariaLabel="题目详情"
       >
-        <div className="text-xs text-[var(--color-text-hint)]">
+        <div className="text-xs text-muted-foreground/70">
           题目ID：{String(viewQuestion?.question_id ?? "")}
         </div>
-        <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-primary)]">
+        <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
           {String(viewQuestion?.question_title ?? "暂无题干")}
         </div>
       </Drawer>
-    </div>
+    </ManagementPage>
   );
 }

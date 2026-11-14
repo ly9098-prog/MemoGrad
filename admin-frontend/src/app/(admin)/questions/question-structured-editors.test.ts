@@ -68,7 +68,7 @@ describe("question code editor integration", () => {
 
   it.each(["", " \r\n "])("shows an empty-code warning for %j", (code) => {
     const html = renderToStaticMarkup(codeEditor([{ type: "code", code }]).element);
-    expect(html).toContain("border-amber-300");
+    expect(html).toContain("border-warning/50");
     expect(html).toContain("代码正文不能为空");
   });
 

@@ -65,15 +65,15 @@ function AltDescEditor({
   const charCount = (s: string) => s.replace(/\s/g, "").length;
 
   return (
-    <div className="space-y-2 rounded-lg border border-[var(--color-border-light)] bg-white/70 px-3 py-2.5 text-xs">
+    <div className="space-y-2 rounded-lg border border-border/60 bg-card/70 px-3 py-2.5 text-xs">
       {/* alt_text */}
       <div>
-        <label className="flex items-center justify-between text-[var(--color-text-hint)]">
+        <label className="flex items-center justify-between text-muted-foreground/70">
           <span>替代文本 (alt text)</span>
-          <span className={charCount(altText) > 100 ? "text-amber-500" : ""}>{charCount(altText)}字</span>
+          <span className={charCount(altText) > 100 ? "text-warning-foreground" : ""}>{charCount(altText)}字</span>
         </label>
         <input
-          className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+          className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
           placeholder="图片加载失败时显示的替代文本"
           value={altText}
           onChange={(e) => { setAltText(e.target.value); setDirty(true); }}
@@ -82,12 +82,12 @@ function AltDescEditor({
       </div>
       {/* description */}
       <div>
-        <label className="flex items-center justify-between text-[var(--color-text-hint)]">
+        <label className="flex items-center justify-between text-muted-foreground/70">
           <span>详细说明 (description)</span>
-          <span className={charCount(description) > 300 ? "text-amber-500" : ""}>{charCount(description)}字</span>
+          <span className={charCount(description) > 300 ? "text-warning-foreground" : ""}>{charCount(description)}字</span>
         </label>
         <textarea
-          className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+          className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
           rows={3}
           placeholder="用于 SEO 和管理端参考的详细说明"
           value={description}
@@ -96,7 +96,7 @@ function AltDescEditor({
         />
       </div>
       {saveMsg && (
-        <p className={`text-[11px] ${saveMsgType === "success" ? "text-[var(--color-success)]" : "text-red-500"}`}>
+        <p className={`text-[11px] ${saveMsgType === "success" ? "text-success" : "text-destructive"}`}>
           {saveMsg}
           <button type="button" className="ml-1" onClick={() => setSaveMsg(null)}>✕</button>
         </p>
@@ -105,7 +105,7 @@ function AltDescEditor({
         <Button type="button" size="sm" onClick={() => saveMutation.mutate()} disabled={!dirty || saveMutation.isPending}>
           {saveMutation.isPending ? <><Loader2 className="h-3 w-3 animate-spin" /> 保存中</> : <><Save className="h-3 w-3" /> 保存</>}
         </Button>
-        {dirty && <span className="text-[10px] text-amber-500">有未保存的修改</span>}
+        {dirty && <span className="text-[10px] text-warning-foreground">有未保存的修改</span>}
       </div>
     </div>
   );
@@ -127,21 +127,21 @@ function PendingUploadPanel({
   onSave: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--color-primary)]/25 bg-[var(--color-primary-light)]/35 p-3 shadow-sm">
+    <div className="rounded-xl border border-primary/25 bg-accent/35 p-3 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--color-border)] bg-white">
+          <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-card">
             <img src={previewUrl} alt="待上传图片预览" className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-[var(--color-primary-dark)]">待保存图片</span>
-              <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-hint)]">
+              <span className="text-xs font-semibold text-accent-foreground">待保存图片</span>
+              <span className="rounded-md bg-card/80 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70">
                 {replacing ? "将替换当前手工图" : "上传后立即生效"}
               </span>
             </div>
-            <p className="mt-1 truncate text-xs font-medium text-[var(--ink)]">{file.name}</p>
-            <p className="mt-0.5 text-[10px] text-[var(--color-text-hint)]">{(file.size / 1024 / 1024).toFixed(2)} MB · PNG / JPEG / WebP</p>
+            <p className="mt-1 truncate text-xs font-medium text-foreground">{file.name}</p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground/70">{(file.size / 1024 / 1024).toFixed(2)} MB · PNG / JPEG / WebP</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:justify-end">
@@ -320,8 +320,8 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
   // ── Loading state ──
   if (isLoading) {
     return (
-      <section className="rounded-xl border border-[var(--color-border)] bg-white/60 p-4">
-        <p className="flex items-center gap-2 text-sm text-[var(--color-text-hint)]">
+      <section className="rounded-xl border border-border bg-card/60 p-4">
+        <p className="flex items-center gap-2 text-sm text-muted-foreground/70">
           <Loader2 className="h-4 w-4 animate-spin" /> 正在加载函数图像资产……
         </p>
       </section>
@@ -331,8 +331,8 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
   // ── Load error state ──
   if (error) {
     return (
-      <section className="rounded-xl border border-red-200 bg-red-50/50 p-4">
-        <p className="flex items-center gap-2 text-sm text-red-600">
+      <section className="rounded-xl border border-destructive/30 bg-destructive-light/50 p-4">
+        <p className="flex items-center gap-2 text-sm text-destructive">
           <AlertCircle className="h-4 w-4" /> 资产加载失败
         </p>
       </section>
@@ -340,14 +340,14 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
   }
 
   return (
-    <section id="graph-assets" className="scroll-mt-28 overflow-hidden rounded-xl border border-[var(--color-border)] bg-white/60">
+    <section id="graph-assets" className="scroll-mt-28 overflow-hidden rounded-xl border border-border bg-card/60">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-1 border-b border-[var(--color-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-[var(--color-primary)]" />
-          <span className="text-sm font-semibold text-[var(--ink)]">展示图片</span>
+          <ImageIcon className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold text-foreground">展示图片</span>
         </div>
-        <span className="text-[11px] text-[var(--color-text-hint)]">上传后独立保存并立即用于小程序展示</span>
+        <span className="text-[11px] text-muted-foreground/70">上传后独立保存并立即用于小程序展示</span>
       </div>
 
       {/* ── Image preview area ── */}
@@ -355,11 +355,11 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
         {effective?.image_url ? (
           <div className="space-y-3">
             {/* Image display */}
-            <div className="relative rounded-lg border bg-white overflow-hidden">
+            <div className="relative rounded-lg border bg-card overflow-hidden">
               {imageLoadError ? (
                 <div className="flex flex-col items-center gap-3 py-12 text-center">
-                  <AlertCircle className="h-8 w-8 text-[var(--color-text-hint)]" />
-                  <p className="text-sm text-[var(--color-text-secondary)]">图片资源加载失败，但资产记录仍然存在。</p>
+                  <AlertCircle className="h-8 w-8 text-muted-foreground/70" />
+                  <p className="text-sm text-muted-foreground">图片资源加载失败，但资产记录仍然存在。</p>
                   <div className="flex items-center gap-2">
                     <Button type="button" variant="secondary" size="sm" onClick={reloadImage}>
                       <RefreshCw className="h-3.5 w-3.5" /> 重新加载
@@ -396,7 +396,7 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
             </div>
 
             {/* Asset metadata */}
-            <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-text-secondary)]">
+            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
               <div>
                 <span className="font-semibold">当前来源：</span>
                 {effective.source_type === "uploaded" ? "手工上传" : effective.source_type === "generated" ? "自动生成" : "模板生成"}
@@ -421,7 +421,7 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
             )}
 
             {/* Status info */}
-            <div className="rounded-lg border border-[var(--color-border-light)] bg-white/70 px-3 py-2.5 text-xs text-[var(--color-text-secondary)]">
+            <div className="rounded-lg border border-border/60 bg-card/70 px-3 py-2.5 text-xs text-muted-foreground">
               {hasUploaded && (
                 <p>当前优先展示手工上传图。</p>
               )}
@@ -439,13 +439,13 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
               {!hasUploaded && hasGenerated && (
                 <p className="mt-0.5">
                   <span className="font-semibold">自动生成：</span>
-                  <span className="text-[var(--color-success)] flex items-center gap-1"><Check className="h-3 w-3" /> 可用</span>
+                  <span className="text-success flex items-center gap-1"><Check className="h-3 w-3" /> 可用</span>
                 </p>
               )}
               {hasTemplate && (
                 <p className="mt-0.5">
                   <span className="font-semibold">模板回退：</span>
-                  <span className="text-[var(--color-success)] flex items-center gap-1"><Check className="h-3 w-3" /> 可用</span>
+                  <span className="text-success flex items-center gap-1"><Check className="h-3 w-3" /> 可用</span>
                 </p>
               )}
             </div>
@@ -453,11 +453,11 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
             {message && (
               <div role="status" aria-live="polite" className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${
                 messageType === "success"
-                  ? "bg-[var(--color-success-light)] text-[var(--color-success)]"
-                  : "bg-red-50 text-red-600"
+                  ? "bg-success-light text-success"
+                  : "bg-destructive-light text-destructive"
               }`}>
                 <span>{message}</span>
-                <button type="button" className="ml-3 shrink-0 rounded p-0.5 hover:bg-white/60" onClick={() => setMessage(null)} aria-label="关闭提示"><X className="h-3 w-3" /></button>
+                <button type="button" className="ml-3 shrink-0 rounded p-0.5 hover:bg-card/60" onClick={() => setMessage(null)} aria-label="关闭提示"><X className="h-3 w-3" /></button>
               </div>
             )}
 
@@ -527,13 +527,13 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
         ) : (
           /* ── Empty state ── */
           <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <ImageIcon className="h-10 w-10 text-[var(--color-text-hint)]" />
+            <ImageIcon className="h-10 w-10 text-muted-foreground/70" />
             <div>
-              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">尚未上传函数图像</p>
-              <p className="mt-1 text-xs text-[var(--color-text-hint)]">支持 PNG、JPEG、WebP，单张不超过 10MB。</p>
+              <p className="text-sm font-semibold text-muted-foreground">尚未上传函数图像</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">支持 PNG、JPEG、WebP，单张不超过 10MB。</p>
             </div>
             {message && (
-              <div role="status" aria-live="polite" className={`rounded-lg px-3 py-2 text-xs ${messageType === "success" ? "bg-[var(--color-success-light)] text-[var(--color-success)]" : "bg-red-50 text-red-600"}`}>{message}</div>
+              <div role="status" aria-live="polite" className={`rounded-lg px-3 py-2 text-xs ${messageType === "success" ? "bg-success-light text-success" : "bg-destructive-light text-destructive"}`}>{message}</div>
             )}
             {canUpdate && (
               <>
@@ -556,7 +556,7 @@ export function FormulaGraphAssetPanel({ cardId, canUpdate }: Props) {
               </>
             )}
             {!canUpdate && (
-              <p className="text-xs text-[var(--color-text-hint)]">您没有上传权限</p>
+              <p className="text-xs text-muted-foreground/70">您没有上传权限</p>
             )}
           </div>
         )}

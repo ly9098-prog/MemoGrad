@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -99,10 +100,10 @@ function statusIcon(status: string) {
 }
 
 function statusColor(status: string) {
-  if (status === "approved") return "text-green-600";
-  if (status === "rejected") return "text-red-500";
-  if (status === "published") return "text-blue-600";
-  return "text-amber-500";
+  if (status === "approved") return "text-success";
+  if (status === "rejected") return "text-destructive";
+  if (status === "published") return "text-primary";
+  return "text-warning-foreground";
 }
 
 function statusTone(status: string) {
@@ -134,34 +135,34 @@ function typeLabel(t: string | null | undefined) {
 function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () => void }) {
   const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(16,24,40,0.42)] px-4 py-10">
-      <div className="relative mt-6 w-full max-w-2xl rounded-2xl border border-[var(--color-border)] bg-white shadow-[var(--shadow-floating)]">
+  const modal = (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay px-4 py-10">
+      <div className="relative mt-6 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-[var(--shadow-floating)]">
         {/* ===== Header with large close hit area ===== */}
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 py-3 pr-14">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 pr-14">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 font-mono text-xs text-[var(--color-text-hint)]">#{item.id}</span>
-            <h3 className="truncate font-display text-base font-bold text-[var(--ink)]">导入题目详情</h3>
+            <span className="shrink-0 font-mono text-xs text-muted-foreground/70">#{item.id}</span>
+            <h3 className="truncate font-display text-base font-bold text-foreground">导入题目详情</h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <div className="flex overflow-hidden rounded-lg border border-border">
               <button
                 type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "formatted" ? "bg-[var(--color-primary)] text-white" : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]"}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "formatted" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
                 onClick={() => setDetailView("formatted")}
               >
                 <FileText className="h-3 w-3" />文本
               </button>
               <button
                 type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "json" ? "bg-[var(--color-primary)] text-white" : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]"}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "json" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
                 onClick={() => setDetailView("json")}
               >
                 <Code2 className="h-3 w-3" />JSON
               </button>
             </div>
             <Link
-              className="hidden sm:inline text-xs font-semibold text-[var(--color-primary-dark)] underline"
+              className="hidden sm:inline text-xs font-semibold text-accent-foreground underline"
               href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}
             >
               审核批次
@@ -171,7 +172,7 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
 
         {/* Large close button — positioned absolutely to avoid crowded header */}
         <button
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--color-text-hint)] shadow-sm ring-1 ring-[var(--color-border)] transition hover:bg-[var(--color-bg-secondary)] hover:text-[var(--ink)] hover:ring-[var(--color-text-hint)] active:scale-95"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border transition hover:bg-secondary hover:text-foreground hover:ring-muted-foreground active:scale-95"
           onClick={onClose}
         >
           <X className="h-5 w-5" />
@@ -182,45 +183,45 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
           {detailView === "formatted" ? (
             <div className="space-y-3">
               <section>
-                <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">题干</p>
-                <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{textFromImport(item) || "—"}</pre>
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">题干</p>
+                <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{textFromImport(item) || "—"}</pre>
               </section>
 
               {isMultiBlankChoice(item) ? (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">选项组</p>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项组</p>
                   <div className="space-y-2">
                     {(() => {
                       const groups = item?.parsed_content?.blank_option_groups;
                       const list: BlankOptionGroup[] = Array.isArray(groups) ? (groups as BlankOptionGroup[]) : [];
                       return list.length > 0 ? list.map((group, gi) => (
-                        <div key={gi} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5">
-                          <p className="mb-1.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">空 {group.id ?? gi + 1}</p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--color-text-secondary)]">
+                        <div key={gi} className="rounded-xl border border-border bg-muted p-2.5">
+                          <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">空 {group.id ?? gi + 1}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                             {group.options?.map((opt, oi) => (
-                              <span key={oi}><span className="font-bold text-[var(--ink)]">{opt.key}.</span> {opt.text}</span>
+                              <span key={oi}><span className="font-bold text-foreground">{opt.key}.</span> {opt.text}</span>
                             ))}
                           </div>
                         </div>
-                      )) : <p className="text-xs text-[var(--color-text-hint)]">暂无选项组数据</p>;
+                      )) : <p className="text-xs text-muted-foreground/70">暂无选项组数据</p>;
                     })()}
                   </div>
                 </section>
               ) : (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">选项</p>
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{renderOptions(optionDataFromImport(item))}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项</p>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{renderOptions(optionDataFromImport(item))}</pre>
                 </section>
               )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">答案</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{item.parsed_answer || "—"}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">答案</p>
+                  <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{item.parsed_answer || "—"}</pre>
                 </section>
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">解析</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{item.parsed_analysis || "—"}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
+                  <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{item.parsed_analysis || "—"}</pre>
                 </section>
               </div>
             </div>
@@ -233,8 +234,8 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
                 { title: "OCR / AI 原始数据", data: { raw_data: item.raw_data, ai_metadata: item.ai_metadata } },
               ].map(({ title, data }) => (
                 <section key={title}>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">{title}</p>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 font-mono text-[11px] leading-relaxed text-[var(--color-text-secondary)]">{renderJson(data)}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">{title}</p>
+                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">{renderJson(data)}</pre>
                 </section>
               ))}
             </div>
@@ -243,6 +244,9 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return modal;
+  return createPortal(modal, document.body);
 }
 
 export default function ImportQuestionsPage() {
@@ -285,16 +289,16 @@ export default function ImportQuestionsPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-2xl font-bold text-[var(--ink)]">导入题目列表</h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。</p>
+              <h3 className="font-display text-2xl font-bold text-foreground">导入题目列表</h3>
+              <p className="mt-1 text-sm text-muted-foreground">查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。</p>
             </div>
-            <Link href="/imports/review" className="inline-flex h-11 items-center justify-center rounded-2xl border border-[var(--color-primary)] bg-[var(--color-primary-light)] px-4 text-sm font-semibold text-[var(--color-primary-dark)] transition hover:bg-white">
+            <Link href="/imports/review" className="inline-flex h-11 items-center justify-center rounded-2xl border border-primary bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-card">
               进入审核
             </Link>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <label className="relative xl:col-span-2">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input className="pl-9" placeholder="搜索题干 / OCR 原文" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
             </label>
             <Input placeholder="批次 ID" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
@@ -310,7 +314,7 @@ export default function ImportQuestionsPage() {
                 { value: "rejected", label: "rejected" },
                 { value: "published", label: "published" },
               ]}
-              className="h-11 w-full justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm"
+              className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
             />
           </div>
         </CardHeader>
@@ -322,7 +326,7 @@ export default function ImportQuestionsPage() {
               return (
                 <div
                   key={item.id}
-                  className="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3.5 transition hover:border-[var(--color-primary-light)] hover:shadow-sm"
+                  className="rounded-xl border border-border bg-card px-4 py-3.5 transition hover:border-primary/25 hover:shadow-sm"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     {/* Left: main content */}
@@ -346,26 +350,26 @@ export default function ImportQuestionsPage() {
                         ) : null}
 
                         {/* Separator */}
-                        <span className="hidden h-3 w-px bg-[var(--color-border)] sm:block" />
+                        <span className="hidden h-3 w-px bg-border sm:block" />
 
                         {/* Subject + type pills */}
                         {item.subject_name || item.subject_code ? (
-                          <span className="rounded-md bg-[var(--color-primary-light)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-primary-dark)]">
+                          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
                             {item.subject_name || item.subject_code}
                           </span>
                         ) : null}
-                        <span className="text-[11px] text-[var(--color-text-hint)]">
+                        <span className="text-[11px] text-muted-foreground/70">
                           {typeLabel(item.question_type)}
                         </span>
 
                         {/* Batch ID */}
-                        <span className="ml-auto truncate font-mono text-[10px] text-[var(--color-text-hint)] sm:ml-0" title={item.batch_id}>
+                        <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground/70 sm:ml-0" title={item.batch_id}>
                           {item.batch_id}
                         </span>
                       </div>
 
                       {/* Stem preview */}
-                      <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink)]">
+                      <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                         {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
                       </p>
                     </div>
@@ -386,12 +390,12 @@ className="h-9 gap-1.5 px-3 text-xs font-medium"
               );
             })}
             {!questions.isLoading && items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-[var(--color-text-hint)]">暂无导入题目</p>
+              <p className="py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
             ) : null}
           </section>
 
           {questions.isError ? (
-            <p className="mt-4 text-sm text-[var(--color-danger)]">导入题目接口当前不可用。</p>
+            <p className="mt-4 text-sm text-destructive">导入题目接口当前不可用。</p>
           ) : null}
         </CardContent>
       </Card>

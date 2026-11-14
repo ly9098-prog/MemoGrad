@@ -339,15 +339,15 @@ export function QuestionVersionPicker({
           setOpen((current) => !current);
         }}
         className={cn(
-          "flex min-h-14 w-full items-center gap-3 rounded-xl border bg-white px-3 py-2.5 text-left outline-none transition-all duration-200",
+          "flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left outline-none transition-all duration-200",
           open
-            ? "border-[var(--color-primary)] ring-4 ring-[rgba(91,123,154,0.12)]"
-            : "border-slate-200 hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50/60 hover:shadow-sm",
+            ? "border-primary ring-4 ring-primary/15"
+            : "border-border hover:-translate-y-px hover:border-primary/30 hover:bg-accent/40 hover:shadow-sm",
           "disabled:cursor-not-allowed disabled:opacity-60",
         )}
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-800">
+          <p className="truncate text-sm font-semibold text-foreground">
             {loading
               ? "正在加载版本…"
               : value === null
@@ -356,7 +356,7 @@ export function QuestionVersionPicker({
                   ? "当前版本"
                   : `v${value}`}
           </p>
-          <p className="mt-0.5 truncate text-[11px] text-slate-400">
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">
             {value === null
               ? "选择一个版本开始对比"
               : value === "current"
@@ -368,7 +368,7 @@ export function QuestionVersionPicker({
         </div>
         <ChevronDown
           className={cn(
-            "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
+            "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
             open && "rotate-180",
           )}
         />
@@ -380,7 +380,7 @@ export function QuestionVersionPicker({
               ref={dropdownRef}
               role="dialog"
               aria-label="选择题目版本"
-              className="z-[120] flex animate-fade-in flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10"
+              className="z-[120] flex animate-fade-in flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-floating)]"
               style={{
                 position: "fixed",
                 left: position.left,
@@ -390,21 +390,21 @@ export function QuestionVersionPicker({
                 bottom: position.bottom,
               }}
             >
-              <div className="shrink-0 border-b border-slate-100 bg-white p-3">
-                <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 transition-all focus-within:border-[var(--color-primary)] focus-within:bg-white focus-within:ring-4 focus-within:ring-[rgba(91,123,154,0.10)]">
-                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <div className="shrink-0 border-b border-border/60 bg-card p-3">
+                <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-muted px-3 transition-all focus-within:border-primary focus-within:bg-card focus-within:ring-4 focus-within:ring-ring/10">
+                  <Search className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                   <input
                     ref={searchRef}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="搜索版本号、修改人或修改原因"
-                    className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
                   />
                   {search ? (
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-slate-400 transition hover:bg-slate-200/70 hover:text-slate-600"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
                       aria-label="清除搜索"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -419,8 +419,8 @@ export function QuestionVersionPicker({
                     className={cn(
                       "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium transition",
                       dateFilter || calendarOpen
-                        ? "border-[var(--color-primary)] bg-[rgba(91,123,154,0.08)] text-[var(--color-primary)]"
-                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                        ? "border-primary bg-accent text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-accent/40",
                     )}
                     aria-expanded={calendarOpen}
                   >
@@ -437,13 +437,13 @@ export function QuestionVersionPicker({
                     <button
                       type="button"
                       onClick={() => setDateFilter(null)}
-                      className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                      className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
                     >
                       <X className="h-3 w-3" />
                       清除日期
                     </button>
                   ) : null}
-                  <span className="ml-auto text-[10px] tabular-nums text-slate-400">
+                  <span className="ml-auto text-[10px] tabular-nums text-muted-foreground/70">
                     {filteredVersions.length} 个历史版本
                   </span>
                 </div>
@@ -467,7 +467,7 @@ export function QuestionVersionPicker({
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [scrollbar-gutter:stable]">
                 {currentMatchesSearch ? (
                   <div className="mb-1">
-                    <p className="px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-400">
+                    <p className="px-2 py-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground/70">
                       当前
                     </p>
                     <VersionOption
@@ -484,10 +484,10 @@ export function QuestionVersionPicker({
                 {groups.map((group) => (
                   <div key={group.label} className="mb-1 last:mb-0">
                     <div className="flex items-center justify-between px-2 py-1.5">
-                      <p className="text-[10px] font-semibold tracking-wide text-slate-400">
+                      <p className="text-[10px] font-semibold tracking-wide text-muted-foreground/70">
                         {group.label}
                       </p>
-                      <span className="text-[9px] tabular-nums text-slate-300">
+                      <span className="text-[9px] tabular-nums text-muted-foreground/50">
                         {group.items.length}
                       </span>
                     </div>
@@ -516,15 +516,15 @@ export function QuestionVersionPicker({
 
                 {!currentMatchesSearch && groups.length === 0 ? (
                   <div className="px-4 py-10 text-center animate-fade-in">
-                    <p className="text-sm font-medium text-slate-500">没有匹配的版本</p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="text-sm font-medium text-muted-foreground">没有匹配的版本</p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">
                       可调整日期，或搜索 v35、修改人姓名、修改原因
                     </p>
                     {dateFilter ? (
                       <button
                         type="button"
                         onClick={() => setDateFilter(null)}
-                        className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 transition hover:border-slate-300 hover:bg-slate-50"
+                        className="mt-3 rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition hover:border-primary/30 hover:bg-accent/40"
                       >
                         清除日期筛选
                       </button>
@@ -559,29 +559,29 @@ function MiniVersionCalendar({
 }) {
   const todayKey = localDateKey(new Date());
   return (
-    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 animate-fade-in">
+    <div className="mt-2 rounded-xl border border-border bg-muted/70 p-2.5 animate-fade-in">
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
           onClick={onPreviousMonth}
-          className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 hover:shadow-sm"
+          className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-card hover:text-foreground hover:shadow-sm"
           aria-label="上个月"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
-        <p className="text-[11px] font-semibold text-slate-600">
+        <p className="text-[11px] font-semibold text-muted-foreground">
           {month.getFullYear()} 年 {month.getMonth() + 1} 月
         </p>
         <button
           type="button"
           onClick={onNextMonth}
-          className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 hover:shadow-sm"
+          className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-card hover:text-foreground hover:shadow-sm"
           aria-label="下个月"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 px-0.5 text-center text-[9px] font-medium text-slate-400">
+      <div className="grid grid-cols-7 gap-1 px-0.5 text-center text-[9px] font-medium text-muted-foreground/70">
         {['一', '二', '三', '四', '五', '六', '日'].map((weekday) => (
           <span key={weekday} className="py-1">{weekday}</span>
         ))}
@@ -601,23 +601,23 @@ function MiniVersionCalendar({
               className={cn(
                 "relative grid h-8 place-items-center rounded-lg text-[10px] tabular-nums transition",
                 active
-                  ? "bg-[var(--color-primary)] font-semibold text-white shadow-sm"
+                  ? "bg-primary font-semibold text-primary-foreground shadow-sm"
                   : disabled
-                    ? "cursor-default text-slate-300"
-                    : "bg-white text-slate-600 hover:-translate-y-px hover:bg-slate-100 hover:shadow-sm",
-                isToday && !active && !disabled && "ring-1 ring-inset ring-[var(--color-primary)]",
+                    ? "cursor-default text-muted-foreground/40"
+                    : "bg-card text-muted-foreground hover:-translate-y-px hover:bg-accent/40 hover:shadow-sm",
+                isToday && !active && !disabled && "ring-1 ring-inset ring-primary",
               )}
               aria-label={`${cell.key}，${count} 个版本`}
             >
               <span>{cell.day}</span>
               {count > 0 && !active ? (
-                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-[var(--color-primary)]" />
+                <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-primary" />
               ) : null}
             </button>
           );
         })}
       </div>
-      <p className="mt-2 px-1 text-[9px] leading-4 text-slate-400">
+      <p className="mt-2 px-1 text-[9px] leading-4 text-muted-foreground/70">
         仅可选择存在历史版本的日期，圆点表示当天有修改记录。
       </p>
     </div>
@@ -647,8 +647,8 @@ function VersionOption({
       className={cn(
         "group flex w-full items-start gap-3 rounded-xl px-2.5 py-2.5 text-left transition-all duration-150",
         active
-          ? "bg-slate-100 shadow-[inset_0_0_0_1px_rgba(148,163,184,0.12)]"
-          : "hover:translate-x-0.5 hover:bg-slate-50",
+          ? "bg-accent shadow-[inset_0_0_0_1px_rgba(74,111,138,0.12)]"
+          : "hover:translate-x-0.5 hover:bg-accent/40",
         disabled && "cursor-not-allowed opacity-45",
       )}
     >
@@ -656,19 +656,19 @@ function VersionOption({
         className={cn(
           "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-all duration-150",
           active
-            ? "scale-100 border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
-            : "border-slate-200 bg-white text-transparent group-hover:border-slate-300",
+            ? "scale-100 border-primary bg-primary text-primary-foreground"
+            : "border-border bg-card text-transparent group-hover:border-primary/30",
         )}
       >
         <Check className="h-3.5 w-3.5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
-          <span className="shrink-0 text-sm font-semibold text-slate-700">{title}</span>
-          <span className="truncate text-[10px] text-slate-400">{meta}</span>
+          <span className="shrink-0 text-sm font-semibold text-foreground">{title}</span>
+          <span className="truncate text-[10px] text-muted-foreground/70">{meta}</span>
         </span>
         {reason ? (
-          <span className="mt-1 block truncate text-[11px] text-slate-500">
+          <span className="mt-1 block truncate text-[11px] text-muted-foreground">
             {reason}
           </span>
         ) : null}

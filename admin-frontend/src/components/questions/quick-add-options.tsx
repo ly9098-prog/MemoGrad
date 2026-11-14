@@ -144,19 +144,19 @@ export function QuickAddOptions({
   };
 
   return (
-    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/40 px-3.5 py-3">
+    <div className="rounded-lg border border-dashed border-border bg-muted/40 px-3.5 py-3">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         disabled={disabled}
-        className="flex w-full items-center justify-between gap-2 text-left text-slate-600 transition hover:text-slate-900"
+        className="flex w-full items-center justify-between gap-2 text-left text-muted-foreground transition hover:text-foreground"
       >
         <span className="flex items-center gap-2 text-xs font-medium">
-          <ListPlus className="h-4 w-4 text-slate-400" />
+          <ListPlus className="h-4 w-4 text-muted-foreground/60" />
           快捷添加选项
         </span>
         <ChevronDown
-          className={cn("h-4 w-4 text-[var(--color-text-hint)] transition-transform", expanded && "rotate-180")}
+          className={cn("h-4 w-4 text-muted-foreground/70 transition-transform", expanded && "rotate-180")}
         />
       </button>
 
@@ -164,13 +164,13 @@ export function QuickAddOptions({
         <div className="mt-3 space-y-3">
           <div>
             <textarea
-              className="min-h-24 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs leading-5 text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              className="min-h-24 w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-ring/20"
               placeholder={"每行一个选项，例如：\nA. 首项内容\n第二项内容（自动分配字母）"}
               value={text}
               disabled={busy || preparing || disabled}
               onChange={(e) => setText(e.target.value)}
             />
-            <p className="mt-1 text-[10px] text-[var(--color-text-hint)]">
+            <p className="mt-1 text-[10px] text-muted-foreground/70">
               A./B./C. 前缀保留为字母键；无前缀自动分配下一个字母。
             </p>
           </div>
@@ -183,14 +183,14 @@ export function QuickAddOptions({
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs",
                     p.conflict || p.invalid
-                      ? "border-red-300 bg-red-50 text-red-600"
-                      : "border-[var(--color-border)]/60 bg-white/70 text-[var(--color-text-secondary)]",
+                      ? "border-destructive/40 bg-destructive-light text-destructive"
+                      : "border-border/60 bg-card/70 text-muted-foreground",
                   )}
                 >
                   <span
                     className={cn(
                       "flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold",
-                      p.conflict || p.invalid ? "bg-red-100 text-red-600" : "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
+                      p.conflict || p.invalid ? "bg-destructive-light text-destructive" : "bg-accent text-accent-foreground",
                     )}
                   >
                     {p.key}
@@ -202,23 +202,23 @@ export function QuickAddOptions({
           ) : null}
 
           {disabled ? (
-            <p className="text-xs text-amber-700" role="status">
+            <p className="text-xs text-warning-foreground" role="status">
               当前题型不支持选项；请切换为单选题或多选题后再添加。
             </p>
           ) : null}
 
           {hasConflict ? (
-            <p className="text-xs text-red-600" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               存在与已有选项重复的键，请调整后重试。
             </p>
           ) : null}
           {hasInvalid ? (
-            <p className="text-xs text-red-600" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               存在只有选项字母、没有正文的空选项，请补充内容后再添加。
             </p>
           ) : null}
           {error ? (
-            <p className="text-xs text-red-600" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {error}
             </p>
           ) : null}

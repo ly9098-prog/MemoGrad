@@ -221,9 +221,9 @@ export function FormulaCategoryPicker({
             className={cn(
               "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
               isSelected
-                ? "bg-[var(--color-primary-light)] font-medium text-[var(--ink)]"
-                : "text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-light)]/40",
-              !selectable && "cursor-pointer font-medium text-[var(--ink)]",
+                ? "bg-accent font-medium text-foreground"
+                : "text-muted-foreground hover:bg-accent/40",
+              !selectable && "cursor-pointer font-medium text-foreground",
               selectable && !isSelected && "cursor-pointer",
             )}
             style={{ paddingLeft: 12 + depth * 20 }}
@@ -234,7 +234,7 @@ export function FormulaCategoryPicker({
                   e.stopPropagation();
                   toggleExpand(node.id);
                 }}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-[var(--color-border)]"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-border"
               >
                 {isExpanded ? (
                   <ChevronDown className="h-3.5 w-3.5" />
@@ -249,10 +249,10 @@ export function FormulaCategoryPicker({
               className={cn(
                 "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase",
                 node.node_type === "subject"
-                  ? "bg-blue-50 text-blue-700"
+                  ? "bg-accent text-accent-foreground"
                   : node.node_type === "chapter"
-                    ? "bg-green-50 text-green-700"
-                    : "bg-gray-100 text-gray-600",
+                    ? "bg-success-light text-success"
+                    : "bg-muted text-muted-foreground",
               )}
             >
               {node.node_type === "subject"
@@ -263,7 +263,7 @@ export function FormulaCategoryPicker({
             </span>
             <span className="min-w-0 flex-1 truncate">{node.name}</span>
             {!selectable && (
-              <span className="shrink-0 text-[10px] text-[var(--color-text-hint)]">
+              <span className="shrink-0 text-[10px] text-muted-foreground/70">
                 点击展开
               </span>
             )}
@@ -284,18 +284,18 @@ export function FormulaCategoryPicker({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "flex h-11 w-full items-center rounded-xl border bg-[var(--color-bg-input)] px-3 pr-16 text-sm transition-all",
+          "flex h-11 w-full items-center rounded-xl border bg-muted px-3 pr-16 text-sm transition-all",
           open
-            ? "border-[var(--color-primary)] bg-white ring-4 ring-[rgba(91,123,154,0.14)]"
-            : "border-[var(--color-border)] hover:border-[var(--color-primary)]",
+            ? "border-primary bg-card ring-4 ring-[rgba(91,123,154,0.14)]"
+            : "border-border hover:border-primary",
           disabled && "cursor-default opacity-50",
-          error && "border-red-400",
+          error && "border-destructive/40",
         )}
       >
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-left",
-            selectedNode ? "text-[var(--ink)]" : "text-[var(--color-text-hint)]",
+            selectedNode ? "text-foreground" : "text-muted-foreground/70",
           )}
           title={selectedNode ? triggerLabel : undefined}
         >
@@ -303,7 +303,7 @@ export function FormulaCategoryPicker({
         </span>
         <ChevronDown
           className={cn(
-            "absolute right-3 h-4 w-4 shrink-0 text-[var(--color-text-hint)] transition-transform",
+            "absolute right-3 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform",
             open && "rotate-180",
           )}
         />
@@ -315,7 +315,7 @@ export function FormulaCategoryPicker({
             event.stopPropagation();
             onChange(null);
           }}
-          className="absolute right-9 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--color-text-hint)] transition hover:bg-[var(--color-border)] hover:text-[var(--ink)]"
+          className="absolute right-9 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground/70 transition hover:bg-border hover:text-foreground"
           aria-label="清除分类"
           title="清除分类"
         >
@@ -323,7 +323,7 @@ export function FormulaCategoryPicker({
         </button>
       )}
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className="mt-1 text-xs text-destructive">{error}</p>
       )}
 
       {open && createPortal(
@@ -335,7 +335,7 @@ export function FormulaCategoryPicker({
             const tree = categories.data?.items;
             if (!tree) {
               return (
-                <div className="flex items-center justify-center px-4 py-8 text-xs text-[var(--color-text-hint)]">
+                <div className="flex items-center justify-center px-4 py-8 text-xs text-muted-foreground/70">
                   加载中...
                 </div>
               );
@@ -343,7 +343,7 @@ export function FormulaCategoryPicker({
             const rendered = renderTree(tree);
             if (!rendered || rendered.length === 0) {
               return (
-                <div className="flex items-center justify-center px-4 py-8 text-xs text-[var(--color-text-hint)]">
+                <div className="flex items-center justify-center px-4 py-8 text-xs text-muted-foreground/70">
                   无匹配分类
                 </div>
               );
@@ -424,15 +424,15 @@ function CategoryPickerDropdown({
     <div
       ref={(el) => setDropdownEl(el)}
       className={cn(
-        "rounded-xl border border-[var(--color-border)]/80 bg-white shadow-lg transition-all duration-150",
+        "rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
         mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
       )}
       style={style}
     >
-      <div className="relative shrink-0 border-b border-[var(--color-border)]/60 p-2">
-        <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-hint)]" />
+      <div className="relative shrink-0 border-b border-border/60 p-2">
+        <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
         <input
-          className="h-8 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] pl-7 pr-2 text-xs outline-none focus:border-[var(--color-primary)]"
+          className="h-8 w-full rounded-lg border border-border bg-muted pl-7 pr-2 text-xs outline-none focus:border-primary"
           placeholder="搜索分类名称或编码..."
           autoFocus
           value={search}

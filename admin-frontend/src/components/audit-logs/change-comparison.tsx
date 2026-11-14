@@ -50,12 +50,12 @@ export function ChangeComparison({ detail }: ChangeComparisonProps) {
 
   return (
     <section className="space-y-3">
-      <h4 className="text-sm font-semibold text-[var(--ink)]">变更内容</h4>
+      <h4 className="text-sm font-semibold text-foreground">变更内容</h4>
 
       {editReason && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5">
-          <p className="text-xs font-medium text-[var(--color-text-hint)]">编辑原因</p>
-          <p className="mt-0.5 text-sm text-[var(--color-text-primary)]">{editReason}</p>
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground/70">编辑原因</p>
+          <p className="mt-0.5 text-sm text-foreground">{editReason}</p>
         </div>
       )}
 
@@ -71,25 +71,25 @@ export function ChangeComparison({ detail }: ChangeComparisonProps) {
             return (
               <div
                 key={field}
-                className="rounded-lg border border-[var(--color-border)] bg-white overflow-hidden"
+                className="rounded-lg border border-border bg-card overflow-hidden"
               >
-                <p className="px-3 py-1.5 text-xs font-medium text-[var(--color-text-hint)] border-b border-[var(--color-border)] bg-[var(--color-bg-input)]">
+                <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground/70 border-b border-border bg-muted/50">
                   {label}
                 </p>
                 <div className="grid gap-0 sm:grid-cols-2">
-                  <div className={cn("p-3", after !== undefined && "border-r-0 sm:border-r border-[var(--color-border)]")}>
-                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-hint)]">
+                  <div className={cn("p-3", after !== undefined && "border-r-0 sm:border-r border-border")}>
+                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                       修改前
                     </p>
-                    <pre className="whitespace-pre-wrap break-words font-sans text-sm text-[var(--color-text-secondary)]">
+                    <pre className="whitespace-pre-wrap break-words font-sans text-sm text-muted-foreground">
                       {renderDiffValue(field, beforeVal)}
                     </pre>
                   </div>
                   <div className="p-3">
-                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-hint)]">
+                    <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                       修改后
                     </p>
-                    <pre className="whitespace-pre-wrap break-words font-sans text-sm font-medium text-[var(--color-text-primary)]">
+                    <pre className="whitespace-pre-wrap break-words font-sans text-sm font-medium text-foreground">
                       {renderDiffValue(field, afterVal)}
                     </pre>
                   </div>
@@ -102,43 +102,43 @@ export function ChangeComparison({ detail }: ChangeComparisonProps) {
 
       {/* Extra fields not in before/after */}
       {!!detail.delete_mode && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5">
-          <p className="text-xs font-medium text-[var(--color-text-hint)]">删除方式</p>
-          <p className="mt-0.5 text-sm text-[var(--color-text-primary)]">{String(detail.delete_mode)}</p>
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground/70">删除方式</p>
+          <p className="mt-0.5 text-sm text-foreground">{String(detail.delete_mode)}</p>
         </div>
       )}
 
       {Array.isArray(detail.requested_ids) && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5">
-          <p className="text-xs font-medium text-[var(--color-text-hint)]">请求删除的 ID</p>
-          <p className="mt-0.5 font-mono text-xs text-[var(--color-text-secondary)]">
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground/70">请求删除的 ID</p>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground">
             共 {(detail.requested_ids as number[]).length} 个: [{(detail.requested_ids as number[]).join(", ")}]
           </p>
         </div>
       )}
 
       {Array.isArray(detail.success_ids) && (
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5">
-          <p className="text-xs font-medium text-[var(--color-text-hint)]">成功删除的 ID</p>
-          <p className="mt-0.5 font-mono text-xs text-[var(--color-text-secondary)]">
+        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground/70">成功删除的 ID</p>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground">
             共 {(detail.success_ids as number[]).length} 个: [{(detail.success_ids as number[]).join(", ")}]
           </p>
         </div>
       )}
 
       {Array.isArray(detail.failed_items) && (
-        <div className="rounded-lg border border-[var(--color-danger)]/40 bg-[var(--color-danger-light)] px-3 py-2.5">
-          <p className="text-xs font-medium text-[var(--color-danger)]">失败项</p>
+        <div className="rounded-lg border border-destructive/40 bg-destructive-light px-3 py-2.5">
+          <p className="text-xs font-medium text-destructive">失败项</p>
           {(detail.failed_items as Array<{ id: number; error: string }>).length > 0 ? (
             <div className="mt-1 space-y-1">
               {(detail.failed_items as Array<{ id: number; error: string }>).map((f, i) => (
-                <p key={i} className="font-mono text-xs text-[var(--color-text-secondary)]">
+                <p key={i} className="font-mono text-xs text-muted-foreground">
                   #{f.id}: {f.error}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">无</p>
+            <p className="mt-1 text-xs text-muted-foreground">无</p>
           )}
         </div>
       )}

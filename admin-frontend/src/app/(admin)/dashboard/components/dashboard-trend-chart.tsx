@@ -190,7 +190,7 @@ export function DashboardTrendChart({
   };
 
   return (
-    <div className="h-full min-w-0 rounded-2xl border border-[var(--color-border-light)] bg-white/[0.86] p-5 shadow-[0_6px_24px_rgba(37,61,89,0.05)] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_10px_32px_rgba(37,61,89,0.075)]">
+    <div className="h-full min-w-0 rounded-2xl border border-border/60 bg-card/85 p-5 shadow-[0_6px_24px_rgba(37,61,89,0.05)] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_10px_32px_rgba(37,61,89,0.075)]">
       <style jsx global>{`
         @keyframes dashboard-shimmer {
           from { transform: translateX(-80%); }
@@ -200,17 +200,17 @@ export function DashboardTrendChart({
       <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-display text-xl font-bold text-[var(--ink)]">近日日活与内容变化</h3>
-            <span className="grid h-4 w-4 place-items-center rounded-full border border-[var(--color-border)] text-[9px] font-semibold text-[var(--color-text-hint)]">
+            <h3 className="font-display text-xl font-bold text-foreground">近日日活与内容变化</h3>
+            <span className="grid h-4 w-4 place-items-center rounded-full border border-border text-[9px] font-semibold text-muted-foreground/70">
               i
             </span>
           </div>
-          <p className="mt-1 text-xs text-[var(--color-text-hint)]">
+          <p className="mt-1 text-xs text-muted-foreground/70">
             {loading ? "正在加载运营趋势" : `最近 ${period === "7d" ? "7" : "30"} 天平台新增与审计事件`}
           </p>
         </div>
 
-        <div className="flex shrink-0 overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/65 p-0.5 shadow-inner">
+        <div className="flex shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/65 p-0.5 shadow-inner">
           {(["7d", "30d"] as Period[]).map((item) => (
             <button
               type="button"
@@ -218,8 +218,8 @@ export function DashboardTrendChart({
               onClick={() => onPeriodChange(item)}
               className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
                 period === item
-                  ? "bg-white text-[var(--color-primary-dark)] shadow-sm ring-1 ring-[var(--color-primary)]/15"
-                  : "text-[var(--color-text-hint)] hover:bg-white/50 hover:text-[var(--ink)]"
+                  ? "bg-card text-accent-foreground shadow-sm ring-1 ring-primary/15"
+                  : "text-muted-foreground/70 hover:bg-card/50 hover:text-foreground"
               }`}
             >
               {item === "7d" ? "最近 7 天" : "最近 30 天"}
@@ -238,13 +238,13 @@ export function DashboardTrendChart({
               onClick={() => setSeries((current) => ({ ...current, [item.key]: !current[item.key] }))}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium transition-all duration-200 ${
                 enabled
-                  ? "border-transparent bg-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border-light)] hover:bg-white"
-                  : "border-transparent text-[var(--color-text-hint)] opacity-55 hover:opacity-80"
+                  ? "border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-card"
+                  : "border-transparent text-muted-foreground/70 opacity-55 hover:opacity-80"
               }`}
             >
               <span
                 className="h-2 w-2 rounded-full transition-transform duration-200"
-                style={{ backgroundColor: enabled ? item.color : "var(--color-border)", transform: enabled ? "scale(1)" : "scale(.8)" }}
+                style={{ backgroundColor: enabled ? item.color : "var(--border)", transform: enabled ? "scale(1)" : "scale(.8)" }}
               />
               {item.label}
             </button>
@@ -253,25 +253,25 @@ export function DashboardTrendChart({
       </div>
 
       {loading ? (
-        <div className="relative h-[318px] overflow-hidden rounded-xl bg-[var(--color-bg-input)]/55 motion-reduce:animate-none">
-          <div className="absolute inset-y-0 -left-1/3 w-1/3 animate-[dashboard-shimmer_1.2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+        <div className="relative h-[318px] overflow-hidden rounded-xl bg-muted/55 motion-reduce:animate-none">
+          <div className="absolute inset-y-0 -left-1/3 w-1/3 animate-[dashboard-shimmer_1.2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-card/80 to-transparent" />
         </div>
       ) : hasData ? (
-        <div ref={chartContainerRef} className="relative h-[318px] min-h-[318px] min-w-0 w-full overflow-hidden rounded-xl bg-white/30">
+        <div ref={chartContainerRef} className="relative h-[318px] min-h-[318px] min-w-0 w-full overflow-hidden rounded-xl bg-card/30">
           {hoveredRow && hoverIndex !== null ? (
             <div
-              className="pointer-events-none absolute top-3 z-20 min-w-40 -translate-x-1/2 rounded-2xl border border-[var(--color-border-light)] bg-white/95 px-4 py-3 text-xs shadow-[0_14px_34px_rgba(37,61,89,0.14)] backdrop-blur-md transition-[left] duration-75"
+              className="pointer-events-none absolute top-3 z-20 min-w-40 -translate-x-1/2 rounded-2xl border border-border/60 bg-card/95 px-4 py-3 text-xs shadow-[0_14px_34px_rgba(37,61,89,0.14)] backdrop-blur-md transition-[left] duration-75"
               style={{ left: `${Math.min(90, Math.max(10, tooltipLeft))}%` }}
             >
-              <p className="mb-2 font-bold text-[var(--ink)]">{hoveredRow.date}</p>
+              <p className="mb-2 font-bold text-foreground">{hoveredRow.date}</p>
               <div className="space-y-1.5">
                 {SERIES.filter((item) => series[item.key]).map((item) => (
-                  <p key={item.key} className="flex items-center justify-between gap-5 text-[var(--color-text-secondary)]">
+                  <p key={item.key} className="flex items-center justify-between gap-5 text-muted-foreground">
                     <span className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
                       {item.label}
                     </span>
-                    <strong className="tabular-nums text-[var(--ink)]">{safeNumber(hoveredRow[item.dataKey]).toLocaleString("zh-CN")}</strong>
+                    <strong className="tabular-nums text-foreground">{safeNumber(hoveredRow[item.dataKey]).toLocaleString("zh-CN")}</strong>
                   </p>
                 ))}
               </div>
@@ -409,7 +409,7 @@ export function DashboardTrendChart({
           </svg>
         </div>
       ) : (
-        <div className="grid h-[318px] min-h-[318px] min-w-0 place-items-center rounded-xl border border-dashed border-[var(--color-border)] text-sm text-[var(--color-text-hint)]">
+        <div className="grid h-[318px] min-h-[318px] min-w-0 place-items-center rounded-xl border border-dashed border-border text-sm text-muted-foreground/70">
           暂无趋势数据
         </div>
       )}

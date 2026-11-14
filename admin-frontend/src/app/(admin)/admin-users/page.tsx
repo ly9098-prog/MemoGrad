@@ -22,8 +22,14 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+  MetricCard,
+  MetricStrip,
+} from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -101,66 +107,19 @@ const PAGE_SIZE_OPTIONS = [
 
 
 function RoleBadge({ role }: { role?: Role }) {
-  if (!role) return <span className="text-xs text-[var(--color-text-hint)]">—</span>;
+  if (!role) return <span className="text-xs text-muted-foreground/70">—</span>;
   const className = role.name === "super_admin"
-    ? "border-[color:rgba(74,111,138,0.22)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
+    ? "border-primary/20 bg-accent text-primary"
     : role.name.includes("system")
-      ? "border-[color:rgba(91,140,91,0.22)] bg-[var(--color-success-light)] text-[var(--color-success)]"
+      ? "border-success/20 bg-success-light text-success"
       : role.name.includes("content")
-        ? "border-[color:rgba(196,154,107,0.25)] bg-[var(--color-warning-light)] text-[#8b6741]"
-        : "border-[var(--color-border)] bg-[var(--color-bg-input)] text-[var(--color-text-secondary)]";
+        ? "border-warning/25 bg-warning-light text-warning-foreground"
+        : "border-border bg-muted/50 text-muted-foreground";
 
   return (
     <span className={cn("inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold", className)}>
       {role.display_name}
     </span>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  helper,
-  icon,
-  tone,
-  loading,
-}: {
-  label: string;
-  value: number;
-  helper: string;
-  icon: ReactNode;
-  tone: "primary" | "success" | "warm" | "danger";
-  loading?: boolean;
-}) {
-  const toneClasses = {
-    primary: {
-      icon: "border-[color:rgba(74,111,138,0.18)] bg-[var(--color-primary-light)] text-[var(--color-primary)]",
-    },
-    success: {
-      icon: "border-[color:rgba(91,140,91,0.18)] bg-[var(--color-success-light)] text-[var(--color-success)]",
-    },
-    warm: {
-      icon: "border-[color:rgba(196,154,107,0.20)] bg-[var(--color-warning-light)] text-[#a77b4c]",
-    },
-    danger: {
-      icon: "border-[color:rgba(196,77,77,0.16)] bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-    },
-  }[tone];
-
-  return (
-    <div className="relative min-h-[126px] overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.88)] p-5 shadow-[0_4px_20px_rgba(27,39,51,0.045)] backdrop-blur-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-[var(--color-text-secondary)]">{label}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--ink)] tabular-nums">
-            {loading ? <span className="inline-block h-8 w-16 animate-pulse rounded-lg bg-[var(--color-border-light)]" /> : value.toLocaleString("zh-CN")}
-          </p>
-          <p className="mt-1.5 text-xs text-[var(--color-text-hint)]">{helper}</p>
-        </div>
-        <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full border", toneClasses.icon)}>{icon}</span>
-      </div>
-
-    </div>
   );
 }
 
@@ -468,44 +427,49 @@ export default function AdminUsersPage() {
   const hasFilters = Boolean(searchInput.trim() || roleFilter || statusFilter !== "all" || dateFrom || dateTo);
 
   return (
-    <div className="relative mx-auto w-full max-w-[1600px] space-y-5 pb-6">
+    <ManagementPage className="space-y-5 pb-6">
+      <ManagementPageHeader
+        icon={<ShieldCheck className="h-5 w-5" />}
+        title="后台管理员"
+        description="管理后台账号、角色归属与登录安全操作；保护账号继续遵循前后端双重限制。"
+        actions={
+          <Button
+            onClick={openCreateForm}
+            disabled={!canCreate}
+            className="h-11 gap-2 rounded-xl px-5 shadow-none"
+          >
+            <Plus className="h-4 w-4" />
+            新建管理员
+          </Button>
+        }
+        meta={<span>超级管理员账号不可在此页面降级、停用或重置密码。</span>}
+      />
       {(manualRefreshing || (users.isLoading && !hasDisplayedUsers)) ? (
         <div
-          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-[rgba(245,244,239,0.58)] backdrop-blur-[2px]"
+          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
           role="status"
           aria-live="polite"
           aria-label="正在加载数据"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-border-light)] bg-white/95 px-5 py-3.5 text-sm font-medium text-[var(--color-text-secondary)] shadow-[0_18px_50px_rgba(35,49,42,0.14)]">
-            <RefreshCw className="h-5 w-5 animate-spin text-[var(--color-primary)]" />
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-popover/95 px-5 py-3.5 text-sm font-medium text-muted-foreground shadow-[0_18px_50px_rgba(35,49,42,0.14)]">
+            <RefreshCw className="h-5 w-5 animate-spin text-primary" />
             <span>加载中…</span>
           </div>
         </div>
       ) : null}
-      <div className="flex justify-end">
-        <Button
-          onClick={openCreateForm}
-          disabled={!canCreate}
-          className="h-11 gap-2 rounded-xl bg-[var(--color-primary)] px-5 text-white shadow-none hover:bg-[var(--color-primary-dark)]"
-        >
-          <Plus className="h-4 w-4" />
-          新建管理员
-        </Button>
-      </div>
-
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricStrip className="sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="管理员总数"
           value={totalUsers.data?.total ?? 0}
-          helper="全部后台管理员账号"
+          hint="全部后台管理员账号"
           icon={<UsersRound className="h-5 w-5" />}
-          tone="primary"
+          tone="accent"
           loading={totalUsers.isLoading}
         />
         <MetricCard
           label="启用中"
           value={activeUsers.data?.total ?? 0}
-          helper="当前可正常登录"
+          hint="当前可正常登录"
           icon={<UserRoundCheck className="h-5 w-5" />}
           tone="success"
           loading={activeUsers.isLoading}
@@ -513,29 +477,29 @@ export default function AdminUsersPage() {
         <MetricCard
           label="本月新增"
           value={monthUsers.data?.total ?? 0}
-          helper={`北京时间 ${today.slice(0, 7)}`}
+          hint={`北京时间 ${today.slice(0, 7)}`}
           icon={<Plus className="h-5 w-5" />}
-          tone="warm"
+          tone="warning"
           loading={monthUsers.isLoading}
         />
         <MetricCard
           label="停用中"
           value={inactiveUsers.data?.total ?? 0}
-          helper="当前不可登录"
+          hint="当前不可登录"
           icon={<UserRoundX className="h-5 w-5" />}
           tone="danger"
           loading={inactiveUsers.isLoading}
         />
-      </section>
+      </MetricStrip>
 
       {message ? (
-        <div className="flex items-center gap-2.5 rounded-xl border border-[var(--color-border)] bg-white/85 px-4 py-3 text-sm shadow-sm">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card/85 px-4 py-3 text-sm shadow-sm">
           {message.includes("失败") || message.includes("error") ? (
-            <ShieldAlert className="h-4 w-4 shrink-0 text-[var(--color-danger)]" />
+            <ShieldAlert className="h-4 w-4 shrink-0 text-destructive" />
           ) : (
-            <UserRoundCheck className="h-4 w-4 shrink-0 text-[var(--color-success)]" />
+            <UserRoundCheck className="h-4 w-4 shrink-0 text-success" />
           )}
-          <span className="text-[var(--ink)]">{message}</span>
+          <span className="text-foreground">{message}</span>
         </div>
       ) : null}
 
@@ -543,9 +507,9 @@ export default function AdminUsersPage() {
         <CardContent className="p-4 lg:p-5">
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
             <label className="relative min-w-0 flex-1 2xl:max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
-                className="h-11 bg-white pl-9"
+                className="h-11 bg-card pl-9"
                 placeholder="搜索用户名 / 显示名 / 邮箱"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
@@ -573,12 +537,12 @@ export default function AdminUsersPage() {
                 clearable={false}
                 className="w-full 2xl:w-40"
               />
-              <div className="flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 2xl:w-[310px]">
-                <CalendarDays className="h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
+              <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 2xl:w-[310px]">
+                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                 <input
                   type="date"
                   aria-label="创建开始日期"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-secondary)] outline-none"
+                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none"
                   value={dateFrom}
                   max={dateTo || undefined}
                   onChange={(event) => {
@@ -588,11 +552,11 @@ export default function AdminUsersPage() {
                     setPage(1);
                   }}
                 />
-                <span className="text-[var(--color-text-hint)]">—</span>
+                <span className="text-muted-foreground/70">—</span>
                 <input
                   type="date"
                   aria-label="创建结束日期"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-secondary)] outline-none"
+                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none"
                   value={dateTo}
                   min={dateFrom || undefined}
                   onChange={(event) => {
@@ -622,7 +586,7 @@ export default function AdminUsersPage() {
       <Card className="overflow-hidden rounded-2xl">
         <CardContent className="p-0">
           {users.isError ? (
-            <div className="m-4 flex items-center gap-2 rounded-xl border border-[color:rgba(196,77,77,0.22)] bg-[var(--color-danger-light)] px-4 py-3 text-sm text-[var(--color-danger)]">
+            <div className="m-4 flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive-light px-4 py-3 text-sm text-destructive">
               <ShieldAlert className="h-4 w-4 shrink-0" />
               {users.error instanceof Error ? users.error.message : "管理员列表接口暂不可用"}
             </div>
@@ -630,8 +594,8 @@ export default function AdminUsersPage() {
 
           <div className="relative overflow-x-auto">
             <table className="w-full min-w-[1060px] border-collapse text-sm">
-              <thead className="bg-[rgba(239,244,248,0.62)] text-left">
-                <tr className="border-b border-[var(--color-border-light)]">
+              <thead className="bg-secondary/50 text-left">
+                <tr className="border-b border-border">
                   <th className="w-12 px-5 py-3.5">
                     <CustomCheckbox
                       checked={allPageSelected}
@@ -648,7 +612,7 @@ export default function AdminUsersPage() {
                     ["最后登录", "min-w-56"],
                     ["操作", "w-48"],
                   ].map(([label, width]) => (
-                    <th key={label} className={cn("px-4 py-3.5 text-xs font-semibold text-[var(--color-text-secondary)]", width)}>
+                    <th key={label} className={cn("px-4 py-3.5 text-xs font-semibold text-muted-foreground", width)}>
                       {label}
                     </th>
                   ))}
@@ -657,14 +621,14 @@ export default function AdminUsersPage() {
               <tbody>
                 {users.isLoading && !hasDisplayedUsers ? (
                   Array.from({ length: Math.min(pageSize, 7) }, (_, index) => (
-                    <tr key={index} className="border-b border-[var(--color-border-light)] last:border-0">
-                      <td className="px-5 py-4"><div className="h-[18px] w-[18px] animate-pulse rounded bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-4 w-8 animate-pulse rounded bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-10 w-52 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-7 w-20 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-7 w-16 animate-pulse rounded-full bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-9 w-44 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-4"><div className="h-9 w-36 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
+                    <tr key={index} className="border-b border-border last:border-0">
+                      <td className="px-5 py-4"><div className="h-[18px] w-[18px] animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-4 w-8 animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-10 w-52 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-7 w-20 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-7 w-16 animate-pulse rounded-full bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-9 w-44 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-4"><div className="h-9 w-36 animate-pulse rounded-lg bg-border" /></td>
                     </tr>
                   ))
                 ) : currentItems.length ? (
@@ -673,7 +637,7 @@ export default function AdminUsersPage() {
                     const protectedRow = isSuperAdmin(user);
                     const primaryName = user.display_name || user.username;
                     return (
-                      <tr key={user.id} className="border-b border-[var(--color-border-light)] transition-colors last:border-0 hover:bg-[rgba(74,111,138,0.035)]">
+                      <tr key={user.id} className="border-b border-border transition-colors last:border-0 hover:bg-accent/40">
                         <td className="px-5 py-4">
                           <CustomCheckbox
                             checked={selectedIds.has(user.id)}
@@ -681,15 +645,15 @@ export default function AdminUsersPage() {
                             aria-label={`选择管理员 ${user.username}`}
                           />
                         </td>
-                        <td className="px-4 py-4 font-mono text-xs text-[var(--color-text-secondary)] tabular-nums">{user.id}</td>
+                        <td className="px-4 py-4 font-mono text-xs text-muted-foreground tabular-nums">{user.id}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-primary-light)] text-sm font-bold text-[var(--color-primary-dark)] ring-1 ring-[color:rgba(74,111,138,0.18)]">
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-primary ring-1 ring-primary/20">
                               {primaryName.charAt(0).toUpperCase() || "A"}
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate font-semibold text-[var(--ink)]">{primaryName}</div>
-                              <div className="mt-0.5 max-w-[300px] truncate text-xs text-[var(--color-text-hint)]">
+                              <div className="truncate font-semibold text-foreground">{primaryName}</div>
+                              <div className="mt-0.5 max-w-[300px] truncate text-xs text-muted-foreground/70">
                                 {user.email || (user.display_name ? user.username : "未设置邮箱")}
                               </div>
                             </div>
@@ -700,8 +664,8 @@ export default function AdminUsersPage() {
                           <StatusBadge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "启用中" : "停用中"}</StatusBadge>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="text-xs font-medium text-[var(--color-text-secondary)]">{formatChinaDateTime(user.last_login_at)}</div>
-                          <div className="mt-1 font-mono text-[11px] text-[var(--color-text-hint)]">{user.last_login_ip || "—"}</div>
+                          <div className="text-xs font-medium text-muted-foreground">{formatChinaDateTime(user.last_login_at)}</div>
+                          <div className="mt-1 font-mono text-[11px] text-muted-foreground/70">{user.last_login_ip || "—"}</div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
@@ -710,7 +674,7 @@ export default function AdminUsersPage() {
                               title="编辑管理员"
                               disabled={protectedRow || !canUpdate}
                               onClick={() => startEdit(user)}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-primary-dark)] transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:pointer-events-none disabled:opacity-35"
+                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <Edit3 className="h-4 w-4" />
                             </button>
@@ -719,7 +683,7 @@ export default function AdminUsersPage() {
                               title="强制登出"
                               disabled={protectedRow || !canForceLogout}
                               onClick={() => setConfirmState({ action: "force-logout", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-primary-dark)] transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:pointer-events-none disabled:opacity-35"
+                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <LogOut className="h-4 w-4" />
                             </button>
@@ -728,7 +692,7 @@ export default function AdminUsersPage() {
                               title="重置密码"
                               disabled={protectedRow || !canResetPassword}
                               onClick={() => setConfirmState({ action: "reset-password", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-primary-dark)] transition hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:pointer-events-none disabled:opacity-35"
+                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <KeyRound className="h-4 w-4" />
                             </button>
@@ -737,7 +701,7 @@ export default function AdminUsersPage() {
                               title="停用账号"
                               disabled={protectedRow || !canDelete || !user.is_active}
                               onClick={() => setConfirmState({ action: "delete", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-[color:rgba(196,77,77,0.15)] bg-white text-[var(--color-danger)] transition hover:border-[color:rgba(196,77,77,0.28)] hover:bg-[var(--color-danger-light)] disabled:pointer-events-none disabled:opacity-30"
+                              className="grid h-9 w-9 place-items-center rounded-xl border border-destructive/15 bg-card text-destructive transition hover:border-destructive/30 hover:bg-destructive-light disabled:pointer-events-none disabled:opacity-30"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -749,9 +713,9 @@ export default function AdminUsersPage() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-5 py-20 text-center">
-                      <UsersRound className="mx-auto h-8 w-8 text-[var(--color-text-hint)]" />
-                      <p className="mt-3 text-sm font-medium text-[var(--color-text-secondary)]">暂无符合条件的管理员</p>
-                      <p className="mt-1 text-xs text-[var(--color-text-hint)]">调整关键词、角色、状态或日期范围，列表会自动更新。</p>
+                      <UsersRound className="mx-auto h-8 w-8 text-muted-foreground/70" />
+                      <p className="mt-3 text-sm font-medium text-muted-foreground">暂无符合条件的管理员</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">调整关键词、角色、状态或日期范围，列表会自动更新。</p>
                     </td>
                   </tr>
                 )}
@@ -759,10 +723,10 @@ export default function AdminUsersPage() {
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-[var(--color-border-light)] px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-              <span>共 <strong className="font-semibold text-[var(--ink)]">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 条数据</span>
-              {selectedIds.size ? <span className="text-[var(--color-primary-dark)]">已选 {selectedIds.size} 条</span> : null}
+          <div className="flex flex-col gap-3 border-t border-border px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>共 <strong className="font-semibold text-foreground">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 条数据</span>
+              {selectedIds.size ? <span className="text-primary">已选 {selectedIds.size} 条</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <nav className="flex items-center gap-1" aria-label="管理员列表分页">
@@ -771,7 +735,7 @@ export default function AdminUsersPage() {
                   aria-label="上一页"
                   disabled={page <= 1}
                   onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-sm text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] disabled:pointer-events-none disabled:opacity-30"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-sm text-muted-foreground transition hover:border-primary disabled:pointer-events-none disabled:opacity-30"
                 >
                   ‹
                 </button>
@@ -785,14 +749,14 @@ export default function AdminUsersPage() {
                       className={cn(
                         "grid h-9 min-w-9 place-items-center rounded-xl border px-2 text-xs font-semibold transition",
                         page === item
-                          ? "border-[var(--color-primary-dark)] bg-[var(--color-primary)] text-white shadow-sm"
-                          : "border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-white",
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-transparent text-muted-foreground hover:border-border hover:bg-accent",
                       )}
                     >
                       {item}
                     </button>
                   ) : (
-                    <span key={item} className="grid h-9 w-7 place-items-center text-xs text-[var(--color-text-hint)]">…</span>
+                    <span key={item} className="grid h-9 w-7 place-items-center text-xs text-muted-foreground/70">…</span>
                   ),
                 )}
                 <button
@@ -800,7 +764,7 @@ export default function AdminUsersPage() {
                   aria-label="下一页"
                   disabled={page >= totalPages}
                   onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-sm text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] disabled:pointer-events-none disabled:opacity-30"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-sm text-muted-foreground transition hover:border-primary disabled:pointer-events-none disabled:opacity-30"
                 >
                   ›
                 </button>
@@ -823,7 +787,7 @@ export default function AdminUsersPage() {
       {showForm
         ? createPortal(
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,37,35,0.46)] px-4 py-6 backdrop-blur-[3px]"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-overlay px-4 py-6 backdrop-blur-[3px]"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) closeForm();
               }}
@@ -832,18 +796,18 @@ export default function AdminUsersPage() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="admin-user-form-title"
-                className="flex max-h-[min(92vh,780px)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] border border-[var(--color-border)] bg-[rgba(254,252,249,0.98)] shadow-[0_28px_90px_rgba(29,37,34,0.24)]"
+                className="flex max-h-[min(92vh,780px)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] border border-border bg-card/95 shadow-[0_28px_90px_rgba(29,37,34,0.24)]"
                 onMouseDown={(event) => event.stopPropagation()}
               >
-                <div className="flex items-start gap-4 border-b border-[var(--color-border-light)] px-6 py-5 sm:px-7">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[color:rgba(74,111,138,0.16)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">
+                <div className="flex items-start gap-4 border-b border-border px-6 py-5 sm:px-7">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-primary/15 bg-accent text-primary">
                     {form.id ? <Edit3 className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
                   </div>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <h3 id="admin-user-form-title" className="font-display text-[22px] font-bold leading-tight text-[var(--ink)]">
+                    <h3 id="admin-user-form-title" className="font-display text-[22px] font-bold leading-tight text-foreground">
                       {form.id ? "编辑管理员" : "新建管理员"}
                     </h3>
-                    <p className="mt-1.5 text-sm leading-5 text-[var(--color-text-secondary)]">
+                    <p className="mt-1.5 text-sm leading-5 text-muted-foreground">
                       {form.id ? "更新账号资料、角色和登录状态。" : "创建一个后台登录账号并分配管理角色。"}
                     </p>
                   </div>
@@ -852,7 +816,7 @@ export default function AdminUsersPage() {
                     onClick={closeForm}
                     disabled={saveMutation.isPending}
                     aria-label="关闭"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground/70 transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -864,16 +828,16 @@ export default function AdminUsersPage() {
                       <div className="space-y-6">
                         <section>
                           <div className="mb-3 flex items-center gap-2">
-                            <LockKeyhole className="h-4 w-4 text-[var(--color-primary)]" />
-                            <h4 className="text-sm font-semibold text-[var(--ink)]">登录凭据</h4>
+                            <LockKeyhole className="h-4 w-4 text-primary" />
+                            <h4 className="text-sm font-semibold text-foreground">登录凭据</h4>
                           </div>
                           <div className="grid gap-4">
                             <div>
                               <div className="mb-1.5 flex items-center justify-between gap-3">
-                                <label className="text-xs font-semibold text-[var(--color-text-secondary)]" htmlFor="admin-username">
-                                  用户名 <span className="text-[var(--color-danger)]">*</span>
+                                <label className="text-xs font-semibold text-muted-foreground" htmlFor="admin-username">
+                                  用户名 <span className="text-destructive">*</span>
                                 </label>
-                                {form.id ? <span className="text-[11px] text-[var(--color-text-hint)]">创建后不可修改</span> : null}
+                                {form.id ? <span className="text-[11px] text-muted-foreground/70">创建后不可修改</span> : null}
                               </div>
                               <Input
                                 id="admin-username"
@@ -884,14 +848,14 @@ export default function AdminUsersPage() {
                                 value={form.username}
                                 disabled={Boolean(form.id) || saveMutation.isPending}
                                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-                                className="h-11 bg-white"
+                                className="h-11 bg-card"
                               />
                             </div>
 
                             {!form.id ? (
                               <div>
-                                <label className="mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)]" htmlFor="admin-password">
-                                  初始密码 <span className="text-[var(--color-danger)]">*</span>
+                                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="admin-password">
+                                  初始密码 <span className="text-destructive">*</span>
                                 </label>
                                 <div className="relative">
                                   <Input
@@ -903,14 +867,14 @@ export default function AdminUsersPage() {
                                     disabled={saveMutation.isPending}
                                     value={form.password}
                                     onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                                    className="h-11 bg-white pr-11"
+                                    className="h-11 bg-card pr-11"
                                   />
                                   <button
                                     type="button"
                                     onClick={() => setShowPassword((value) => !value)}
                                     disabled={saveMutation.isPending}
                                     aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                                    className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--color-text-secondary)]"
+                                    className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-muted hover:text-muted-foreground"
                                   >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                   </button>
@@ -929,8 +893,8 @@ export default function AdminUsersPage() {
                                         className={cn(
                                           "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors",
                                           passed
-                                            ? "border-[color:rgba(91,140,91,0.22)] bg-[var(--color-success-light)] text-[var(--color-success)]"
-                                            : "border-[var(--color-border-light)] bg-[var(--color-bg-input)] text-[var(--color-text-hint)]",
+                                            ? "border-success/20 bg-success-light text-success"
+                                            : "border-border bg-muted/50 text-muted-foreground/70",
                                         )}
                                       >
                                         <span className="text-[10px]">{passed ? "✓" : "·"}</span>{label}
@@ -943,17 +907,17 @@ export default function AdminUsersPage() {
                           </div>
                         </section>
 
-                        <div className="h-px bg-[var(--color-border-light)]" />
+                        <div className="h-px bg-border" />
 
                         <section>
                           <div className="mb-3 flex items-center gap-2">
-                            <Mail className="h-4 w-4 text-[var(--color-primary)]" />
-                            <h4 className="text-sm font-semibold text-[var(--ink)]">展示信息</h4>
-                            <span className="text-[11px] text-[var(--color-text-hint)]">可选</span>
+                            <Mail className="h-4 w-4 text-primary" />
+                            <h4 className="text-sm font-semibold text-foreground">展示信息</h4>
+                            <span className="text-[11px] text-muted-foreground/70">可选</span>
                           </div>
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                              <label className="mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)]" htmlFor="admin-display-name">显示名</label>
+                              <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="admin-display-name">显示名</label>
                               <Input
                                 id="admin-display-name"
                                 maxLength={64}
@@ -961,11 +925,11 @@ export default function AdminUsersPage() {
                                 disabled={saveMutation.isPending}
                                 value={form.display_name}
                                 onChange={(event) => setForm((current) => ({ ...current, display_name: event.target.value }))}
-                                className="h-11 bg-white"
+                                className="h-11 bg-card"
                               />
                             </div>
                             <div>
-                              <label className="mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)]" htmlFor="admin-email">邮箱</label>
+                              <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="admin-email">邮箱</label>
                               <Input
                                 id="admin-email"
                                 type="email"
@@ -975,22 +939,22 @@ export default function AdminUsersPage() {
                                 disabled={saveMutation.isPending}
                                 value={form.email}
                                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                                className="h-11 bg-white"
+                                className="h-11 bg-card"
                               />
                             </div>
                           </div>
                         </section>
 
-                        <div className="h-px bg-[var(--color-border-light)]" />
+                        <div className="h-px bg-border" />
 
                         <section>
                           <div className="mb-3 flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-[var(--color-primary)]" />
-                            <h4 className="text-sm font-semibold text-[var(--ink)]">权限与状态</h4>
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <h4 className="text-sm font-semibold text-foreground">权限与状态</h4>
                           </div>
                           <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)]">
-                              角色 <span className="text-[var(--color-danger)]">*</span>
+                            <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+                              角色 <span className="text-destructive">*</span>
                             </label>
                             <CustomSelect
                               value={form.role_id}
@@ -1001,7 +965,7 @@ export default function AdminUsersPage() {
                               className="w-full"
                             />
                             {selectedFormRole ? (
-                              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-hint)]">
+                              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground/70">
                                 <RoleBadge role={selectedFormRole} />
                                 <span>{selectedFormRole.description || (selectedFormRole.is_system ? "系统内置角色" : "自定义角色")}</span>
                               </div>
@@ -1014,11 +978,11 @@ export default function AdminUsersPage() {
                             aria-checked={form.is_active}
                             disabled={saveMutation.isPending}
                             onClick={() => setForm((current) => ({ ...current, is_active: !current.is_active }))}
-                            className="mt-4 flex w-full items-center justify-between gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-4 py-3 text-left transition hover:border-[color:rgba(74,111,138,0.3)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            className="mt-4 flex w-full items-center justify-between gap-4 rounded-2xl border border-border bg-muted/50 px-4 py-3 text-left transition hover:border-primary/30 hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <span className="min-w-0">
-                              <strong className="block text-sm font-semibold text-[var(--ink)]">{form.id ? "启用账号" : "创建后立即启用"}</strong>
-                              <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-hint)]">
+                              <strong className="block text-sm font-semibold text-foreground">{form.id ? "启用账号" : "创建后立即启用"}</strong>
+                              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground/70">
                                 {form.is_active ? "账号创建后可直接登录后台。" : "账号将保持停用，需后续启用后才能登录。"}
                               </span>
                             </span>
@@ -1026,13 +990,13 @@ export default function AdminUsersPage() {
                               className={cn(
                                 "relative h-6 w-11 shrink-0 rounded-full border transition-colors",
                                 form.is_active
-                                  ? "border-[var(--color-success)] bg-[var(--color-success)]"
-                                  : "border-[var(--color-border)] bg-white",
+                                  ? "border-success bg-success"
+                                  : "border-border bg-card",
                               )}
                             >
                               <span
                                 className={cn(
-                                  "absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform",
+                                  "absolute top-0.5 h-[18px] w-[18px] rounded-full bg-card shadow-sm transition-transform",
                                   form.is_active ? "translate-x-[21px]" : "translate-x-[3px]",
                                 )}
                               />
@@ -1040,13 +1004,13 @@ export default function AdminUsersPage() {
                           </button>
                         </section>
 
-                        <div className="flex items-start gap-2.5 rounded-2xl border border-[var(--color-border-light)] bg-[rgba(239,244,248,0.48)] px-4 py-3 text-xs leading-5 text-[var(--color-text-secondary)]">
-                          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary)]" />
+                        <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-xs leading-5 text-muted-foreground">
+                          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                           <span>超级管理员账号受保护，不提供角色修改、停用、强退或密码重置入口。</span>
                         </div>
 
                         {saveMutation.isError ? (
-                          <div className="flex items-start gap-2 rounded-xl border border-[color:rgba(196,77,77,0.22)] bg-[var(--color-danger-light)] px-4 py-3 text-xs leading-5 text-[var(--color-danger)]">
+                          <div className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive-light px-4 py-3 text-xs leading-5 text-destructive">
                             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
                             <span>{saveMutation.error instanceof Error ? saveMutation.error.message : "保存失败，请检查输入后重试。"}</span>
                           </div>
@@ -1054,8 +1018,8 @@ export default function AdminUsersPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border-light)] bg-[rgba(247,245,241,0.72)] px-6 py-4 sm:px-7">
-                      <span className="hidden text-xs text-[var(--color-text-hint)] sm:block">按 Esc 可关闭</span>
+                    <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-6 py-4 sm:px-7">
+                      <span className="hidden text-xs text-muted-foreground/70 sm:block">按 Esc 可关闭</span>
                       <div className="ml-auto flex items-center gap-2.5">
                         <Button
                           variant="secondary"
@@ -1076,7 +1040,7 @@ export default function AdminUsersPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="m-6 flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-4 py-3 text-sm text-[var(--color-text-secondary)] sm:m-7">
+                  <div className="m-6 flex items-center gap-2 rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground sm:m-7">
                     <ShieldAlert className="h-4 w-4 shrink-0" />
                     当前账号没有{form.id ? "编辑管理员" : "创建管理员"}权限。
                   </div>
@@ -1100,6 +1064,6 @@ export default function AdminUsersPage() {
           actionMutation.mutate(confirmState);
         }}
       />
-    </div>
+    </ManagementPage>
   );
 }

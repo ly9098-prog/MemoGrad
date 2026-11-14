@@ -6,6 +6,10 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+} from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -22,10 +26,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-[#eceff3] text-[#5b7b9a]",
-  running: "bg-[#e7f4e7] text-[#3a7d44]",
-  paused: "bg-[#f6e7e7] text-[#a05656]",
-  finished: "bg-[#eceff3] text-[#8a8f98]",
+  draft: "bg-muted text-muted-foreground",
+  running: "bg-success-light text-success",
+  paused: "bg-destructive-light text-destructive",
+  finished: "bg-muted text-muted-foreground",
 };
 
 // 分组 JSON 快捷填入模板（strategy 需为智能刷题引擎识别的值）
@@ -46,8 +50,8 @@ const VARIANT_PRESETS: { label: string; json: string }[] = [
 
 function showToast(msg: string, error = false) {
   const el = document.createElement("div");
-  el.className = `fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in bg-white ${
-    error ? "border-[var(--color-danger)]/30 text-[var(--color-danger)]" : "border-[var(--color-success)]/30 text-[var(--color-success)]"
+  el.className = `fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-popover px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in ${
+    error ? "border-destructive/30 text-destructive" : "border-success/30 text-success"
   }`;
   el.textContent = msg;
   document.body.appendChild(el);
@@ -164,39 +168,39 @@ export default function RecommendationExperimentsPage() {
   }, [compareRow]);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">推荐 A/B 实验</h1>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            创建实验并为用户稳定分组；建议以 weakness_vector 为 Control、scored（图谱综合推荐）为 Treatment
-          </p>
-        </div>
-        {canWrite && (
-          <Button onClick={() => setCreateOpen((v) => !v)}>
-            <Plus className="h-4 w-4" />
-            新建实验
-          </Button>
-        )}
-      </div>
+    <ManagementPage className="space-y-6">
+      <ManagementPageHeader
+        icon={<FlaskConical className="h-5 w-5" />}
+        title="推荐 A/B 实验"
+        description="创建实验并为用户稳定分组；建议以 weakness_vector 为 Control、scored（图谱综合推荐）为 Treatment。"
+        actions={
+          canWrite ? (
+            <Button onClick={() => setCreateOpen((v) => !v)}>
+              <Plus className="h-4 w-4" />
+              新建实验
+            </Button>
+          ) : null
+        }
+        meta={<span>实验分组由稳定 hash 决定，同一用户在同一实验中保持同一分组。</span>}
+      />
 
       {createOpen && (
         <Card>
-          <CardHeader className="text-sm font-bold text-[var(--color-text-primary)]">新建实验</CardHeader>
+          <CardHeader className="text-sm font-bold text-foreground">新建实验</CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+              <label className="text-xs font-semibold text-muted-foreground">
                 实验名称
                 <input
-                  className="mt-1 w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
-              <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+              <label className="text-xs font-semibold text-muted-foreground">
                 场景
                 <select
-                  className="mt-1 w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
                   value={scene}
                   onChange={(e) => setScene(e.target.value)}
                 >
@@ -204,19 +208,19 @@ export default function RecommendationExperimentsPage() {
                   <option value="similar" disabled>相似题（暂未接入实验分流）</option>
                   <option value="knowledge_path" disabled>知识路径（暂未接入实验分流）</option>
                 </select>
-                <span className="mt-1 block text-[10px] font-normal text-[var(--color-text-hint)]">当前运行时仅智能刷题会解析 A/B 实验。</span>
+                <span className="mt-1 block text-[10px] font-normal text-muted-foreground/70">当前运行时仅智能刷题会解析 A/B 实验。</span>
               </label>
             </div>
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+            <label className="text-xs font-semibold text-muted-foreground">
               分组 (JSON，示例 [{"{\"key\":\"A\",\"strategy\":\"weakness_vector\",\"ratio\":0.5},{\"key\":\"B\",\"strategy\":\"path\",\"ratio\":0.5}"}])
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-[var(--color-text-hint)]">快捷填入：</span>
+                <span className="text-xs text-muted-foreground/70">快捷填入：</span>
                 {VARIANT_PRESETS.map((p) => (
                   <button
                     key={p.label}
                     type="button"
                     onClick={() => setVariantsText(p.json)}
-                    className="rounded-full border border-[var(--color-border)] bg-white/70 px-2.5 py-1 text-xs text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                    className="rounded-full border border-border bg-card/70 px-2.5 py-1 text-xs text-muted-foreground transition hover:border-primary hover:text-primary"
                   >
                     {p.label}
                   </button>
@@ -224,7 +228,7 @@ export default function RecommendationExperimentsPage() {
               </div>
               <textarea
                 rows={3}
-                className="mt-1 w-full rounded-xl border border-[var(--color-border)] px-3 py-2 font-mono text-xs"
+                className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 font-mono text-xs text-foreground"
                 value={variantsText}
                 onChange={(e) => setVariantsText(e.target.value)}
                 placeholder='[{"key":"A","strategy":"weakness_vector","ratio":0.5},{"key":"B","strategy":"scored","ratio":0.5}]'
@@ -253,7 +257,7 @@ export default function RecommendationExperimentsPage() {
             header: "状态",
             accessorKey: "status",
             cell: ({ row }) => (
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_COLORS[row.original.status] ?? "bg-[#eceff3] text-[#5b7b9a]"}`}>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_COLORS[row.original.status] ?? "bg-muted text-muted-foreground"}`}>
                 {STATUS_LABELS[row.original.status] ?? row.original.status}
               </span>
             ),
@@ -263,7 +267,7 @@ export default function RecommendationExperimentsPage() {
             header: "分组",
             accessorKey: "variants",
             cell: ({ row }) => (
-              <span className="font-mono text-xs text-[var(--color-text-secondary)]">
+              <span className="font-mono text-xs text-muted-foreground">
                 {(row.original.variants ?? []).map((v) => `${v.key}:${Math.round((v.ratio ?? 0) * 100)}%`).join("  ")}
               </span>
             ),
@@ -314,7 +318,7 @@ export default function RecommendationExperimentsPage() {
       {compareRow && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="text-sm font-bold text-[var(--color-text-primary)]">分组对比（近 30 天）— {compareRow.experiment_name}</h2>
+            <h2 className="text-sm font-bold text-foreground">分组对比（近 30 天）— {compareRow.experiment_name}</h2>
             <Button variant="ghost" size="sm" onClick={() => setCompareId(null)}>
               关闭
             </Button>
@@ -357,9 +361,9 @@ export default function RecommendationExperimentsPage() {
         </Card>
       )}
 
-      <div className="flex items-center gap-2 text-xs text-[var(--color-text-hint)]">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
         <FlaskConical className="h-3.5 w-3.5" /> 实验通过稳定 hash 为用户分组，用户在同一实验中始终命中同一分组
       </div>
-    </div>
+    </ManagementPage>
   );
 }
