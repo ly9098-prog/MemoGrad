@@ -276,6 +276,22 @@ describe("sidebar disclosure continuity", () => {
     expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
   });
 
+  it("lets explicit activation replace a different hovered group", () => {
+    hoverGroup(renderSidebar(), "question-management");
+    (groupButton(renderSidebar(), "system-management").props.onClick as () => void)();
+    const expansion = groupExpansion(renderSidebar());
+    expect(h.states[0]).toEqual({ hovered: null, open: "system-management" });
+    expect(expansion["system-management"]).toBe(true);
+    expect(expansion["question-management"]).toBe(false);
+  });
+
+  it("reopens the explicitly chosen group even if it was open before another hover", () => {
+    (groupButton(renderSidebar(), "system-management").props.onClick as () => void)();
+    hoverGroup(renderSidebar(), "question-management");
+    (groupButton(renderSidebar(), "system-management").props.onClick as () => void)();
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
+  });
+
   it("ignores a leave event while the pointer is still inside the moved module", () => {
     const tree = renderSidebar();
     hoverGroup(tree, "system-management");

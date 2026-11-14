@@ -290,11 +290,11 @@ export function Sidebar({
                     }
                     clearGroupHoverTimer();
                     setGroupInteraction((current) => {
-                      if (current.hovered === item.key) {
+                      if (current.hovered !== null) {
                         return { hovered: null, open: item.key };
                       }
                       return {
-                        hovered: current.hovered,
+                        hovered: null,
                         open: current.open === item.key ? null : item.key,
                       };
                     });

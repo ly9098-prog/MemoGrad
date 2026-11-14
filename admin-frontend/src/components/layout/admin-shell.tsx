@@ -104,9 +104,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className={styles.shell} data-navigation-expanded={isDesktopNavigationExpanded && !isFocusedFormulaEditor ? "true" : undefined}>
+    <div className={styles.shell} data-navigation-expanded={isDesktopNavigationExpanded ? "true" : undefined}>
       <Sidebar
-        collapsed={!isDesktopNavigationExpanded || isFocusedFormulaEditor}
+        collapsed={!isDesktopNavigationExpanded}
         onHoverChange={setNavigationHovered}
         onFocusWithinChange={setNavigationFocused}
       />

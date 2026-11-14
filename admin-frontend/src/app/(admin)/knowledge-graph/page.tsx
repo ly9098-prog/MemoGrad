@@ -18,12 +18,13 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ManagementPage } from "@/components/admin/management-ui";
+import { BodyPortal } from "@/components/ui/body-portal";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type {
   KnowledgeGraphEdge,
@@ -1039,6 +1040,8 @@ export default function KnowledgeGraphPage() {
     && graph.data.overview_topics.length,
   );
 
+  const GraphPanelContainer = fullscreenMode === "overlay" ? BodyPortal : Fragment;
+
   return (
     <ManagementPage className="flex flex-col gap-3.5 space-y-0 [overflow-anchor:none]">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1143,12 +1146,13 @@ export default function KnowledgeGraphPage() {
         "grid min-h-[680px] grid-cols-1 items-start gap-4 [overflow-anchor:none]",
         !isDefaultOverview && "xl:grid-cols-[minmax(0,1fr)_350px]",
       )}>
+        <GraphPanelContainer>
         <section
           ref={graphPanelRef}
           className={cn(
             "surface-card relative min-h-0 overflow-hidden rounded-2xl [overflow-anchor:none]",
             fullscreenMode === "none" && "h-[680px]",
-            fullscreenMode === "overlay" && "fixed inset-3 z-[100] h-[calc(100vh-1.5rem)] bg-[var(--porcelain)] shadow-2xl",
+            fullscreenMode === "overlay" && "fixed inset-3 z-[100] h-[calc(100dvh-1.5rem)] bg-[var(--porcelain)] shadow-2xl",
             fullscreenMode === "native" && "h-screen w-screen rounded-none bg-[var(--porcelain)]",
           )}
         >
@@ -1267,6 +1271,8 @@ export default function KnowledgeGraphPage() {
             </div>
           )}
         </section>
+
+        </GraphPanelContainer>
 
         {!isDefaultOverview ? (
         <aside className="surface-card min-h-[680px] rounded-2xl p-[18px] [overflow-anchor:none] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden xl:h-[680px] xl:overflow-y-auto">
