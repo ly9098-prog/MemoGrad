@@ -5,16 +5,13 @@ import { Sidebar } from "./sidebar";
 type Element = ReactElement<Record<string, unknown>>;
 type AuthState = { role: { name: string }; permissions: string[] };
 
-// The sidebar owns its expanded-group state with useState + useLayoutEffect.
-// The project has no jsdom/react-testing-library (and must not add them), so the
-// hooks are replaced with a tiny deterministic harness: state slots persist across
-// renders like React state, and layout effects run only when explicitly flushed.
 const h = vi.hoisted(() => ({
   states: [] as unknown[],
   stateIndex: 0,
-  layoutEffects: [] as (() => void)[],
   pathname: "/questions",
   auth: { role: { name: "super_admin" }, permissions: [] as string[] } as AuthState,
+  logout: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock("react", async (original) => ({
@@ -31,24 +28,17 @@ vi.mock("react", async (original) => ({
     };
     return [h.states[index], setter];
   },
-  useLayoutEffect: (effect: () => void) => {
-    h.layoutEffects.push(effect);
-  },
+  useRef: (current: unknown) => ({ current }),
 }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => h.pathname }));
+vi.mock("next/navigation", () => ({ usePathname: () => h.pathname, useRouter: () => ({ replace: h.replace }) }));
 vi.mock("@/lib/auth/auth-store", () => ({
-  useAuthStore: (select: (state: AuthState) => unknown) => select(h.auth),
+  useAuthStore: (select: (state: AuthState & { logout: typeof h.logout }) => unknown) => select({ ...h.auth, logout: h.logout }),
 }));
 
-function renderSidebar(): Element {
+function renderSidebar(props: Parameters<typeof Sidebar>[0] = {}): Element {
   h.stateIndex = 0;
-  h.layoutEffects = [];
-  return Sidebar() as Element;
-}
-
-function flushLayoutEffects() {
-  h.layoutEffects.forEach((effect) => effect());
+  return Sidebar(props) as Element;
 }
 
 function walk(node: unknown, visit: (element: Element) => void) {
@@ -87,7 +77,7 @@ function groupButton(tree: unknown, key: string): Element {
 function logoLink(tree: unknown): Element {
   let found: Element | undefined;
   walk(tree, (element) => {
-    if (element.props.href === "/dashboard" && String(element.props.className ?? "").includes("mb-8")) {
+    if (element.props.href === "/dashboard" && element.props["aria-label"] === "MemoGrad 管理工作台") {
       found = element;
     }
   });
@@ -98,74 +88,186 @@ function logoLink(tree: unknown): Element {
 beforeEach(() => {
   h.states = [];
   h.stateIndex = 0;
-  h.layoutEffects = [];
   h.pathname = "/questions";
   h.auth = { role: { name: "super_admin" }, permissions: [] };
+  h.logout.mockReset().mockResolvedValue(undefined);
+  h.replace.mockReset();
 });
 
-describe("sidebar expanded group ownership", () => {
-  it("collapses every expanded group when the logo navigates back to the dashboard", () => {
-    // Arrange: a child route keeps its parent group expanded.
+describe("sidebar reference layout behavior", () => {
+  function links(tree: unknown) {
+    const hrefs: string[] = [];
+    walk(tree, (element) => {
+      if (typeof element.props.href === "string") hrefs.push(element.props.href);
+    });
+    return hrefs;
+  }
+
+  it("filters permission-restricted routes before searching", () => {
+    h.auth = { role: { name: "editor" }, permissions: ["question:read", "role:read"] };
     let tree = renderSidebar();
-    flushLayoutEffects();
-    expect(groupExpansion(tree)["question-management"]).toBe(true);
-
-    // Act: the logo sends the user to /dashboard, which belongs to no group.
-    h.pathname = "/dashboard";
-    renderSidebar();
-    flushLayoutEffects();
-
-    // Assert: no group stays expanded.
-    expect(h.states[0]).toBeNull();
+    expect(links(tree)).toContain("/questions");
+    expect(links(tree)).not.toContain("/roles");
+    expect(links(tree)).not.toContain("/ai-settings");
+    h.states[1] = "角色权限";
     tree = renderSidebar();
-    const expansion = groupExpansion(tree);
+    expect(links(tree)).not.toContain("/roles");
+    expect(Object.keys(groupExpansion(tree))).toHaveLength(0);
+  });
+
+  it("finds child routes without changing manual disclosure preferences", () => {
+    renderSidebar();
+    h.states[1] = "公式分类";
+    const tree = renderSidebar();
+    expect(links(tree)).toContain("/formulas/categories");
+    expect(links(tree)).not.toContain("/questions");
+    expect(groupExpansion(tree)["formula-management"]).toBe(true);
+    expect(h.states[0]).toBeNull();
+  });
+
+  it("clears search and closes the mobile panel after choosing a route", () => {
+    renderSidebar();
+    h.states[1] = "公式";
+    const onNavigate = vi.fn();
+    const tree = renderSidebar({ variant: "mobile", onNavigate });
+    walk(tree, (element) => {
+      if (element.props.href === "/formulas/categories") (element.props.onClick as () => void)();
+    });
+    expect(h.states[1]).toBe("");
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it("does not reuse desktop disclosure identifiers in the mobile panel", () => {
+    const ids: string[] = [];
+    walk(renderSidebar({ variant: "mobile" }), (element) => {
+      if (typeof element.props.id === "string") ids.push(element.props.id);
+    });
+    expect(ids).toContain("sidebar-mobile-group-question-management");
+    expect(ids).not.toContain("sidebar-group-question-management");
+  });
+
+  it("keeps the collapsed desktop sidebar as a reachable icon rail", () => {
+    const tree = renderSidebar({ collapsed: true });
+    expect(tree.props.id).toBe("admin-desktop-navigation");
+    expect(tree.props.className).toContain("lg:flex");
+    expect(tree.props["data-collapsed"]).toBe("true");
+    expect(Object.values(groupExpansion(tree)).some(Boolean)).toBe(false);
+    expect(links(tree)).toContain("/questions");
+  });
+
+  it("returns to login even when server logout fails after local session clearing", async () => {
+    h.logout.mockRejectedValue(new Error("unavailable"));
+    let logoutButton!: Element;
+    walk(renderSidebar(), (element) => {
+      if (element.type === "button" && element.props["aria-label"] === "登出") logoutButton = element;
+    });
+    await (logoutButton.props.onClick as () => Promise<void>)();
+    expect(h.logout).toHaveBeenCalledOnce();
+    expect(h.replace).toHaveBeenCalledWith("/login");
+  });
+});
+
+describe("sidebar disclosure continuity", () => {
+  it("keeps real content navigation visible on the dashboard instead of emptying the sidebar", () => {
+    h.pathname = "/dashboard";
+    expect(groupExpansion(renderSidebar())["question-management"]).toBe(true);
+  });
+
+  it("closes the previous group when another group opens", () => {
+    const tree = renderSidebar();
+    (groupButton(tree, "system-management").props.onClick as () => void)();
+    const expansion = groupExpansion(renderSidebar());
     expect(expansion["question-management"]).toBe(false);
-    expect(Object.values(expansion).some(Boolean)).toBe(false);
+    expect(expansion["system-management"]).toBe(true);
+    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
   });
 
-  it("collapses a manually expanded group when the logo is clicked while already on the dashboard", () => {
-    h.pathname = "/dashboard";
-    h.states[0] = "system-management";
-    let tree = renderSidebar();
-    expect(groupExpansion(tree)["system-management"]).toBe(true);
-
-    const onClick = logoLink(tree).props.onClick;
-    expect(typeof onClick).toBe("function");
-
-    // Clicking the logo must collapse the panel and hand the click back to the
-    // link itself (no extra side effects beyond the normal navigation).
-    expect((onClick as () => void)()).toBeUndefined();
-    expect(h.states[0]).toBeNull();
-    tree = renderSidebar();
-    expect(groupExpansion(tree)["system-management"]).toBe(false);
-  });
-
-  it("keeps accordion semantics when moving between child routes", () => {
-    renderSidebar();
-    flushLayoutEffects();
-
+  it("opens the active route group without an effect-driven second render", () => {
     h.pathname = "/audit-logs";
-    renderSidebar();
-    flushLayoutEffects();
-
     const expansion = groupExpansion(renderSidebar());
     expect(expansion["system-management"]).toBe(true);
     expect(expansion["question-management"]).toBe(false);
     expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
   });
 
-  it("keeps manual parent toggles working on a child route", () => {
-    h.pathname = "/questions";
-    let tree = renderSidebar();
-    flushLayoutEffects();
+  it("switches exclusively to the route group after navigation", () => {
+    (groupButton(renderSidebar(), "formula-management").props.onClick as () => void)();
+    h.pathname = "/audit-logs";
+    const expansion = groupExpansion(renderSidebar());
+    expect(expansion["system-management"]).toBe(true);
+    expect(expansion["formula-management"]).toBe(false);
+    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
+  });
 
-    (groupButton(tree, "question-management").props.onClick as () => void)();
-    expect(h.states[0]).toBeNull();
+  it("reopens the active group on a new path after a manual collapse", () => {
+    (groupButton(renderSidebar(), "question-management").props.onClick as () => void)();
+    h.pathname = "/imports/123";
+    const expansion = groupExpansion(renderSidebar());
+    expect(expansion["question-management"]).toBe(true);
+    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
+  });
 
-    tree = renderSidebar();
-    expect(groupExpansion(tree)["question-management"]).toBe(false);
+  it("keeps only one matching group expanded during search", () => {
+    renderSidebar();
+    h.states[1] = "管理";
+    const expansion = groupExpansion(renderSidebar());
+    expect(Object.keys(expansion).length).toBeGreaterThan(1);
+    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
+  });
 
-    (groupButton(tree, "system-management").props.onClick as () => void)();
-    expect(h.states[0]).toBe("system-management");
+  it("opens the chosen search group without leaving the previous group open", () => {
+    renderSidebar();
+    h.states[1] = "管理";
+    (groupButton(renderSidebar(), "formula-management").props.onClick as () => void)();
+    const expansion = groupExpansion(renderSidebar());
+    expect(h.states[1]).toBe("");
+    expect(expansion["formula-management"]).toBe(true);
+    expect(Object.values(expansion).filter(Boolean)).toHaveLength(1);
+  });
+
+  it("keeps mobile groups mutually exclusive too", () => {
+    const tree = renderSidebar({ variant: "mobile" });
+    walk(tree, (element) => {
+      if (element.props["aria-controls"] === "sidebar-mobile-group-system-management") {
+        (element.props.onClick as () => void)();
+      }
+    });
+    const expandedGroups: unknown[] = [];
+    walk(renderSidebar({ variant: "mobile" }), (element) => {
+      if (element.type === "button" && element.props["aria-expanded"] === true) {
+        expandedGroups.push(element.props["aria-controls"]);
+      }
+    });
+    expect(expandedGroups).toEqual(["sidebar-mobile-group-system-management"]);
+  });
+
+  it("allows manually collapsing the active group on its current route", () => {
+    (groupButton(renderSidebar(), "question-management").props.onClick as () => void)();
+    expect(groupExpansion(renderSidebar())["question-management"]).toBe(false);
+  });
+
+  it("makes animated closed panels inert and their links unfocusable", () => {
+    const tree = renderSidebar();
+    walk(tree, (element) => {
+      if (element.props.id === "sidebar-group-system-management") {
+        expect(element.props.inert).toBe(true);
+        expect(element.props.hidden).toBeUndefined();
+      }
+      if (element.props.href === "/audit-logs") expect(element.props.tabIndex).toBe(-1);
+    });
+  });
+
+  it("expands the full sidebar when selecting a group from the icon rail", () => {
+    const onExpand = vi.fn();
+    (groupButton(renderSidebar({ collapsed: true, onExpand }), "formula-management").props.onClick as () => void)();
+    expect(onExpand).toHaveBeenCalledOnce();
+    expect(groupExpansion(renderSidebar())["formula-management"]).toBe(true);
+  });
+
+  it("keeps menu preferences when the logo returns to the dashboard", () => {
+    (groupButton(renderSidebar(), "system-management").props.onClick as () => void)();
+    (logoLink(renderSidebar()).props.onClick as () => void)();
+    h.pathname = "/dashboard";
+    expect(groupExpansion(renderSidebar())["system-management"]).toBe(true);
   });
 });
