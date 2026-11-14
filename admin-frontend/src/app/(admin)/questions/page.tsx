@@ -289,9 +289,9 @@ export default function QuestionsPage() {
         <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-2xl font-bold text-foreground">
+              <h1 className="font-display text-2xl font-bold text-foreground">
                 正式题库
-              </h3>
+              </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 点击题目查看题干、选项、答案与解析；详情面板用于编辑、版本对比或删除。
               </p>

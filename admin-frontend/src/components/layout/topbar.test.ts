@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { Topbar } from "./topbar";
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard",
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
@@ -21,5 +20,12 @@ describe("Topbar accessibility", () => {
     const markup = renderToStaticMarkup(createElement(Topbar));
     expect(markup).toMatch(/<button[^>]*aria-label="登出"/);
     expect(markup).toContain('class="hidden sm:inline">登出</span>');
+  });
+
+  it("keeps route-specific page titles in the content area", () => {
+    const markup = renderToStaticMarkup(createElement(Topbar));
+
+    expect(markup).toContain("后台管理系统");
+    expect(markup).not.toContain("Operations Console /");
   });
 });

@@ -2,10 +2,9 @@
 
 import type { Ref } from "react";
 import { LogOut, Menu, UserRound } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import { adminRoutes, getActiveAdminRoute } from "@/lib/routes";
 
 function getUserName(user: unknown) {
   if (user && typeof user === "object" && "username" in user && typeof user.username === "string") return user.username;
@@ -22,11 +21,9 @@ export function Topbar({
   navigationButtonRef?: Ref<HTMLButtonElement>;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
   const logout = useAuthStore((state) => state.logout);
-  const activeRoute = getActiveAdminRoute(pathname, adminRoutes);
 
   async function handleLogout() {
     await logout();
@@ -51,11 +48,8 @@ export function Topbar({
           <div className="min-w-0">
             <p className="truncate font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
               Operations Console
-              {activeRoute ? <span className="text-primary"> / {activeRoute.label}</span> : null}
             </p>
-            <h1 className="truncate font-display text-xl font-bold text-foreground sm:text-2xl">
-              {activeRoute?.label ?? "后台管理系统"}
-            </h1>
+            <p className="truncate font-display text-xl font-bold text-foreground sm:text-2xl">后台管理系统</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
