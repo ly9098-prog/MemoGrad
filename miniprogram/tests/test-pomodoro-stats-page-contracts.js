@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { test } = require('node:test')
 const { fixture } = require('./helpers/pomodoro-stats-page-fixture')
 const plain = value => JSON.parse(JSON.stringify(value))
+const pageDir = path.resolve(__dirname, '../subpackages/productivity/pomodoro-stats')
 const GETTERS = [
   "_getPageInitController",
   "_getSettingsController",
@@ -142,6 +145,27 @@ test('duration display patch uses current segments hook and preserves original t
   const patch = f.page._getTodayDurationDisplayPatch(value)
   assert.equal(patch._dispTodayDurationText, value)
   assert.equal(patch._dispTodayDurationSegments, segments)
+})
+
+test('initial duration segments match the formatter contract', () => {
+  const f = fixture()
+  assert.deepEqual(
+    plain(f.page._buildDurationSegments('0分钟')),
+    plain(f.page.data._dispTodayDurationSegments)
+  )
+})
+
+test('daily duration uses alternating digit reveal animation', () => {
+  const wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8')
+  const wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8')
+  assert.match(wxml, /wx:key="key"/)
+  assert.match(wxml, /daily-duration-digit-\{\{item\.direction\}\}/)
+  assert.match(wxml, /animation-delay: \{\{item\.delay\}\}ms/)
+  assert.match(wxss, /@keyframes dailyDurationDigitInTop/)
+  assert.match(wxss, /@keyframes dailyDurationDigitInBottom/)
+  assert.match(wxss, /daily-duration-digit-top/)
+  assert.match(wxss, /daily-duration-digit-bottom/)
+  assert.match(wxss, /prefers-reduced-motion: reduce[\s\S]*daily-duration-digit/)
 })
 
 test('date event forwards raw value and preserves undefined return', () => {

@@ -88,9 +88,10 @@
             </view>
             <view class="daily-duration-metric">
               <text class="daily-metric-label daily-duration-label">学习时长</text>
-              <view class="daily-duration-value-row duration-value {{durationValueAnimating ? 'daily-number-updating duration-value-updating' : ''}}">
-                <block wx:for="{{_dispTodayDurationSegments}}" wx:key="index">
-                  <text class="{{item.type === 'num' ? 'daily-duration-segment-num' : 'daily-duration-segment-unit'}}">{{item.text}}</text>
+              <view class="daily-duration-value-row duration-value" aria-label="学习时长 {{_dispTodayDurationText}}">
+                <block wx:for="{{_dispTodayDurationSegments}}" wx:key="key">
+                  <text wx:if="{{item.type === 'unit'}}" class="daily-duration-segment-unit">{{item.text}}</text>
+                  <text wx:else class="daily-duration-segment-num daily-duration-digit daily-duration-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
               </view>
             </view>

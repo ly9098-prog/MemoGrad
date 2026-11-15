@@ -1003,12 +1003,6 @@ page {
   will-change: transform, opacity;
 }
 
-.duration-value-updating {
-  transform: translateZ(0) translateY(-1rpx) scale(1.025);
-  opacity: 0.96;
-  text-shadow: 0 0 20rpx rgba(59, 130, 246, 0.28);
-}
-
 /* ============================================
    SHARED POMODORO THEME
    The stats page follows the preference selected on the timer page.
@@ -1414,10 +1408,6 @@ page {
 
 .theme-light .detail-close-text {
   color: #849087;
-}
-
-.theme-light .duration-value-updating {
-  text-shadow: 0 0 20rpx rgba(59, 130, 246, 0.20);
 }
 
 /* Complete the existing loading/error states in both themes. */
@@ -2545,12 +2535,6 @@ page {
   text-shadow: none;
   transition: opacity 160ms ease;
   will-change: opacity;
-}
-
-.duration-value-updating {
-  transform: translateZ(0);
-  opacity: .88;
-  text-shadow: none;
 }
 
 .daily-number-updating {
@@ -3859,4 +3843,45 @@ page {
 .is-locked .stat-lock {
   opacity: 1;
   filter: none;
+}
+
+/* 当日学习时长：数字按位交替从上下方滑入，并用递增延迟制造交错感。 */
+.daily-duration-value-row {
+  overflow: hidden;
+}
+.daily-duration-digit {
+  display: inline-block;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+.daily-duration-digit-top {
+  animation: dailyDurationDigitInTop 380ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.daily-duration-digit-bottom {
+  animation: dailyDurationDigitInBottom 380ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes dailyDurationDigitInTop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -.42em, 0) scale(.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes dailyDurationDigitInBottom {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, .42em, 0) scale(.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .daily-duration-digit {
+    animation: none !important;
+  }
 }
