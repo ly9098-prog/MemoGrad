@@ -1,15 +1,44 @@
 <view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
-  <view class="fc-header">
-    <text class="fc-kicker">MEMORY NOTE · {{card.studyCardTypeLabel || '速记'}}</text>
-    <rich-text
-      class="fc-title fc-title-rich"
-      nodes="{{content.titleNodes}}"
-      user-select="{{true}}"
-    />
-    <view class="fc-tags"><text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
-      <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:key="id">{{tag.name}}</text>
+  <view class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}" bindtap="toggleCardFlip">
+    <view class="fc-flip-face fc-flip-front">
+      <view class="fc-header">
+        <text class="fc-kicker">MEMORY NOTE · {{card.studyCardTypeLabel || '速记'}}</text>
+        <rich-text
+          class="fc-title fc-title-rich"
+          nodes="{{content.titleNodes}}"
+          user-select="{{true}}"
+        />
+        <view class="fc-tags"><text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
+          <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:key="id">{{tag.name}}</text>
+        </view>
+      </view>
+      <view class="fc-flip-hint" aria-hidden="true">点击翻面查看公式与记忆提示</view>
+    </view>
+    <view class="fc-flip-face fc-flip-back">
+      <view class="fc-section-heading">
+        <view>
+          <text class="fc-section-kicker">MEMORY BACK</text>
+          <text class="fc-section-title">公式与记忆提示</text>
+        </view>
+        <view class="fc-core-mark">Σ</view>
+      </view>
+      <view class="fc-flip-back-section" wx:if="{{content.secondaryNodes && content.secondaryNodes.length}}">
+        <text class="fc-flip-back-label">核心结论</text>
+        <rich-text class="fc-rich-text" nodes="{{content.secondaryNodes}}" user-select="{{true}}" />
+      </view>
+      <view class="fc-flip-back-section" wx:if="{{content.symbolNotesNodes && content.symbolNotesNodes.length}}">
+        <text class="fc-flip-back-label">变量含义</text>
+        <rich-text class="fc-rich-text" nodes="{{content.symbolNotesNodes}}" user-select="{{true}}" />
+      </view>
+      <view class="fc-flip-back-section" wx:if="{{content.summaryNodes && content.summaryNodes.length}}">
+        <text class="fc-flip-back-label">记忆提示</text>
+        <rich-text class="fc-rich-text" nodes="{{content.summaryNodes}}" user-select="{{true}}" />
+      </view>
+      <view class="fc-flip-hint" aria-hidden="true">再次点击翻回正面</view>
     </view>
   </view>
+
+  <view class="fc-detail-body">
 
   <view class="fc-formula-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
     <view class="fc-section-heading compact">
@@ -190,6 +219,7 @@
         </view>
       </view>
     </view>
+  </view>
   </view>
 </view>
 

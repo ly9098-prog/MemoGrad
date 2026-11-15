@@ -102,12 +102,20 @@
 
       <view wx:if="{{!guestMode}}" class="focus-metrics">
         <view class="metric-item">
-          <text class="metric-value">{{dueReviewCount}}</text>
+          <view class="metric-value reveal-metric" aria-label="到期复习 {{dueReviewCount}}">
+            <block wx:for="{{_animDueReviewSegments}}" wx:key="key">
+              <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
+            </block>
+          </view>
           <text class="metric-label">到期复习</text>
         </view>
         <view class="metric-divider"></view>
         <view class="metric-item">
-          <text class="metric-value">{{_animStreakDays}}</text>
+          <view class="metric-value reveal-metric" aria-label="连续天数 {{_animStreakDays}}">
+            <block wx:for="{{_animStreakSegments}}" wx:key="key">
+              <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
+            </block>
+          </view>
           <text class="metric-label">连续天数</text>
         </view>
         <view class="metric-divider"></view>
@@ -227,6 +235,28 @@
       <view class="mastery-heading-copy">
         <text class="section-kicker">MASTERY SNAPSHOT</text>
         <text class="section-title">四科掌握概览</text>
+      </view>
+    </view>
+
+    <view class="mastery-radar" wx:if="{{_masteryRadarItems.length === 4}}">
+      <view class="mastery-radar-stage">
+        <view
+          class="radar-polygon"
+          style="{{_masteryRadarPolygonStyle}}"
+        ></view>
+        <view
+          wx:for="{{_masteryRadarItems}}"
+          wx:key="key"
+          class="radar-point"
+          style="{{item.pointStyle}} animation-delay: {{item.delay}}ms;"
+        ></view>
+      </view>
+      <view class="mastery-radar-legend">
+        <view wx:for="{{_masteryRadarItems}}" wx:key="key" class="mastery-radar-legend-item">
+          <text class="mastery-radar-legend-name">{{item.subjectName}}</text>
+          <text class="mastery-radar-legend-value">{{item.score}}%</text>
+          <text wx:if="{{item.trend}}" class="mastery-radar-trend trend-{{item.trend}}">{{item.trendText}}</text>
+        </view>
       </view>
     </view>
 

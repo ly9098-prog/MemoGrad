@@ -2,6 +2,7 @@ const auth = require('../../utils/auth')
 const {
   GOAL_OPTIONS,
   TODAY_GOAL_TOTAL,
+  clearGrowthLifecycleTimers,
   growthPageMethods,
 } = require('./utils/growth-page-controller')
 const { homeCanvasMethods } = require('./utils/home-canvas')
@@ -103,9 +104,8 @@ Page({
     this._alive = true
     this._visible = true
     this._examRoutePending = false
-    // chooseAvatar 会打开微信原生选择界面，返回页面时会再次触发 onShow。
-    // 资料弹层打开期间绝不做 setData / 用户同步，避免在原生开放能力完成回调前
-    // 重建 button/input 节点，导致头像回调丢失或 nickname 快捷填入条被卸载。
+    // chooseAvatar opens native UI and can trigger onShow again.
+    // Never setData/sync while the profile sheet is open.
     if (this.data.showProfileSheet) return
     this._dismissLoginGuide()
     const showSeq = ++this._showSeq
@@ -777,7 +777,7 @@ Page({
     this._pauseLoginGuide()
     this._showSeq++
     this._growthSeq++
-    this._clearAnimTimer()
+    clearGrowthLifecycleTimers(this)
 
     // 系统头像面板、相册或其他原生 UI 都可能触发页面 hide。
     // 这里不能 setData 清理资料弹层，否则会在开放能力回调前重建节点。
@@ -791,7 +791,7 @@ Page({
     this._showSeq++
     this._growthSeq++
     this._profileSaveSeq++
-    this._clearAnimTimer()
+    clearGrowthLifecycleTimers(this)
     clearTimeout(this._profileAutoSaveTimer)
     clearTimeout(this._profileSavedHintTimer)
     this._profileAutoSaveTimer = null

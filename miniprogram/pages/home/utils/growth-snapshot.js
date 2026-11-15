@@ -134,6 +134,7 @@ function buildGrowthSnapshot(options = {}) {
       streakDays: ctx.streakDays,
       todayGoalDone: ctx.todayGoalDone,
       levelProgress: ctx.levelProgress,
+      dueReviewCount: ctx.dueReviewCount,
     },
   }
 }
@@ -145,6 +146,8 @@ function getGrowthFallback(options = {}) {
     studyLevel: 'Lv1 起步',
     levelProgress: 0,
     todayGoalTotal,
+    _animStreakSegments: [],
+    _animDueReviewSegments: [],
     ...growthView.getPrimaryTaskSnapshot({
       todayGoalDone: 0,
       todayGoalTotal,
