@@ -3,6 +3,10 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  isFocusPassthroughTarget,
+  isTopModalSurface,
+} from "@/lib/modal-focus";
 import { X } from "lucide-react";
 
 type DrawerProps = {
@@ -14,19 +18,6 @@ type DrawerProps = {
   /** Accessibility label */
   ariaLabel?: string;
 };
-
-/**
- * True when this drawer is the top-most modal surface. A confirm dialog opened
- * from inside the drawer must own Escape/focus until it closes.
- */
-function isTopModalSurface(drawer: HTMLElement | null): boolean {
-  if (!drawer) return true;
-  const modals = Array.from(
-    document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'),
-  );
-  const topModal = modals.at(-1);
-  return !topModal || topModal.contains(drawer);
-}
 
 /**
  * Slide-in drawer from the right edge via portal.
@@ -98,6 +89,7 @@ export function Drawer({
     const drawer = drawerRef.current;
     const handleFocusTrap = (e: FocusEvent) => {
       if (drawer.contains(e.target as Node)) return;
+      if (isFocusPassthroughTarget(e.target)) return;
       if (!isTopModalSurface(drawer)) return;
       drawer.focus();
     };

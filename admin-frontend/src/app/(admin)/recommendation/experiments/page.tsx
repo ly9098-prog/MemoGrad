@@ -4,12 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlaskConical, Play, Pause, Flag, ShieldCheck, GitCompareArrows, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import {
+  FieldLabel,
   ManagementPage,
   ManagementPageHeader,
+  ManagementPanel,
 } from "@/components/admin/management-ui";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -185,34 +189,39 @@ export default function RecommendationExperimentsPage() {
       />
 
       {createOpen && (
-        <Card>
-          <CardHeader className="text-sm font-bold text-foreground">新建实验</CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
+        <ManagementPanel
+          title="新建实验"
+          description="填写实验名称、运行场景和稳定分组的 JSON 配置。"
+          contentClassName="grid gap-4"
+        >
+            <div className="grid gap-4 md:grid-cols-2">
               <label className="text-xs font-semibold text-muted-foreground">
-                实验名称
-                <input
-                  className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+                <FieldLabel>实验名称</FieldLabel>
+                <Input
+                  className="mt-1 bg-card"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
               <label className="text-xs font-semibold text-muted-foreground">
-                场景
-                <select
-                  className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+                <FieldLabel>场景</FieldLabel>
+                <CustomSelect
+                  className="mt-1 bg-card"
                   value={scene}
-                  onChange={(e) => setScene(e.target.value)}
-                >
-                  <option value="practice_smart">智能刷题</option>
-                  <option value="similar" disabled>相似题（暂未接入实验分流）</option>
-                  <option value="knowledge_path" disabled>知识路径（暂未接入实验分流）</option>
-                </select>
+                  onChange={setScene}
+                  options={[
+                    { value: "practice_smart", label: "智能刷题" },
+                    { value: "similar", label: "相似题（暂未接入实验分流）", disabled: true },
+                    { value: "knowledge_path", label: "知识路径（暂未接入实验分流）", disabled: true },
+                  ]}
+                  placeholder="选择场景"
+                  clearable={false}
+                />
                 <span className="mt-1 block text-[10px] font-normal text-muted-foreground/70">当前运行时仅智能刷题会解析 A/B 实验。</span>
               </label>
             </div>
             <label className="text-xs font-semibold text-muted-foreground">
-              分组 (JSON，示例 [{"{\"key\":\"A\",\"strategy\":\"weakness_vector\",\"ratio\":0.5},{\"key\":\"B\",\"strategy\":\"path\",\"ratio\":0.5}"}])
+              <FieldLabel>分组 (JSON，示例 [{"{\"key\":\"A\",\"strategy\":\"weakness_vector\",\"ratio\":0.5},{\"key\":\"B\",\"strategy\":\"path\",\"ratio\":0.5}"}])</FieldLabel>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground/70">快捷填入：</span>
                 {VARIANT_PRESETS.map((p) => (
@@ -226,9 +235,9 @@ export default function RecommendationExperimentsPage() {
                   </button>
                 ))}
               </div>
-              <textarea
+              <Textarea
                 rows={3}
-                className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 font-mono text-xs text-foreground"
+                className="mt-2 min-h-20 bg-card font-mono text-xs"
                 value={variantsText}
                 onChange={(e) => setVariantsText(e.target.value)}
                 placeholder='[{"key":"A","strategy":"weakness_vector","ratio":0.5},{"key":"B","strategy":"scored","ratio":0.5}]'
@@ -242,14 +251,18 @@ export default function RecommendationExperimentsPage() {
                 {createMutation.isPending ? "创建中…" : "创建"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+        </ManagementPanel>
       )}
-
-      <DataTable<RecommendationExperiment>
-        data={rows}
-        emptyText="暂无实验，点击右上角「新建实验」"
-        columns={[
+      <ManagementPanel
+        title="实验列表"
+        description="启动、暂停、结束实验，或打开最近 30 天的分组对比。"
+        contentClassName="p-0"
+      >
+        <DataTable<RecommendationExperiment>
+          className="rounded-none border-0 bg-transparent"
+          data={rows}
+          emptyText="暂无实验，点击右上角「新建实验」"
+          columns={[
           { id: "name", header: "名称", accessorKey: "name" },
           { id: "scene", header: "场景", accessorKey: "scene" },
           {
@@ -312,19 +325,26 @@ export default function RecommendationExperimentsPage() {
               );
             },
           },
-        ]}
-      />
+          ]}
+        />
+        <div className="flex items-center gap-2 border-t border-border/60 px-5 py-3 text-[11px] text-muted-foreground/70">
+          <FlaskConical className="h-3.5 w-3.5" /> 实验通过稳定 hash 为用户分组，用户在同一实验中始终命中同一分组
+        </div>
+      </ManagementPanel>
 
       {compareRow && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <h2 className="text-sm font-bold text-foreground">分组对比（近 30 天）— {compareRow.experiment_name}</h2>
+        <ManagementPanel
+          title={`分组对比（近 30 天）— ${compareRow.experiment_name}`}
+          description="对比各组曝光、答题、正确率、完成率和掌握度提升。"
+          actions={
             <Button variant="ghost" size="sm" onClick={() => setCompareId(null)}>
               关闭
             </Button>
-          </CardHeader>
-          <CardContent>
+          }
+          contentClassName="p-0"
+        >
             <DataTable<{ key: string; exposure: number; answer: number; accuracy: number; completionRate: number; masteryDelta: number | null; ctr: number }>
+              className="rounded-none border-0 bg-transparent"
               data={compareVariants}
               emptyText="暂无该实验的推荐日志数据"
               columns={[
@@ -357,13 +377,8 @@ export default function RecommendationExperimentsPage() {
                 },
               ]}
             />
-          </CardContent>
-        </Card>
+        </ManagementPanel>
       )}
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-        <FlaskConical className="h-3.5 w-3.5" /> 实验通过稳定 hash 为用户分组，用户在同一实验中始终命中同一分组
-      </div>
     </ManagementPage>
   );
 }

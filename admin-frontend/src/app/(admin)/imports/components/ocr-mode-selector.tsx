@@ -25,7 +25,7 @@ export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorPr
       <span className="text-xs font-semibold text-muted-foreground">
         OCR 识别方式
       </span>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3" role="group" aria-label="OCR 识别方式">
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           const Icon = opt.icon;
@@ -35,6 +35,7 @@ export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorPr
               type="button"
               disabled={disabled}
               onClick={() => onChange(opt.value)}
+              aria-pressed={selected}
               className={[
                 "group relative flex flex-col gap-1.5 rounded-xl border px-3.5 py-3 text-left text-sm transition-all duration-200",
                 "cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",

@@ -46,12 +46,16 @@ type QuestionListCardProps = {
 
 function ListLoading() {
   return (
-    <div className="space-y-3">
+    <div className="divide-y divide-border" aria-hidden="true">
       {Array.from({ length: 5 }, (_, index) => (
-        <div
-          key={index}
-          className="h-28 animate-pulse rounded-[1.2rem] border border-border bg-card/60"
-        />
+        <div key={index} className="flex h-[84px] animate-pulse items-center gap-3 px-4 py-2.5 motion-reduce:animate-none">
+          <div className="h-4 w-4 shrink-0 rounded bg-secondary" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-2.5 w-1/3 rounded bg-secondary" />
+            <div className="h-3 w-4/5 rounded bg-secondary" />
+            <div className="h-2 w-1/2 rounded bg-secondary" />
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -79,54 +83,54 @@ function QuestionListItem({
   return (
     <article
       onMouseEnter={onPrefetch}
-      className={`group rounded-[1.2rem] border transition-all duration-200 ${
+      className={`group relative transition-colors last:rounded-b-[17px] ${
         selected
-          ? "border-primary bg-accent/30 shadow-sm ring-2 ring-accent"
-          : "border-border bg-card/85 shadow-sm hover:border-primary/45 hover:bg-card hover:shadow-[var(--shadow-card)]"
+          ? "bg-accent/45 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-r-full before:bg-primary"
+          : "bg-card hover:bg-secondary/35"
       }`}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start gap-3 px-4 py-2.5">
         <CustomCheckbox checked={checked} onChange={onToggle} className="mt-1" />
 
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onSelect} className="w-full text-left">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center rounded-[5px] bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
                 #{String(question.id).padStart(4, "0")}
               </span>
               <TypeBadge type={question.question_type} />
               <DifficultyBadge difficulty={question.difficulty} />
               <span
-                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                className={`inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10px] font-medium ${
                   question.is_active
-                    ? "border-success/30 bg-success-light text-success"
-                    : "border-border bg-muted text-muted-foreground"
+                    ? "bg-success-light text-success"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {question.is_active ? "已启用" : "已停用"}
               </span>
             </div>
 
-            <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-foreground">
+            <div className="mt-1 line-clamp-1 text-[13px] font-medium leading-5 text-foreground">
               {looksLikeProgrammingCode(stemText) ? stemText : <MathFormula text={stemText} />}
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
               {question.subject_name || question.subject_code ? (
                 <span className="inline-flex items-center gap-1">
-                  <BookOpen className="h-3 w-3" />
+                  <BookOpen className="h-3 w-3" aria-hidden="true" />
                   {question.subject_name || question.subject_code}
                 </span>
               ) : null}
               {question.year ? (
                 <span className="inline-flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
+                  <Tag className="h-3 w-3" aria-hidden="true" />
                   {question.year} 年
                 </span>
               ) : null}
               {question.updated_at ? (
                 <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
+                  <Clock className="h-3 w-3" aria-hidden="true" />
                   更新于 {question.updated_at.slice(0, 16).replace("T", " ")}
                 </span>
               ) : null}
@@ -136,8 +140,9 @@ function QuestionListItem({
 
         <Button
           variant="ghost"
+          size="sm"
           onClick={onOpenDetail}
-          className="mt-1 h-9 rounded-full px-3 text-xs text-muted-foreground transition-all duration-200 group-hover:bg-muted/40 group-hover:text-foreground"
+          className="mt-0.5 h-8 rounded-[8px] px-2.5 text-[11px] text-muted-foreground transition-colors group-hover:bg-secondary/50 group-hover:text-foreground"
         >
           详情
         </Button>
@@ -176,7 +181,7 @@ export function QuestionListCard({
   onSetPage,
 }: QuestionListCardProps) {
   return (
-    <section className="min-w-0 space-y-3">
+    <section className="min-w-0 overflow-visible rounded-[18px] border border-border bg-card shadow-[var(--shadow-card)]">
       <QuestionListToolbar
         itemCount={items.length}
         total={total}
@@ -193,12 +198,12 @@ export function QuestionListCard({
         onExport={onExport}
       />
 
-      <div className={`space-y-2.5 transition-opacity duration-200 ${isFetching && !isLoading ? "opacity-70" : "opacity-100"}`}>
+      <div className={`transition-opacity duration-200 ${isFetching && !isLoading ? "opacity-70" : "opacity-100"}`}>
         {isLoading ? <ListLoading /> : null}
 
         <div
           key={`${filters.subject_id}-${filters.question_type}-${filters.is_active}-${filters.year}-${filters.difficulty}-${filters.keyword}-${filters.import_batch_id}-${filters.knowledge_point_id}-${page}-${pageSize}`}
-          className="stagger-enter space-y-2.5"
+          className="divide-y divide-border"
         >
           {items.map((question) => (
             <QuestionListItem

@@ -71,6 +71,69 @@
   --ease-out-ui: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Main-content theme. Keep the sidebar on the warm root palette and scope the
+   cooler, higher-contrast workspace tokens to the admin content surface. */
+.admin-content-theme {
+  --background: #f4f7f8;
+  --foreground: #172b36;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #172b36;
+  --popover: #ffffff;
+  --popover-foreground: #172b36;
+  --primary: #236879;
+  --primary-hover: #1b5564;
+  --primary-foreground: #ffffff;
+  --secondary: #eef3f4;
+  --secondary-foreground: #24424c;
+  --muted: #eef3f4;
+  --muted-foreground: #566975;
+  --accent: #e4f0f2;
+  --accent-foreground: #1b5564;
+  --destructive: #b54747;
+  --destructive-hover: #a03d3d;
+  --destructive-light: #fbeeee;
+  --destructive-foreground: #ffffff;
+  --success: #2f7a57;
+  --success-light: #eaf5ef;
+  --success-foreground: #ffffff;
+  --warning: #a86a22;
+  --warning-light: #fbf3e7;
+  --warning-foreground: #7c4c12;
+  --info: #236879;
+  --info-light: #e4f0f2;
+  --border: #dce5e8;
+  --input: #cbd8dc;
+  --ring: #236879;
+  --overlay: rgba(16, 24, 40, 0.42);
+  --admin-canvas: #f4f7f8;
+  --color-primary: #236879;
+  --color-primary-dark: #1b5564;
+  --color-primary-light: #e4f0f2;
+  --color-success: #2f7a57;
+  --color-success-light: #eaf5ef;
+  --color-warning: #a86a22;
+  --color-warning-light: #fbf3e7;
+  --color-danger: #b54747;
+  --color-danger-light: #fbeeee;
+  --color-text-primary: #172b36;
+  --color-text-secondary: #566975;
+  --color-text-hint: #5c707a;
+  --color-border: #dce5e8;
+  --color-border-light: #e6eef0;
+  --color-bg: #f4f7f8;
+  --color-bg-card: #ffffff;
+  --color-bg-input: #eef3f4;
+  --ink: #172b36;
+  --porcelain: #ffffff;
+  --blueprint-line: rgba(35, 104, 121, 0.06);
+  --color-accent: #e4f0f2;
+  --color-accent-light: #f0f7f8;
+  --shadow-card: 0 4px 18px rgba(23, 43, 54, 0.045), 0 1px 3px rgba(23, 43, 54, 0.035);
+  --shadow-crisp: 0 1px 2px rgba(23, 43, 54, 0.06), 0 6px 16px rgba(23, 43, 54, 0.05);
+  --shadow-floating: 0 18px 48px rgba(23, 43, 54, 0.12), 0 2px 8px rgba(23, 43, 54, 0.06);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -162,17 +225,17 @@ a {
   background: rgba(74, 111, 138, 0.18);
 }
 
-/* ── Scholar surface card ── */
+/* ── Semantic surface card ── */
 .surface-card {
-  border: 1px solid var(--color-border-light);
-  background: rgba(254, 252, 249, 0.85);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(23, 43, 54, 0.025), 0 10px 28px rgba(23, 43, 54, 0.035);
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .surface-card:hover {
-  box-shadow: 0 6px 28px rgba(27, 39, 51, 0.08), 0 1px 4px rgba(27, 39, 51, 0.04);
+  border-color: color-mix(in srgb, var(--border) 72%, var(--primary));
+  box-shadow: 0 2px 4px rgba(23, 43, 54, 0.03), 0 14px 34px rgba(23, 43, 54, 0.045);
 }
 
 /* ── Blueprint panel (academic grid aesthetic) ── */

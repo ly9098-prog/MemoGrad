@@ -2,10 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("FormulaCategoryDialog", () => {
-  it("portals outside the isolated management page with an SSR fallback", () => {
+  it("uses the shared dialog primitives for modal migration", () => {
     const source = readFileSync(new URL("./formula-category-dialog.tsx", import.meta.url), "utf8");
 
-    expect(source).toContain("if (typeof document === \"undefined\") return dialog;");
-    expect(source).toContain("return createPortal(dialog, document.body);");
+    expect(source).toContain("from \"@/components/ui/dialog\"");
+    expect(source).toContain("<Dialog open");
+    expect(source).toContain("<DialogContent");
+    expect(source).toContain("<DialogTitle");
+    expect(source).not.toContain("createPortal");
+    expect(source).not.toContain("role=\"dialog\"");
   });
 });

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { StatusBadge } from "@/components/status-badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getQuestionTypeLabel, canonicalizeQuestionType } from "@/lib/question-types";
 import type { ImportQuestionItem, PaginatedResponse } from "@/lib/api/types";
@@ -135,14 +142,17 @@ function typeLabel(t: string | null | undefined) {
 function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () => void }) {
   const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
 
-  const modal = (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay px-4 py-10">
-      <div className="relative mt-6 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-[var(--shadow-floating)]">
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="admin-content-theme top-6 max-h-[calc(100dvh-3rem)] max-w-2xl translate-y-0 overflow-hidden rounded-2xl p-0" showCloseButton={false}>
+        <DialogDescription className="sr-only">
+          查看导入题目的题干、答案、解析及 OCR/AI 原始数据。
+        </DialogDescription>
         {/* ===== Header with large close hit area ===== */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 pr-14">
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-border px-5 py-3 pr-14">
           <div className="flex items-center gap-3 min-w-0">
             <span className="shrink-0 font-mono text-xs text-muted-foreground/70">#{item.id}</span>
-            <h3 className="truncate font-display text-base font-bold text-foreground">导入题目详情</h3>
+            <DialogTitle className="truncate font-display text-base font-bold text-foreground">导入题目详情</DialogTitle>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex overflow-hidden rounded-lg border border-border">
@@ -168,18 +178,21 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
               审核批次
             </Link>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Large close button — positioned absolutely to avoid crowded header */}
-        <button
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border transition hover:bg-secondary hover:text-foreground hover:ring-muted-foreground active:scale-95"
-          onClick={onClose}
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <DialogClose asChild>
+          <button
+            type="button"
+            aria-label="关闭导入题目详情"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border transition hover:bg-secondary hover:text-foreground hover:ring-muted-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </DialogClose>
 
         {/* ===== Scrollable body ===== */}
-        <div className="overflow-y-auto max-h-[70vh] px-5 py-4">
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
           {detailView === "formatted" ? (
             <div className="space-y-3">
               <section>
@@ -241,12 +254,9 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  if (typeof document === "undefined") return modal;
-  return createPortal(modal, document.body);
 }
 
 export default function ImportQuestionsPage() {

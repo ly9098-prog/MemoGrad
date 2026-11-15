@@ -2,8 +2,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("import workspace overlay boundaries", () => {
+  it("uses shared dialog primitives for the import question detail modal", () => {
+    const source = readFileSync(new URL("questions/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('from "@/components/ui/dialog"');
+    expect(source).toContain("<DialogContent");
+    expect(source).not.toContain("createPortal");
+  });
+
   it.each([
-    ["questions/page.tsx", "modal"],
     ["review/components/review-batch-answer-dialog.tsx", "dialog"],
     ["review/components/review-batch-complete-dialog.tsx", "dialog"],
     ["components/import-toast.tsx", "toast"],

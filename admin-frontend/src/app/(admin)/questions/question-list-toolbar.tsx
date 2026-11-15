@@ -36,92 +36,78 @@ export function QuestionListToolbar({
   onExport,
 }: QuestionListToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-card px-3 py-2.5 shadow-sm">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3 text-xs font-semibold text-accent-foreground">
-          <Layers className="h-3.5 w-3.5" />
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+          <Layers className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           题目总览
         </span>
-        <span className="inline-flex h-9 items-center rounded-full bg-card px-3 text-xs font-semibold text-foreground">
-          当前页 {itemCount} 题
-        </span>
+        <span aria-hidden="true" className="hidden h-3 w-px bg-border sm:block" />
+        <span>当前页 {itemCount} 题</span>
+        {typeof total === "number" ? <span>共 {total} 题</span> : null}
+        {hasActiveFilters ? <span className="font-medium text-primary">已启用筛选</span> : null}
         {isFetching && !isLoading ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-xs font-medium text-muted-foreground/70">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span className="inline-flex items-center gap-1 font-medium text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
             更新中
           </span>
         ) : null}
-        {typeof total === "number" ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-sm font-medium text-muted-foreground">
-            共 {total} 题
-          </span>
-        ) : null}
-        {hasActiveFilters ? (
-          <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-sm font-medium text-muted-foreground">
-            已启用筛选
-          </span>
-        ) : null}
+        {selectedCount > 0 ? <span className="font-semibold text-primary">已选 {selectedCount} 项</span> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {selectedCount > 0 ? (
-          <span className="inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground">
-            已选 {selectedCount} 项
-          </span>
-        ) : null}
         <button
           type="button"
           role="checkbox"
           aria-checked={allChecked}
           onClick={onToggleAll}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground transition hover:border-primary/25 hover:bg-muted/40"
+          className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-border bg-card px-3 text-[11px] text-muted-foreground transition hover:border-primary/25 hover:bg-secondary/40 sm:h-9"
         >
           <span
             aria-hidden="true"
             className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
-              allChecked
-                ? "border-primary bg-primary"
-                : "border-border bg-card"
+              allChecked ? "border-primary bg-primary" : "border-border bg-card"
             }`}
           >
-            {allChecked ? (
-              <Check className="h-3 w-3 text-white" strokeWidth={3} />
-            ) : null}
+            {allChecked ? <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} /> : null}
           </span>
           <span className="font-medium">选择当前页</span>
         </button>
+
         <div ref={exportMenuRef} className="relative">
           <Button
             variant="secondary"
+            size="sm"
             onClick={onToggleExportMenu}
             aria-expanded={exportOpen}
             aria-haspopup="menu"
             disabled={!!exportingFormat}
-            className="h-9 rounded-full px-3"
+            className="h-10 rounded-[8px] border-border bg-card px-3 text-[11px] sm:h-9"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
             {exportingFormat
               ? exportingFormat === "csv"
                 ? "导出 CSV 中..."
                 : "导出 Word 中..."
               : "导出"}
             <ChevronDown
-              className={`h-4 w-4 transition ${exportOpen ? "rotate-180" : ""}`}
+              className={`h-3.5 w-3.5 transition ${exportOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
             />
           </Button>
           {exportOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-2 min-w-[160px] animate-drop-in overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]">
+            <div className="absolute right-0 top-full z-30 mt-2 min-w-[150px] animate-drop-in overflow-hidden rounded-[12px] border border-border bg-popover p-1.5 shadow-[var(--shadow-floating)]">
               <button
                 type="button"
                 onClick={() => onExport("csv")}
-                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/40"
+                className="flex w-full items-center rounded-[8px] px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/60"
               >
                 导出 CSV
               </button>
               <button
                 type="button"
                 onClick={() => onExport("docx")}
-                className="flex w-full items-center rounded-xl px-3 py-2 text-sm text-foreground transition hover:bg-muted/40"
+                className="flex w-full items-center rounded-[8px] px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/60"
               >
                 导出 Word
               </button>

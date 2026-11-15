@@ -206,6 +206,7 @@ function PortalDropdown({
     <div
       ref={listRef}
       role="listbox"
+      data-focus-passthrough
       className={cn(
         "rounded-xl border border-border/80 bg-card py-1 shadow-lg",
         optionClassName,

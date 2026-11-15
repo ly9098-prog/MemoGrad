@@ -9,7 +9,7 @@ export function ManagementPage({ children, className }: { children: ReactNode; c
   return (
     <div
       className={cn(
-        "mgmt-page-enter relative isolate min-w-0 w-full space-y-8 pb-16 [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_16px_50px_rgba(31,49,61,0.055)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[rgba(74,111,138,0.055)] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.48),rgba(247,249,250,0.76))] after:pointer-events-none after:absolute after:-left-5 after:top-0 after:-z-10 after:h-28 after:w-px after:bg-[linear-gradient(180deg,var(--primary),transparent)]",
+        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_16px_50px_rgba(23,43,54,0.045)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[rgba(35,104,121,0.055)] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(244,247,248,0.86))] after:pointer-events-none after:absolute after:-left-5 after:top-0 after:-z-10 after:h-28 after:w-px after:bg-[linear-gradient(180deg,var(--primary),transparent)]",
         className,
       )}
     >
@@ -32,35 +32,32 @@ export function ManagementPageHeader({
   meta?: ReactNode;
 }) {
   return (
-    <header className="relative border-b border-border pb-5 pt-1">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-4">
-            {icon ? (
-              <div className="relative mt-0.5 grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border border-primary/20 bg-[linear-gradient(145deg,var(--card),var(--secondary))] text-primary shadow-[0_8px_22px_rgba(45,80,104,0.08),inset_0_0_0_1px_rgba(255,255,255,0.78)] before:absolute before:-bottom-1 before:h-1 before:w-5 before:rounded-full before:bg-primary/70">
-                {icon}
-              </div>
-            ) : null}
-            <div className="min-w-0">
-              <h1 className="text-[30px] font-bold leading-[1.15] tracking-[-0.045em] text-foreground md:text-[34px]">
-                {title}
-              </h1>
-              {description ? (
-                <p className="mt-2.5 max-w-[78ch] text-[13px] leading-6 text-muted-foreground md:text-sm">
-                  {description}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          {meta ? (
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground lg:ml-16">
-              <span aria-hidden="true" className="h-px w-5 bg-[rgba(74,111,138,0.32)]" />
-              {meta}
+    <header className="relative border-b border-border pb-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3.5">
+          {icon ? (
+            <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-border bg-secondary/60 text-primary">
+              {icon}
             </div>
           ) : null}
+          <div className="min-w-0">
+            <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground md:text-[30px]">
+              {title}
+            </h1>
+            {description ? (
+              <p className="mt-2 max-w-[78ch] text-[13px] leading-6 text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+            {meta ? (
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] leading-5 text-muted-foreground">
+                {meta}
+              </div>
+            ) : null}
+          </div>
         </div>
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2.5 lg:justify-end lg:pb-0.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             {actions}
           </div>
         ) : null}
@@ -106,29 +103,29 @@ export function ManagementPanel({
     <section
       className={cn(
         "relative overflow-hidden border border-border bg-card transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
-        variant === "default" && "rounded-[18px] shadow-[0_9px_30px_rgba(24,35,45,0.035)]",
-        variant === "quiet" && "rounded-[16px] bg-[rgba(255,254,250,0.76)] shadow-none",
-        variant === "focus" && "rounded-[20px] border-[rgba(74,111,138,0.30)] shadow-[var(--mgmt-shadow)]",
+        variant === "default" && "rounded-[16px] shadow-[0_1px_2px_rgba(23,43,54,0.025),0_10px_28px_rgba(23,43,54,0.035)]",
+        variant === "quiet" && "rounded-[16px] bg-card/65 shadow-none",
+        variant === "focus" && "rounded-[18px] border-primary/30 shadow-[var(--mgmt-shadow)]",
         className,
       )}
     >
       {variant === "focus" ? (
         <>
-          <div className="absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,var(--primary),rgba(74,111,138,0.14)_52%,transparent)]" />
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-[linear-gradient(90deg,var(--primary),rgba(35,104,121,0.14)_52%,transparent)]" />
           <div aria-hidden="true" className="absolute bottom-0 left-0 top-0 w-px bg-primary/15" />
         </>
       ) : null}
       {hasHeader ? (
-        <div className="flex flex-col gap-3 border-b border-border bg-[linear-gradient(180deg,var(--secondary),rgba(255,255,255,0.18))] px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border bg-secondary/35 px-5 py-3.5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             {icon ? (
-              <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-primary/15 bg-card text-primary shadow-[0_4px_12px_rgba(45,80,104,0.05)]">
+              <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-[9px] border border-border bg-card text-primary">
                 {icon}
               </div>
             ) : null}
             <div className="min-w-0">
-              {title ? <h2 className="text-[15px] font-bold leading-5 tracking-[-0.015em] text-foreground">{title}</h2> : null}
-              {description ? <p className="mt-1 max-w-[76ch] text-xs leading-5 text-muted-foreground">{description}</p> : null}
+              {title ? <h2 className="text-[14px] font-semibold leading-5 tracking-[-0.015em] text-foreground">{title}</h2> : null}
+              {description ? <p className="mt-1 max-w-[76ch] text-[11px] leading-5 text-muted-foreground">{description}</p> : null}
             </div>
           </div>
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2.5">{actions}</div> : null}
@@ -172,13 +169,13 @@ export function MetricCard({
   }[tone];
 
   return (
-    <div className="group relative min-w-0 bg-card px-5 py-[18px] transition-[background-color] duration-200 hover:bg-accent/35 motion-reduce:transition-none">
-      <span aria-hidden="true" className={cn("absolute left-5 top-0 h-[2px] w-8 origin-left scale-x-50 rounded-full opacity-55 transition-[transform,opacity] duration-300 group-hover:scale-x-100 group-hover:opacity-100 motion-reduce:transition-none", markerClass)} />
+    <div className="group relative min-w-0 bg-card px-4 py-4 transition-[background-color] duration-200 hover:bg-accent/35 sm:px-5 sm:py-[18px] motion-reduce:transition-none">
+      <span aria-hidden="true" className={cn("absolute left-4 top-0 h-[2px] w-8 origin-left scale-x-50 rounded-full opacity-55 transition-[transform,opacity] duration-300 group-hover:scale-x-100 group-hover:opacity-100 sm:left-5 motion-reduce:transition-none", markerClass)} />
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium leading-5 text-muted-foreground">{label}</p>
-        {icon ? <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary/70 text-muted-foreground transition-colors duration-200 group-hover:text-primary">{icon}</span> : null}
+        <p className="text-[11px] font-medium leading-5 text-muted-foreground sm:text-xs">{label}</p>
+        {icon ? <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-secondary/70 text-muted-foreground transition-colors duration-200 group-hover:text-primary sm:h-7 sm:w-7">{icon}</span> : null}
       </div>
-      <p className={cn("mt-1.5 text-[27px] font-semibold leading-none tracking-[-0.04em] tabular-nums", toneClass)}>
+      <p className={cn("mt-1.5 text-[24px] font-semibold leading-none tracking-[-0.04em] tabular-nums sm:text-[27px]", toneClass)}>
         {loading ? (
           <span className="inline-block h-7 w-16 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
         ) : (

@@ -12,7 +12,7 @@ export function QuestionMessageToast({ message, onClose }: QuestionMessageToastP
   if (!message) return null;
 
   const toast = (
-    <div className="fixed right-6 top-24 z-[60] max-w-[calc(100vw-3rem)] animate-fade-in">
+    <div className="admin-content-theme fixed right-6 top-24 z-[60] max-w-[calc(100vw-3rem)] animate-fade-in">
       <div
         role="status"
         aria-live="polite"

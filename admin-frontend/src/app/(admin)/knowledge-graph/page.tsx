@@ -1047,7 +1047,7 @@ export default function KnowledgeGraphPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-display text-[28px] font-bold tracking-tight text-foreground">知识图谱</h1>
+            <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-foreground">知识图谱</h1>
             <span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">Graph</span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">探索知识点关系、定位学习路径，并检查图谱连接质量。</p>

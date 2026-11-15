@@ -111,6 +111,7 @@ backend/backend/
 backend/sync_package.json
 backend/.last_sync
 .firecrawl/
+.playwright-cli/
 !artifacts/**/office-acceptance-checklist.md
 
 # Downloaded font files

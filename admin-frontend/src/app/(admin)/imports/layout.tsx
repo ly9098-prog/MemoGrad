@@ -20,7 +20,10 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
 
   return (
     <ManagementPage className="space-y-6">
-      <nav className="flex flex-wrap gap-2 rounded-2xl border border-border bg-card/80 p-2 shadow-[var(--shadow-card)]">
+      <nav
+        aria-label="导入工作区导航"
+        className="flex flex-wrap gap-1 rounded-[14px] border border-border bg-card p-1.5"
+      >
         {importTabs.map((tab) => {
           const Icon = tab.icon;
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -29,13 +32,13 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
               key={tab.href}
               href={tab.href}
               className={cn(
-                "inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition",
+                "inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors",
                 active
-                  ? "border-primary/35 bg-accent text-accent-foreground shadow-sm"
-                  : "border-transparent text-muted-foreground hover:border-border hover:bg-card hover:text-foreground",
+                  ? "border-primary/25 bg-accent text-accent-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {tab.label}
             </Link>
           );

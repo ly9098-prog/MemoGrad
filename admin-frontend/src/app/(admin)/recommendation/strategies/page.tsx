@@ -4,12 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import {
+  FieldLabel,
+  ManagementNotice,
   ManagementPage,
   ManagementPageHeader,
+  ManagementPanel,
 } from "@/components/admin/management-ui";
+import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -178,114 +181,122 @@ export default function RecommendationStrategiesPage() {
         meta={<span>策略配置会参与后续推荐请求；保存后按现有缓存失效规则生效。</span>}
       />
 
-      <div className="rounded-xl border border-border bg-card/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
-        <strong className="text-foreground">智能刷题默认主策略：</strong> default_scored（图谱综合推荐）。
+      <ManagementNotice tone="info" title="智能刷题默认主策略：default_scored（图谱综合推荐）">
         A/B 实验运行时可按用户分组覆盖默认策略；系统权重 1.0 表示中性，用户级个性化微调仍由后端自动维护。
-      </div>
+      </ManagementNotice>
 
-      <DataTable<RecommendationStrategy>
-        data={rows}
-        emptyText="暂无策略配置，点击右上角「种子默认策略」初始化"
-        columns={[
-          { id: "name", header: "名称", accessorKey: "name" },
-          {
-            id: "type",
-            header: "策略类型",
-            accessorKey: "name",
-            cell: ({ row }) => {
-              const type = getStrategyType(row.original);
-              return STRATEGY_TYPE_LABELS[type] ?? (type || "未标注");
+      <ManagementPanel
+        title="策略配置"
+        description="按场景查看当前权重与启用状态；保存后由现有推荐缓存策略生效。"
+        contentClassName="p-0"
+      >
+        <DataTable<RecommendationStrategy>
+          className="rounded-none border-0 bg-transparent"
+          data={rows}
+          emptyText="暂无策略配置，点击右上角「种子默认策略」初始化"
+          columns={[
+            { id: "name", header: "名称", accessorKey: "name" },
+            {
+              id: "type",
+              header: "策略类型",
+              accessorKey: "name",
+              cell: ({ row }) => {
+                const type = getStrategyType(row.original);
+                return STRATEGY_TYPE_LABELS[type] ?? (type || "未标注");
+              },
             },
-          },
-          {
-            id: "scene",
-            header: "场景",
-            accessorKey: "scene",
-            cell: ({ row }) => SCENE_LABELS[row.original.scene] ?? row.original.scene,
-          },
-          {
-            id: "weights",
-            header: "核心权重",
-            accessorKey: "name",
-            cell: ({ row }) => {
-              if (isScoredStrategy(row.original)) {
-                const w = getScoredWeights(row.original);
+            {
+              id: "scene",
+              header: "场景",
+              accessorKey: "scene",
+              cell: ({ row }) => SCENE_LABELS[row.original.scene] ?? row.original.scene,
+            },
+            {
+              id: "weights",
+              header: "核心权重",
+              accessorKey: "name",
+              cell: ({ row }) => {
+                if (isScoredStrategy(row.original)) {
+                  const w = getScoredWeights(row.original);
+                  return (
+                    <span className="font-mono text-xs text-muted-foreground" title="复习 / 薄弱 / 错题 / 新题 / 多样性 / 图谱">
+                      {w.due_weight.toFixed(2)} / {w.weakness_weight.toFixed(2)} / {w.wrong_weight.toFixed(2)} / {w.new_question_weight.toFixed(2)} / {w.diversity_weight.toFixed(2)} / {w.path_weight.toFixed(2)}
+                    </span>
+                  );
+                }
                 return (
-                  <span className="font-mono text-xs text-muted-foreground" title="复习 / 薄弱 / 错题 / 新题 / 多样性 / 图谱">
-                    {w.due_weight.toFixed(2)} / {w.weakness_weight.toFixed(2)} / {w.wrong_weight.toFixed(2)} / {w.new_question_weight.toFixed(2)} / {w.diversity_weight.toFixed(2)} / {w.path_weight.toFixed(2)}
+                  <span className="font-mono text-xs text-muted-foreground" title="相似 / 重叠 / 难度 / 掌握 / 路径">
+                    {row.original.weight_vector_similarity.toFixed(2)} / {row.original.weight_knowledge_overlap.toFixed(2)} /{" "}
+                    {row.original.weight_difficulty_match.toFixed(2)} / {row.original.weight_mastery_gap.toFixed(2)} /{" "}
+                    {row.original.weight_path_priority.toFixed(2)}
                   </span>
                 );
-              }
-              return (
-                <span className="font-mono text-xs text-muted-foreground" title="相似 / 重叠 / 难度 / 掌握 / 路径">
-                  {row.original.weight_vector_similarity.toFixed(2)} / {row.original.weight_knowledge_overlap.toFixed(2)} /{" "}
-                  {row.original.weight_difficulty_match.toFixed(2)} / {row.original.weight_mastery_gap.toFixed(2)} /{" "}
-                  {row.original.weight_path_priority.toFixed(2)}
-                </span>
-              );
+              },
             },
-          },
-          {
-            id: "explore",
-            header: "探索率",
-            accessorKey: "exploration_ratio",
-            cell: ({ row }) => isScoredStrategy(row.original) ? "—" : (row.original.exploration_ratio * 100).toFixed(0) + "%",
-          },
-          {
-            id: "flags",
-            header: "状态",
-            accessorKey: "name",
-            cell: ({ row }) => (
-              <div className="flex gap-1.5">
-                {row.original.is_default && (
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] text-accent-foreground">默认</span>
-                )}
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] ${
-                    row.original.is_active ? "bg-success-light text-success" : "bg-destructive-light text-destructive"
-                  }`}
-                >
-                  {row.original.is_active ? "启用" : "停用"}
-                </span>
-              </div>
-            ),
-          },
-          {
-            id: "action",
-            header: "操作",
-            accessorKey: "name",
-            cell: ({ row }) =>
-              canWrite ? (
-                <Button variant="secondary" size="sm" onClick={() => startEdit(row.original)}>
-                  编辑权重
-                </Button>
-              ) : (
-                <span className="text-xs text-muted-foreground/70">无权限</span>
+            {
+              id: "explore",
+              header: "探索率",
+              accessorKey: "exploration_ratio",
+              cell: ({ row }) => isScoredStrategy(row.original) ? "—" : (row.original.exploration_ratio * 100).toFixed(0) + "%",
+            },
+            {
+              id: "flags",
+              header: "状态",
+              accessorKey: "name",
+              cell: ({ row }) => (
+                <div className="flex gap-1.5">
+                  {row.original.is_default && (
+                    <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] text-accent-foreground">默认</span>
+                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] ${
+                      row.original.is_active ? "bg-success-light text-success" : "bg-destructive-light text-destructive"
+                    }`}
+                  >
+                    {row.original.is_active ? "启用" : "停用"}
+                  </span>
+                </div>
               ),
-          },
-        ]}
-      />
+            },
+            {
+              id: "action",
+              header: "操作",
+              accessorKey: "name",
+              cell: ({ row }) =>
+                canWrite ? (
+                  <Button variant="secondary" size="sm" onClick={() => startEdit(row.original)}>
+                    编辑权重
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground/70">无权限</span>
+                ),
+            },
+          ]}
+        />
+        {strategies.isFetching ? (
+          <div className="flex items-center gap-2 border-t border-border/60 px-5 py-3 text-[11px] text-muted-foreground/70">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> 加载中…
+          </div>
+        ) : null}
+      </ManagementPanel>
 
       {editing && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-foreground">编辑策略「{editing.name}」</h2>
-              {editingScored && (
-                <p className="mt-1 text-xs text-muted-foreground/70">
-                  以下为系统级乘数，会与每个用户的自适应权重相乘后进入综合打分。
-                </p>
-              )}
-            </div>
+        <ManagementPanel
+          title={`编辑策略「${editing.name}」`}
+          description={editingScored
+            ? "以下为系统级乘数，会与每个用户的自适应权重相乘后进入综合打分。"
+            : "权重与探索率会参与后续推荐请求，保存前请确认范围。"}
+          actions={
             <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
               关闭
             </Button>
-          </CardHeader>
-          <CardContent className="grid gap-5">
+          }
+          contentClassName="grid gap-5"
+        >
             <label className="max-w-md text-xs font-semibold text-muted-foreground">
-              显示名
-              <input
-                className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+              <FieldLabel>显示名</FieldLabel>
+              <Input
+                className="mt-1 bg-card"
                 value={form.display_name ?? ""}
                 onChange={(e) => setField("display_name", e.target.value)}
               />
@@ -298,13 +309,13 @@ export default function RecommendationStrategiesPage() {
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                     {SCORED_WEIGHT_FIELDS.map(([key, label]) => (
                       <label key={key} className="text-xs font-semibold text-muted-foreground">
-                        {label} (0~2，1 为中性)
-                        <input
+                        <FieldLabel>{label} (0~2，1 为中性)</FieldLabel>
+                        <Input
                           type="number"
                           step="0.05"
                           min={0}
                           max={2}
-                          className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+                          className="mt-1 bg-card"
                           value={form[`scored_${key}`] ?? "1"}
                           onChange={(e) => setField(`scored_${key}`, e.target.value)}
                         />
@@ -340,13 +351,13 @@ export default function RecommendationStrategiesPage() {
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="text-xs font-semibold text-muted-foreground">
-                    {label} (0~1)
-                    <input
+                    <FieldLabel>{label} (0~1)</FieldLabel>
+                    <Input
                       type="number"
                       step="0.05"
                       min={0}
                       max={1}
-                      className="mt-1 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground"
+                      className="mt-1 bg-card"
                       value={form[key] ?? ""}
                       onChange={(e) => setField(key, e.target.value)}
                     />
@@ -361,14 +372,7 @@ export default function RecommendationStrategiesPage() {
                 {saveMutation.isPending ? "保存中…" : "保存"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {strategies.isFetching && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> 加载中…
-        </div>
+        </ManagementPanel>
       )}
     </ManagementPage>
   );

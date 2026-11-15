@@ -136,19 +136,17 @@ function MetricCard({
 }) {
   const styles = metricToneStyles[tone];
   return (
-    <Card className="relative overflow-hidden rounded-2xl">
+    <div className="relative min-w-0 overflow-hidden bg-card px-4 py-4">
       <div className={`absolute inset-x-0 top-0 h-0.5 ${styles.accent}`} />
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground/70">{label}</p>
-            <p className="mt-1 text-[26px] font-bold leading-none tabular-nums text-foreground">{value}</p>
-          </div>
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>{icon}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground/70">{label}</p>
+          <p className="mt-1 text-[26px] font-bold leading-none tabular-nums text-foreground">{value}</p>
         </div>
-        <p className="mt-2 truncate text-[11px] text-muted-foreground">{hint}</p>
-      </CardContent>
-    </Card>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>{icon}</div>
+      </div>
+      <p className="mt-2 truncate text-[11px] text-muted-foreground">{hint}</p>
+    </div>
   );
 }
 
@@ -645,9 +643,9 @@ export default function SystemTasksPage() {
         <div>
           <div className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">异步任务诊断</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">异步任务诊断</h1>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
             聚合 Outbox、Redis 队列、Worker 与答题投影，快速定位积压、重试和永久失败。
           </p>
         </div>
@@ -734,7 +732,7 @@ export default function SystemTasksPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-px overflow-hidden rounded-[16px] border border-border bg-border md:grid-cols-2 xl:grid-cols-5">
             <MetricCard
               label="Outbox 未发布"
               value={data.outbox.unpublished}
@@ -945,8 +943,8 @@ export default function SystemTasksPage() {
                         <th className="w-[13%] px-3 py-2.5">任务类型</th>
                         <th className="w-[10%] px-3 py-2.5">状态</th>
                         <th className="w-[18%] px-3 py-2.5">下次执行 / 队列</th>
-                        <th className="w-[21%] px-3 py-2.5">最近执行结果</th>
-                        <th className="w-[13%] px-3 py-2.5">操作</th>
+                        <th className="w-[19%] px-3 py-2.5">最近执行结果</th>
+                        <th className="w-[15%] whitespace-nowrap px-3 py-2.5">操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -990,11 +988,11 @@ export default function SystemTasksPage() {
                               </p>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <div className="flex items-center gap-1">
-                                <button type="button" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent" onClick={() => { setSelectedAsyncId(null); setSelectedScheduledId(task.task_id); }}>
+                              <div className="flex flex-nowrap items-center gap-0.5">
+                                <button type="button" className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent" onClick={() => { setSelectedAsyncId(null); setSelectedScheduledId(task.task_id); }}>
                                   <Eye className="h-3 w-3" />详情
                                 </button>
-                                <button type="button" disabled={!task.can_run_now || runScheduled.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40" onClick={() => setPendingOperation({ kind: "run-scheduled", task })}>
+                                <button type="button" disabled={!task.can_run_now || runScheduled.isPending} className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40" onClick={() => setPendingOperation({ kind: "run-scheduled", task })}>
                                   <Play className="h-3 w-3" />{task.task_id === "postgres_backup" ? "备份" : "执行"}
                                 </button>
                               </div>

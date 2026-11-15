@@ -617,10 +617,7 @@ export default function FormulasPage() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1
-            className="font-display text-[28px] font-bold leading-tight tracking-tight text-foreground"
-            style={{ fontVariationSettings: "'wght' 700" }}
-          >
+          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground md:text-[30px]">
             408 速记卡管理
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -820,11 +817,11 @@ export default function FormulasPage() {
             </div>
 
             {formulas.isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 6 }, (_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl border bg-card/60" />)}
+              <div className="divide-y divide-border border-y border-border">
+                {Array.from({ length: 6 }, (_, i) => <div key={i} className="h-[92px] animate-pulse bg-secondary/25" />)}
               </div>
             ) : formulas.isError ? (
-              <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-destructive/30 bg-destructive-light/35 py-14 text-center animate-fade-in">
+              <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-destructive/30 bg-destructive-light/30 py-14 text-center animate-fade-in">
                 <AlertCircle className="h-9 w-9 text-destructive/70" />
                 <div>
                   <p className="text-sm font-semibold text-destructive">公式加载失败</p>
@@ -833,22 +830,23 @@ export default function FormulasPage() {
                 <Button variant="secondary" size="sm" onClick={() => formulas.refetch()}>重新加载</Button>
               </div>
             ) : (
-              <div className={`space-y-2 transition-opacity duration-200 ${formulas.isFetching ? "opacity-70" : "opacity-100"}`}>
-                <div className="stagger-enter space-y-2" key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}>
-                {items.map((card) => {
+              <div className={`transition-opacity duration-200 ${formulas.isFetching ? "opacity-70" : "opacity-100"}`}>
+                {items.length > 0 ? (
+                  <div className="stagger-enter divide-y divide-border border-y border-border" key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}>
+                  {items.map((card) => {
                   const isSelected = selectedId === card.id;
                   const tagNames = card.tags?.map((tag) => tag.name).join(" · ") || "";
                   return (
                     <article
                       key={card.id}
                       onMouseEnter={() => prefetchDetail(card.id)}
-                      className={`group rounded-2xl border transition-all duration-200 ${
+                      className={`group border-l-2 transition-colors duration-150 motion-reduce:transition-none ${
                         isSelected
-                          ? "border-primary bg-accent/35 shadow-sm ring-2 ring-accent"
-                          : "border-border bg-card/82 hover:border-primary/45 hover:bg-card"
+                          ? "border-primary bg-accent/35"
+                          : "border-transparent hover:bg-secondary/30"
                       }`}
                     >
-                      <div className="flex items-start gap-3 p-3">
+                      <div className="flex items-start gap-3 px-3 py-3.5">
                         {isBatchable ? (
                           <CustomCheckbox
                             checked={safeSelectedIds.has(card.id)}
@@ -897,11 +895,12 @@ export default function FormulasPage() {
                       </div>
                     </article>
                   );
-                })}
-                </div>
+                  })}
+                  </div>
+                ) : null}
 
                 {!items.length ? (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border bg-card/60 py-14 text-center animate-fade-in">
+                  <div className="flex flex-col items-center gap-2 rounded-[12px] border border-dashed border-border bg-secondary/20 py-14 text-center animate-fade-in">
                     <Sigma className="h-10 w-10 text-muted-foreground/70" />
                     <p className="text-sm font-semibold text-muted-foreground">{selectedCategory ? `「${selectedCategory.name}」下暂无匹配速记卡` : "暂无匹配速记卡"}</p>
                     <p className="max-w-sm text-xs leading-5 text-muted-foreground/70">
@@ -986,27 +985,27 @@ export default function FormulasPage() {
 
                 <div className="flex flex-wrap gap-1.5">
                   {selectedCard.tags?.map((tag) => (
-                    <span key={tag.id} className="inline-flex items-center rounded-md border border-border bg-card px-2 py-1 text-[10px] text-muted-foreground">
+                    <span key={tag.id} className="inline-flex items-center rounded-md bg-secondary/50 px-2 py-1 text-[10px] text-muted-foreground">
                       {tag.name}
                     </span>
                   ))}
                 </div>
 
                 {selectedCard.summary ? (
-                  <section className="rounded-2xl border border-border bg-card p-3">
+                  <section className="border-b border-border pb-3">
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70">内容摘要</p>
                     <p className="text-xs leading-5 text-muted-foreground"><MixedLatexRenderer text={selectedCard.summary} /></p>
                   </section>
                 ) : null}
 
-                <section className="rounded-2xl border border-border bg-card p-3">
+                <section className="border-b border-border pb-4">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-bold text-foreground">公式预览</p>
                     <span className="text-[10px] text-muted-foreground/70">{selectedCard.formula_blocks?.length || 0} 个公式块</span>
                   </div>
                   <div className="space-y-2">
                     {selectedCard.formula_blocks?.length ? selectedCard.formula_blocks.map((block, index) => (
-                      <div key={index} className="rounded-xl border border-border bg-[var(--porcelain)]/45 p-3">
+                      <div key={index} className="rounded-[10px] bg-secondary/35 p-3">
                         {block.label ? <p className="mb-1 text-[10px] font-semibold text-muted-foreground/70">{block.label}</p> : null}
                         <LatexRenderer latex={normalizeLatexExpression(block.latex)} displayMode={true} />
                         {block.note ? <p className="mt-1 text-[10px] leading-5 text-muted-foreground"><MixedLatexRenderer text={block.note} /></p> : null}
@@ -1018,33 +1017,33 @@ export default function FormulasPage() {
                 </section>
 
                 {selectedCard.card_type === "function_graph" && selectedCard.graph_asset?.thumbnail_url ? (
-                  <section className="rounded-2xl border border-border bg-card p-3">
+                  <section className="border-b border-border pb-4">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-xs font-bold text-foreground">函数图像</p>
                       <span className={`rounded-md border px-1.5 py-0.5 text-[10px] ${GRAPH_STATUS_BADGE[selectedCard.graph_status || ""] || "bg-muted"}`}>
                         {GRAPH_STATUS_LABEL[selectedCard.graph_status || ""] || selectedCard.graph_status}
                       </span>
                     </div>
-                    <img src={selectedCard.graph_asset.thumbnail_url} alt="函数图像" className="max-h-44 w-full rounded-xl border bg-card object-contain" />
+                    <img src={selectedCard.graph_asset.thumbnail_url} alt="函数图像" className="max-h-44 w-full rounded-[10px] bg-secondary/30 object-contain" />
                   </section>
                 ) : null}
 
                 {selectedCard.conditions ? (
-                  <section className="rounded-2xl border border-warning/40 bg-warning-light/55 p-3">
+                  <section className="rounded-[10px] border border-warning/35 bg-warning-light/45 p-3">
                     <p className="text-xs font-bold text-warning-foreground">适用条件</p>
                     <div className="mt-1.5 text-xs leading-5 text-warning-foreground">{renderStructuredConditions(selectedCard.conditions)}</div>
                   </section>
                 ) : null}
 
                 {selectedCard.error_tips ? (
-                  <section className="rounded-2xl border border-destructive/30 bg-destructive-light/45 p-3">
+                  <section className="rounded-[10px] border border-destructive/25 bg-destructive-light/40 p-3">
                     <p className="text-xs font-bold text-destructive">易错提醒</p>
                     <div className="mt-1.5 text-xs leading-5 text-destructive">{renderStructuredErrorTips(selectedCard.error_tips)}</div>
                   </section>
                 ) : null}
 
                 {selectedCard.status === "rejected" && selectedCard.rejection_reason ? (
-                  <section className="rounded-2xl border border-destructive/30 bg-destructive-light/45 p-3">
+                  <section className="rounded-[10px] border border-destructive/25 bg-destructive-light/40 p-3">
                     <p className="text-xs font-bold text-destructive">驳回原因</p>
                     <p className="mt-1.5 text-xs leading-5 text-destructive">{selectedCard.rejection_reason}</p>
                   </section>

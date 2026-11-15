@@ -132,7 +132,7 @@ export default function AISettingsPage() {
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground/70">
             AI Operations Center
           </p>
-          <h2 className="mt-1 font-display text-xl font-bold text-foreground">AI 解析设置</h2>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-foreground">AI 解析设置</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             管理 OCR 纠错、题目补全、AI 解析生成等能力
           </p>

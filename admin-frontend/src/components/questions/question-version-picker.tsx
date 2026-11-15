@@ -380,6 +380,7 @@ export function QuestionVersionPicker({
               ref={dropdownRef}
               role="dialog"
               aria-label="选择题目版本"
+              data-focus-passthrough
               className="z-[120] flex animate-fade-in flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-floating)]"
               style={{
                 position: "fixed",

@@ -127,13 +127,14 @@ export function QuestionDrawerBody({
     <>
       <QuestionDetailView question={question} />
       <QuestionVersionHistorySection
+        className="px-7"
         question={question}
         versions={versions}
         history={history}
         details={details}
         labels={labels}
       />
-      <QuestionSecondaryInfo question={question} />
+      <QuestionSecondaryInfo className="px-7" question={question} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -70,6 +70,7 @@ export default function FormulaCategoriesPage() {
   const [search, setSearch] = useState("");
   const [dialogParent, setDialogParent] = useState<AdminFormulaCategoryNode | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const dialogTriggerRef = useRef<HTMLElement | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-formula-categories"],
@@ -159,13 +160,17 @@ export default function FormulaCategoriesPage() {
   };
 
   const openCreateDialog = (parent: AdminFormulaCategoryNode | null) => {
+    dialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDialogParent(parent);
     setShowCreateDialog(true);
   };
 
   const closeCreateDialog = () => {
+    const trigger = dialogTriggerRef.current;
     setShowCreateDialog(false);
     setDialogParent(null);
+    window.requestAnimationFrame(() => trigger?.focus());
   };
 
   const saveChanges = () => {
@@ -247,7 +252,7 @@ export default function FormulaCategoriesPage() {
     <ManagementPage className="space-y-5 pb-24">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-foreground">公式分类管理</h1>
+          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground md:text-[30px]">公式分类管理</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">科目 → 章节 → 分组，使用结构化配置台维护分类体系</p>
         </div>
         {canWrite ? (

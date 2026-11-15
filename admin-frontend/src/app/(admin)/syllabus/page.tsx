@@ -273,19 +273,19 @@ export default function SyllabusPage() {
       </MetricStrip>
 
       <div className="grid gap-5 xl:grid-cols-[328px_minmax(0,1fr)] xl:items-start">
-        <div className="space-y-5 xl:sticky xl:top-5">
+        <div className="min-w-0 space-y-5 xl:sticky xl:top-5">
           <ManagementPanel variant="quiet" title="版本索引" description={`${versionsQuery.data?.length ?? 0} 个版本 · 选择后在右侧编辑范围`} contentClassName="p-2.5">
-            <div className="space-y-1.5">
+            <div className="divide-y divide-border">
               {(versionsQuery.data ?? []).map((item) => {
                 const selected = selectedVersionId === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => setSelectedVersionId(item.id)}
-                    className={`group relative flex w-full items-center gap-3 rounded-[13px] border px-3 py-2.5 text-left transition-[background-color,border-color,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] motion-reduce:transition-none ${selected ? "border-[rgba(74,111,138,0.32)] bg-[var(--mgmt-steel)] shadow-[0_8px_20px_rgba(45,80,104,0.07)]" : "border-transparent hover:border-[var(--mgmt-line)] hover:bg-card"}`}
+                    className={`group relative flex w-full items-center gap-3 border-l-2 px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${selected ? "border-primary bg-accent/35" : "border-transparent hover:bg-secondary/35"}`}
                     aria-pressed={selected}
                   >
-                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[11px] border text-[13px] font-bold tabular-nums transition-colors ${selected ? "border-[rgba(74,111,138,0.26)] bg-card text-accent-foreground" : "border-[var(--mgmt-line)] bg-[rgba(237,243,246,0.52)] text-muted-foreground group-hover:bg-[var(--mgmt-steel)]"}`}>{item.effective_year}</span>
+                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-[9px] text-[13px] font-bold tabular-nums transition-colors ${selected ? "bg-card text-accent-foreground" : "bg-secondary/55 text-muted-foreground"}`}>{item.effective_year}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start justify-between gap-2">
                         <span className="min-w-0 truncate text-sm font-semibold text-foreground">{item.name}</span>
@@ -297,7 +297,6 @@ export default function SyllabusPage() {
                         <span className="shrink-0 tabular-nums">{item.knowledge_point_count} KP</span>
                       </span>
                     </span>
-                    {selected ? <span aria-hidden="true" className="absolute inset-y-3 left-0 w-[2px] rounded-r-full bg-primary" /> : null}
                   </button>
                 );
               })}
@@ -325,7 +324,11 @@ export default function SyllabusPage() {
               }
               contentClassName={showCreateForm ? "p-4" : "p-0"}
             >
-              <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                aria-hidden={!showCreateForm}
+                inert={!showCreateForm}
+              >
                 <div className="overflow-hidden">
                   <div className="space-y-3">
                     <label>
@@ -355,7 +358,7 @@ export default function SyllabusPage() {
           ) : null}
         </div>
 
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <ManagementPanel
             variant="focus"
             title={detail?.name ?? "版本范围"}
@@ -424,7 +427,7 @@ export default function SyllabusPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 p-4 sm:p-5">
+                <div className="p-4 sm:p-5">
                   {groupedCatalog.map(([subjectKey, items]) => {
                     const subjectName = items[0]?.subject_name ?? "未分类科目";
                     const subjectCode = items[0]?.subject_code ?? "unknown";
@@ -432,14 +435,14 @@ export default function SyllabusPage() {
                     const selectedCount = items.filter((item) => selectedKnowledgePointIds.has(item.knowledge_point_id)).length;
                     const collapsed = collapsedSubjects.has(subjectKey);
                     return (
-                      <section key={subjectKey} className="overflow-hidden rounded-[15px] border border-[var(--mgmt-line)] bg-card shadow-[0_6px_18px_rgba(31,49,61,0.02)] transition-[border-color,box-shadow] duration-200 hover:border-[rgba(74,111,138,0.27)] hover:shadow-[0_10px_24px_rgba(31,49,61,0.035)] motion-reduce:transition-none">
+                      <section key={subjectKey} className="overflow-hidden border-b border-border last:border-b-0">
                         <button
                           type="button"
                           onClick={() => toggleSubjectGroup(subjectKey)}
                           aria-expanded={!collapsed}
-                          className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-[rgba(237,243,246,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+                          className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
                         >
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[rgba(74,111,138,0.16)] bg-[var(--mgmt-steel)] text-accent-foreground">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-secondary/60 text-accent-foreground">
                             <Layers3 className="h-4 w-4" />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -456,9 +459,13 @@ export default function SyllabusPage() {
                           </span>
                           <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:text-accent-foreground motion-reduce:transition-none ${collapsed ? "-rotate-90" : "rotate-0"}`} />
                         </button>
-                        <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}>
+                        <div
+                          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
+                          aria-hidden={collapsed}
+                          inert={collapsed}
+                        >
                           <div className="overflow-hidden">
-                            <div className="grid gap-2 border-t border-[var(--mgmt-line)] bg-[rgba(250,251,251,0.72)] p-3 md:grid-cols-2">
+                            <div className="grid gap-2 border-t border-border bg-secondary/15 p-3 md:grid-cols-2">
                               {items.map((item) => {
                                 const checked = selectedKnowledgePointIds.has(item.knowledge_point_id);
                                 const disabled = detail.status !== "draft" || !canWrite;
@@ -467,7 +474,7 @@ export default function SyllabusPage() {
                                     key={item.knowledge_point_id}
                                     disabled={disabled}
                                     onClick={() => toggleKnowledgePoint(item.knowledge_point_id)}
-                                    className={`flex min-h-[72px] items-start gap-3 rounded-[11px] border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] disabled:cursor-default disabled:active:scale-100 motion-reduce:transition-none ${checked ? "border-[rgba(74,111,138,0.30)] bg-[var(--mgmt-steel)] shadow-[inset_2px_0_0_var(--primary),0_5px_16px_rgba(45,80,104,0.035)]" : "border-[var(--mgmt-line)] bg-card hover:border-[rgba(74,111,138,0.28)] hover:bg-muted/40"}`}
+                                    className={`flex min-h-[64px] items-start gap-3 border-l-2 px-3 py-2.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default motion-reduce:transition-none ${checked ? "border-primary bg-accent/40" : "border-transparent bg-card/55 hover:bg-card"}`}
                                   >
                                     <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-[background-color,border-color,transform] duration-200 ${checked ? "border-primary bg-primary text-white" : "border-border bg-card text-transparent"}`}>
                                       <Check className="h-3 w-3" strokeWidth={3} />

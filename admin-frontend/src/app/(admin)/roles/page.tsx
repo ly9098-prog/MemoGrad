@@ -592,6 +592,8 @@ export default function RolesPage() {
                             "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
                             collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
                           )}
+                          aria-hidden={collapsed}
+                          inert={collapsed}
                         >
                           <div className="min-h-0 overflow-hidden">
                             <div className="overflow-x-auto border-t border-border bg-card/60">

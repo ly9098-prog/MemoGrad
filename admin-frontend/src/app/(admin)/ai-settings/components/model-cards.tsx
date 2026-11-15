@@ -280,6 +280,8 @@ function CompatibleExampleImporter({ disabled = false, onApply }: CompatibleExam
           "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
           expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
+        aria-hidden={!expanded}
+        inert={!expanded}
       >
         <div className="overflow-hidden">
           <div className="border-t border-border/90 px-3 pb-3 pt-3">
@@ -1878,7 +1880,7 @@ export function ModelCards() {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table className="w-full min-w-[880px] border-collapse">
           <thead>
             <tr className="border-b border-border/60">
               <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">模型</th>

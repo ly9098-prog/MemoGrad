@@ -93,16 +93,16 @@ export function ImportWorkspaceHeader({
     <>
       <style>{motionStyles}</style>
       <header className="relative import-enter">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 items-start gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-accent text-accent-foreground shadow-[0_6px_20px_rgba(45,80,104,0.07)] import-soft-pop">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-border bg-secondary/60 text-primary import-soft-pop">
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[30px]">
+              <h2 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground sm:text-[30px]">
                 {title}
               </h2>
-              <p className="mt-1.5 max-w-[68ch] text-sm leading-6 text-muted-foreground">{description}</p>
+              <p className="mt-2 max-w-[68ch] text-[13px] leading-6 text-muted-foreground">{description}</p>
             </div>
           </div>
           {(meta || actions) ? (
@@ -111,9 +111,6 @@ export function ImportWorkspaceHeader({
               {actions}
             </div>
           ) : null}
-        </div>
-        <div className="mt-5 h-px bg-border/60">
-          <div className="h-px w-20 bg-primary" />
         </div>
       </header>
     </>

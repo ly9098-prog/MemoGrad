@@ -3,7 +3,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ManagementPage } from "@/components/admin/management-ui";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -284,103 +283,99 @@ export default function QuestionsPage() {
   });
 
   return (
-    <ManagementPage className="space-y-4 pb-10">
-      <Card className="overflow-visible border border-border bg-card/90 shadow-[var(--shadow-card)]">
-        <CardHeader className="space-y-4 pb-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="font-display text-2xl font-bold text-foreground">
-                正式题库
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                点击题目查看题干、选项、答案与解析；详情面板用于编辑、版本对比或删除。
-              </p>
-            </div>
-
+    <ManagementPage className="space-y-5 pb-10">
+      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">正式题库</h1>
+            <span className="inline-flex h-7 items-center rounded-[7px] border border-border bg-card px-2.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+              全库 {questions.data?.total?.toLocaleString("zh-CN") ?? "--"} 题
+            </span>
           </div>
+          <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
+            检索、审核与维护正式题目；列表用于快速扫描，右侧预览用于阅读，完整详情用于编辑。
+          </p>
+        </div>
+      </header>
 
-          <QuestionFilterToolbar
-            filters={filters}
-            subjectOptions={subjectOptions}
-            keywordInput={keywordInput}
-            importBatchInput={importBatchInput}
-            searchDebouncing={searchDebouncing}
-            listFetching={questions.isFetching}
+      <QuestionFilterToolbar
+        filters={filters}
+        subjectOptions={subjectOptions}
+        keywordInput={keywordInput}
+        importBatchInput={importBatchInput}
+        searchDebouncing={searchDebouncing}
+        listFetching={questions.isFetching}
+        hasActiveFilters={hasActiveFilters}
+        commonFilterOpen={menus.isCommonFilterOpen}
+        moreFilterOpen={menus.isMoreFilterOpen}
+        commonFilterRef={commonFilterMenuRef}
+        moreFilterRef={moreFilterRef}
+        onKeywordChange={handleKeywordChange}
+        onResetFilters={handleResetFilters}
+        onToggleMenu={toggleMenu}
+        onApplyFilterPreset={applyFilterPreset}
+        onApplySavedFilters={handleApplySavedFilters}
+        onSaveCurrentFilters={handleSaveCurrentFilters}
+        onFilterChange={updateFilter}
+        onImportBatchChange={handleImportBatchChange}
+      />
+
+      <div className="@container">
+        <div className="grid items-start gap-4 @min-[1080px]:grid-cols-[minmax(0,1fr)_400px]">
+          <QuestionListCard
+            items={items}
+            total={questions.data?.total}
+            page={page}
+            totalPages={questions.data?.total_pages ?? 1}
+            pageSize={pageSize}
+            isLoading={questions.isLoading}
+            isFetching={questions.isFetching}
+            isError={questions.isError}
             hasActiveFilters={hasActiveFilters}
-            commonFilterOpen={menus.isCommonFilterOpen}
-            moreFilterOpen={menus.isMoreFilterOpen}
-            commonFilterRef={commonFilterMenuRef}
-            moreFilterRef={moreFilterRef}
-            onKeywordChange={handleKeywordChange}
+            selectedQuestionId={selectedQuestionId}
+            selectedIds={selectedIds}
+            allChecked={allChecked}
+            filters={filters}
+            exportOpen={menus.isExportOpen}
+            exportingFormat={exportingFormat}
+            exportMenuRef={exportMenuRef}
+            onToggleAll={toggleAll}
+            onToggleOne={toggleOne}
+            onSelectQuestion={selectQuestion}
+            onOpenDetail={openDetail}
+            onPrefetchDetail={prefetchDetail}
+            onToggleExportMenu={() => toggleMenu("isExportOpen")}
+            onExport={(format) => void handleExport(format)}
             onResetFilters={handleResetFilters}
-            onToggleMenu={toggleMenu}
-            onApplyFilterPreset={applyFilterPreset}
-            onApplySavedFilters={handleApplySavedFilters}
-            onSaveCurrentFilters={handleSaveCurrentFilters}
-            onFilterChange={updateFilter}
-            onImportBatchChange={handleImportBatchChange}
+            onRetry={() => questions.refetch()}
+            onPageSizeChange={handlePageSizeChange}
+            onSetPage={setPage}
           />
-        </CardHeader>
 
-        <CardContent className="space-y-4">
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <QuestionListCard
-              items={items}
-              total={questions.data?.total}
-              page={page}
-              totalPages={questions.data?.total_pages ?? 1}
-              pageSize={pageSize}
-              isLoading={questions.isLoading}
-              isFetching={questions.isFetching}
-              isError={questions.isError}
-              hasActiveFilters={hasActiveFilters}
-              selectedQuestionId={selectedQuestionId}
-              selectedIds={selectedIds}
-              allChecked={allChecked}
-              filters={filters}
-              exportOpen={menus.isExportOpen}
-              exportingFormat={exportingFormat}
-              exportMenuRef={exportMenuRef}
-              onToggleAll={toggleAll}
-              onToggleOne={toggleOne}
-              onSelectQuestion={selectQuestion}
-              onOpenDetail={openDetail}
-              onPrefetchDetail={prefetchDetail}
-              onToggleExportMenu={() => toggleMenu("isExportOpen")}
-              onExport={(format) => void handleExport(format)}
-              onResetFilters={handleResetFilters}
-              onRetry={() => questions.refetch()}
-              onPageSizeChange={handlePageSizeChange}
-              onSetPage={setPage}
-            />
-
-            <aside className="hidden xl:block xl:min-h-0 xl:self-stretch">
-              <div className="xl:sticky xl:top-0 xl:h-dvh xl:min-h-0 xl:overflow-hidden">
-              <div className="flex h-full min-h-0 flex-col overflow-hidden border-l border-border bg-card p-5">
-                <QuestionSideDetailPanel
-                  questionId={selectedQuestionId}
-                  question={selectedQuestion}
-                  isError={detail.isError}
-                  scrollRef={detailScrollRef}
-                  copyButton={copyQuestionButton}
-                  canWrite={canWrite}
-                  canDelete={canDelete}
-                  onOpenFullDetail={() => setIsDetailDrawerOpen(true)}
-                  onEdit={() => {
-                    startEditing();
-                    setIsDetailDrawerOpen(true);
-                  }}
-                  onDelete={() => {
-                    if (selectedQuestion) requestDelete(selectedQuestion.id);
-                  }}
-                  onRetry={() => detail.refetch()}
-                />
-              </div>
-              </div>
-            </aside>
-          </div>
-        </CardContent>
-      </Card>
+          <aside className="hidden self-stretch @min-[1080px]:block">
+            <div className="sticky top-0 flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden rounded-[18px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+              <QuestionSideDetailPanel
+                questionId={selectedQuestionId}
+                question={selectedQuestion}
+                isError={detail.isError}
+                scrollRef={detailScrollRef}
+                copyButton={copyQuestionButton}
+                canWrite={canWrite}
+                canDelete={canDelete}
+                onOpenFullDetail={() => setIsDetailDrawerOpen(true)}
+                onEdit={() => {
+                  startEditing();
+                  setIsDetailDrawerOpen(true);
+                }}
+                onDelete={() => {
+                  if (selectedQuestion) requestDelete(selectedQuestion.id);
+                }}
+                onRetry={() => detail.refetch()}
+              />
+            </div>
+          </aside>
+        </div>
+      </div>
 
       <QuestionMessageToast message={message} onClose={clearMessage} />
 

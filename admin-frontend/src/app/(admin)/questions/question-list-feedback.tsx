@@ -23,7 +23,7 @@ export function QuestionListFeedback({
   return (
     <>
       {emptyVisible ? (
-        <div className="flex flex-col items-center gap-3 rounded-[1.6rem] border border-dashed border-border bg-card/60 py-16 text-center animate-fade-in">
+        <div className="flex flex-col items-center gap-3 px-6 py-16 text-center animate-fade-in">
           <FileQuestion className="h-12 w-12 text-muted-foreground/70" />
           <p className="text-sm font-semibold text-muted-foreground">暂无匹配题目</p>
           <p className="text-xs text-muted-foreground/70">尝试调整搜索关键词或筛选条件</p>
@@ -36,7 +36,7 @@ export function QuestionListFeedback({
       ) : null}
 
       {isError ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-destructive/30 bg-destructive-light/60 py-12 text-center animate-fade-in">
+        <div className="flex flex-col items-center gap-3 border-t border-border bg-destructive-light/35 px-6 py-12 text-center animate-fade-in">
           <AlertCircle className="h-9 w-9 text-destructive" />
           <div>
             <p className="text-sm font-semibold text-destructive">题目加载失败</p>

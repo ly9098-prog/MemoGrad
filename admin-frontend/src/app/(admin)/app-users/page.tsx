@@ -351,8 +351,56 @@ export default function AppUsersPage() {
           </div>
         </div>
       ) : null}
-      <Card className="overflow-visible rounded-2xl">
-        <CardContent className="p-4 lg:p-5">
+      <MetricStrip className="grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="用户总数"
+          value={totalUsers.data?.total ?? 0}
+          hint="全部小程序用户"
+          icon={<UsersRound className="h-4 w-4" />}
+          loading={totalUsers.isLoading}
+        />
+        <MetricCard
+          label="正常用户"
+          value={activeUsers.data?.total ?? 0}
+          hint="当前可正常使用"
+          icon={<UserCheck className="h-4 w-4" />}
+          tone="success"
+          loading={activeUsers.isLoading}
+        />
+        <MetricCard
+          label="封禁用户"
+          value={bannedUsers.data?.total ?? 0}
+          hint="当前限制使用"
+          icon={<UserX className="h-4 w-4" />}
+          tone="danger"
+          loading={bannedUsers.isLoading}
+        />
+        <MetricCard
+          label="今日新增"
+          value={todayUsers.data?.total ?? 0}
+          hint={`北京时间 ${today}`}
+          icon={<UserPlus className="h-4 w-4" />}
+          loading={todayUsers.isLoading}
+        />
+      </MetricStrip>
+
+      {notice ? (
+        <div
+          role="status"
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm",
+            notice.tone === "success"
+              ? "border-success/25 bg-success-light text-success"
+              : "border-destructive/25 bg-destructive-light text-destructive",
+          )}
+        >
+          {notice.tone === "success" ? <ShieldCheck className="h-4 w-4 shrink-0" /> : <UserX className="h-4 w-4 shrink-0" />}
+          <span>{notice.text}</span>
+        </div>
+      ) : null}
+
+      <Card className="overflow-hidden rounded-2xl">
+        <div className="border-b border-border/70 bg-secondary/20 p-4 lg:p-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <label className="relative min-w-0 flex-1 xl:max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
@@ -413,58 +461,7 @@ export default function AppUsersPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <MetricStrip className="grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="用户总数"
-          value={totalUsers.data?.total ?? 0}
-          hint="全部小程序用户"
-          icon={<UsersRound className="h-4 w-4" />}
-          loading={totalUsers.isLoading}
-        />
-        <MetricCard
-          label="正常用户"
-          value={activeUsers.data?.total ?? 0}
-          hint="当前可正常使用"
-          icon={<UserCheck className="h-4 w-4" />}
-          tone="success"
-          loading={activeUsers.isLoading}
-        />
-        <MetricCard
-          label="封禁用户"
-          value={bannedUsers.data?.total ?? 0}
-          hint="当前限制使用"
-          icon={<UserX className="h-4 w-4" />}
-          tone="danger"
-          loading={bannedUsers.isLoading}
-        />
-        <MetricCard
-          label="今日新增"
-          value={todayUsers.data?.total ?? 0}
-          hint={`北京时间 ${today}`}
-          icon={<UserPlus className="h-4 w-4" />}
-          loading={todayUsers.isLoading}
-        />
-      </MetricStrip>
-
-      {notice ? (
-        <div
-          role="status"
-          className={cn(
-            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm",
-            notice.tone === "success"
-              ? "border-success/25 bg-success-light text-success"
-              : "border-destructive/25 bg-destructive-light text-destructive",
-          )}
-        >
-          {notice.tone === "success" ? <ShieldCheck className="h-4 w-4 shrink-0" /> : <UserX className="h-4 w-4 shrink-0" />}
-          <span>{notice.text}</span>
         </div>
-      ) : null}
-
-      <Card className="overflow-visible rounded-2xl">
         <CardContent className="p-0">
           <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
             <div className="flex items-center gap-3">

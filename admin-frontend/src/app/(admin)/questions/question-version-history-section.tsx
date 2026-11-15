@@ -4,6 +4,7 @@ import { ArrowLeftRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuestionVersionPicker, type QuestionVersionSelection } from "@/components/questions/question-version-picker";
 import type { AdminQuestion, QuestionVersion, QuestionVersionDetail } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 import { QuestionVersionComparison } from "./components/question-version-comparison";
 import type { QuestionVersionLabels } from "./question-version-labels";
 
@@ -30,6 +31,7 @@ export type QuestionVersionHistorySectionProps = {
     compare?: QuestionVersionDetail | null;
   };
   labels: QuestionVersionLabels;
+  className?: string;
 };
 
 export function QuestionVersionHistorySection(props: QuestionVersionHistorySectionProps) {
@@ -43,7 +45,7 @@ export function QuestionVersionHistorySection(props: QuestionVersionHistorySecti
   const hasNoVersions = (versions.data?.total ?? 0) === 0 && !versions.isFetching;
 
   return (
-    <section className="py-6">
+    <section className={cn("py-6", props.className)}>
       <button
         type="button"
         onClick={history.toggle}

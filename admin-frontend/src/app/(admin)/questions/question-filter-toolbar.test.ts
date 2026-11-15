@@ -69,6 +69,8 @@ describe("QuestionFilterToolbar", () => {
     expect(closed.html).not.toContain("导入批次 ID");
     expect(open.html).toContain("全部有效题目");
     expect(open.html).toContain("导入批次 ID");
+    expect(toolbarLayer(open.nodes)).toContain("relative");
+    expect(toolbarLayer(open.nodes)).toContain("z-20");
   });
 
   it("renders the coverage jump filter and clear action only when present", () => {
@@ -82,3 +84,11 @@ describe("QuestionFilterToolbar", () => {
     expect(withJump.html).toContain("知识点 #42");
   });
 });
+
+function toolbarLayer(nodes: Element[]) {
+  const root = nodes.find((node) => {
+    const className = node.props.className;
+    return typeof className === "string" && className.includes("space-y-3");
+  });
+  return String(root?.props.className ?? "");
+}

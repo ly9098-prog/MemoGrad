@@ -68,7 +68,7 @@ export function ReviewToolbar({
           role="tablist"
           aria-label="审核队列"
           onKeyDown={handleTabKeyDown}
-          className="inline-flex rounded-2xl border border-border bg-card p-1 shadow-sm"
+          className="inline-flex rounded-[10px] bg-secondary/55 p-1"
         >
           {REVIEW_TABS.map((item) => {
             const active = tab === item.value;
@@ -82,8 +82,8 @@ export function ReviewToolbar({
                 onClick={() => onTabChange(item.value)}
                 className={
                   active
-                    ? "inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-sm"
-                    : "inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
+                    ? "inline-flex h-10 items-center gap-2 rounded-[8px] bg-card px-4 text-sm font-semibold text-foreground shadow-sm"
+                    : "inline-flex h-10 items-center gap-2 rounded-[8px] px-4 text-sm font-medium text-muted-foreground transition hover:bg-card/65 hover:text-foreground"
                 }
               >
                 {tabIcons[item.value]}
@@ -94,7 +94,7 @@ export function ReviewToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span className="inline-flex h-9 min-w-[104px] items-center justify-center rounded-full border border-border bg-card px-4 tabular-nums">
+          <span className="inline-flex h-9 min-w-[104px] items-center justify-center rounded-[8px] bg-secondary/45 px-3 tabular-nums">
             共 <strong className="mx-1 text-foreground">{total ?? 0}</strong> 条
           </span>
           <Button
@@ -102,7 +102,7 @@ export function ReviewToolbar({
             size="sm"
             onClick={onRefresh}
             disabled={isFetching}
-            className="h-9 rounded-full px-3"
+            className="h-9 rounded-[8px] px-3 shadow-none"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
@@ -113,9 +113,9 @@ export function ReviewToolbar({
         </div>
       </div>
 
-      <div className="rounded-[1.35rem] border border-border bg-card/90 px-4 py-3 shadow-[0_8px_24px_rgba(40,60,90,0.055)]">
+      <div className="rounded-[10px] bg-secondary/30 px-3 py-2.5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <label className="flex h-11 w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-card px-4 shadow-sm transition focus-within:border-primary focus-within:shadow-[0_0_0_3px_var(--accent)] xl:max-w-md">
+          <label className="flex h-10 w-full min-w-0 items-center gap-3 rounded-[8px] bg-card px-3 transition focus-within:ring-2 focus-within:ring-ring/20 xl:max-w-md">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden="true" />
             <input
               type="text"
@@ -137,7 +137,7 @@ export function ReviewToolbar({
             ) : null}
           </label>
 
-          <div className="flex h-11 shrink-0 items-center gap-2 rounded-2xl border border-border bg-card px-3 shadow-sm">
+          <div className="flex h-10 shrink-0 items-center gap-2 rounded-[8px] bg-card px-3">
             <BookOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">
               科目
@@ -157,7 +157,7 @@ export function ReviewToolbar({
             variant="ghost"
             onClick={onResetFilters}
             disabled={!hasActiveFilters}
-            className="h-11 shrink-0 self-start rounded-2xl border border-border bg-card px-4 text-sm text-muted-foreground shadow-sm hover:border-primary/25 hover:bg-muted/40 disabled:opacity-45 xl:self-auto"
+            className="h-10 shrink-0 self-start rounded-[8px] bg-card px-4 text-sm text-muted-foreground hover:bg-card/70 disabled:opacity-45 xl:self-auto"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
             重置

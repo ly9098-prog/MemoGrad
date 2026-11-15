@@ -23,10 +23,10 @@ interface SeriesMeta {
 }
 
 const SERIES: SeriesMeta[] = [
-  { key: "users", dataKey: "users_new", label: "新增用户", color: "#4a6f8a", glow: "#9bb0bf" },
-  { key: "questions", dataKey: "questions_new", label: "新增题目", color: "#6d906d", glow: "#a8bea8" },
-  { key: "imports", dataKey: "imports_new", label: "导入批次", color: "#8b7c97", glow: "#b8afc1" },
-  { key: "audits", dataKey: "audits_total", label: "审计事件", color: "#b58a62", glow: "#d7b99b" },
+  { key: "users", dataKey: "users_new", label: "新增用户", color: "var(--primary)", glow: "var(--primary)" },
+  { key: "questions", dataKey: "questions_new", label: "新增题目", color: "var(--success)", glow: "var(--success)" },
+  { key: "imports", dataKey: "imports_new", label: "导入批次", color: "var(--warning)", glow: "var(--warning)" },
+  { key: "audits", dataKey: "audits_total", label: "审计事件", color: "var(--muted-foreground)", glow: "var(--muted-foreground)" },
 ];
 
 const VIEWBOX_HEIGHT = 318;
@@ -190,36 +190,31 @@ export function DashboardTrendChart({
   };
 
   return (
-    <div className="h-full min-w-0 rounded-2xl border border-border/60 bg-card/85 p-5 shadow-[0_6px_24px_rgba(37,61,89,0.05)] backdrop-blur-sm transition-shadow duration-300 hover:shadow-[0_10px_32px_rgba(37,61,89,0.075)]">
+    <div className="min-w-0 rounded-[18px] border border-border bg-card p-5 shadow-[var(--shadow-card)] transition-shadow duration-200 hover:shadow-[0_10px_32px_rgba(23,43,54,0.07)]">
       <style jsx global>{`
         @keyframes dashboard-shimmer {
           from { transform: translateX(-80%); }
           to { transform: translateX(440%); }
         }
       `}</style>
-      <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-display text-xl font-bold text-foreground">近日日活与内容变化</h3>
-            <span className="grid h-4 w-4 place-items-center rounded-full border border-border text-[9px] font-semibold text-muted-foreground/70">
-              i
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground/70">
-            {loading ? "正在加载运营趋势" : `最近 ${period === "7d" ? "7" : "30"} 天平台新增与审计事件`}
+          <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">运营趋势</h3>
+          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+            {loading ? "正在加载运营趋势" : `最近 ${period === "7d" ? "7" : "30"} 天新增用户、题目、导入与审计事件`}
           </p>
         </div>
 
-        <div className="flex shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/65 p-0.5 shadow-inner">
+        <div className="flex shrink-0 overflow-hidden rounded-[10px] border border-border bg-secondary/60 p-0.5">
           {(["7d", "30d"] as Period[]).map((item) => (
             <button
               type="button"
               key={item}
               onClick={() => onPeriodChange(item)}
-              className={`rounded-[9px] px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+              className={`rounded-[8px] px-3 py-1.5 text-[11px] font-semibold transition-all duration-200 ${
                 period === item
                   ? "bg-card text-accent-foreground shadow-sm ring-1 ring-primary/15"
-                  : "text-muted-foreground/70 hover:bg-card/50 hover:text-foreground"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground"
               }`}
             >
               {item === "7d" ? "最近 7 天" : "最近 30 天"}
@@ -236,10 +231,10 @@ export function DashboardTrendChart({
               type="button"
               key={item.key}
               onClick={() => setSeries((current) => ({ ...current, [item.key]: !current[item.key] }))}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium transition-all duration-200 ${
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-all duration-200 ${
                 enabled
-                  ? "border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-card"
-                  : "border-transparent text-muted-foreground/70 opacity-55 hover:opacity-80"
+                  ? "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary/50"
+                  : "border-transparent text-muted-foreground/60 opacity-55 hover:opacity-80"
               }`}
             >
               <span
@@ -253,14 +248,14 @@ export function DashboardTrendChart({
       </div>
 
       {loading ? (
-        <div className="relative h-[318px] overflow-hidden rounded-xl bg-muted/55 motion-reduce:animate-none">
+        <div className="relative h-[318px] overflow-hidden rounded-[12px] bg-secondary/40 motion-reduce:animate-none">
           <div className="absolute inset-y-0 -left-1/3 w-1/3 animate-[dashboard-shimmer_1.2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-card/80 to-transparent" />
         </div>
       ) : hasData ? (
-        <div ref={chartContainerRef} className="relative h-[318px] min-h-[318px] min-w-0 w-full overflow-hidden rounded-xl bg-card/30">
+        <div ref={chartContainerRef} className="relative h-[318px] min-h-[318px] min-w-0 w-full overflow-hidden rounded-[12px] bg-secondary/20">
           {hoveredRow && hoverIndex !== null ? (
             <div
-              className="pointer-events-none absolute top-3 z-20 min-w-40 -translate-x-1/2 rounded-2xl border border-border/60 bg-card/95 px-4 py-3 text-xs shadow-[0_14px_34px_rgba(37,61,89,0.14)] backdrop-blur-md transition-[left] duration-75"
+              className="pointer-events-none absolute top-3 z-20 min-w-40 -translate-x-1/2 rounded-[12px] border border-border bg-popover px-3.5 py-2.5 text-xs shadow-[var(--shadow-floating)] transition-[left] duration-75"
               style={{ left: `${Math.min(90, Math.max(10, tooltipLeft))}%` }}
             >
               <p className="mb-2 font-bold text-foreground">{hoveredRow.date}</p>
@@ -290,9 +285,9 @@ export function DashboardTrendChart({
           >
             <defs>
               <linearGradient id="dashboardUsersArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4a6f8a" stopOpacity="0.13" />
-                <stop offset="48%" stopColor="#4a6f8a" stopOpacity="0.055" />
-                <stop offset="100%" stopColor="#4a6f8a" stopOpacity="0.006" />
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.13" />
+                <stop offset="48%" stopColor="var(--primary)" stopOpacity="0.055" />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.006" />
               </linearGradient>
             </defs>
 
@@ -303,12 +298,12 @@ export function DashboardTrendChart({
                   x2={PLOT.left + chart.plotWidth}
                   y1={tick.y}
                   y2={tick.y}
-                  stroke="#e3e0da"
+                  stroke="var(--border)"
                   strokeOpacity="0.75"
                   strokeDasharray="4 5"
                   vectorEffect="non-scaling-stroke"
                 />
-                <text x={PLOT.left - 10} y={tick.y + 4} textAnchor="end" fontSize="11" fill="#8a9ba9">
+                <text x={PLOT.left - 10} y={tick.y + 4} textAnchor="end" fontSize="11" fill="var(--muted-foreground)">
                   {Math.round(tick.value)}
                 </text>
               </g>
@@ -323,12 +318,12 @@ export function DashboardTrendChart({
                     x2={x}
                     y1={PLOT.top}
                     y2={PLOT.top + PLOT_HEIGHT}
-                    stroke="#ece8e1"
+                    stroke="var(--border)"
                     strokeOpacity="0.62"
                     strokeDasharray="4 6"
                     vectorEffect="non-scaling-stroke"
                   />
-                  <text x={x} y={VIEWBOX_HEIGHT - 9} textAnchor="middle" fontSize="11" fill="#8a9ba9">
+                  <text x={x} y={VIEWBOX_HEIGHT - 9} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)">
                     {formatDateTick(rows[index]?.date ?? "")}
                   </text>
                 </g>
@@ -336,12 +331,10 @@ export function DashboardTrendChart({
             })}
 
             {series.users && chart.paths.users.area ? (
-              <path d={chart.paths.users.area} fill="url(#dashboardUsersArea)" opacity="0">
-                <animate attributeName="opacity" from="0" to="1" dur="560ms" begin="120ms" fill="freeze" />
-              </path>
+              <path d={chart.paths.users.area} fill="url(#dashboardUsersArea)" opacity="1" />
             ) : null}
 
-            {SERIES.map((meta, seriesIndex) => {
+            {SERIES.map((meta) => {
               if (!series[meta.key]) return null;
               const path = chart.paths[meta.key].line;
               if (!path) return null;
@@ -356,12 +349,7 @@ export function DashboardTrendChart({
                     strokeLinejoin="round"
                     opacity="0.055"
                     vectorEffect="non-scaling-stroke"
-                    pathLength={1}
-                    strokeDasharray="1"
-                    strokeDashoffset="1"
-                  >
-                    <animate attributeName="stroke-dashoffset" from="1" to="0" dur="760ms" begin={`${90 + seriesIndex * 70}ms`} fill="freeze" />
-                  </path>
+                  />
                   <path
                     d={path}
                     fill="none"
@@ -370,12 +358,7 @@ export function DashboardTrendChart({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     vectorEffect="non-scaling-stroke"
-                    pathLength={1}
-                    strokeDasharray="1"
-                    strokeDashoffset="1"
-                  >
-                    <animate attributeName="stroke-dashoffset" from="1" to="0" dur="760ms" begin={`${90 + seriesIndex * 70}ms`} fill="freeze" />
-                  </path>
+                  />
                 </g>
               );
             })}
@@ -386,7 +369,7 @@ export function DashboardTrendChart({
                 x2={hoveredX}
                 y1={PLOT.top}
                 y2={PLOT.top + PLOT_HEIGHT}
-                stroke="#2f74df"
+                stroke="var(--primary)"
                 strokeOpacity="0.24"
                 strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
@@ -401,7 +384,7 @@ export function DashboardTrendChart({
                   return (
                     <g key={`active-${meta.key}`}>
                       <circle cx={point.x} cy={point.y} r="8" fill={meta.glow} opacity="0.18" />
-                      <circle cx={point.x} cy={point.y} r="4.2" fill={meta.color} stroke="#fff" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                      <circle cx={point.x} cy={point.y} r="4.2" fill={meta.color} stroke="var(--card)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                     </g>
                   );
                 })
@@ -409,7 +392,7 @@ export function DashboardTrendChart({
           </svg>
         </div>
       ) : (
-        <div className="grid h-[318px] min-h-[318px] min-w-0 place-items-center rounded-xl border border-dashed border-border text-sm text-muted-foreground/70">
+        <div className="grid h-[318px] min-h-[318px] min-w-0 place-items-center rounded-[12px] border border-dashed border-border text-sm text-muted-foreground">
           暂无趋势数据
         </div>
       )}

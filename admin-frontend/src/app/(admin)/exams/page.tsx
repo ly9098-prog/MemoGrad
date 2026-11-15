@@ -265,7 +265,11 @@ export default function ExamPapersPage() {
       </MetricStrip>
 
       {canWrite ? (
-        <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div
+          aria-hidden={!showCreateForm}
+          inert={!showCreateForm}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+        >
           <div className="overflow-hidden">
             <ManagementPanel
               variant="quiet"

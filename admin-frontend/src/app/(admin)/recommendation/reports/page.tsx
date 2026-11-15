@@ -3,12 +3,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { FileSearch, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { Drawer } from "@/components/ui/drawer";
 import {
+  EmptyState,
+  ManagementNotice,
   ManagementPage,
   ManagementPageHeader,
+  ManagementPanel,
 } from "@/components/admin/management-ui";
 import { apiRequest } from "@/lib/api/client";
 import type {
@@ -51,33 +53,29 @@ function percent(v: number | undefined | null): string {
   return `${(Number(v) * 100).toFixed(1)}%`;
 }
 
-function KVCard({ title, items }: { title: string; items: [string, string][] }) {
+function SummaryStrip({ items }: { items: [string, string][] }) {
   return (
-    <Card>
-      <CardHeader className="text-sm font-bold text-foreground">{title}</CardHeader>
-      <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-3">
+    <div className="grid divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
         {items.map(([k, v]) => (
-          <div key={k} className="flex flex-col">
-            <span className="text-xs text-muted-foreground">{k}</span>
-            <span className="text-lg font-bold text-foreground">{v}</span>
+          <div key={k} className="min-w-0 px-5 py-4">
+            <span className="text-[11px] text-muted-foreground">{k}</span>
+            <span className="mt-1.5 block truncate text-[22px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-foreground" title={v}>{v}</span>
           </div>
         ))}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
 function Warnings({ warnings }: { warnings: string[] }) {
   if (!warnings || warnings.length === 0) return null;
   return (
-    <div className="rounded-2xl border border-destructive/20 bg-destructive-light/60 p-4">
-      <div className="mb-2 text-xs font-bold text-destructive">告警（{warnings.length}）</div>
-      <ul className="list-disc pl-5 text-sm text-muted-foreground">
+    <ManagementNotice className="mx-5 my-4" tone="danger" title={`告警（${warnings.length}）`}>
+      <ul className="list-disc pl-4">
         {warnings.map((w, i) => (
           <li key={i}>{w}</li>
         ))}
       </ul>
-    </div>
+    </ManagementNotice>
   );
 }
 
@@ -85,9 +83,14 @@ function DictRows({ rows, label }: { rows: Record<string, unknown>[] | undefined
   if (!rows || rows.length === 0) return null;
   const columns = Object.keys(rows[0] ?? {}).map((key) => ({ id: key, header: key, accessorKey: key }));
   return (
-    <div className="mt-4">
-      <div className="mb-2 text-xs font-bold text-muted-foreground">{label}</div>
-      <DataTable<Record<string, unknown>> data={rows} columns={columns} emptyText="无数据" />
+    <div className="border-t border-border/60">
+      <div className="bg-secondary/25 px-5 py-3 text-[11px] font-semibold text-muted-foreground">{label}</div>
+      <DataTable<Record<string, unknown>>
+        className="rounded-none border-0 bg-transparent"
+        data={rows}
+        columns={columns}
+        emptyText="无数据"
+      />
     </div>
   );
 }
@@ -127,9 +130,13 @@ export default function RecommendationReportsPage() {
       />
 
       {h && (
-        <>
-          <KVCard
-            title="健康度"
+        <ManagementPanel
+          title="健康度"
+          description="推荐日志、兜底、策略解析与向量召回的整体运行状态。"
+          icon={<FileSearch className="h-4 w-4" />}
+          contentClassName="p-0"
+        >
+          <SummaryStrip
             items={[
               ["推荐日志总数", String(h.total_recommendation_logs)],
               ["兜底率", percent(h.fallback_rate)],
@@ -144,17 +151,22 @@ export default function RecommendationReportsPage() {
           <Warnings warnings={h.warnings} />
           <DictRows rows={h.top_fallback_scenes} label="兜底场景 Top" />
           <DictRows rows={h.top_error_strategies} label="出错策略 Top" />
-        </>
+        </ManagementPanel>
       )}
 
       {quality.data && (
-        <>
-          <KVCard title="推荐质量" items={summaryItems(quality.data.summary, QUALITY_SUMMARY_LABELS)} />
+        <ManagementPanel
+          title="推荐质量"
+          description="观察推荐覆盖、相似度和兜底比例，并定位高频异常场景。"
+          contentClassName="p-0"
+        >
+          <SummaryStrip items={summaryItems(quality.data.summary, QUALITY_SUMMARY_LABELS)} />
           <Warnings warnings={quality.data.warnings} />
           {quality.data.hot_questions && quality.data.hot_questions.length > 0 && (
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-bold text-muted-foreground">热门题目</div>
+            <div className="border-t border-border/60">
+              <div className="bg-secondary/25 px-5 py-3 text-[11px] font-semibold text-muted-foreground">热门题目</div>
               <DataTable<Record<string, unknown>>
+                className="rounded-none border-0 bg-transparent"
                 data={quality.data.hot_questions}
                 emptyText="无数据"
                 columns={[
@@ -185,28 +197,29 @@ export default function RecommendationReportsPage() {
           )}
           <DictRows rows={quality.data.high_fallback_scenes} label="高兜底场景" />
           <DictRows rows={quality.data.low_similarity_samples} label="低相似样本" />
-        </>
+        </ManagementPanel>
       )}
 
       {knowledge.data && (
-        <>
-          <KVCard
-            title="知识图谱质量"
-            items={summaryItems(knowledge.data.summary, KNOWLEDGE_SUMMARY_LABELS)}
-          />
+        <ManagementPanel
+          title="知识图谱质量"
+          description="检查知识点连接、孤立节点与前驱循环，避免推荐路径失真。"
+          contentClassName="p-0"
+        >
+          <SummaryStrip items={summaryItems(knowledge.data.summary, KNOWLEDGE_SUMMARY_LABELS)} />
           <Warnings warnings={knowledge.data.warnings} />
           <DictRows rows={knowledge.data.isolated_knowledge_points} label="孤立知识点" />
           <DictRows rows={knowledge.data.low_question_count_points} label="低题量知识点" />
-        </>
+        </ManagementPanel>
       )}
 
       {!health.isLoading && !health.data && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground/70">
+        <ManagementPanel variant="quiet" contentClassName="p-0">
+          <EmptyState>
             <FileSearch className="mx-auto mb-2 h-6 w-6" />
             暂无健康报告数据（可能推荐日志为空）
-          </CardContent>
-        </Card>
+          </EmptyState>
+        </ManagementPanel>
       )}
 
       <Drawer

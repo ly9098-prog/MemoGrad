@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ClipboardCheck } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MessageToast } from "@/components/ui/message-toast";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { hasPermission } from "@/lib/permissions/permissions";
@@ -425,24 +425,25 @@ export default function ReviewPage() {
         canBatchReview && validSelectedIds.size > 0 ? "pb-28" : "pb-10"
       }`}
     >
-      <Card className="overflow-visible border border-border bg-card/90 shadow-[var(--shadow-card)]">
-        <CardHeader className="space-y-4 pb-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold text-foreground">
-              审核工作台
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              处理已入库题目的重审、驳回恢复与版本回滚。首次导入审核请前往{" "}
-              <Link
-                href="/imports/review"
-                className="font-semibold text-accent-foreground underline decoration-primary/35 underline-offset-2 transition hover:decoration-primary"
-              >
-                待审核题目
-              </Link>
-              。
-            </p>
-          </div>
-
+      <ManagementPageHeader
+        icon={<ClipboardCheck className="h-4 w-4" />}
+        title="审核工作台"
+        description={
+          <>
+            处理已入库题目的重审、驳回恢复与版本回滚。首次导入审核请前往{" "}
+            <Link
+              href="/imports/review"
+              className="font-semibold text-primary underline decoration-primary/30 underline-offset-2 transition hover:decoration-primary"
+            >
+              待审核题目
+            </Link>
+            。
+          </>
+        }
+        meta={<span>批量操作上限 50 项；拒绝与回滚需填写原因。</span>}
+      />
+      <section className="overflow-visible rounded-[16px] border border-border bg-card shadow-[var(--shadow-card)]">
+        <div className="border-b border-border px-4 py-4 lg:px-5">
           <ReviewToolbar
             tab={tab}
             onTabChange={handleTabChange}
@@ -459,9 +460,9 @@ export default function ReviewPage() {
               void questions.refetch();
             }}
           />
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-4">
+        <div className="space-y-4 p-4 lg:p-5">
           {batchResult ? (
             <ReviewBatchResult
               decision={batchResult.decision}
@@ -514,8 +515,8 @@ export default function ReviewPage() {
             }}
             onPageSizeChange={handlePageSizeChange}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {canBatchReview ? (
         <ReviewBatchSelectionBar

@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import type { FormulaCategoryNode } from "@/components/formulas/formula-category-picker";
@@ -72,37 +79,30 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
     return null;
   }
 
-  const dialog = (
-    <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-start justify-center bg-[rgba(16,24,40,0.42)] backdrop-blur-[2px] pt-[15vh]"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="w-full max-w-md animate-drop-in rounded-2xl border border-border bg-card p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-lg font-bold text-foreground">{title}</h3>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-muted">
-            <X className="h-4 w-4 mx-auto" />
-          </button>
-        </div>
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="admin-content-theme max-w-md">
+        <DialogHeader className="pr-8">
+          <DialogTitle className="font-sans text-lg font-bold">{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            创建公式分类节点并设置编码和名称。
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="mt-4 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">编码（英文）*</label>
+            <label htmlFor="formula-category-code" className="text-xs font-semibold text-muted-foreground">编码（英文）*</label>
             <Input
+              id="formula-category-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="例如：chapter1_limits"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">名称 *</label>
+            <label htmlFor="formula-category-name" className="text-xs font-semibold text-muted-foreground">名称 *</label>
             <Input
+              id="formula-category-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：函数、极限与连续"
@@ -118,20 +118,17 @@ export function FormulaCategoryDialog({ parentNode, onClose }: Props) {
             <p className="text-sm text-destructive">{error}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <DialogFooter>
             <Button variant="secondary" onClick={onClose}>
-              <X className="h-3.5 w-3.5" /> 取消
+              取消
             </Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending}>
               <Save className="h-3.5 w-3.5" />
               {createMutation.isPending ? "创建中..." : "创建"}
             </Button>
-          </div>
+          </DialogFooter>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  if (typeof document === "undefined") return dialog;
-  return createPortal(dialog, document.body);
 }

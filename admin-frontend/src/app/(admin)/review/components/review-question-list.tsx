@@ -110,13 +110,13 @@ function ReviewRow({
 
   return (
     <article
-      className={
+      className={`group border-l-2 transition-colors duration-150 motion-reduce:transition-none ${
         checked
-          ? "group rounded-[1.2rem] border border-primary bg-accent/25 shadow-sm transition-all duration-200"
-          : "group rounded-[1.2rem] border border-border bg-card/85 shadow-sm transition-all duration-200 hover:border-primary/45 hover:bg-card hover:shadow-[var(--shadow-card)]"
-      }
+          ? "border-primary bg-accent/30"
+          : "border-transparent hover:bg-secondary/30"
+      }`}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start gap-3 px-4 py-3.5">
         {canSelect ? (
           <CustomCheckbox
             checked={checked}
@@ -212,11 +212,11 @@ function ReviewRow({
 
 function LoadingRows() {
   return (
-    <div className="space-y-2.5" aria-hidden="true">
+    <div className="divide-y divide-border border-y border-border" aria-hidden="true">
       {Array.from({ length: 5 }, (_, index) => (
         <div
           key={index}
-          className="h-[104px] animate-pulse rounded-[1.2rem] border border-border bg-card/60"
+          className="h-[104px] animate-pulse bg-secondary/25"
         />
       ))}
     </div>
@@ -265,7 +265,7 @@ export function ReviewQuestionList({
 
   return (
     <section className="space-y-3" aria-busy={isFetching}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-border bg-card px-3 py-2.5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-secondary/20 px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {canBatchReview ? (
             <CustomCheckbox
@@ -299,27 +299,29 @@ export function ReviewQuestionList({
 
       {isLoading ? <LoadingRows /> : null}
 
-      <div
-        className={`space-y-2.5 ${animateEnter ? "stagger-enter" : ""}`}
-      >
-        {items.map((question) => (
-          <ReviewRow
-            key={question.id}
-            question={question}
-            tab={tab}
-            checked={selectedIds.has(question.id)}
-            canSelect={canBatchReview}
-            canReview={canReview}
-            onToggle={() => onToggleOne(question.id)}
-            onOpenPreview={() => onOpenPreview(question.id)}
-            onApprove={() => onApprove(question.id)}
-            onReject={() => onReject(question.id)}
-          />
-        ))}
-      </div>
+      {items.length > 0 ? (
+        <div
+          className={`divide-y divide-border border-y border-border ${animateEnter ? "stagger-enter" : ""}`}
+        >
+          {items.map((question) => (
+            <ReviewRow
+              key={question.id}
+              question={question}
+              tab={tab}
+              checked={selectedIds.has(question.id)}
+              canSelect={canBatchReview}
+              canReview={canReview}
+              onToggle={() => onToggleOne(question.id)}
+              onOpenPreview={() => onOpenPreview(question.id)}
+              onApprove={() => onApprove(question.id)}
+              onReject={() => onReject(question.id)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {emptyVisible ? (
-        <div className="flex flex-col items-center gap-3 rounded-[1.6rem] border border-dashed border-border bg-card/60 py-16 text-center animate-fade-in">
+        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-border bg-secondary/20 py-14 text-center animate-fade-in">
           <EmptyIcon className="h-12 w-12 text-muted-foreground/70" aria-hidden="true" />
           <p className="text-sm font-semibold text-muted-foreground">
             {hasActiveFilters
@@ -344,7 +346,7 @@ export function ReviewQuestionList({
       ) : null}
 
       {isError ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-destructive/30 bg-destructive-light/60 py-12 text-center animate-fade-in">
+        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-destructive/30 bg-destructive-light/45 py-12 text-center animate-fade-in">
           <AlertCircle className="h-9 w-9 text-destructive" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-destructive">{errorTitle}</p>

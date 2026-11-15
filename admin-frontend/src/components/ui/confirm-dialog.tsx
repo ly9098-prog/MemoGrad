@@ -58,6 +58,7 @@ export function ConfirmDialog({
     >
       <DialogContent
         ref={dialogRef}
+        className="admin-content-theme"
         showCloseButton={false}
         data-confirm-dialog="true"
         onEscapeKeyDown={(event) => {
@@ -81,7 +82,9 @@ export function ConfirmDialog({
           }
         }}
       >
-        <DialogTitle>{title}</DialogTitle>
+        <DialogTitle className="font-sans text-xl font-semibold tracking-[-0.02em]">
+          {title}
+        </DialogTitle>
         {description ? <DialogDescription>{description}</DialogDescription> : null}
         {children ? <div className="mt-4">{children}</div> : null}
         <DialogFooter>

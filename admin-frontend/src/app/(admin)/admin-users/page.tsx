@@ -503,10 +503,10 @@ export default function AdminUsersPage() {
         </div>
       ) : null}
 
-      <Card className="overflow-visible rounded-2xl">
-        <CardContent className="p-4 lg:p-5">
-          <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
-            <label className="relative min-w-0 flex-1 2xl:max-w-sm">
+      <Card className="overflow-hidden rounded-2xl">
+        <div className="border-b border-border/70 bg-secondary/20 p-4 lg:p-5">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <label className="relative min-w-0 flex-1 xl:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 className="h-11 bg-card pl-9"
@@ -516,7 +516,7 @@ export default function AdminUsersPage() {
               />
             </label>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[160px_160px_minmax(300px,1fr)] 2xl:flex 2xl:items-center">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:flex xl:items-center">
               <CustomSelect
                 value={roleFilter}
                 onChange={(value) => {
@@ -525,7 +525,7 @@ export default function AdminUsersPage() {
                 }}
                 options={roleOptions}
                 placeholder="全部角色"
-                className="w-full 2xl:w-40"
+                className="w-full xl:w-40"
               />
               <CustomSelect
                 value={statusFilter}
@@ -535,9 +535,9 @@ export default function AdminUsersPage() {
                 }}
                 options={STATUS_OPTIONS}
                 clearable={false}
-                className="w-full 2xl:w-40"
+                className="w-full xl:w-40"
               />
-              <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 2xl:w-[310px]">
+              <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 xl:w-[310px]">
                 <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                 <input
                   type="date"
@@ -569,7 +569,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 2xl:ml-auto">
+            <div className="flex items-center gap-2 xl:ml-auto">
               {hasFilters ? (
                 <Button variant="secondary" onClick={clearFilters} className="h-11 px-3 shadow-none">
                   清除
@@ -580,10 +580,7 @@ export default function AdminUsersPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="overflow-hidden rounded-2xl">
+        </div>
         <CardContent className="p-0">
           {users.isError ? (
             <div className="m-4 flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive-light px-4 py-3 text-sm text-destructive">

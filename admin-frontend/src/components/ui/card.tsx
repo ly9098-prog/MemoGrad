@@ -5,7 +5,7 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
   return (
     <section
       data-slot="card"
-      className={cn("surface-card rounded-3xl text-card-foreground", className)}
+      className={cn("surface-card rounded-[16px] text-card-foreground", className)}
       {...props}
     />
   );

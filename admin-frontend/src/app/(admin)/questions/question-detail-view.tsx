@@ -15,7 +15,6 @@ import {
 import type { AdminQuestion } from "@/lib/api/types";
 import { QuestionAnswerDisplay } from "./components/question-answer-display";
 import { DifficultyBadge } from "./components/question-difficulty-badge";
-import { QuestionSecondaryInfo } from "./components/question-secondary-info";
 import { TypeBadge } from "./components/question-type-badge";
 import { textFromContent } from "./question-content-editing";
 import {
@@ -130,7 +129,6 @@ export function QuestionDetailView({ question }: QuestionDetailViewProps) {
         </div>
         <QuestionKnowledgePointsDisplay value={question.knowledge_points} />
       </section>
-      <QuestionSecondaryInfo question={question} />
     </div>
   );
 }

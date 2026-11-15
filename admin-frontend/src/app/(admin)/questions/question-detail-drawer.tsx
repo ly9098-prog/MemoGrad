@@ -1,7 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import {
+  isFocusPassthroughTarget,
+  isTopModalSurface,
+} from "@/lib/modal-focus";
 import { QuestionDrawerHeader } from "./question-drawer-header";
 
 type QuestionDetailDrawerProps = {
@@ -33,6 +37,31 @@ export function QuestionDetailDrawer({
   onClose,
   children,
 }: QuestionDetailDrawerProps) {
+  const drawerRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open || questionId === null) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    drawer.focus();
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (drawer.contains(event.target as Node)) return;
+      if (isFocusPassthroughTarget(event.target)) return;
+      if (!isTopModalSurface(drawer)) return;
+      drawer.focus();
+    };
+
+    document.addEventListener("focusin", handleFocusIn);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      previousFocusRef.current?.focus();
+    };
+  }, [open, questionId]);
+
   if (!open || questionId === null) return null;
 
   const drawer = (
@@ -41,10 +70,12 @@ export function QuestionDetailDrawer({
       onClick={onClose}
     >
       <aside
+        ref={drawerRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={editing ? "编辑题目" : "题目详情"}
-        className="question-detail-drawer h-full w-full max-w-[880px] overflow-y-auto overscroll-contain border-l border-border/80 bg-card shadow-[-18px_0_52px_rgba(15,23,42,0.12)] animate-drop-in"
+        className="question-detail-drawer admin-content-theme h-full w-full max-w-[880px] overflow-y-auto overscroll-contain border-l border-border/80 bg-card shadow-[-18px_0_52px_rgba(15,23,42,0.12)] animate-drop-in"
         onClick={(event) => event.stopPropagation()}
       >
         <QuestionDrawerHeader

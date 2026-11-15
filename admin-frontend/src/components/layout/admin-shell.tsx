@@ -94,7 +94,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return (
       <div className={styles.shell}>
         <SidebarSkeleton />
-        <main className={styles.workspace}>
+        <main className={`${styles.workspace} admin-content-theme`}>
           <MainContentSkeleton />
         </main>
       </div>
@@ -124,7 +124,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </button>
       )}
       <main
-        className={`${styles.workspace} ${
+        className={`${styles.workspace} admin-content-theme ${
           isFocusedFormulaEditor
             ? "p-0"
             : "px-4 pb-6 pt-16 lg:px-8 lg:py-8 [&>*]:min-w-0 [&>*]:w-full"
