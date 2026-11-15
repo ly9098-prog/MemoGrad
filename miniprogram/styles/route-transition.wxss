@@ -1,21 +1,21 @@
 .route-enter {
-  animation: route-content-enter 180ms cubic-bezier(.16, 1, .3, 1);
+  animation: route-content-enter 180ms cubic-bezier(.16, 1, .3, 1) backwards;
 }
 
 .route-enter-page {
-  animation: route-content-enter-page 250ms cubic-bezier(.16, 1, .3, 1);
+  animation: route-content-enter-page 250ms cubic-bezier(.16, 1, .3, 1) backwards;
 }
 
 .route-enter-detail {
-  animation: route-content-enter-detail 240ms cubic-bezier(.16, 1, .3, 1);
+  animation: route-content-enter-detail 240ms cubic-bezier(.16, 1, .3, 1) backwards;
 }
 
 .route-enter-task {
-  animation: route-content-enter-task 180ms cubic-bezier(.16, 1, .3, 1);
+  animation: route-content-enter-task 180ms cubic-bezier(.16, 1, .3, 1) backwards;
 }
 
 .route-enter-opacity {
-  animation: route-content-enter 160ms cubic-bezier(.16, 1, .3, 1);
+  animation: route-content-enter 160ms cubic-bezier(.16, 1, .3, 1) backwards;
 }
 
 @keyframes route-content-enter {

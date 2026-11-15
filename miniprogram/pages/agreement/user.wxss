@@ -283,7 +283,3 @@ page {
 
 .delay-one { animation-delay: .05s; }
 .delay-two { animation-delay: .10s; }
-
-@media (prefers-reduced-motion: reduce) {
-  .wechat-login-btn { animation: none !important; }
-}

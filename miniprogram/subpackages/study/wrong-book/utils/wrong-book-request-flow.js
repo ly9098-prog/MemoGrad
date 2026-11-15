@@ -104,6 +104,7 @@ aiInsightText: pageContext.data.aiDiagnosis
 hasMore: page < data.total_pages,
 page: reset ? 2 : page + 1,
 loading: false,
+contentEntered: true,
 })
 pageContext._syncSelectionState()
 if (reset) pageContext.loadTaskFlow()

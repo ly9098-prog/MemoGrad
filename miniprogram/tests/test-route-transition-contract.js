@@ -12,10 +12,10 @@ function read(...segments) {
 test('route transition styles provide classified enter animations', () => {
   const styles = read('styles', 'route-transition.wxss')
 
-  assert.match(styles, /\.route-enter-page\s*\{[^}]+animation:\s*route-content-enter-page 250ms/)
-  assert.match(styles, /\.route-enter-detail\s*\{[^}]+animation:\s*route-content-enter-detail 240ms/)
-  assert.match(styles, /\.route-enter-task\s*\{[^}]+animation:\s*route-content-enter-task 180ms/)
-  assert.match(styles, /\.route-enter-opacity\s*\{[^}]+animation:\s*route-content-enter 160ms/)
+  assert.match(styles, /\.route-enter-page\s*\{[^}]+animation:\s*route-content-enter-page 250ms[^;]+backwards/)
+  assert.match(styles, /\.route-enter-detail\s*\{[^}]+animation:\s*route-content-enter-detail 240ms[^;]+backwards/)
+  assert.match(styles, /\.route-enter-task\s*\{[^}]+animation:\s*route-content-enter-task 180ms[^;]+backwards/)
+  assert.match(styles, /\.route-enter-opacity\s*\{[^}]+animation:\s*route-content-enter 160ms[^;]+backwards/)
   assert.match(styles, /cubic-bezier\(\.16, 1, \.3, 1\)/)
 })
 
@@ -38,7 +38,7 @@ test('first batch pages use transition classes without return replay', () => {
   assert.ok(read('subpackages', 'exam', 'paper-list', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'history', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'result', 'index.wxml').includes('route-enter-opacity'))
-  assert.ok(read('subpackages', 'study', 'study-plan', 'index.wxml').includes('route-enter-page'))
+  assert.ok(read('subpackages', 'study', 'study-plan', 'index.wxml').includes('route-enter-opacity'))
 })
 
 test('remaining pages use a single classified transition system', () => {
@@ -55,11 +55,11 @@ test('remaining pages use a single classified transition system', () => {
     'subpackages/knowledge/knowledge-detail/index.wxml': ['route-enter-opacity'],
     'subpackages/productivity/pomodoro-stats/index.wxml': ['route-enter-opacity'],
     'subpackages/study/practice/practice.wxml': ['route-enter-task'],
-    'subpackages/study/wrong-book/wrong-book.wxml': ['route-enter-page'],
-    'subpackages/study/wrong-detail/wrong-detail.wxml': ['route-enter-detail'],
+    'subpackages/study/wrong-book/wrong-book.wxml': ['route-enter-opacity'],
+    'subpackages/study/wrong-detail/wrong-detail.wxml': ['route-enter-opacity'],
     'subpackages/study/review-today/review-today.wxml': ['route-enter-task'],
     'subpackages/study/practice-result/index.wxml': ['route-enter-page'],
-    'subpackages/exam/exam-runner/index.wxml': ['route-enter-task'],
+    'subpackages/exam/exam-runner/index.wxml': ['route-enter-opacity'],
   }
 
   for (const [file, expected] of Object.entries(cases)) {
@@ -86,10 +86,24 @@ test('legacy page-enter definitions are removed after migration', () => {
     const source = read(...file.split('/'))
     assert.doesNotMatch(source, /\.page-enter|@keyframes pageEnter/)
   }
+  assert.doesNotMatch(read('pages', 'agreement', 'user.wxss'), /\.wechat-login-btn/)
 })
 
 test('study plan refreshes silently on return without toggling route enter', () => {
   const page = read('subpackages', 'study', 'study-plan', 'index.js')
   assert.match(page, /onShow\(\) \{[\s\S]*if \(this\._loadedOnce\) this\.loadOverview\(\{ silent: true \}\)/)
   assert.match(page, /async loadOverview\(options = \{\}\) \{[\s\S]*const silent = options\.silent === true/)
+})
+
+test('wrong book enters once and does not replay after an empty refresh', () => {
+  const markup = read('subpackages', 'study', 'wrong-book', 'wrong-book.wxml')
+  const page = read('subpackages', 'study', 'wrong-book', 'wrong-book.js')
+  const lifecycle = read('subpackages', 'study', 'wrong-book', 'utils', 'wrong-book-lifecycle.js')
+  const requestFlow = read('subpackages', 'study', 'wrong-book', 'utils', 'wrong-book-request-flow.js')
+
+  assert.match(markup, /\{\{contentEntered \? 'route-enter-opacity' : ''\}\}/)
+  assert.doesNotMatch(page, /contentEntered/)
+  assert.match(lifecycle, /contentEntered: false/)
+  assert.match(lifecycle, /contentEntered: true/)
+  assert.match(requestFlow, /loading: false,\s*contentEntered: true,\s*\}\)/)
 })
