@@ -102,7 +102,7 @@
 
       <view wx:if="{{!guestMode}}" class="focus-metrics">
         <view class="metric-item">
-          <view class="metric-value reveal-metric" aria-label="到期复习 {{dueReviewCount}}">
+          <view class="metric-value reveal-metric" aria-label="到期复习 {{_animDueReviewCount}}">
             <block wx:for="{{_animDueReviewSegments}}" wx:key="key">
               <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
             </block>
@@ -196,7 +196,7 @@
         <view class="route-copy">
           <text class="route-eyebrow">记忆复习</text>
           <text class="route-title">今日复习</text>
-          <text class="route-desc">{{guestMode ? '登录后查看个人复习计划' : (dueReviewCount > 0 ? dueReviewCount + ' 道错题正处于最佳复习窗口' : '暂无到期任务，也可以提前巩固')}}</text>
+          <text class="route-desc">{{guestMode ? '登录后查看个人复习计划' : (_animDueReviewCount > 0 ? _animDueReviewCount + ' 道错题正处于最佳复习窗口' : '暂无到期任务，也可以提前巩固')}}</text>
         </view>
         <view class="route-arrow">→</view>
       </view>

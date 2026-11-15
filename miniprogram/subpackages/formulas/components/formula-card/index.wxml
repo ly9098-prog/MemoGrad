@@ -1,6 +1,15 @@
 <view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
-  <view class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}" bindtap="toggleCardFlip">
-    <view class="fc-flip-face fc-flip-front">
+  <view
+    class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}"
+    bindtap="toggleCardFlip"
+    catchtouchstart="onFormulaTouchStart"
+    catchtouchend="onFormulaTouchEnd"
+    catchtouchcancel="onFormulaTouchEnd"
+    role="button"
+    aria-label="{{isFlipped ? '返回公式卡封面' : '翻面查看公式与记忆提示'}}"
+    aria-expanded="{{isFlipped}}"
+  >
+    <view class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
       <view class="fc-header">
         <text class="fc-kicker">MEMORY NOTE · {{card.studyCardTypeLabel || '速记'}}</text>
         <rich-text
@@ -14,7 +23,7 @@
       </view>
       <view class="fc-flip-hint" aria-hidden="true">点击翻面查看公式与记忆提示</view>
     </view>
-    <view class="fc-flip-face fc-flip-back">
+    <view class="fc-flip-face fc-flip-back" aria-hidden="{{!isFlipped}}">
       <view class="fc-section-heading">
         <view>
           <text class="fc-section-kicker">MEMORY BACK</text>
@@ -22,9 +31,15 @@
         </view>
         <view class="fc-core-mark">Σ</view>
       </view>
-      <view class="fc-flip-back-section" wx:if="{{content.secondaryNodes && content.secondaryNodes.length}}">
-        <text class="fc-flip-back-label">核心结论</text>
-        <rich-text class="fc-rich-text" nodes="{{content.secondaryNodes}}" user-select="{{true}}" />
+      <view class="fc-flip-back-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
+        <text class="fc-flip-back-label">核心公式</text>
+        <view class="fc-formula-list">
+          <view class="fc-formula-row" wx:for="{{formulaBlocks}}" wx:for-item="block" wx:key="_key">
+            <view class="fc-reading-line {{block.hasWideRows ? 'is-long' : ''}}">
+              <rich-text class="fc-formula-rich" nodes="{{block.readingRows[0].lineItems[0].mathNodes}}" user-select="{{true}}" />
+            </view>
+          </view>
+        </view>
       </view>
       <view class="fc-flip-back-section" wx:if="{{content.symbolNotesNodes && content.symbolNotesNodes.length}}">
         <text class="fc-flip-back-label">变量含义</text>

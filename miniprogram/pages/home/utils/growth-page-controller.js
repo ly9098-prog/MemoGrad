@@ -177,11 +177,11 @@ const growthPageMethods = {
     growthAnimation.start(this)
     numberReveal.start(this, {
       fields: [
-        { name: 'dueReviewCount', segmentsKey: '_animDueReviewSegments' },
+        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
         { name: '_animStreakDays', segmentsKey: '_animStreakSegments' },
       ],
       to: {
-        dueReviewCount: this._growthTargets.dueReviewCount,
+        _animDueReviewCount: this._growthTargets.dueReviewCount,
         _animStreakDays: this._growthTargets.streakDays || 0,
       },
       durations: numberReveal.DEFAULT_DURATIONS,
@@ -253,6 +253,7 @@ const growthPageMethods = {
 
 function clearGrowthLifecycleTimers(page) {
   growthAnimation.clear(page)
+  numberReveal.finish(page)
   masteryRadar.clear(page)
 }
 

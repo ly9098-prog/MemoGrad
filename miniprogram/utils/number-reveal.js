@@ -42,6 +42,11 @@ function buildDisplay(field, value) {
   return buildNumberSegments(value)
 }
 
+function commitDisplayPatch(patch, field, value) {
+  patch[field.name] = value
+  if (field.segmentsKey) patch[field.segmentsKey] = buildDisplay(field, value)
+}
+
 function updateField(options) {
   const { values, field, fromValue, toValue, duration, elapsed } = options
   if (fromValue === toValue) return true
@@ -76,6 +81,7 @@ function tick(page, state) {
   if (Object.keys(patch).length) page.setData(patch)
   if (complete.every(Boolean)) {
     page._numberRevealTimer = null
+    page._numberRevealState = null
     return
   }
   page._numberRevealTimer = setTimeout(() => tick(page, state), FRAME_INTERVAL_MS)
@@ -86,13 +92,38 @@ function clear(page) {
     clearTimeout(page._numberRevealTimer)
     page._numberRevealTimer = null
   }
+  page._numberRevealState = null
+}
+
+function finish(page) {
+  const state = page._numberRevealState
+  clear(page)
+  if (!state) return false
+  const patch = {}
+  state.fields.forEach((field) => {
+    commitDisplayPatch(patch, field, toDisplayNumber(state.to[field.name]))
+  })
+  page.setData(patch)
+  return true
 }
 
 function start(page, options) {
   clear(page)
   const fields = options.fields || []
-  const unchanged = fields.every((field) => page.data[field.name] === options.to[field.name])
-  if (unchanged) return false
+  const fieldsNeedingAnimation = fields.filter((field) => (
+    page.data[field.name] !== options.to[field.name] ||
+    !hasDisplaySegments(page.data, field)
+  ))
+  const initialPatch = {}
+  fields.forEach((field) => {
+    const toValue = toDisplayNumber(options.to[field.name])
+    const currentValue = toDisplayNumber(page.data[field.name])
+    if (toValue !== currentValue || !hasDisplaySegments(page.data, field)) {
+      commitDisplayPatch(initialPatch, field, currentValue)
+    }
+  })
+  if (Object.keys(initialPatch).length) page.setData(initialPatch)
+  if (!fieldsNeedingAnimation.length) return false
   const state = {
     fields,
     from: fields.reduce((result, field) => {
@@ -103,8 +134,13 @@ function start(page, options) {
     durations: options.durations || DEFAULT_DURATIONS,
     startTime: Date.now(),
   }
+  page._numberRevealState = state
   page._numberRevealTimer = setTimeout(() => tick(page, state), FRAME_INTERVAL_MS)
   return true
+}
+
+function hasDisplaySegments(data, field) {
+  return Array.isArray(data[field.segmentsKey]) && data[field.segmentsKey].length > 0
 }
 
 module.exports = {
@@ -112,6 +148,7 @@ module.exports = {
   buildNumberSegments,
   buildPercentSegments,
   clear,
+  finish,
   start,
   tick,
 }

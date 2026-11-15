@@ -96,7 +96,7 @@
 
           <view class="hero-metrics">
             <view class="hero-metric">
-              <view class="hero-metric-value reveal-metric" aria-label="累计正确 {{trend ? trend.totalQuestions : hero.totalQuestions}}">
+              <view class="hero-metric-value reveal-metric" aria-label="累计正确 {{hero.totalCorrect}}">
                 <block wx:for="{{_animTotalCorrectSegments}}" wx:key="key">
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>

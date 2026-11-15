@@ -437,7 +437,7 @@ Page({
     this._gaugeTimer = null
     clearTimeout(this._growthTimer)
     this._growthTimer = null
-    numberReveal.clear(this)
+    numberReveal.finish(this)
     clearTimeout(this._adaptiveTimer)
     this._adaptiveTimer = null
     // Requests invalidated above will intentionally skip their completion
@@ -480,7 +480,7 @@ Page({
     this._gaugeTimer = null
     clearTimeout(this._growthTimer)
     this._growthTimer = null
-    numberReveal.clear(this)
+    numberReveal.finish(this)
     clearTimeout(this._adaptiveTimer)
     this._adaptiveTimer = null
   },
@@ -1097,7 +1097,7 @@ Page({
       to: {
         _animTodayQuestions: hero.todayQuestions || 0,
         _animTotalCorrect: hero.totalCorrect || 0,
-        _animConsecutiveDays: trend ? trend.activeDays : hero.consecutiveDays,
+        _animConsecutiveDays: hero.consecutiveDays || 0,
         _animAccuracy: trend ? trend.avgAccuracyPct : hero.totalAccuracyPct,
         _animDueReviewCount: hero.dueReviewCount || 0,
       },

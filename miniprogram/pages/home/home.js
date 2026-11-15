@@ -42,7 +42,7 @@ Page({
     goalOptions: GOAL_OPTIONS,
     showGoalPicker: false,
 
-    dueReviewCount: 0,
+    _animDueReviewCount: 0,
     remainingCount: TODAY_GOAL_TOTAL,
     primaryTaskType: 'practice',
     primaryTaskKicker: 'TODAY PLAN · 优先级 01',

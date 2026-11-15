@@ -25,9 +25,13 @@ test('number reveal starts only when values actually change and reaches targets'
     _visible: true,
     data: {
       _animTotalCorrect: 12,
+      _animTotalCorrectSegments: numberReveal.buildNumberSegments(12),
       _animConsecutiveDays: 4,
+      _animConsecutiveSegments: numberReveal.buildNumberSegments(4),
       _animAccuracy: 68,
+      _animAccuracySegments: numberReveal.buildPercentSegments(68),
       _animDueReviewCount: 2,
+      _animDueReviewSegments: numberReveal.buildNumberSegments(2),
     },
     patches: [],
     setData(patch, callback) {
@@ -78,4 +82,67 @@ test('number reveal starts only when values actually change and reaches targets'
       resolve()
     }, 220)
   })
+})
+
+test('number reveal republishes zero and unchanged displays before animating', () => {
+  const page = {
+    _alive: true,
+    _visible: true,
+    data: {
+      _animTodayQuestions: 0,
+      _animTodayQuestionsSegments: [],
+      _animTotalCorrect: 0,
+      _animTotalCorrectSegments: [],
+      _animConsecutiveDays: 0,
+      _animConsecutiveSegments: [],
+      _animAccuracy: 0,
+      _animAccuracySegments: [],
+      _animDueReviewCount: 0,
+      _animDueReviewSegments: [],
+    },
+    setData(patch) { Object.assign(this.data, patch) },
+  }
+  const fields = [
+    { name: '_animTodayQuestions', segmentsKey: '_animTodayQuestionsSegments' },
+    { name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments' },
+    { name: '_animConsecutiveDays', segmentsKey: '_animConsecutiveSegments' },
+    { name: '_animAccuracy', kind: 'percent', segmentsKey: '_animAccuracySegments' },
+    { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
+  ]
+
+  assert.equal(numberReveal.start(page, {
+    fields,
+    to: {
+      _animTodayQuestions: 0,
+      _animTotalCorrect: 0,
+      _animConsecutiveDays: 0,
+      _animAccuracy: 0,
+      _animDueReviewCount: 0,
+    },
+  }), true)
+
+  fields.forEach((field) => {
+    assert.deepEqual(page.data[field.segmentsKey].map(item => item.text), ['0'])
+  })
+})
+
+test('number reveal finish commits final values when a page hides mid-animation', () => {
+  const page = {
+    _alive: true,
+    _visible: true,
+    data: {
+      _animTotalCorrect: 3,
+      _animTotalCorrectSegments: numberReveal.buildNumberSegments(3),
+    },
+    setData(patch) { Object.assign(this.data, patch) },
+  }
+  numberReveal.start(page, {
+    fields: [{ name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments' }],
+    to: { _animTotalCorrect: 18 },
+    durations: { _animTotalCorrect: 5000 },
+  })
+  assert.equal(numberReveal.finish(page), true)
+  assert.equal(page.data._animTotalCorrect, 18)
+  assert.deepEqual(page.data._animTotalCorrectSegments.map(item => item.text), ['1', '8'])
+  assert.equal(page._numberRevealTimer, null)
 })
