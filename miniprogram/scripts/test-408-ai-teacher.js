@@ -22,8 +22,13 @@ assert.deepStrictEqual(helper.ACTIONS.map(item => item.action), expectedActions,
 assert.strictEqual(new Set(helper.ACTIONS.map(item => item.action)).size, 7, '固定动作不得重复')
 assert.deepStrictEqual(
   helper.PRIMARY_ACTIONS.map(item => item.action),
-  ['explain_options', 'core_concept', 'similar_question', 'connect_knowledge'],
-  '错题详情首屏只应展示四个互补动作'
+  ['explain_options', 'core_concept', 'explain_correct', 'connect_knowledge'],
+  '错题详情首屏应将只讲正确项与同类题互换'
+)
+assert.deepStrictEqual(
+  helper.MORE_ACTIONS.map(item => item.action),
+  ['similar_question', 'harder_question', 'high_frequency_traps'],
+  '同类题应进入更多动作并占据原只讲正确项的位置'
 )
 assert.deepStrictEqual(
   new Set([...helper.PRIMARY_ACTIONS, ...helper.MORE_ACTIONS].map(item => item.action)),
@@ -105,6 +110,10 @@ const wrongDetailWxss = fs.readFileSync(path.join(miniRoot, 'subpackages/study/w
 assert(wrongDetailWxml.includes('AI 复盘'), '错题详情必须将 AI 能力统一为 AI 复盘入口')
 assert(wrongDetailWxml.includes('teacherPrimaryActions'), 'AI 复盘必须展示精简后的首屏专项动作')
 assert(wrongDetailWxml.includes('teacherMoreActions'), 'AI 复盘必须保留完整动作的更多入口')
+assert(wrongDetailWxml.includes('aiRegenerating || aiLoading || aiSkeletonVisible'), 'AI 复盘状态必须响应生成中与重新生成')
+for (const label of ['生成中', '更新中', '生成失败', '需更新', '已生成']) {
+  assert(wrongDetailWxml.includes(label), `AI 复盘状态必须包含 ${label}`)
+}
 assert(!wrongDetailWxml.includes('class="teacher-card"'), '错题详情不得继续渲染重复的独立 AI 老师卡片')
 for (const handler of ['onAiSwipeStart', 'onAiSwipeEnd', 'onAiSwipeCancel']) {
   assert(wrongDetailJs.includes(`${handler}(`), `复盘卡片缺少 ${handler} 处理`)

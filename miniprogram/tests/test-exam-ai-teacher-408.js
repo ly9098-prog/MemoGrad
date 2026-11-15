@@ -20,7 +20,7 @@ test('teacher retains exports and the complete empty result shape and text', () 
   })
   assert.equal(teacher.ACTIONS.length, 7)
   assert.deepEqual(teacher.PRIMARY_ACTIONS.map(item => item.action), [
-    'explain_options', 'core_concept', 'similar_question', 'connect_knowledge',
+    'explain_options', 'core_concept', 'explain_correct', 'connect_knowledge',
   ])
 })
 

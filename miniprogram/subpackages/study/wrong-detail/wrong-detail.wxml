@@ -126,7 +126,15 @@
 <text class="ai-subtitle">完整展示错因、补漏重点与复练任务</text>
 </view>
 </view>
-<view class="ai-mark {{aiCards && !aiFallback && !aiCards.formatError ? 'is-ready' : ''}}"><view class="ai-mark-dot"></view><text>{{aiCards && !aiFallback ? (aiCards.formatError ? '需更新' : '已生成') : 'AI'}}</text></view>
+<view class="ai-mark {{aiRegenerating || aiLoading || aiSkeletonVisible ? 'is-loading' : (aiFallback && !aiCards ? 'is-error' : (aiCards && !aiFallback && aiCards.formatError ? 'is-warning' : (aiCards && !aiFallback ? 'is-ready' : '')))}}" aria-live="polite">
+<view class="ai-mark-dot"></view>
+<text wx:if="{{aiRegenerating}}">更新中</text>
+<text wx:elif="{{aiLoading || aiSkeletonVisible}}">生成中</text>
+<text wx:elif="{{aiFallback && !aiCards}}">生成失败</text>
+<text wx:elif="{{aiCards && aiCards.formatError}}">需更新</text>
+<text wx:elif="{{aiCards && !aiFallback}}">已生成</text>
+<text wx:else>AI</text>
+</view>
 </view>
 <view wx:if="{{!aiCards && (aiSkeletonVisible || aiLoading)}}" class="ai-loading-state">
 <template is="ai-loading-sections" data="{{sections: aiSkeletonSections}}" />

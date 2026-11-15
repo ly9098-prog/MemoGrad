@@ -7,7 +7,7 @@ const ACTIONS = [
 { action: 'connect_knowledge', label: '帮我串联相关知识点', shortLabel: '知识串联', icon: '/assets/icons/wrong-detail/network.svg' },
 { action: 'high_frequency_traps', label: '总结这个知识点的高频陷阱', shortLabel: '高频陷阱', icon: '/assets/icons/wrong-detail/triangle-alert.svg' },
 ]
-const PRIMARY_ACTION_KEYS = ['explain_options', 'core_concept', 'similar_question', 'connect_knowledge']
+const PRIMARY_ACTION_KEYS = ['explain_options', 'core_concept', 'explain_correct', 'connect_knowledge']
 const PRIMARY_ACTION_SET = new Set(PRIMARY_ACTION_KEYS)
 const PRIMARY_ACTIONS = PRIMARY_ACTION_KEYS.map(key => ACTIONS.find(item => item.action === key)).filter(Boolean)
 const MORE_ACTIONS = ACTIONS.filter(item => !PRIMARY_ACTION_SET.has(item.action))
