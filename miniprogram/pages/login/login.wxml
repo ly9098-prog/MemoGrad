@@ -30,7 +30,7 @@
     <view class="ambient-glow glow-two"></view>
 
     <view class="login-shell">
-      <view class="brand-stage page-enter">
+      <view class="brand-stage route-enter-page">
         <view class="hero-brand-card">
           <view class="hero-grid"></view>
           <view class="hero-glow"></view>
@@ -93,7 +93,7 @@
         </view>
       </view>
 
-      <view class="login-panel page-enter delay-one">
+      <view class="login-panel route-enter-page delay-one">
         <view class="panel-header">
           <text class="panel-label">WECHAT SYNC</text>
           <text class="panel-title">开启你的学习成长档案</text>
@@ -131,7 +131,7 @@
         <view wx:if="{{error}}" class="error-msg">{{error}}</view>
       </view>
 
-      <view class="value-panel page-enter delay-two">
+      <view class="value-panel route-enter-page delay-two">
         <view class="value-panel-head">
           <text class="value-eyebrow">STUDY SYSTEM</text>
           <text class="value-caption">让每次练习都沉淀为长期进步</text>
@@ -164,7 +164,7 @@
         </view>
       </view>
 
-      <view class="footer page-enter delay-three">
+      <view class="footer route-enter-page delay-three">
         <text class="footer-text">学习数据用于错题记录与智能刷题服务</text>
         <text class="footer-text">ICP备案号：桂ICP备2026003057号-2X</text>
       </view>

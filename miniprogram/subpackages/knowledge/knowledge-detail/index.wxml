@@ -11,7 +11,7 @@
 <text class="error-copy">{{error}}</text>
 <button class="retry-button" bindtap="retry">重新加载</button>
 </view>
-<view wx:elif="{{detail}}" class="detail-content detail-content-{{contentPhase}}">
+<view wx:elif="{{detail}}" class="detail-content detail-content-{{contentPhase}} route-enter-opacity">
 <view class="detail-hero">
 <view class="hero-meta-row">
 <view class="subject-pill">

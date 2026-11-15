@@ -1,4 +1,4 @@
-<view class="animation-page">
+<view class="animation-page route-enter-opacity">
   <premium-nav title="动画预览" variant="light" bind:back="goBack" />
   <view class="animation-stage"></view>
 </view>

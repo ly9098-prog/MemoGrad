@@ -89,7 +89,7 @@ if (this._guestMode) return
 this._syncMinDate()
 this._loadStudyStrategy()
 this._syncQuestionGoalFromStorage()
-if (this._loadedOnce) this.loadOverview()
+if (this._loadedOnce) this.loadOverview({ silent: true })
 this._showFabAndScheduleHide()
 },
 onHide() {
@@ -212,18 +212,27 @@ const today = getChinaDate(0, api.now())
 if (this.data.minDate !== today) this.setData({ minDate: today })
 return today
 },
-async loadOverview() {
+async loadOverview(options = {}) {
 if (this._guestMode) return
-this.setData({ loading: true, errorText: '' })
+const silent = options.silent === true
+if (silent) {
+  this.setData({ errorText: '' })
+} else {
+  this.setData({ loading: true, errorText: '' })
+}
 try {
 const overview = await api.get('/study-plan/overview')
 this._syncMinDate()
 this.applyOverview(overview)
 } catch (error) {
-this.setData({ errorText: api.getErrorMessage(error) })
+if (silent) {
+  this.setData({ errorText: api.getErrorMessage(error) })
+} else {
+  this.setData({ errorText: api.getErrorMessage(error), loading: false })
+}
 } finally {
 this._loadedOnce = true
-this.setData({ loading: false })
+if (!silent) this.setData({ loading: false })
 }
 },
   applyOverview(overview) {

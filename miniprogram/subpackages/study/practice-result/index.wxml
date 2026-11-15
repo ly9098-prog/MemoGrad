@@ -2,7 +2,7 @@
 <view class="page">
 <app-dialog id="appDialog" theme="mint"></app-dialog>
 <scroll-view
-    class="page-scroll route-enter"
+    class="page-scroll route-enter-page"
     scroll-y="{{!reviewDialogVisible}}"
     enhanced
     bounces="{{false}}"

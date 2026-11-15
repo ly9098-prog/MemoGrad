@@ -35,7 +35,7 @@
   </view>
 
   <!-- Editorial greeting -->
-  <view class="editorial-head page-enter">
+  <view class="editorial-head route-enter-page">
     <text class="editorial-date">{{dateStr}}</text>
     <view class="editorial-title-row">
       <text class="editorial-title">{{greeting}}，{{displayName}}</text>
@@ -45,7 +45,7 @@
   </view>
 
   <!-- Top study card rebuilt to match the supplied reference composition -->
-  <view class="focus-card page-enter delay-one">
+  <view class="focus-card route-enter-page delay-one">
     <image class="focus-bg-art" src="/assets/icons/home-hero/top-card-background-cropped.png" mode="scaleToFill" />
     <view class="focus-bg-wash" aria-hidden="true"></view>
     <view class="focus-hero-visual" aria-hidden="true">
@@ -129,7 +129,7 @@
 
 
   <!-- Smart Study Hub tasks -->
-  <view class="content-section page-enter delay-two">
+  <view class="content-section route-enter-page delay-two">
     <view class="section-heading">
       <view>
         <text class="section-kicker">SMART STUDY HUB</text>
@@ -230,7 +230,7 @@
   </view>
 
   <!-- Four-subject mastery snapshot · reference card layout -->
-  <view class="content-section mastery-section page-enter delay-three" wx:if="{{subjectMastery.length > 0}}">
+  <view class="content-section mastery-section route-enter-page delay-three" wx:if="{{subjectMastery.length > 0}}">
     <view class="section-heading compact-heading mastery-heading">
       <view class="mastery-heading-copy">
         <text class="section-kicker">MASTERY SNAPSHOT</text>
@@ -307,7 +307,7 @@
   </view>
 
   <!-- Compact tool dock -->
-  <view class="content-section tool-section page-enter delay-three">
+  <view class="content-section tool-section route-enter-page delay-three">
     <view class="section-heading compact-heading">
       <view>
         <text class="section-kicker">TOOLS</text>
@@ -339,7 +339,7 @@
     </view>
   </view>
 
-  <view class="growth-note page-enter delay-three">
+  <view class="growth-note route-enter-page delay-three">
     <view class="growth-note-copy">
       <text class="growth-note-label">TODAY'S NOTE</text>
       <text class="growth-note-text">{{dailyBoostText}}</text>

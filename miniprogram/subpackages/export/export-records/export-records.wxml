@@ -16,7 +16,7 @@
     show-scrollbar="{{false}}"
     bindscrolltolower="onLoadMore"
   >
-    <view class="records-content">
+    <view class="records-content route-enter-page">
       <!-- Safe default: unavailable until capability check succeeds -->
       <view wx:if="{{!exportAvailable}}" class="unavailable-state">
         <view class="unavailable-icon" aria-hidden="true">
