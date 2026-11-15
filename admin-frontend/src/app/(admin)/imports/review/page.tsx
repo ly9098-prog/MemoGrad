@@ -13,7 +13,7 @@ import { formatChinaClock } from "@/lib/time";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
-import { isTopModalSurface } from "@/lib/modal-focus";
+import { hasOpenTransientOverlay, isTopModalSurface } from "@/lib/modal-focus";
 import { useOutsideClick } from "@/lib/use-outside-click";
 import { reviewPageStyles } from "./review-page-styles";
 import {
@@ -664,13 +664,7 @@ export default function ImportReviewPage() {
       }
       const drawer = document.querySelector<HTMLElement>("[data-review-detail-drawer]");
       if (!drawer || !isTopModalSurface(drawer)) return;
-      if (
-        document.querySelector(
-          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
-        )
-      ) {
-        return;
-      }
+      if (hasOpenTransientOverlay()) return;
       closeDrawer();
     };
     document.addEventListener("keydown", onKeyDown);

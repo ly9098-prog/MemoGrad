@@ -38,7 +38,7 @@ import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
 import { apiRequest, toQuery } from "@/lib/api/client";
-import { isTopModalSurface } from "@/lib/modal-focus";
+import { hasOpenTransientOverlay, isTopModalSurface } from "@/lib/modal-focus";
 import { useModalSurface } from "@/lib/use-modal-surface";
 import type {
   AdminUserCreateRequest,
@@ -352,13 +352,7 @@ export default function AdminUsersPage() {
       ) {
         return;
       }
-      if (
-        document.querySelector(
-          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
-        )
-      ) {
-        return;
-      }
+      if (hasOpenTransientOverlay()) return;
       if (!formDialogRef.current || !isTopModalSurface(formDialogRef.current)) return;
       closeForm();
     };

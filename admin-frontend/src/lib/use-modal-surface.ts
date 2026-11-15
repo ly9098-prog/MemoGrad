@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import {
+  hasOpenTransientOverlay,
   isFocusPassthroughTarget,
   isTopModalSurface,
 } from "./modal-focus";
@@ -100,13 +101,7 @@ export function useModalSurface({
       ) {
         return;
       }
-      if (
-        document.querySelector(
-          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
-        )
-      ) {
-        return;
-      }
+      if (hasOpenTransientOverlay()) return;
       if (!isTopModalSurface(surface)) return;
       onEscapeRef.current();
     };
