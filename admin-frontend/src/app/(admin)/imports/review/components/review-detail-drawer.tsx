@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { cn } from "@/lib/utils";
+import { useModalSurface } from "@/lib/use-modal-surface";
 import {
 } from "@/lib/question-types";
 import type { ImportQuestionItem } from "@/lib/api/types";
@@ -131,11 +133,14 @@ export function ReviewDetailDrawer({
   onReject,
   onComplete,
 }: ReviewDetailDrawerProps) {
+  const drawerRef = useRef<HTMLElement>(null);
+  useModalSurface({ open, surfaceRef: drawerRef });
+
   if (!open) return null;
 
   const drawer = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/70 backdrop-blur-[1px]" role="presentation" onClick={onClose}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="drawer-title"
+      <aside ref={drawerRef} tabIndex={-1} data-review-detail-drawer role="dialog" aria-modal="true" aria-labelledby="drawer-title"
             className="flex h-full w-full max-w-3xl flex-col overflow-y-auto shadow-[var(--shadow-floating)] animate-slide-in bg-noise"
             style={{
               background: 'var(--background)',

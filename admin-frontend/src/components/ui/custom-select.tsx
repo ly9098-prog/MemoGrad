@@ -105,6 +105,8 @@ export function CustomSelect({
     if (!open) return;
     const escHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         close();
         ref.current?.querySelector("button")?.focus();
       }
@@ -153,6 +155,9 @@ export function CustomSelect({
       return;
     }
     if (e.key === "Escape") {
+      if (!open) return;
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
       setActiveIndex(-1);
       ref.current?.querySelector("button")?.focus();

@@ -13,6 +13,7 @@ import { formatChinaClock } from "@/lib/time";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
+import { isTopModalSurface } from "@/lib/modal-focus";
 import { useOutsideClick } from "@/lib/use-outside-click";
 import { reviewPageStyles } from "./review-page-styles";
 import {
@@ -652,7 +653,25 @@ export default function ImportReviewPage() {
   useEffect(() => {
     if (previewId === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDrawer();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (
+        target?.closest(
+          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
+        )
+      ) {
+        return;
+      }
+      const drawer = document.querySelector<HTMLElement>("[data-review-detail-drawer]");
+      if (!drawer || !isTopModalSurface(drawer)) return;
+      if (
+        document.querySelector(
+          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
+        )
+      ) {
+        return;
+      }
+      closeDrawer();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);

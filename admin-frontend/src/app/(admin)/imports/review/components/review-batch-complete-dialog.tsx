@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Check, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import {
   type BatchCompleteStrategy,
 } from "../review-batch-complete-draft";
 import type { BatchCompleteResultState } from "../review-batch-complete-result-state";
+import { useModalSurface } from "@/lib/use-modal-surface";
 
 type ReviewBatchCompleteDialogProps = {
   open: boolean;
@@ -47,11 +49,19 @@ export function ReviewBatchCompleteDialog({
   onExecute,
   onFinish,
 }: ReviewBatchCompleteDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalSurface({
+    open,
+    surfaceRef: dialogRef,
+    onEscape: onClose,
+    escapeDisabled: executing,
+  });
+
   if (!open) return null;
 
   const dialog = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/60" role="presentation" onClick={() => { if (!executing) { onClose(); } }}>
-          <aside role="dialog" aria-modal="true" className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-card shadow-[var(--shadow-floating)]" onClick={(e) => e.stopPropagation()}>
+          <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-card shadow-[var(--shadow-floating)]" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-6 py-4 backdrop-blur-xl">
               <div className="flex items-start justify-between gap-4">

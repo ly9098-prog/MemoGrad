@@ -38,6 +38,7 @@ import {
 } from "@/components/admin/management-ui";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useModalSurface } from "@/lib/use-modal-surface";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
 import { apiRequest, toQuery } from "@/lib/api/client";
@@ -222,6 +223,14 @@ export default function ExamPaperDetailPage() {
   const announcedPaperNoticeRef = useRef("");
   const jumpHighlightTimerRef = useRef<number | null>(null);
   const refreshInFlightRef = useRef(false);
+  const jumpDrawerRef = useRef<HTMLDivElement | null>(null);
+  const jumpReturnFocusRef = useRef<HTMLElement | null>(null);
+
+  useModalSurface({
+    open: jumpDrawerOpen,
+    surfaceRef: jumpDrawerRef,
+    returnFocusRef: jumpReturnFocusRef,
+  });
 
   const paperQuery = useQuery({
     queryKey: ["exam-paper", paperRef],
@@ -324,6 +333,10 @@ export default function ExamPaperDetailPage() {
       }
       if (!typing && (event.key === "j" || event.key === "J") && items.length) {
         event.preventDefault();
+        jumpReturnFocusRef.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
         setJumpDrawerOpen(true);
       }
     }
@@ -413,7 +426,10 @@ export default function ExamPaperDetailPage() {
   }, [items]);
   const activeItem = items[activeQuestionIndex];
   const activeSubjectName = activeItem?.subject_name || "未定位";
-  function openJumpDrawer() {
+  function openJumpDrawer(trigger?: HTMLElement | null) {
+    jumpReturnFocusRef.current =
+      trigger ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setJumpNumber("");
     setJumpDrawerOpen(true);
   }
@@ -801,7 +817,7 @@ export default function ExamPaperDetailPage() {
                 <Button
                   variant="secondary"
                   className="min-w-[172px] justify-between gap-3 transition-transform active:scale-[0.98] motion-reduce:transform-none"
-                  onClick={openJumpDrawer}
+                  onClick={(event) => openJumpDrawer(event.currentTarget)}
                   title="打开题号导航（快捷键 J）"
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -997,7 +1013,7 @@ export default function ExamPaperDetailPage() {
 
       {jumpDrawerOpen
         ? createPortal(
-            <div className="fixed inset-0 z-[2147483647] [--mgmt-paper:var(--popover)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)]" role="dialog" aria-modal="true" aria-label="题号导航">
+            <div ref={jumpDrawerRef} tabIndex={-1} className="fixed inset-0 z-[2147483647] [--mgmt-paper:var(--popover)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)]" role="dialog" aria-modal="true" aria-label="题号导航">
           <button
             type="button"
             className="absolute inset-0 bg-overlay backdrop-blur-[2px]"
@@ -1026,6 +1042,7 @@ export default function ExamPaperDetailPage() {
               <div className="mt-4 flex gap-2">
                 <div className="relative min-w-0 flex-1">
                   <Input
+                    data-autofocus
                     className="h-10 pr-16 tabular-nums"
                     inputMode="numeric"
                     value={jumpNumber}

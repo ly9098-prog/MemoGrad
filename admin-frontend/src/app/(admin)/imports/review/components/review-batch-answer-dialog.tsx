@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import { Eye, FileText, Upload, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import type { ImageAnswerMode } from "../hooks/use-review-image-answer-flow";
 import { ImageAnswerPreview, ImageAnswerResult } from "./image-answer-results";
 import { BatchAnswerPreview, BatchAnswerResult } from "./batch-answer-results";
+import { useModalSurface } from "@/lib/use-modal-surface";
 
 type ReviewBatchAnswerDialogProps = {
   open: boolean;
@@ -75,12 +77,20 @@ export function ReviewBatchAnswerDialog({
   onImagePreview,
   onImageApply,
 }: ReviewBatchAnswerDialogProps) {
-  if (!open) return null;
+  const dialogRef = useRef<HTMLElement>(null);
   const executing = textExecuting || imageExecuting;
+  useModalSurface({
+    open,
+    surfaceRef: dialogRef,
+    onEscape: onClose,
+    escapeDisabled: executing,
+  });
+
+  if (!open) return null;
 
   const dialog = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/60" role="presentation" onClick={() => { if (!executing) { onClose(); } }}>
-      <aside role="dialog" aria-modal="true" className="scholar-panel flex h-full w-full max-w-xl flex-col overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="scholar-panel flex h-full w-full max-w-xl flex-col overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="scholar-panel-header sticky top-0 z-10 px-6 py-4">
               <div className="flex items-start justify-between gap-4">

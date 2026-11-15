@@ -22,7 +22,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ManagementPage,
@@ -38,6 +38,8 @@ import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
 import { apiRequest, toQuery } from "@/lib/api/client";
+import { isTopModalSurface } from "@/lib/modal-focus";
+import { useModalSurface } from "@/lib/use-modal-surface";
 import type {
   AdminUserCreateRequest,
   AdminUserPatchRequest,
@@ -144,6 +146,14 @@ export default function AdminUsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
+  const formDialogRef = useRef<HTMLDivElement | null>(null);
+  const formReturnFocusRef = useRef<HTMLElement | null>(null);
+
+  useModalSurface({
+    open: showForm,
+    surfaceRef: formDialogRef,
+    returnFocusRef: formReturnFocusRef,
+  });
 
   const createdFrom = dateFrom ? chinaDateToUtcIso(dateFrom) : undefined;
   const createdTo = dateTo ? endOfChinaDateUtcIso(dateTo) : undefined;
@@ -333,7 +343,24 @@ export default function AdminUsersPage() {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeForm();
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (
+        target?.closest(
+          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
+        )
+      ) {
+        return;
+      }
+      if (
+        document.querySelector(
+          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
+        )
+      ) {
+        return;
+      }
+      if (!formDialogRef.current || !isTopModalSurface(formDialogRef.current)) return;
+      closeForm();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -342,14 +369,20 @@ export default function AdminUsersPage() {
     };
   }, [showForm, closeForm]);
 
-  const openCreateForm = () => {
+  const openCreateForm = (trigger?: HTMLElement | null) => {
+    formReturnFocusRef.current =
+      trigger ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setForm(emptyForm);
     setShowPassword(false);
     saveMutation.reset();
     setShowForm(true);
   };
 
-  const startEdit = (user: AdminUserSummary) => {
+  const startEdit = (user: AdminUserSummary, trigger?: HTMLElement | null) => {
+    formReturnFocusRef.current =
+      trigger ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setForm({
       id: user.id,
       username: user.username,
@@ -434,7 +467,7 @@ export default function AdminUsersPage() {
         description="管理后台账号、角色归属与登录安全操作；保护账号继续遵循前后端双重限制。"
         actions={
           <Button
-            onClick={openCreateForm}
+            onClick={(event) => openCreateForm(event.currentTarget)}
             disabled={!canCreate}
             className="h-11 gap-2 rounded-xl px-5 shadow-none"
           >
@@ -670,7 +703,7 @@ export default function AdminUsersPage() {
                               type="button"
                               title="编辑管理员"
                               disabled={protectedRow || !canUpdate}
-                              onClick={() => startEdit(user)}
+                              onClick={(event) => startEdit(user, event.currentTarget)}
                               className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <Edit3 className="h-4 w-4" />
@@ -790,6 +823,8 @@ export default function AdminUsersPage() {
               }}
             >
               <div
+                ref={formDialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="admin-user-form-title"
@@ -838,6 +873,7 @@ export default function AdminUsersPage() {
                               </div>
                               <Input
                                 id="admin-username"
+                                data-autofocus={!form.id ? "" : undefined}
                                 autoFocus={!form.id}
                                 autoComplete="off"
                                 maxLength={64}

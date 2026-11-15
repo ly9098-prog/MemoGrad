@@ -107,6 +107,11 @@ export function ReviewDrawerEditForm({
                               onSubjectDropdownStyleChange({ top: r.bottom + 4, left: Math.min(r.left, maxRight - w), width: w });
                             }
                           }}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Escape" || !subjectEditDropdownOpen) return;
+                            event.preventDefault();
+                            onSubjectDropdownOpenChange(false);
+                          }}
                           onBlur={() => setTimeout(() => onSubjectDropdownOpenChange(false), 150)}
                         >
                           <span className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left ${editState.subject_id ? "" : "text-muted-foreground/70"}`} title={editState.subject_id ? (subjectOptions.find((s) => s.id === editState.subject_id)?.name || "") : ""}>
@@ -121,7 +126,16 @@ export function ReviewDrawerEditForm({
                           )}
                         </button>
                         {subjectEditDropdownOpen ? createPortal(
-                          <div className="fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-border bg-card py-1 shadow-lg" style={subjectEditDropdownStyle}>
+                          <div
+                            data-focus-passthrough
+                            className="fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-border bg-card py-1 shadow-lg"
+                            style={subjectEditDropdownStyle}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Escape") return;
+                              event.preventDefault();
+                              onSubjectDropdownOpenChange(false);
+                            }}
+                          >
                             <button
                               type="button"
                               className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent/40 ${

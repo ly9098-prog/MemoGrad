@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import {
-  isFocusPassthroughTarget,
-  isTopModalSurface,
-} from "@/lib/modal-focus";
+import { useModalSurface } from "@/lib/use-modal-surface";
 import { QuestionDrawerHeader } from "./question-drawer-header";
 
 type QuestionDetailDrawerProps = {
@@ -38,29 +35,10 @@ export function QuestionDetailDrawer({
   children,
 }: QuestionDetailDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open || questionId === null) return;
-    const drawer = drawerRef.current;
-    if (!drawer) return;
-    previousFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    drawer.focus();
-
-    const handleFocusIn = (event: FocusEvent) => {
-      if (drawer.contains(event.target as Node)) return;
-      if (isFocusPassthroughTarget(event.target)) return;
-      if (!isTopModalSurface(drawer)) return;
-      drawer.focus();
-    };
-
-    document.addEventListener("focusin", handleFocusIn);
-    return () => {
-      document.removeEventListener("focusin", handleFocusIn);
-      previousFocusRef.current?.focus();
-    };
-  }, [open, questionId]);
+  useModalSurface({
+    open: open && questionId !== null,
+    surfaceRef: drawerRef,
+  });
 
   if (!open || questionId === null) return null;
 

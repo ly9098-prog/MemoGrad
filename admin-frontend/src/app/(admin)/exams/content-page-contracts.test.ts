@@ -113,7 +113,11 @@ describe("exam administration request lifecycle", () => {
     ExamPaperDetailPage();
     await h.queries[0].queryFn();
     expect(h.request).toHaveBeenCalledWith("/exams/papers/42");
-    h.effects[0]();
+    const redirectEffect = h.effects.find((effect) =>
+      effect.toString().includes("router.replace"),
+    );
+    expect(redirectEffect).toBeTypeOf("function");
+    redirectEffect?.();
     expect(h.replace).toHaveBeenCalledWith("/exams/public/a");
   });
 
