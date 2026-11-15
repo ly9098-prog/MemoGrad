@@ -10,7 +10,7 @@
 
   <view class="agreement-page" style="padding-top: {{navHeight}}px;">
     <view class="agreement-content">
-      <view class="agreement-hero page-enter">
+      <view class="agreement-hero route-enter-page">
         <text class="agreement-kicker">MEMOGRAD · DATA PROTECTION</text>
         <text class="agreement-title">隐私政策</text>
         <text class="agreement-desc">我们仅在提供学习服务所必需的范围内处理您的数据。</text>
@@ -20,7 +20,7 @@
         </view>
       </view>
 
-      <view class="article-card page-enter delay-one">
+      <view class="article-card route-enter-page delay-one">
         <view class="article-intro">
           <text class="article-intro-label">PRIVACY AT A GLANCE</text>
           <text class="article-intro-text">本政策说明数据的收集、使用、保存、共享方式，以及您可行使的权利。</text>
@@ -164,7 +164,7 @@
         </view>
       </view>
 
-      <view class="agreement-end page-enter delay-two">
+      <view class="agreement-end route-enter-page delay-two">
         <view class="agreement-end-line"></view>
         <text>MEMOGRAD · YOUR DATA, YOUR RIGHTS</text>
       </view>

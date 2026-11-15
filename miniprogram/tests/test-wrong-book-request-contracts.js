@@ -118,7 +118,7 @@ test('list date rollover forces reset, invalidates task flow and retains params/
   assert.equal(f.calls.at(-2)[0], 'selection'); assert.equal(f.calls.at(-1)[0], 'taskFlow')
   assert.deepEqual(Object.keys(f.calls.find(c => c[0] === 'setData' && 'list' in c[1])[1]), [
     'list', 'listTotal', 'analysis', 'taskGroups', 'ungroupedCount', 'highFrequencyCount',
-    'aiInsightText', 'hasMore', 'page', 'loading',
+    'aiInsightText', 'hasMore', 'page', 'loading', 'contentEntered',
   ])
 })
 

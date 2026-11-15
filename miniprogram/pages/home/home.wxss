@@ -893,6 +893,37 @@ page {
   font-variant-numeric: tabular-nums;
 }
 
+.reveal-metric {
+  display: inline-flex;
+  align-items: baseline;
+  overflow: hidden;
+  line-height: 1.1;
+}
+
+.reveal-digit {
+  display: inline-block;
+  line-height: 1;
+  will-change: transform, opacity;
+}
+
+.reveal-digit-top {
+  animation: numberRevealTop 380ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.reveal-digit-bottom {
+  animation: numberRevealBottom 380ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes numberRevealTop {
+  0% { opacity: 0; transform: translate3d(0, -.38em, 0) scale(.97); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes numberRevealBottom {
+  0% { opacity: 0; transform: translate3d(0, .38em, 0) scale(.97); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
 .metric-value.level-value {
   max-width: 190rpx;
   overflow: hidden;
@@ -1225,30 +1256,21 @@ page {
   height: calc(38rpx + env(safe-area-inset-bottom));
 }
 
-/* Motion */
-.page-enter {
-  opacity: 0;
-  animation: pageEnter .42s cubic-bezier(.2, .8, .2, 1) forwards;
-}
-
 .delay-one { animation-delay: .05s; }
 .delay-two { animation-delay: .10s; }
 .delay-three { animation-delay: .15s; }
 
-@keyframes pageEnter {
-  from { opacity: 0; transform: translateY(14rpx); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .login-guide,
   .login-guide-content,
-  .page-enter,
   .focus-progress-fill,
   .route-card,
   .tool-item,
   .primary-action,
-  .secondary-action {
+  .secondary-action,
+  .radar-polygon,
+  .radar-point,
+  .reveal-digit {
     animation: none !important;
     transition: none;
     opacity: 1 !important;
@@ -2021,6 +2043,81 @@ page {
 .mastery-foot-tech .mastery-status { color:#65746A; font-weight:650; }
 .mastery-card-pressed { transform:translateY(2rpx) scale(.988); opacity:.9; }
 @media (max-width:360px){.mastery-grid-tech{gap:12rpx}.mastery-card-tech{min-height:244rpx;padding:18rpx 16rpx}.mastery-card-tech .mastery-subject{font-size:22rpx}.mastery-foot-tech{font-size:16rpx}.mastery-icon{width:50rpx;height:50rpx}}
+
+/* Mastery radar: expand once per real data change, then interpolate scores. */
+.mastery-radar {
+  margin-top: 24rpx;
+  padding: 24rpx 22rpx;
+  border: 1rpx solid #DDE5DC;
+  border-radius: 30rpx;
+  background: linear-gradient(150deg, #FFFFFC, #FAFCF8);
+  box-shadow: 0 13rpx 30rpx rgba(27, 55, 40, .065);
+}
+
+.mastery-radar-stage {
+  position: relative;
+  height: 460rpx;
+  opacity: var(--radar-expand, 1);
+}
+
+.radar-polygon {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, rgba(104, 221, 106, .30), rgba(183, 232, 42, .10));
+  box-shadow: 0 0 36rpx rgba(104, 221, 106, .12);
+  animation: radarExpand 680ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.radar-point {
+  position: absolute;
+  width: 16rpx;
+  height: 16rpx;
+  margin: -8rpx 0 0 -8rpx;
+  border-radius: 50%;
+  background: #4A7C55;
+  box-shadow: 0 0 0 8rpx rgba(74, 124, 85, .10);
+  animation: pointReveal 420ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.mastery-radar-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx 20rpx;
+  margin-top: 26rpx;
+}
+
+.mastery-radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  min-width: 0;
+}
+
+.mastery-radar-legend-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1A2C22;
+  font-size: 22rpx;
+  font-weight: 850;
+}
+
+.mastery-radar-legend-value { color: #33B04A; font-size: 22rpx; font-weight: 950; }
+.mastery-radar-trend { font-size: 20rpx; font-weight: 900; }
+.mastery-radar-trend.trend-up { color: #33B04A; }
+.mastery-radar-trend.trend-down { color: #C0563A; }
+
+@keyframes radarExpand {
+  0% { opacity: 0; transform: scale(.42); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pointReveal {
+  0% { opacity: 0; transform: scale(.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
 
 /* v9: closer reference match — Scheme 3 mastery cards */
 .mastery-section { margin-top: 54rpx; }

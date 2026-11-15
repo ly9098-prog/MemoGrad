@@ -5,6 +5,49 @@
 
 .formula-card-wrap { padding: 0; color: #23483C; }
 
+.fc-flip-stage {
+  position: relative;
+  min-height: 300rpx;
+  transform-style: preserve-3d;
+  transition: transform 620ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.fc-flip-stage.is-flipped { transform: rotateY(180deg); }
+
+.fc-flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.fc-flip-front { position: relative; z-index: 1; }
+
+.fc-flip-back {
+  position: absolute;
+  inset: 0;
+  padding: 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #D8EEE6;
+  border-radius: 30rpx;
+  background: linear-gradient(145deg, #F8FEFB, #F1F9F4);
+  transform: rotateY(180deg);
+  overflow: auto;
+}
+
+.fc-flip-hint {
+  margin-top: 18rpx;
+  color: #748F84;
+  font-size: 19rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.fc-flip-back-section { margin-top: 20rpx; }
+.fc-flip-back-label { display: block; margin-bottom: 8rpx; color: #3A6F5B; font-size: 21rpx; font-weight: 900; }
+.fc-flip-back-section .fc-rich-text { color: #23483C; font-size: 24rpx; line-height: 1.6; }
+.fc-flip-back-section .fc-formula-row + .fc-formula-row { margin-top: 16rpx; padding-top: 16rpx; border-top: 1rpx solid #E5F2ED; }
+
+.fc-detail-body { margin-top: 24rpx; }
+
 .fc-header {
   padding: 2rpx 0 24rpx;
   border-bottom: 1rpx solid #D8EEE6;
@@ -156,6 +199,11 @@
 .fc-example-detail.error .fc-example-detail-label { color: #B45B48; }
 
 @media (prefers-reduced-motion: reduce) {
+  .fc-flip-stage,
+  .fc-flip-face {
+    transition: none !important;
+  }
+
   .fc-collapse-header,
   .fc-collapse-arrow::before,
   .fc-collapse-body { transition: none !important; }

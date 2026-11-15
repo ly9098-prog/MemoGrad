@@ -58,6 +58,7 @@ function buildGrowthWithBadges(ctx, growth) {
     studyLevel: growth.level_title || 'Lv1 起步',
     levelProgress,
     todayGoalTotal,
+    _animDueReviewCount: dueReviewCount,
     ...(strategySnapshot || taskSnapshot),
     ...hubDisplay,
     ...planDisplay,
@@ -104,6 +105,7 @@ function buildGrowthWithoutBadges(ctx) {
     studyLevel: levelMeta.studyLevel,
     levelProgress,
     todayGoalTotal,
+    _animDueReviewCount: dueReviewCount,
     ...(strategySnapshot || taskSnapshot),
     ...hubDisplay,
     ...planDisplay,
@@ -134,6 +136,7 @@ function buildGrowthSnapshot(options = {}) {
       streakDays: ctx.streakDays,
       todayGoalDone: ctx.todayGoalDone,
       levelProgress: ctx.levelProgress,
+      dueReviewCount: ctx.dueReviewCount,
     },
   }
 }
@@ -145,6 +148,9 @@ function getGrowthFallback(options = {}) {
     studyLevel: 'Lv1 起步',
     levelProgress: 0,
     todayGoalTotal,
+    _animDueReviewCount: 0,
+    _animStreakSegments: [],
+    _animDueReviewSegments: [],
     ...growthView.getPrimaryTaskSnapshot({
       todayGoalDone: 0,
       todayGoalTotal,

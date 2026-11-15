@@ -1,6 +1,8 @@
 const api = require('../../../utils/api')
 const storage = require('../../../utils/storage')
 const growthAnimation = require('./growth-animation')
+const numberReveal = require('../../../utils/number-reveal')
+const masteryRadar = require('./mastery-radar')
 const growthClient = require('./growth-client')
 const growthSnapshot = require('./growth-snapshot')
 const auth = require('../../../utils/auth')
@@ -173,6 +175,18 @@ const growthPageMethods = {
 
   _animateNumbers() {
     growthAnimation.start(this)
+    numberReveal.start(this, {
+      fields: [
+        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
+        { name: '_animStreakDays', segmentsKey: '_animStreakSegments' },
+      ],
+      to: {
+        _animDueReviewCount: this._growthTargets.dueReviewCount,
+        _animStreakDays: this._growthTargets.streakDays || 0,
+      },
+      durations: numberReveal.DEFAULT_DURATIONS,
+    })
+    masteryRadar.start(this)
   },
 
   _animateNumbersTick(from, to, durations, startTime) {
@@ -237,8 +251,15 @@ const growthPageMethods = {
   },
 }
 
+function clearGrowthLifecycleTimers(page) {
+  growthAnimation.clear(page)
+  numberReveal.finish(page)
+  masteryRadar.clear(page)
+}
+
 module.exports = {
   GOAL_OPTIONS,
   TODAY_GOAL_TOTAL,
+  clearGrowthLifecycleTimers,
   growthPageMethods,
 }

@@ -35,7 +35,7 @@
   </view>
 
   <!-- Editorial greeting -->
-  <view class="editorial-head page-enter">
+  <view class="editorial-head route-enter-page">
     <text class="editorial-date">{{dateStr}}</text>
     <view class="editorial-title-row">
       <text class="editorial-title">{{greeting}}，{{displayName}}</text>
@@ -45,7 +45,7 @@
   </view>
 
   <!-- Top study card rebuilt to match the supplied reference composition -->
-  <view class="focus-card page-enter delay-one">
+  <view class="focus-card route-enter-page delay-one">
     <image class="focus-bg-art" src="/assets/icons/home-hero/top-card-background-cropped.png" mode="scaleToFill" />
     <view class="focus-bg-wash" aria-hidden="true"></view>
     <view class="focus-hero-visual" aria-hidden="true">
@@ -102,12 +102,20 @@
 
       <view wx:if="{{!guestMode}}" class="focus-metrics">
         <view class="metric-item">
-          <text class="metric-value">{{dueReviewCount}}</text>
+          <view class="metric-value reveal-metric" aria-label="到期复习 {{_animDueReviewCount}}">
+            <block wx:for="{{_animDueReviewSegments}}" wx:key="key">
+              <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
+            </block>
+          </view>
           <text class="metric-label">到期复习</text>
         </view>
         <view class="metric-divider"></view>
         <view class="metric-item">
-          <text class="metric-value">{{_animStreakDays}}</text>
+          <view class="metric-value reveal-metric" aria-label="连续天数 {{_animStreakDays}}">
+            <block wx:for="{{_animStreakSegments}}" wx:key="key">
+              <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
+            </block>
+          </view>
           <text class="metric-label">连续天数</text>
         </view>
         <view class="metric-divider"></view>
@@ -121,7 +129,7 @@
 
 
   <!-- Smart Study Hub tasks -->
-  <view class="content-section page-enter delay-two">
+  <view class="content-section route-enter-page delay-two">
     <view class="section-heading">
       <view>
         <text class="section-kicker">SMART STUDY HUB</text>
@@ -188,7 +196,7 @@
         <view class="route-copy">
           <text class="route-eyebrow">记忆复习</text>
           <text class="route-title">今日复习</text>
-          <text class="route-desc">{{guestMode ? '登录后查看个人复习计划' : (dueReviewCount > 0 ? dueReviewCount + ' 道错题正处于最佳复习窗口' : '暂无到期任务，也可以提前巩固')}}</text>
+          <text class="route-desc">{{guestMode ? '登录后查看个人复习计划' : (_animDueReviewCount > 0 ? _animDueReviewCount + ' 道错题正处于最佳复习窗口' : '暂无到期任务，也可以提前巩固')}}</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
@@ -222,11 +230,33 @@
   </view>
 
   <!-- Four-subject mastery snapshot · reference card layout -->
-  <view class="content-section mastery-section page-enter delay-three" wx:if="{{subjectMastery.length > 0}}">
+  <view class="content-section mastery-section route-enter-page delay-three" wx:if="{{subjectMastery.length > 0}}">
     <view class="section-heading compact-heading mastery-heading">
       <view class="mastery-heading-copy">
         <text class="section-kicker">MASTERY SNAPSHOT</text>
         <text class="section-title">四科掌握概览</text>
+      </view>
+    </view>
+
+    <view class="mastery-radar" wx:if="{{_masteryRadarItems.length === 4}}">
+      <view class="mastery-radar-stage">
+        <view
+          class="radar-polygon"
+          style="{{_masteryRadarPolygonStyle}}"
+        ></view>
+        <view
+          wx:for="{{_masteryRadarItems}}"
+          wx:key="key"
+          class="radar-point"
+          style="{{item.pointStyle}} animation-delay: {{item.delay}}ms;"
+        ></view>
+      </view>
+      <view class="mastery-radar-legend">
+        <view wx:for="{{_masteryRadarItems}}" wx:key="key" class="mastery-radar-legend-item">
+          <text class="mastery-radar-legend-name">{{item.subjectName}}</text>
+          <text class="mastery-radar-legend-value">{{item.score}}%</text>
+          <text wx:if="{{item.trend}}" class="mastery-radar-trend trend-{{item.trend}}">{{item.trendText}}</text>
+        </view>
       </view>
     </view>
 
@@ -277,7 +307,7 @@
   </view>
 
   <!-- Compact tool dock -->
-  <view class="content-section tool-section page-enter delay-three">
+  <view class="content-section tool-section route-enter-page delay-three">
     <view class="section-heading compact-heading">
       <view>
         <text class="section-kicker">TOOLS</text>
@@ -309,7 +339,7 @@
     </view>
   </view>
 
-  <view class="growth-note page-enter delay-three">
+  <view class="growth-note route-enter-page delay-three">
     <view class="growth-note-copy">
       <text class="growth-note-label">TODAY'S NOTE</text>
       <text class="growth-note-text">{{dailyBoostText}}</text>

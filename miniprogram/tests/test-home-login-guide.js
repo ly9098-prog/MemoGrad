@@ -62,6 +62,7 @@ function launch(memory = new Map(), options = {}) {
     async _validateHomeSession() { this._authed = authenticated },
     _guestBasePatch: () => ({ guestMode: true }),
     _clearAnimTimer() {},
+    clearGrowthLifecycleTimers() {},
     openLoginFromHome() { navigation.push(this.data.showLoginGuide) },
   }
   const mocks = {
@@ -70,7 +71,7 @@ function launch(memory = new Map(), options = {}) {
       isAdmin: () => false,
       getUser: () => ({}),
     },
-    './utils/growth-page-controller': { TODAY_GOAL_TOTAL: 30, GOAL_OPTIONS: [], growthPageMethods },
+    './utils/growth-page-controller': { TODAY_GOAL_TOTAL: 30, GOAL_OPTIONS: [], clearGrowthLifecycleTimers: () => {}, growthPageMethods },
     './utils/home-canvas': { homeCanvasMethods: {} },
     './utils/guest-login-guide': exported.exports,
   }

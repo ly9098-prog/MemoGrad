@@ -471,6 +471,7 @@ Component({
           this._syncGraphViewportRatio()
 
           if (idChanged) {
+            patch.isFlipped = false
             patch.showSymbolNotes = false
             patch.showSecondary = false
             patch.showErrorTips = true
@@ -502,6 +503,7 @@ Component({
   },
 
   data: {
+    isFlipped: false,
     expandedBlock: null,
     expandedHeight: 0,
     expandedScrollHeight: 0,
@@ -556,6 +558,9 @@ Component({
   },
 
   methods: {
+    toggleCardFlip() {
+      this.setData({ isFlipped: !this.data.isFlipped })
+    },
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)
       var block = this.data.formulaBlocks[index]

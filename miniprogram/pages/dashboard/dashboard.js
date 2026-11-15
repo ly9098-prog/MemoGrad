@@ -5,6 +5,7 @@ const { buildDiagnosisSubjectOptions } = require('./dashboard.diagnosis')
 const { getChinaDate, parseServerUtc } = require('../../utils/china-time')
 const errorDiagnosis = require('./utils/error-diagnosis')
 const { studyStrategy } = require('../../utils/storage')
+const numberReveal = require('../../utils/number-reveal')
 
 const DASHBOARD_AI_HTTP_TIMEOUT_MS = 55000
 const DASHBOARD_AI_SUCCESS_COOLDOWN_MS = 60000
@@ -227,6 +228,16 @@ Page({
     pageReady: false,
 
     hero: null,
+    _animTotalCorrect: 0,
+    _animTotalCorrectSegments: [],
+    _animConsecutiveDays: 0,
+    _animConsecutiveSegments: [],
+    _animAccuracy: 0,
+    _animAccuracySegments: [],
+    _animDueReviewCount: 0,
+    _animDueReviewSegments: [],
+    _animTodayQuestions: 0,
+    _animTodayQuestionsSegments: [],
     subtitle: '',
     trend: null,
     trendError: null,
@@ -328,6 +339,7 @@ Page({
   _trendTimer: null,
   _gaugeTimer: null,
   _growthTimer: null,
+  _numberRevealTimer: null,
   _adaptiveTimer: null,
   _lastLoadAt: 0,
   _loadPromise: null,
@@ -425,6 +437,7 @@ Page({
     this._gaugeTimer = null
     clearTimeout(this._growthTimer)
     this._growthTimer = null
+    numberReveal.finish(this)
     clearTimeout(this._adaptiveTimer)
     this._adaptiveTimer = null
     // Requests invalidated above will intentionally skip their completion
@@ -467,6 +480,7 @@ Page({
     this._gaugeTimer = null
     clearTimeout(this._growthTimer)
     this._growthTimer = null
+    numberReveal.finish(this)
     clearTimeout(this._adaptiveTimer)
     this._adaptiveTimer = null
   },
@@ -1062,7 +1076,39 @@ Page({
       pageReady: true,
       error: null,
       _hasData: models.hasData,
-    }, () => this._afterDashboardCommit(models, mode, canRedrawTrend))
+    }, () => {
+      this._startNumberReveal(models)
+      this._afterDashboardCommit(models, mode, canRedrawTrend)
+    })
+  },
+
+  _startNumberReveal(models) {
+    if (!this._alive || !this._visible) return
+    const trend = models.trend
+    const hero = models.hero
+    numberReveal.start(this, {
+      fields: [
+        { name: '_animTodayQuestions', segmentsKey: '_animTodayQuestionsSegments' },
+        { name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments' },
+        { name: '_animConsecutiveDays', segmentsKey: '_animConsecutiveSegments' },
+        { name: '_animAccuracy', kind: 'percent', segmentsKey: '_animAccuracySegments' },
+        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
+      ],
+      to: {
+        _animTodayQuestions: hero.todayQuestions || 0,
+        _animTotalCorrect: hero.totalCorrect || 0,
+        _animConsecutiveDays: hero.consecutiveDays || 0,
+        _animAccuracy: trend ? trend.avgAccuracyPct : hero.totalAccuracyPct,
+        _animDueReviewCount: hero.dueReviewCount || 0,
+      },
+      durations: {
+        _animTodayQuestions: 600,
+        _animTotalCorrect: 600,
+        _animConsecutiveDays: 600,
+        _animAccuracy: 500,
+        _animDueReviewCount: 600,
+      },
+    })
   },
 
   _afterDashboardCommit(models, mode, canRedrawTrend) {
