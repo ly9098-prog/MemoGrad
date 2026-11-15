@@ -7,6 +7,8 @@ describe("import workspace overlay boundaries", () => {
 
     expect(source).toContain('from "@/components/ui/dialog"');
     expect(source).toContain("<DialogContent");
+    expect(source).toContain("onCloseAutoFocus");
+    expect(source).toContain("previewTriggerRef");
     expect(source).not.toContain("createPortal");
   });
 

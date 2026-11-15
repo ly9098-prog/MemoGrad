@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -139,12 +139,29 @@ function typeLabel(t: string | null | undefined) {
 }
 
 /** Compact detail modal */
-function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () => void }) {
+function DetailModal({
+  item,
+  onClose,
+  returnFocusRef,
+}: {
+  item: ImportQuestionItem;
+  onClose: () => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
+}) {
   const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="admin-content-theme top-6 max-h-[calc(100dvh-3rem)] max-w-2xl translate-y-0 overflow-hidden rounded-2xl p-0" showCloseButton={false}>
+      <DialogContent
+        className="admin-content-theme top-6 max-h-[calc(100dvh-3rem)] max-w-2xl translate-y-0 overflow-hidden rounded-2xl p-0"
+        showCloseButton={false}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef.current;
+          if (!target?.isConnected) return;
+          event.preventDefault();
+          target.focus();
+        }}
+      >
         <DialogDescription className="sr-only">
           查看导入题目的题干、答案、解析及 OCR/AI 原始数据。
         </DialogDescription>
@@ -264,6 +281,7 @@ export default function ImportQuestionsPage() {
   const batchIdParam = searchParams.get("batch_id") || "";
   const [filters, setFilters] = useState({ batch_id: "", status: "", subject_id: "", source_type: "", keyword: "" });
   const [previewId, setPreviewId] = useState<number | null>(null);
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
 
   const queryParams = useMemo(
     () => ({ page: 1, page_size: 50, batch_id: filters.batch_id || batchIdParam, status: filters.status, subject_id: filters.subject_id ? Number(filters.subject_id) : undefined, source_type: filters.source_type, keyword: filters.keyword }),
@@ -295,7 +313,7 @@ export default function ImportQuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -328,15 +346,15 @@ export default function ImportQuestionsPage() {
             />
           </div>
         </CardHeader>
-        <CardContent>
-          {/* ===== Card-style question list ===== */}
-          <section className="space-y-2">
+        <CardContent className="p-0">
+          {/* ===== Continuous question list ===== */}
+          <section className="divide-y divide-border">
             {items.map((item) => {
               const StatusIcon = statusIcon(item.status);
               return (
                 <div
                   key={item.id}
-                  className="rounded-xl border border-border bg-card px-4 py-3.5 transition hover:border-primary/25 hover:shadow-sm"
+                  className="px-4 py-3.5 transition-colors hover:bg-accent/20"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     {/* Left: main content */}
@@ -388,8 +406,11 @@ export default function ImportQuestionsPage() {
                     <div className="flex shrink-0 items-start sm:pl-3">
                       <Button
                         variant="ghost"
-className="h-9 gap-1.5 px-3 text-xs font-medium"
-                        onClick={() => setPreviewId(item.id)}
+                        className="h-9 gap-1.5 px-3 text-xs font-medium"
+                        onClick={(event) => {
+                          previewTriggerRef.current = event.currentTarget;
+                          setPreviewId(item.id);
+                        }}
                       >
                         <Eye className="h-4 w-4" />
                         查看
@@ -400,19 +421,23 @@ className="h-9 gap-1.5 px-3 text-xs font-medium"
               );
             })}
             {!questions.isLoading && items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
+              <p className="px-4 py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
             ) : null}
           </section>
 
           {questions.isError ? (
-            <p className="mt-4 text-sm text-destructive">导入题目接口当前不可用。</p>
+            <p className="border-t border-border px-4 py-3 text-sm text-destructive">导入题目接口当前不可用。</p>
           ) : null}
         </CardContent>
       </Card>
 
       {/* ===== Detail modal ===== */}
       {previewItem ? (
-        <DetailModal item={previewItem} onClose={() => setPreviewId(null)} />
+        <DetailModal
+          item={previewItem}
+          onClose={() => setPreviewId(null)}
+          returnFocusRef={previewTriggerRef}
+        />
       ) : null}
     </div>
   );
