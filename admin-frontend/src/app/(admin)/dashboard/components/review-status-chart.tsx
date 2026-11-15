@@ -1,28 +1,21 @@
 "use client";
 
+import styles from "../dashboard-workspace.module.css";
+
 type ReviewStatusDatum = { name: string; count: number };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  pending: { label: "待审核", color: "var(--warning)" },
-  reviewing: { label: "审核中", color: "var(--primary)" },
-  approved: { label: "已审核", color: "var(--success)" },
-  published: { label: "已发布", color: "var(--success)" },
-  rejected: { label: "已驳回", color: "var(--destructive)" },
-  error: { label: "异常", color: "var(--destructive)" },
-  draft: { label: "草稿", color: "var(--muted-foreground)" },
-  archived: { label: "已归档", color: "#7c8d96" },
+  pending: { label: "待审核", color: "#6768e8" },
+  reviewing: { label: "审核中", color: "#348de5" },
+  approved: { label: "已审核", color: "#1fae9e" },
+  published: { label: "已发布", color: "#147c78" },
+  rejected: { label: "已驳回", color: "#dd7a9b" },
+  error: { label: "异常", color: "#cf5d6b" },
+  draft: { label: "草稿", color: "#8fa8aa" },
+  archived: { label: "已归档", color: "#b2c4c1" },
 };
 
-const FALLBACK_COLORS = [
-  "var(--primary)",
-  "var(--success)",
-  "var(--warning)",
-  "var(--destructive)",
-  "var(--muted-foreground)",
-];
-
-const RADIUS = 54;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const FALLBACK_COLORS = ["#6768e8", "#1fae9e", "#348de5", "#dd7a9b", "#8fa8aa"];
 
 function formatCount(value: number) {
   return value.toLocaleString("zh-CN");
@@ -52,91 +45,60 @@ export function ReviewStatusChart({
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-[220px] flex-col items-center gap-5 p-5 sm:flex-row" aria-label="正在加载审核状态分布">
-        <div className="h-[164px] w-[164px] shrink-0 animate-pulse rounded-full border-[14px] border-muted motion-reduce:animate-none" />
-        <div className="w-full flex-1 space-y-3">
+      <div className={styles.reviewSkeleton} aria-label="正在加载审核状态分布">
+        <div className={styles.reviewSkeletonBar} />
+        <div className={styles.reviewSkeletonLines}>
           {Array.from({ length: 3 }, (_, index) => (
-            <div key={index} className="space-y-1.5">
-              <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-muted motion-reduce:animate-none" />
-              <div className="h-2 w-1/3 animate-pulse rounded-full bg-muted motion-reduce:animate-none" />
-            </div>
+            <span key={index} style={{ width: `${70 - index * 12}%` }} />
           ))}
         </div>
       </div>
     );
   }
 
-  const segments = entries.map((entry, index) => ({
-    entry,
-    length: (entry.count / total) * CIRCUMFERENCE,
-    offset: entries
-      .slice(0, index)
-      .reduce((sum, previous) => sum + (previous.count / total) * CIRCUMFERENCE, 0),
-  }));
-
   return (
     <div
       key={animationKey ?? entries.map((entry) => `${entry.name}:${entry.count}`).join("|")}
-      className="flex h-full min-h-[220px] flex-col items-center gap-5 p-5 sm:flex-row"
+      className={styles.reviewChart}
     >
-      <div className="relative h-[164px] w-[164px] shrink-0">
-        <svg
-          viewBox="0 0 160 160"
-          className="h-full w-full -rotate-90"
-          role="img"
-          aria-label={total > 0 ? `审核状态分布，共 ${formatCount(total)} 题` : "暂无审核状态数据"}
-        >
-          <title>审核状态分布</title>
-          <circle cx="80" cy="80" r={RADIUS} fill="none" stroke="var(--muted)" strokeWidth="14" />
-          {segments.map(({ entry, length, offset }) => {
-            const gap = segments.length > 1 ? 3 : 0;
-            const visibleLength = Math.max(0, length - gap);
-            return (
-              <circle
-                key={entry.name}
-                cx="80"
-                cy="80"
-                r={RADIUS}
-                fill="none"
-                stroke={entry.color}
-                strokeWidth="14"
-                strokeDasharray={`${visibleLength} ${CIRCUMFERENCE - visibleLength}`}
-                strokeDashoffset={-offset}
-                strokeLinecap="butt"
-              />
-            );
-          })}
-        </svg>
-        <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-          <div>
-            <p className="text-[24px] font-semibold leading-none tracking-[-0.04em] tabular-nums text-foreground">
-              {formatCount(total)}
-            </p>
-            <p className="mt-1.5 text-[10px] font-medium text-muted-foreground">题目总数</p>
-          </div>
+      <div className={styles.reviewChartHeader}>
+        <div>
+          <h4>审核分布</h4>
+          <p>按当前题目审核状态统计。</p>
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 space-y-2.5">
+      <div
+        className={styles.reviewBar}
+        role="img"
+        aria-label={total > 0 ? `审核状态分布，共 ${formatCount(total)} 题` : "暂无审核状态数据"}
+      >
+        {entries.map((entry) => (
+          <span
+            key={entry.name}
+            className={styles.reviewBarSegment}
+            style={{ width: `${entry.pct}%`, backgroundColor: entry.color }}
+            title={`${entry.label} ${formatCount(entry.count)} 题`}
+          />
+        ))}
+      </div>
+
+      <div className={styles.reviewLegend}>
         {entries.length > 0 ? (
-          entries.map((entry) => (
-            <div key={entry.name} className="flex items-center justify-between gap-3 text-xs">
-              <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: entry.color }}
-                />
-                <span className="truncate">{entry.label}</span>
+          entries.slice(0, 5).map((entry) => (
+            <div key={entry.name} className={styles.reviewLegendRow}>
+              <span className={styles.reviewLegendLabel}>
+                <i style={{ backgroundColor: entry.color }} />
+                <span>{entry.label}</span>
               </span>
-              <span className="shrink-0 tabular-nums text-foreground">
-                <strong className="font-semibold">{formatCount(entry.count)}</strong>
-                <span className="ml-2 text-[11px] text-muted-foreground">{entry.pct.toFixed(1)}%</span>
+              <span className={styles.reviewLegendValue}>
+                {formatCount(entry.count)}
+                <small>{entry.pct.toFixed(1)}%</small>
               </span>
             </div>
           ))
         ) : (
-          <p className="text-xs leading-6 text-muted-foreground">暂无审核状态数据，题库统计完成后会在此显示。</p>
+          <p className={styles.reviewEmpty}>暂无审核状态数据，题库统计完成后会在此显示。</p>
         )}
       </div>
     </div>
