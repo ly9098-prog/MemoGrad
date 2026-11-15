@@ -8,9 +8,9 @@ const ACTIONS = [
   { action: 'high_frequency_traps', label: '总结这个知识点的高频陷阱', shortLabel: '高频陷阱', icon: '/assets/icons/wrong-detail/triangle-alert.svg' },
 ]
 
-// 错题详情首屏只展示高频、互补的四个动作；完整七动作仍保持兼容，
-// 供“更多”以及练习/考试结果页继续复用。
-const PRIMARY_ACTION_KEYS = ['explain_options', 'core_concept', 'similar_question', 'connect_knowledge']
+// 错题详情首屏展示四个动作，其中“只讲正确项”替代“同类题”进入首屏，
+// “同类题”收进更多；完整七动作仍保持兼容，供练习/考试结果页继续复用。
+const PRIMARY_ACTION_KEYS = ['explain_options', 'core_concept', 'explain_correct', 'connect_knowledge']
 const PRIMARY_ACTION_SET = new Set(PRIMARY_ACTION_KEYS)
 const PRIMARY_ACTIONS = PRIMARY_ACTION_KEYS.map(key => ACTIONS.find(item => item.action === key)).filter(Boolean)
 const MORE_ACTIONS = ACTIONS.filter(item => !PRIMARY_ACTION_SET.has(item.action))

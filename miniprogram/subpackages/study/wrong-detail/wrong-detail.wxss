@@ -102,3 +102,34 @@
   font-size: 24rpx;
   line-height: 1.4;
 }
+.ai-mark {
+  white-space: nowrap;
+}
+.ai-mark.is-loading {
+  border-color: #C7D6C9;
+  background: #F1F6EC;
+  color: #58715B;
+}
+.ai-mark.is-loading .ai-mark-dot {
+  background: #78A83C;
+  animation: switchPulse .9s ease-in-out infinite;
+}
+.ai-mark.is-warning {
+  border-color: #E3D4B0;
+  background: #FBF6E9;
+  color: #8B6A2D;
+}
+.ai-mark.is-warning .ai-mark-dot {
+  background: #C49A3A;
+}
+.ai-mark.is-error {
+  width: auto;
+  min-width: 106rpx;
+  padding: 0 14rpx;
+  border-color: #E4CFC8;
+  background: #FAF1EE;
+  color: #A05A48;
+}
+.ai-mark.is-error .ai-mark-dot {
+  background: #C06A55;
+}
