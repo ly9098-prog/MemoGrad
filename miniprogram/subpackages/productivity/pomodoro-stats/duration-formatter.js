@@ -27,11 +27,29 @@ function buildDurationSegments(text) {
   const parts = []
   const regex = /(\d+)|(小时|分钟|时|分)/g
   let match = null
+  let revealIndex = 0
   while ((match = regex.exec(normalized))) {
-    if (match[1]) parts.push({ type: 'num', text: match[1] })
-    else if (match[2]) parts.push({ type: 'unit', text: match[2] })
+    if (match[1]) {
+      String(match[1]).split('').forEach(digit => {
+        parts.push({
+          type: 'num',
+          text: digit,
+          key: `${parts.length}-${digit}`,
+          direction: revealIndex % 2 === 0 ? 'top' : 'bottom',
+          delay: revealIndex * 38,
+        })
+        revealIndex += 1
+      })
+    } else if (match[2]) {
+      parts.push({ type: 'unit', text: match[2], key: `${parts.length}-${match[2]}` })
+    }
   }
-  if (!parts.length) return [{ type: 'num', text: normalized }]
+  if (!parts.length) {
+    return [{
+      type: 'num', text: normalized, key: `0-${normalized}`,
+      direction: 'top', delay: 0,
+    }]
+  }
   return parts
 }
 
