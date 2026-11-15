@@ -189,7 +189,8 @@ export default function DashboardPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const permissions = useAuthStore((state) => state.permissions);
-  const canRequestDashboard = isAuthenticated && !isBootstrapping;
+  const canReadDashboard = hasPermission(permissions, "dashboard:read");
+  const canRequestDashboard = isAuthenticated && !isBootstrapping && canReadDashboard;
   const canReadSystem = hasPermission(permissions, "system:read");
   const [period, setPeriod] = useState<Period>("7d");
   const [manualRefreshing, setManualRefreshing] = useState(false);
@@ -304,6 +305,33 @@ export default function DashboardPage() {
   const aiHint = aiStats.data
     ? `成功率 ${aiStats.data.success_rate.toFixed(1)}%`
     : "AI 指标暂不可用";
+
+  if (isAuthenticated && !isBootstrapping && !canReadDashboard) {
+    return (
+      <ManagementPage className="space-y-5">
+        <header className="border-b border-border pb-5">
+          <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">运营总览</h1>
+          <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
+            聚合用户、题库、审核、导入、AI 与系统状态的实时运营视图。
+          </p>
+        </header>
+        <ManagementPanel
+          title="无权限查看仪表盘"
+          description="当前角色未被授予 dashboard:read 权限。"
+          icon={<ShieldAlert className="h-4 w-4" />}
+          variant="quiet"
+        >
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <ShieldAlert className="h-8 w-8 text-muted-foreground/60" aria-hidden="true" />
+            <p className="text-sm font-semibold text-foreground">无法加载运营数据</p>
+            <p className="max-w-md text-xs leading-5 text-muted-foreground">
+              请联系超级管理员为当前角色分配“仪表盘查看”权限。
+            </p>
+          </div>
+        </ManagementPanel>
+      </ManagementPage>
+    );
+  }
 
   return (
     <ManagementPage className="space-y-5 pb-10">

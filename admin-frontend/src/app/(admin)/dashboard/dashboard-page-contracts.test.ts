@@ -3,6 +3,7 @@ import { isValidElement, type ReactElement } from "react";
 import DashboardPage from "./page";
 import { DashboardTrendChart } from "./components/dashboard-trend-chart";
 import { BodyPortal } from "@/components/ui/body-portal";
+import { ManagementPanel } from "@/components/admin/management-ui";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -101,6 +102,27 @@ describe("dashboard page request ownership", () => {
     DashboardPage();
     const diagnostics = h.queries.find((query) => query.queryKey.join("|") === "dashboard|task-diagnostics");
     expect(diagnostics?.enabled).toBe(false);
+  });
+
+  it("gates every dashboard request without dashboard:read", () => {
+    h.permissions = [];
+    DashboardPage();
+    expect(h.queries).toHaveLength(6);
+    expect(h.queries.every((query) => query.enabled === false)).toBe(true);
+    expect(h.request).not.toHaveBeenCalled();
+  });
+
+  it("renders a permission state instead of dashboard data without dashboard:read", () => {
+    h.permissions = [];
+    const root = DashboardPage();
+    const panel = find(
+      root,
+      (element) =>
+        element.type === ManagementPanel &&
+        element.props.title === "无权限查看仪表盘",
+    );
+    expect(panel).toBeDefined();
+    expect(find(panel, (element) => element.props.children === "无法加载运营数据")).toBeDefined();
   });
 
   it.each([
