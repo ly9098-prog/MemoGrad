@@ -317,7 +317,7 @@ export default function ImportQuestionsPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-2xl font-bold text-foreground">导入题目列表</h3>
+              <h1 className="font-display text-2xl font-bold text-foreground">导入题目列表</h1>
               <p className="mt-1 text-sm text-muted-foreground">查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。</p>
             </div>
             <Link href="/imports/review" className="inline-flex h-11 items-center justify-center rounded-2xl border border-primary bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-card">

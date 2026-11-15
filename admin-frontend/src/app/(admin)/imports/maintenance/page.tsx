@@ -92,6 +92,7 @@ export default function ImportMaintenancePage() {
 
   return (
     <div className="space-y-4">
+      <h1 className="sr-only">导入运维</h1>
       {/* ===== Top bar ===== */}
       <div className="flex items-center justify-end">
         <Button

@@ -6,10 +6,10 @@ describe("Drawer", () => {
     const source = readFileSync(new URL("./drawer.tsx", import.meta.url), "utf8");
 
     expect(source).toContain(
-      'import {\n  isFocusPassthroughTarget,\n  isTopModalSurface,\n} from "@/lib/modal-focus";',
+      'import {\n  hasOpenTransientOverlay,\n  isFocusPassthroughTarget,\n  isTopModalSurface,\n} from "@/lib/modal-focus";',
     );
     expect(source).toContain(
-      'if (e.key === "Escape" && !e.defaultPrevented && isTopModalSurface(drawerRef.current)) onClose();',
+      "!hasOpenTransientOverlay()",
     );
     expect(source).toContain(
       "if (isFocusPassthroughTarget(e.target)) return;",

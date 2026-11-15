@@ -84,7 +84,7 @@ export default function ImportHistoryPage() {
       <Card>
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="font-display text-2xl font-bold text-foreground">导入记录</h3>
+            <h1 className="font-display text-2xl font-bold text-foreground">导入记录</h1>
             <p className="mt-1 text-sm text-muted-foreground">查看批次统计，发布已通过题目，删除未发布批次。</p>
           </div>
           <Button variant="secondary" disabled={batches.isFetching} onClick={() => batches.refetch()}>

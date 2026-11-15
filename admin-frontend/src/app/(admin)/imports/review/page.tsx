@@ -792,7 +792,7 @@ export default function ImportReviewPage() {
         <CardHeader className="space-y-2 pb-3">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-lg font-bold text-foreground">待审核题目</h3>
+              <h1 className="font-display text-lg font-bold text-foreground">待审核题目</h1>
               <p className="mt-0.5 text-xs text-muted-foreground">审核导入题目，通过后发布到正式题库</p>
             </div>
             <div className="flex flex-wrap gap-2">

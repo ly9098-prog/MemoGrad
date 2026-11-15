@@ -15,6 +15,36 @@ type UseModalSurfaceOptions = {
   escapeDisabled?: boolean;
 };
 
+export type ModalEscapeInput = {
+  key: string;
+  defaultPrevented: boolean;
+  hasOnEscape: boolean;
+  escapeDisabled: boolean;
+  targetOwnsTransientOverlay: boolean;
+  hasTransientOverlay: boolean;
+  isTopModal: boolean;
+};
+
+export function shouldHandleModalEscape({
+  key,
+  defaultPrevented,
+  hasOnEscape,
+  escapeDisabled,
+  targetOwnsTransientOverlay,
+  hasTransientOverlay,
+  isTopModal,
+}: ModalEscapeInput): boolean {
+  return (
+    key === "Escape" &&
+    !defaultPrevented &&
+    hasOnEscape &&
+    !escapeDisabled &&
+    !targetOwnsTransientOverlay &&
+    !hasTransientOverlay &&
+    isTopModal
+  );
+}
+
 const FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
@@ -68,7 +98,8 @@ export function useModalSurface({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (!isTopModalSurface(surface)) return;
+      const isTopModal = isTopModalSurface(surface);
+      if (!isTopModal) return;
       if (target?.closest("[data-focus-passthrough]")) return;
 
       if (event.key === "Tab") {
@@ -92,18 +123,27 @@ export function useModalSurface({
         return;
       }
 
-      if (!onEscapeRef.current || escapeDisabledRef.current) return;
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (
+      const targetOwnsTransientOverlay = Boolean(
         target?.closest(
           '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
-        )
+        ),
+      );
+      const onEscape = onEscapeRef.current;
+      if (!onEscape) return;
+      if (
+        !shouldHandleModalEscape({
+          key: event.key,
+          defaultPrevented: event.defaultPrevented,
+          hasOnEscape: true,
+          escapeDisabled: escapeDisabledRef.current,
+          targetOwnsTransientOverlay,
+          hasTransientOverlay: hasOpenTransientOverlay(),
+          isTopModal,
+        })
       ) {
         return;
       }
-      if (hasOpenTransientOverlay()) return;
-      if (!isTopModalSurface(surface)) return;
-      onEscapeRef.current();
+      onEscape();
     };
 
     document.addEventListener("focusin", handleFocusIn);

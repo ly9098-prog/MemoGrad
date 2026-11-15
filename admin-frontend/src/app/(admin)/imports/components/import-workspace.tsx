@@ -99,9 +99,9 @@ export function ImportWorkspaceHeader({
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground sm:text-[30px]">
+              <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground sm:text-[30px]">
                 {title}
-              </h2>
+              </h1>
               <p className="mt-2 max-w-[68ch] text-[13px] leading-6 text-muted-foreground">{description}</p>
             </div>
           </div>

@@ -115,7 +115,7 @@ export default function AISettingsPage() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive-light">
           <Ban className="h-8 w-8 text-destructive" />
         </div>
-        <h3 className="text-xl font-semibold text-foreground">权限不足</h3>
+        <h1 className="text-xl font-semibold text-foreground">权限不足</h1>
         <p className="max-w-sm text-sm text-muted-foreground">仅超级管理员可访问 AI 解析设置页面</p>
       </div>
     );
@@ -132,7 +132,7 @@ export default function AISettingsPage() {
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground/70">
             AI Operations Center
           </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-foreground">AI 解析设置</h2>
+          <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-foreground">AI 解析设置</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             管理 OCR 纠错、题目补全、AI 解析生成等能力
           </p>

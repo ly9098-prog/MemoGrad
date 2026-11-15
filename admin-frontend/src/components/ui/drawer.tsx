@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
+  hasOpenTransientOverlay,
   isFocusPassthroughTarget,
   isTopModalSurface,
 } from "@/lib/modal-focus";
@@ -72,7 +73,14 @@ export function Drawer({
 
   // Escape key
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape" && !e.defaultPrevented && isTopModalSurface(drawerRef.current)) onClose();
+    if (
+      e.key === "Escape" &&
+      !e.defaultPrevented &&
+      isTopModalSurface(drawerRef.current) &&
+      !hasOpenTransientOverlay()
+    ) {
+      onClose();
+    }
   }, [onClose]);
 
   useEffect(() => {
