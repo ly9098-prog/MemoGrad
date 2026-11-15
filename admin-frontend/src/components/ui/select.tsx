@@ -208,7 +208,7 @@ function PortalDropdown({
       role="listbox"
       data-focus-passthrough
       className={cn(
-        "rounded-xl border border-border/80 bg-card py-1 shadow-lg",
+        "admin-content-theme rounded-xl border border-border/80 bg-card py-1 shadow-lg",
         optionClassName,
       )}
       style={style}

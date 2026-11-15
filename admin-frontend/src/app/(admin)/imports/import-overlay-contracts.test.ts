@@ -25,5 +25,16 @@ describe("import workspace overlay boundaries", () => {
   it("portals review feedback without accessing document during SSR", () => {
     const source = readFileSync(new URL("review/page.tsx", import.meta.url), "utf8");
     expect(source).toContain('typeof document === "undefined" ? messageToast : createPortal(messageToast, document.body)');
+    expect(source).toContain('className="admin-content-theme animate-paper-slide fixed');
+  });
+
+  it.each([
+    "review/components/review-detail-drawer.tsx",
+    "review/components/review-batch-answer-dialog.tsx",
+    "review/components/review-batch-complete-dialog.tsx",
+    "components/import-toast.tsx",
+  ])("keeps %s on the admin content theme", (file) => {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    expect(source).toContain("admin-content-theme");
   });
 });

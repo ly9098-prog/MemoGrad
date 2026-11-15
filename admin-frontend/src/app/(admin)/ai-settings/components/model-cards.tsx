@@ -391,7 +391,7 @@ function ProviderSelect({
       ref={menuRef}
       role="listbox"
       style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
-      className="fixed z-[120] max-h-64 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]"
+      className="admin-content-theme fixed z-[120] max-h-64 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]"
     >
       {filtered.length > 0 ? filtered.map((item) => {
         const selected = normalizedValue === item.value;
@@ -689,7 +689,7 @@ function AddModelDrawer({
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-40 flex justify-end backdrop-blur-[0.5px] transition-[background-color] duration-200",
+        "admin-content-theme fixed inset-0 z-40 flex justify-end backdrop-blur-[0.5px] transition-[background-color] duration-200",
         visible ? "bg-foreground/[0.10]" : "bg-foreground/0",
       )}
       onMouseDown={requestClose}
@@ -1389,7 +1389,7 @@ function ModelConfigDrawer({
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-40 flex justify-end backdrop-blur-[0.5px] transition-[background-color] duration-200",
+        "admin-content-theme fixed inset-0 z-40 flex justify-end backdrop-blur-[0.5px] transition-[background-color] duration-200",
         visible ? "bg-foreground/[0.10]" : "bg-foreground/0",
       )}
       onMouseDown={requestClose}

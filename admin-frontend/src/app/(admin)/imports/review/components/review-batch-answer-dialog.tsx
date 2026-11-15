@@ -90,7 +90,7 @@ export function ReviewBatchAnswerDialog({
 
   const dialog = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/60" role="presentation" onClick={() => { if (!executing) { onClose(); } }}>
-      <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="scholar-panel flex h-full w-full max-w-xl flex-col overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="admin-content-theme scholar-panel flex h-full w-full max-w-xl flex-col overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="scholar-panel-header sticky top-0 z-10 px-6 py-4">
               <div className="flex items-start justify-between gap-4">

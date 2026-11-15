@@ -1013,7 +1013,7 @@ export default function ExamPaperDetailPage() {
 
       {jumpDrawerOpen
         ? createPortal(
-            <div ref={jumpDrawerRef} tabIndex={-1} className="fixed inset-0 z-[2147483647] [--mgmt-paper:var(--popover)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)]" role="dialog" aria-modal="true" aria-label="题号导航">
+            <div ref={jumpDrawerRef} tabIndex={-1} className="admin-content-theme fixed inset-0 z-[2147483647] [--mgmt-paper:var(--popover)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)]" role="dialog" aria-modal="true" aria-label="题号导航">
           <button
             type="button"
             className="absolute inset-0 bg-overlay backdrop-blur-[2px]"
@@ -1228,7 +1228,7 @@ export default function ExamPaperDetailPage() {
               type="button"
               onClick={scrollBackToTop}
               style={backToTopLeft != null ? { left: `${backToTopLeft}px` } : undefined}
-              className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 z-[2147483000] flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-primary/20 bg-popover px-3.5 text-sm font-semibold text-accent-foreground shadow-[0_12px_34px_rgba(31,49,61,0.18)] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-card hover:shadow-[0_16px_38px_rgba(31,49,61,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 active:translate-y-0 motion-reduce:transform-none sm:px-4"
+              className="admin-content-theme fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 z-[2147483000] flex h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-primary/20 bg-popover px-3.5 text-sm font-semibold text-accent-foreground shadow-[0_12px_34px_rgba(31,49,61,0.18)] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-card hover:shadow-[0_16px_38px_rgba(31,49,61,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 active:translate-y-0 motion-reduce:transform-none sm:px-4"
               aria-label="返回页面顶部"
               title="返回顶部"
             >

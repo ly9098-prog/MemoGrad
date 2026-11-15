@@ -822,7 +822,7 @@ export default function AdminUsersPage() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="admin-user-form-title"
-                className="flex max-h-[min(92vh,780px)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] border border-border bg-card/95 shadow-[0_28px_90px_rgba(29,37,34,0.24)]"
+                className="admin-content-theme flex max-h-[min(92vh,780px)] w-full max-w-[620px] flex-col overflow-hidden rounded-[28px] border border-border bg-card/95 shadow-[0_28px_90px_rgba(29,37,34,0.24)]"
                 onMouseDown={(event) => event.stopPropagation()}
               >
                 <div className="flex items-start gap-4 border-b border-border px-6 py-5 sm:px-7">

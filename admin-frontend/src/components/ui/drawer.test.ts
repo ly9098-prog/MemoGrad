@@ -14,5 +14,8 @@ describe("Drawer", () => {
     expect(source).toContain(
       "if (isFocusPassthroughTarget(e.target)) return;",
     );
+    expect(source).toContain(
+      '"admin-content-theme fixed inset-0 z-50 flex justify-end',
+    );
   });
 });

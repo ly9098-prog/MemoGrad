@@ -764,7 +764,7 @@ export default function ImportReviewPage() {
   const canBatchOperate = items.length > 0 && (selectedIds.size > 0 || Boolean(filters.batch_id || batchIdParam));
 
   const messageToast = message ? (
-        <div role="status" aria-live="polite" className="animate-paper-slide fixed right-6 top-6 z-[60] max-w-sm overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-[0_20px_60px_rgba(45,62,80,0.12),0_4px_16px_rgba(45,62,80,0.06)] backdrop-blur-xl">
+        <div role="status" aria-live="polite" className="admin-content-theme animate-paper-slide fixed right-6 top-6 z-[60] max-w-sm overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-[0_20px_60px_rgba(45,62,80,0.12),0_4px_16px_rgba(45,62,80,0.06)] backdrop-blur-xl">
           <div className="h-1 bg-gradient-to-r from-primary via-warning to-success" />
           <div className="px-5 py-4">
           <div className="flex items-start gap-3.5">

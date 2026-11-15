@@ -128,7 +128,7 @@ export function ReviewDrawerEditForm({
                         {subjectEditDropdownOpen ? createPortal(
                           <div
                             data-focus-passthrough
-                            className="fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-border bg-card py-1 shadow-lg"
+                            className="admin-content-theme fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-border bg-card py-1 shadow-lg"
                             style={subjectEditDropdownStyle}
                             onKeyDown={(event) => {
                               if (event.key !== "Escape") return;

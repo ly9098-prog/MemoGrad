@@ -102,7 +102,7 @@ export function Drawer({
   return createPortal(
     <div
       className={cn(
-        "fixed inset-0 z-50 flex justify-end transition-all duration-250 ease-out",
+        "admin-content-theme fixed inset-0 z-50 flex justify-end transition-all duration-250 ease-out",
         visible ? "bg-overlay/70" : "bg-transparent",
       )}
       onClick={onClose}

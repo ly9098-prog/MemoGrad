@@ -65,7 +65,7 @@ export function ImportToast({
       role={tone === "error" ? "alert" : "status"}
       aria-live={tone === "error" ? "assertive" : "polite"}
       className={cn(
-        "fixed right-4 top-24 z-[80] flex w-[min(500px,calc(100vw-2rem))] items-start gap-3 rounded-2xl border px-3.5 py-3 text-[13px] shadow-[0_18px_48px_rgba(27,39,51,0.16)] backdrop-blur-xl animate-drop-in sm:right-6",
+        "admin-content-theme fixed right-4 top-24 z-[80] flex w-[min(500px,calc(100vw-2rem))] items-start gap-3 rounded-2xl border px-3.5 py-3 text-[13px] shadow-[0_18px_48px_rgba(27,39,51,0.16)] backdrop-blur-xl animate-drop-in sm:right-6",
         settings.shell,
       )}
     >

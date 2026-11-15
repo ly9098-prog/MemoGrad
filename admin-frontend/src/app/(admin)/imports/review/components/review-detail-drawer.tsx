@@ -141,7 +141,7 @@ export function ReviewDetailDrawer({
   const drawer = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/70 backdrop-blur-[1px]" role="presentation" onClick={onClose}>
       <aside ref={drawerRef} tabIndex={-1} data-review-detail-drawer role="dialog" aria-modal="true" aria-labelledby="drawer-title"
-            className="flex h-full w-full max-w-3xl flex-col overflow-y-auto shadow-[var(--shadow-floating)] animate-slide-in bg-noise"
+            className="admin-content-theme flex h-full w-full max-w-3xl flex-col overflow-y-auto shadow-[var(--shadow-floating)] animate-slide-in bg-noise"
             style={{
               background: 'var(--background)',
               backgroundImage: 'linear-gradient(var(--blueprint-line) 1px, transparent 1px), linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px), url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.025\'/%3E%3C/svg%3E")',

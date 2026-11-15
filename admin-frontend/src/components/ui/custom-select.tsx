@@ -385,7 +385,7 @@ function PortalDropdown({
       id={id}
       data-focus-passthrough
       className={cn(
-        "rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
+        "admin-content-theme rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
         mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
       )}
       style={style}

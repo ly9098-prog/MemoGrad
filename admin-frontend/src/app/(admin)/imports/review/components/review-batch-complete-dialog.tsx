@@ -61,7 +61,7 @@ export function ReviewBatchCompleteDialog({
 
   const dialog = (
     <div className="fixed inset-0 z-40 flex justify-end bg-overlay/60" role="presentation" onClick={() => { if (!executing) { onClose(); } }}>
-          <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="flex h-full w-full max-w-xl flex-col overflow-y-auto bg-card shadow-[var(--shadow-floating)]" onClick={(e) => e.stopPropagation()}>
+          <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" className="admin-content-theme flex h-full w-full max-w-xl flex-col overflow-y-auto bg-card shadow-[var(--shadow-floating)]" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-6 py-4 backdrop-blur-xl">
               <div className="flex items-start justify-between gap-4">
