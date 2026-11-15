@@ -515,8 +515,6 @@ async def publish_questions(
     batch_id: str | None = None,
 ) -> PublishResponse:
     """批量发布审核通过的题目到正式题库。"""
-    await _migrate_old_approved(db)
-
     if question_ids:
         stmt = select(QuestionImport).where(
             QuestionImport.id.in_(question_ids),
@@ -540,6 +538,21 @@ async def publish_questions(
     stats = {"published": 0, "duplicate": 0, "failed": 0}
 
     for qi in records:
+        # Legacy approved rows may already point at a formal question. Mark the
+        # import status without creating or replacing that question again.
+        if qi.question_id is not None:
+            qi.status = "published"
+            details.append(
+                {
+                    "id": qi.id,
+                    "status": "published",
+                    "question_id": qi.question_id,
+                    "reason": "legacy_question_link",
+                }
+            )
+            stats["published"] += 1
+            continue
+
         item = await publish_single_question(db, qi)
         details.append(item)
         if item["status"] in stats:

@@ -244,8 +244,6 @@ class TestPublishQuestions:
             _make_qi_mock(qi_id=2),
         ]
         db.execute.side_effect = [
-            _make_execute_result(scalars=[]),  # _migrate: has question_id
-            _make_execute_result(scalars=[]),  # _migrate: orphans
             _make_execute_result(scalars=qis),   # select approved records
         ]
 
@@ -269,8 +267,6 @@ class TestPublishQuestions:
         db = _make_mock_db()
         qis = [_make_qi_mock(qi_id=1, batch_id="BATCH_X")]
         db.execute.side_effect = [
-            _make_execute_result(scalars=[]),  # _migrate: has question_id
-            _make_execute_result(scalars=[]),  # _migrate: orphans
             _make_execute_result(scalars=qis),
         ]
 
@@ -297,8 +293,6 @@ class TestPublishQuestions:
         dup_q.id = 99
 
         db.execute.side_effect = [
-            _make_execute_result(scalars=[]),  # _migrate: has question_id
-            _make_execute_result(scalars=[]),  # _migrate: orphans
             _make_execute_result(scalars=qis),
         ]
 
@@ -328,8 +322,6 @@ class TestPublishQuestions:
     def test_empty_id_list(self):
         db = _make_mock_db()
         db.execute.side_effect = [
-            _make_execute_result(scalars=[]),  # _migrate: has question_id
-            _make_execute_result(scalars=[]),  # _migrate: orphans
             _make_execute_result(scalars=[]),  # select
         ]
 
@@ -344,8 +336,6 @@ class TestPublishQuestions:
         # Only approved records are selected; pending/rejected are filtered by query
 
         db.execute.side_effect = [
-            _make_execute_result(scalars=[]),  # _migrate: has question_id
-            _make_execute_result(scalars=[]),  # _migrate: orphans
             _make_execute_result(scalars=qis),
         ]
 
@@ -361,6 +351,23 @@ class TestPublishQuestions:
         # Only 1 approved record selected
         assert result.total == 1
         assert result.published == 1
+
+    def test_publishes_linked_approved_without_new_question(self):
+        db = _make_mock_db()
+        qi = _make_qi_mock(qi_id=1, question_id=100)
+        db.execute.side_effect = [
+            _make_execute_result(scalars=[qi]),
+        ]
+
+        result = asyncio.run(publish_questions(db, question_ids=[1]))
+
+        assert result.total == 1
+        assert result.published == 1
+        assert result.duplicates == 0
+        assert result.failed == 0
+        assert result.details[0].reason == "legacy_question_link"
+        assert qi.status == "published"
+        db.add.assert_not_called()
 
 
 # --- approve_and_publish ---
