@@ -29,7 +29,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PremiumSection, PremiumSectionHeader, PremiumStat } from "@/components/admin/management-ui";
+import {
+  EmptyState,
+  ManagementNotice,
+  ManagementSkeletonRows,
+  PremiumSection,
+  PremiumSectionHeader,
+  PremiumStat,
+} from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getQuestionTypeLabel, canonicalizeQuestionType } from "@/lib/question-types";
 import type { ImportQuestionItem, PaginatedResponse } from "@/lib/api/types";
@@ -133,6 +140,12 @@ function duplicateStatusTone(status: string | null | undefined) {
   if (status === "possible_duplicate") return "warning" as const;
   if (status === "normal") return "success" as const;
   return "neutral" as const;
+}
+
+function duplicateStatusLabel(status: string) {
+  if (status === "possible_duplicate") return "疑似重复";
+  if (status === "normal") return "无重复";
+  return status;
 }
 
 function typeLabel(t: string | null | undefined) {
@@ -320,13 +333,13 @@ export default function ImportQuestionsPage() {
       <PremiumSection>
         <PremiumSectionHeader
           title="导入题目列表"
-          description="查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。"
+          description="查看导入暂存题目、重复检测与 OCR/AI 元数据。"
           icon={<Search className="h-3.5 w-3.5" />}
           titleAs="h1"
           titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
           meta={
             <>
-              <StatusBadge tone="accent">question_imports</StatusBadge>
+              <StatusBadge tone="accent">导入暂存</StatusBadge>
               <span>查看详情不会改变审核状态</span>
             </>
           }
@@ -340,7 +353,7 @@ export default function ImportQuestionsPage() {
         <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-2 xl:grid-cols-4">
           <PremiumStat label="匹配总数" value={questions.data?.total ?? items.length} hint={questions.isError ? "导入题目接口不可用" : "当前筛选的全部匹配结果"} icon={<FileText className="h-3.5 w-3.5" />} loading={questions.isLoading} />
           <PremiumStat label="本页记录" value={items.length} hint="单页最多展示 50 条" icon={<Search className="h-3.5 w-3.5" />} loading={questions.isLoading} />
-          <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页 pending 记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
+          <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页待审核记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
           <PremiumStat label="本页疑似重复" value={duplicateCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页重复检测命中"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="violet" tone={duplicateCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
         </div>
         <div className="grid gap-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(239,248,254,0.48),rgba(255,255,255,0.12))] px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
@@ -364,8 +377,16 @@ export default function ImportQuestionsPage() {
             className="h-11 w-full justify-between rounded-[10px] border border-border bg-card px-3 text-sm"
           />
         </div>
-        <section className="divide-y divide-[var(--admin-line)]">
-          {items.map((item) => {
+        {questions.isError ? (
+          <div className="border-b border-[var(--admin-line)] p-4 sm:p-5">
+            <ManagementNotice tone="danger" title="导入题目接口不可用">
+              当前无法读取导入暂存列表。请检查接口状态或稍后重试，现有筛选条件不会被清空。
+            </ManagementNotice>
+          </div>
+        ) : null}
+        <section aria-busy={questions.isLoading} className="divide-y divide-[var(--admin-line)]">
+          {questions.isLoading ? <ManagementSkeletonRows rows={5} /> : null}
+          {!questions.isLoading ? items.map((item) => {
             const StatusIcon = statusIcon(item.status);
             return (
               <div key={item.id} className="group px-4 py-4 transition-colors hover:bg-[rgba(239,247,252,0.54)] sm:px-5">
@@ -382,7 +403,7 @@ export default function ImportQuestionsPage() {
                       {item.duplicate_status ? (
                         <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
                           <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
-                          {item.duplicate_status === "possible_duplicate" ? "疑似重复" : item.duplicate_status}
+                          {duplicateStatusLabel(item.duplicate_status)}
                         </StatusBadge>
                       ) : null}
 
@@ -423,14 +444,11 @@ export default function ImportQuestionsPage() {
                 </div>
               </div>
             );
-          })}
-          {!questions.isLoading && items.length === 0 ? (
-            <p className="px-4 py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
+          }) : null}
+          {!questions.isLoading && !questions.isError && items.length === 0 ? (
+            <EmptyState>当前筛选没有导入题目。调整状态、批次或关键词后再试。</EmptyState>
           ) : null}
         </section>
-        {questions.isError ? (
-          <p className="border-t border-[var(--admin-line)] px-5 py-3 text-sm text-destructive">导入题目接口当前不可用。</p>
-        ) : null}
       </PremiumSection>
 
       {previewItem ? (

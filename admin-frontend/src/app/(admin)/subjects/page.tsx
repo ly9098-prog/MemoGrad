@@ -290,9 +290,9 @@ export default function SubjectsPage() {
                       aria-selected={false}
                       aria-level={subject.depth + 1}
                       aria-label={`${subject.name}，${subject.is_active ? "已启用" : "已停用"}`}
-                      className={`group grid grid-cols-[minmax(0,1fr)_104px] items-center gap-3 px-5 py-3.5 transition-[background-color,box-shadow,transform] duration-200 motion-reduce:transition-none sm:grid-cols-[minmax(0,1fr)_130px_160px] ${
+                      className={`group grid grid-cols-[minmax(0,1fr)_104px] items-center gap-3 px-5 py-3.5 transition-colors duration-200 motion-reduce:transition-none sm:grid-cols-[minmax(0,1fr)_130px_160px] ${
                         blockedSubjectId === subject.id
-                          ? "bg-warning-light/70 shadow-[inset_3px_0_0_rgba(196,154,107,0.72)]"
+                          ? "bg-warning-light/70"
                           : subject.is_product_root
                             ? "bg-[rgba(237,243,246,0.48)]"
                             : "hover:bg-[rgba(237,243,246,0.36)]"
@@ -387,16 +387,16 @@ export default function SubjectsPage() {
                   <p className="mt-1 text-[11px] leading-5 text-muted-foreground">启停影响产品可见范围，但不改变历史数据归属。</p>
                 </div>
               </div>
-              <div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground">
-                <div className="border-l-2 border-primary pl-3">
+              <div className="mt-4 divide-y divide-[var(--admin-line)] text-sm leading-6 text-muted-foreground">
+                <div className="py-4 first:pt-0">
                   <p className="font-semibold text-foreground">根科目控制产品入口</p>
                   <p className="mt-1">关闭根科目会整体隐藏相关刷题入口，因此需要二次确认。</p>
                 </div>
-                <div className="border-l-2 border-[var(--admin-line)] pl-3">
+                <div className="py-4">
                   <p className="font-semibold text-foreground">父级停用受下级状态保护</p>
                   <p className="mt-1">只要任意下级仍在线，父科目的停用操作就会被拦截；请从最末级开始逐层停用。</p>
                 </div>
-                <div className="border-l-2 border-[var(--admin-line)] pl-3">
+                <div className="py-4 last:pb-0">
                   <p className="font-semibold text-foreground">子科目启用会补齐上级状态</p>
                   <p className="mt-1">重新启用任意子科目时，系统会自动启用其父级及更高层级，避免出现“子级在线、父级关闭”的不可达状态。</p>
                 </div>

@@ -382,7 +382,7 @@ export default function CoveragePage() {
             </thead>
             <tbody>
               {filteredItems.map((item: CoverageMatrixItem) => (
-                <tr key={item.syllabus_knowledge_point_id} className="group border-b border-border/60 align-top transition-[background-color,box-shadow] duration-200 hover:bg-[rgba(74,111,138,0.035)] hover:shadow-[inset_3px_0_0_rgba(74,111,138,0.28)]">
+                <tr key={item.syllabus_knowledge_point_id} className="group border-b border-border/60 align-top transition-[background-color] duration-200 hover:bg-[rgba(74,111,138,0.045)]">
                   <td className="sticky left-0 z-[1] border-r border-border/60 bg-[var(--mgmt-paper)] px-5 py-4 shadow-[10px_0_18px_-18px_rgba(31,49,61,0.35)] transition-colors duration-200 group-hover:bg-card">
                     <p className="font-semibold text-foreground">{item.name}</p>
                     <p className="mt-1 text-xs text-muted-foreground/70">{item.subject_name} · KP #{item.knowledge_point_id}</p>

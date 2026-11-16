@@ -478,7 +478,7 @@ export default function SyllabusPage() {
                                     key={item.knowledge_point_id}
                                     disabled={disabled}
                                     onClick={() => toggleKnowledgePoint(item.knowledge_point_id)}
-                                    className={`flex min-h-[64px] items-start gap-3 border-l-2 px-3 py-2.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default motion-reduce:transition-none ${checked ? "border-primary bg-accent/40" : "border-transparent bg-card/55 hover:bg-card"}`}
+                                    className={`flex min-h-[64px] items-start gap-3 px-3 py-2.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default motion-reduce:transition-none ${checked ? "bg-accent/45" : "bg-card/55 hover:bg-card"}`}
                                   >
                                     <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-[background-color,border-color,transform] duration-200 ${checked ? "border-primary bg-primary text-white" : "border-border bg-card text-transparent"}`}>
                                       <Check className="h-3 w-3" strokeWidth={3} />

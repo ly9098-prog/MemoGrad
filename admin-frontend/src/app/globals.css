@@ -345,7 +345,7 @@ a {
   position: relative;
   min-width: 0;
   padding: 15px 20px 13px;
-  background: radial-gradient(190px 110px at 92% 2%, var(--premium-accent-soft), transparent 72%);
+  background: transparent;
 }
 
 .admin-premium-stat[data-tone="alert"] .admin-premium-stat-value { color: var(--premium-accent); }

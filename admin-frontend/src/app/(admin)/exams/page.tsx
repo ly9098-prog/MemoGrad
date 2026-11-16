@@ -415,7 +415,7 @@ export default function ExamPapersPage() {
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") router.push(`/exams/${paper.public_id}`);
                           }}
-                          className="group relative border-t border-border transition-[background-color,box-shadow] duration-200 hover:bg-accent/40 hover:shadow-[inset_3px_0_0_var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none"
+                          className="group relative border-t border-border transition-[background-color] duration-200 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none"
                         >
                           <td className="px-5 py-4">
                             <div className="flex min-w-0 items-center gap-2">
