@@ -13,8 +13,6 @@ interface ToggleProps {
 export function Toggle({ checked, onChange, disabled, size = "md", color }: ToggleProps) {
   const height = size === "sm" ? 5 : 6;
   const width = size === "sm" ? 9 : 11;
-  const knob = size === "sm" ? 3.5 : 5;
-  const translate = size === "sm" ? 120 : 100;
 
   return (
     <button

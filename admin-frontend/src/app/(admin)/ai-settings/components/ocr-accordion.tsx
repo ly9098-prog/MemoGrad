@@ -1,9 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, FileText, Braces, Filter, Rows3, Save, Brain, WandSparkles } from "lucide-react";
+import { FileText, Braces, Filter, Rows3, Save, Brain, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";

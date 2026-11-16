@@ -53,7 +53,6 @@ import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { EXAM_YEAR_OPTIONS, isSupportedExamYear } from "@/lib/exam-years";
 import {
-  SUBJECT_ORDER as EXAM_SUBJECT_ORDER,
   groupDraftItemsBySubject,
   filterCandidates,
   countMatchedSelected,
@@ -75,8 +74,6 @@ const CORE_SUBJECT_CODES = new Set([
   "computer_network",
 ]);
 const CORE_SUBJECT_CODE_QUERY = Array.from(CORE_SUBJECT_CODES).join(",");
-
-const SUBJECT_ORDER = EXAM_SUBJECT_ORDER;
 
 const SUBJECT_JUMP_STYLE: Record<string, { dot: string; chip: string }> = {
   data_structure: { dot: "bg-[#4a6f8a]", chip: "border-[#bfd0db] bg-[#edf4f7] text-[#2d5068] hover:border-[#7f9fb2] hover:bg-[#e4eef3]" },

@@ -1,18 +1,14 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
   Eye,
   FileText,
-  GripVertical,
-  ImageIcon,
   LayoutTemplate,
   Loader2,
   Plus,
@@ -29,13 +25,11 @@ import type {
   GraphSpecExpression,
   GraphSpecPanel,
   GraphSpecDomain,
-  GraphSpecAnnotation,
   GraphSpecRefLine,
   GraphPreviewResponse,
   GraphConfirmResponse,
   GraphStatus,
   QualityCheckResult,
-  FormulaGraphAsset,
 } from "@/lib/api/types";
 
 // ── Types ──

@@ -10,7 +10,6 @@ import {
   reuseFirstBlankOptions,
   updateMultiBlankChoiceAnswer,
 } from "./question-options";
-import type { NormalizedQuestionOption } from "./question-options";
 
 
 // ─── grouped option mutations ─────────────────────────────────────

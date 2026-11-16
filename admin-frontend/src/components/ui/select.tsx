@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface SelectOption {
@@ -34,6 +34,7 @@ export function Select({
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const activeIndexRef = useRef(-1);
+  const listboxId = useId();
 
   const selected = options.find((o) => o.value === value);
 
@@ -86,6 +87,7 @@ export function Select({
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         className={cn(
           "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card pl-3 pr-2 text-xs font-medium text-foreground outline-none transition-all duration-150",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
@@ -127,6 +129,7 @@ export function Select({
           value={value}
           onChange={(v) => { onChange(v); setOpen(false); }}
           options={options}
+          listboxId={listboxId}
         />
       )}
     </div>
@@ -140,6 +143,7 @@ function PortalDropdown({
   value,
   onChange,
   options,
+  listboxId,
 }: {
   triggerRef: React.RefObject<HTMLDivElement | null>;
   color?: string;
@@ -147,6 +151,7 @@ function PortalDropdown({
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
+  listboxId: string;
 }) {
   const [style, setStyle] = useState<React.CSSProperties>({
     position: "fixed",
@@ -205,6 +210,7 @@ function PortalDropdown({
   return createPortal(
     <div
       ref={listRef}
+      id={listboxId}
       role="listbox"
       data-focus-passthrough
       className={cn(

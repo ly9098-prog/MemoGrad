@@ -50,7 +50,6 @@ import type {
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission, type PermissionKey } from "@/lib/permissions/permissions";
 import {
-  ADMIN_ROLE_NAMES,
   checkPassword,
   isPasswordReady,
   isFormReady,
@@ -62,7 +61,6 @@ import {
   buildPagination,
   endOfChinaDateUtcIso,
   statusToQuery,
-  type PaginationItem,
   type StatusFilter,
 } from "@/lib/admin-user-utils";
 import { chinaDateString, chinaDateToUtcIso, formatChinaDateTime } from "@/lib/time";

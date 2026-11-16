@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { useState, useCallback } from "react";
+import { AlertTriangle } from "lucide-react";
 import { MathFormula } from "@/components/ui/math-formula";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { MissingOptionImageAlert } from "./missing-option-image-alert";

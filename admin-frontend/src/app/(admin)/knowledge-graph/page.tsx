@@ -51,10 +51,8 @@ import {
 import {
   cubicPoint,
   cubicUnitNormal,
-  segmentsProperlyIntersect,
   polylineIntersectionCount,
   getNodeLabelPlacement,
-  type NodeLabelPlacement,
 } from "@/lib/knowledge-graph-geometry";
 import { cn } from "@/lib/utils";
 

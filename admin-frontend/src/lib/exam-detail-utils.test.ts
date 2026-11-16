@@ -6,7 +6,6 @@ import {
   computeDraftScore,
   hasStaleVersion,
   buildCandidateSearchSummary,
-  SUBJECT_ORDER,
   type DraftItemLike,
 } from "./exam-detail-utils";
 

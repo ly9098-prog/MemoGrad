@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -158,6 +159,7 @@ export function QuestionVersionPicker({
   const triggerRef = useRef<HTMLDivElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const dialogId = useId();
   const [position, setPosition] = useState<{
     left: number;
     width: number;
@@ -333,6 +335,7 @@ export function QuestionVersionPicker({
         role="combobox"
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-controls={dialogId}
         disabled={disabled || loading}
         onClick={() => {
           if (disabled || loading) return;
@@ -378,6 +381,7 @@ export function QuestionVersionPicker({
         ? createPortal(
             <div
               ref={dropdownRef}
+              id={dialogId}
               role="dialog"
               aria-label="选择题目版本"
               data-focus-passthrough

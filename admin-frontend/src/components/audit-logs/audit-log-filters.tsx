@@ -10,7 +10,6 @@ import {
   SEVERITY_LABELS,
   STATUS_LABELS,
   RESOURCE_TYPE_LABELS,
-  actionLabel,
 } from "./action-labels";
 import type { SelectOption } from "@/components/ui/custom-select";
 

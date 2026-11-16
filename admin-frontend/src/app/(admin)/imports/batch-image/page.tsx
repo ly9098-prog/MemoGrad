@@ -9,7 +9,6 @@ import { apiRequest, getApiAccessToken, toQuery } from "@/lib/api/client";
 import { connectSSE } from "@/lib/api/sse";
 import type { BatchImageJobStatusResponse, BatchImageUploadResponse, BatchImageReparseResponse, TraceEvent } from "@/lib/api/types";
 import {
-  IMAGE_MIME,
   MAX_FILES,
   DEFAULT_CONCURRENCY,
   dedupeFiles,
@@ -321,6 +320,7 @@ export default function BatchImagePage() {
       setMessage({ text: error instanceof Error ? error.message : "重新解析失败，请稍后重试。", type: "error" });
     },
   });
+  void reparseMutation;
 
   // ── Click-outside for concurrency dropdown ───────────────────
 

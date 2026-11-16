@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -339,6 +339,7 @@ function ProviderSelect({
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const listboxId = useId();
   const normalizedValue = value.trim().toLowerCase();
   const filtered = PROVIDER_PRESETS.filter((item) => {
     if (!normalizedValue) return true;
@@ -389,6 +390,7 @@ function ProviderSelect({
   const menu = open && menuPosition && typeof document !== "undefined" ? createPortal(
     <div
       ref={menuRef}
+      id={listboxId}
       role="listbox"
       style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
       className="admin-content-theme fixed z-[120] max-h-64 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-floating)]"
@@ -458,8 +460,11 @@ function ProviderSelect({
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
+          role="combobox"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
           placeholder={placeholder}
           onFocus={openMenu}
           onChange={(event) => {

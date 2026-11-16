@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { AlertTriangle, BookOpen, ClipboardCheck, FileText, type LucideIcon } from "lucide-react";
 import { MathFormula } from "@/components/ui/math-formula";
 

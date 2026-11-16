@@ -62,4 +62,10 @@ type _TaskTrace = Assert<HasAllFrontendKeys<
   TaskTraceResponse
 >>;
 
-export {};
+export type ContractAssertions = [
+  _Login,
+  _Dashboard,
+  _SystemHealth,
+  _TaskDiagnostics,
+  _TaskTrace,
+];

@@ -175,10 +175,6 @@ function editableText(value: unknown) {
   }
 }
 
-function flattenCategories(nodes: FormulaCategoryNode[]): FormulaCategoryNode[] {
-  return nodes.flatMap((node) => [node, ...flattenCategories(node.children || [])]);
-}
-
 function findCategoryPath(nodes: FormulaCategoryNode[], targetId: number): FormulaCategoryNode[] | null {
   for (const node of nodes) {
     if (node.id === targetId) return [node];

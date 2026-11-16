@@ -332,7 +332,6 @@ describe("updateSegOptionKey", () => {
   });
 
   it("does not mutate the original array", () => {
-    const copy = segs.map((s) => ({ ...s }));
     updateSegOptionKey(segs, 0, "B");
     expect(segs[0].option_key).toBe("A");
     expect(segs[0].assignment_method).toBe("auto");
@@ -369,7 +368,6 @@ describe("updateSegUrl", () => {
   });
 
   it("does not mutate the original array", () => {
-    const copy = segs.map((s) => ({ ...s }));
     updateSegUrl(segs, 0, "http://new.url/img2.png");
     expect(segs[0].url).toBe("http://old.url/img.png");
     expect(segs[0].assignment_method).toBe("auto");

@@ -33,7 +33,6 @@ import {
   scopeLabel,
   scopeTone,
   updateSubjectTreeStatus,
-  type FlatSubject,
 } from "@/lib/subject-tree-utils";
 
 type PendingToggle = {
@@ -281,6 +280,7 @@ export default function SubjectsPage() {
                     <div
                       key={subject.id}
                       role="treeitem"
+                      aria-selected={false}
                       aria-level={subject.depth + 1}
                       aria-label={`${subject.name}，${subject.is_active ? "已启用" : "已停用"}`}
                       className={`group grid grid-cols-[minmax(0,1fr)_104px] items-center gap-3 px-5 py-3.5 transition-[background-color,box-shadow,transform] duration-200 motion-reduce:transition-none sm:grid-cols-[minmax(0,1fr)_130px_160px] ${

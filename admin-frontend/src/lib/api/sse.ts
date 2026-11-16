@@ -147,7 +147,6 @@ export function connectSSE(
   const controller = new AbortController();
   let retryCount = 0;
   let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
-  let lastDataTime = Date.now();
   let disconnectedByUser = false;
   const traceId = requestedTraceId && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/.test(requestedTraceId)
     ? requestedTraceId
@@ -171,7 +170,6 @@ export function connectSSE(
   function resetHeartbeat() {
     if (heartbeatTimer) clearTimeout(heartbeatTimer);
     if (heartbeatTimeoutMs <= 0) return;
-    lastDataTime = Date.now();
     heartbeatTimer = setTimeout(() => {
       // No data received within heartbeat window
       emitError({

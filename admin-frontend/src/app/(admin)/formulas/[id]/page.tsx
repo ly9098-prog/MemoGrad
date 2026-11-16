@@ -16,7 +16,6 @@ import { FunctionPropertiesPanel } from "@/components/formulas/function-properti
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { apiRequest } from "@/lib/api/client";
-import type { FormulaGraphAsset } from "@/lib/api/types";
 import { decodeApiText, normalizeLatexExpression } from "@/lib/math-text";
 import { formatChinaDate } from "@/lib/time";
 import { safeInternalRedirect } from "@/lib/safe-redirect";

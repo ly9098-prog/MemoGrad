@@ -43,7 +43,6 @@ import {
   endOfChinaDateUtcIso,
   type UserAction,
   type UserStatusFilter,
-  type PaginationItem,
 } from "@/lib/app-user-utils";
 
 type ConfirmState = {

@@ -32,7 +32,7 @@ import {
   type MultiBlankAction,
   type MultiBlankEditState,
 } from "./components/multi-blank-choice-utils";
-import { isMultiBlankChoice, type EditState } from "./review-edit-state";
+import type { EditState } from "./review-edit-state";
 import {
   buildReviewQueueParams,
   createDefaultReviewFilters,
@@ -111,7 +111,6 @@ export default function ImportReviewPage() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
   const subjectBtnRef = useRef<HTMLButtonElement>(null);
-  const [subjectDropdownStyle, setSubjectDropdownStyle] = useState<React.CSSProperties>({});
   const [subjectEditDropdownOpen, setSubjectEditDropdownOpen] = useState(false);
   const subjectEditBtnRef = useRef<HTMLButtonElement>(null);
   const [subjectEditDropdownStyle, setSubjectEditDropdownStyle] = useState<React.CSSProperties>({});

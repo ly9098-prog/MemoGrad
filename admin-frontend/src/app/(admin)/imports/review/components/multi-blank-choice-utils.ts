@@ -621,17 +621,6 @@ function cleanAnswerMapForGroups(
 }
 
 /**
- * Find the next available alphabetic key (A-Z) not already used in an option set.
- */
-function nextAlphaKey(usedKeys: Set<string>): string {
-  for (let i = 0; i < 26; i++) {
-    const letter = String.fromCharCode(65 + i);
-    if (!usedKeys.has(letter)) return letter;
-  }
-  return "";
-}
-
-/**
  * Generate the next group ID in sequence (①, ②, ③, …).
  */
 function nextGroupId(existingIds: string[]): string {
