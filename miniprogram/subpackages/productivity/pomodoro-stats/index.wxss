@@ -3855,10 +3855,10 @@ page {
   will-change: transform, opacity;
 }
 .daily-duration-digit-top {
-  animation: dailyDurationDigitInTop 380ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: dailyDurationDigitInTop 320ms cubic-bezier(.22, 1, .36, 1) both;
 }
 .daily-duration-digit-bottom {
-  animation: dailyDurationDigitInBottom 380ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: dailyDurationDigitInBottom 320ms cubic-bezier(.22, 1, .36, 1) both;
 }
 @keyframes dailyDurationDigitInTop {
   0% {

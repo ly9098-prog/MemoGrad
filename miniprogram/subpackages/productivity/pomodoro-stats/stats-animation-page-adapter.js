@@ -84,7 +84,7 @@ const { createDurationAnimationController, getClearTimeout, getSetTimeout } = de
         setTimeout: getSetTimeout(),
         getDisplaySessions: () => page.data._dispTodaySessions,
         setDisplayDurationSec: value => { page._displayTodayDurationSec = value },
-        getDurationDisplayPatch: text => page._getTodayDurationDisplayPatch(text),
+        getDurationDisplayPatch: (text, options) => page._getTodayDurationDisplayPatch(text, options),
         setData: patch => page.setData(patch),
       })
     }
@@ -156,7 +156,7 @@ const { createStartAnimationsController, getDate, getSetTimeout } = dependencies
         now: () => getDate().now(),
         setTimeout: getSetTimeout(),
         setData: patch => page.setData(patch),
-        getDurationDisplayPatch: text => page._getTodayDurationDisplayPatch(text),
+        getDurationDisplayPatch: (text, options) => page._getTodayDurationDisplayPatch(text, options),
         formatMin: sec => page._fmtMin(sec),
         renderPie: (progress, includeLabels) => page._renderPieChart(progress, includeLabels),
         revealPieLabelsIncrementally: () => page._revealPieLabelsIncrementally(),

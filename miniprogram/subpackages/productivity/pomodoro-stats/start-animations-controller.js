@@ -30,7 +30,7 @@ function startNumberAnimation(options, reqId) {
     options.setDisplayDurationSec(displayDurationSec)
     options.setData({
       _dispTodaySessions: Math.round(targetSessions * eased),
-      ...options.getDurationDisplayPatch(options.formatMin(displayDurationSec)),
+      ...options.getDurationDisplayPatch(options.formatMin(displayDurationSec), { reveal: progress >= 1 }),
       durationValueAnimating: progress < 1,
     })
     if (step < totalSteps) {

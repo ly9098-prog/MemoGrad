@@ -32,9 +32,9 @@ function createHarness(overrides = {}) {
     },
     getDisplaySessions: () => state.displaySessions,
     setDisplayDurationSec: value => { state.displayDurationSec = value },
-    getDurationDisplayPatch: text => ({
+    getDurationDisplayPatch: (text, { reveal = false } = {}) => ({
       _dispTodayDurationText: text,
-      _dispTodayDurationSegments: [{ type: 'num', text }],
+      _dispTodayDurationSegments: reveal ? [{ type: 'num', text, reveal: true }] : [{ type: 'num', text }],
     }),
     setData: patch => { state.data.push(patch) },
     ...overrides,
@@ -72,7 +72,7 @@ test('equal formatted values commit immediately without animation', () => {
   assert.deepEqual(h.state.data, [{
     _dispTodaySessions: 2,
     _dispTodayDurationText: '1分钟',
-    _dispTodayDurationSegments: [{ type: 'num', text: '1分钟' }],
+    _dispTodayDurationSegments: [{ type: 'num', text: '1分钟', reveal: true }],
     durationValueAnimating: false,
   }])
   assert.equal(h.state.timer, null)
@@ -88,6 +88,10 @@ test('animation ends at the target and updates only changed display ticks', () =
   assert.equal(h.state.data.at(-1).durationValueAnimating, false)
   assert.equal(h.state.data.at(-1)._dispTodaySessions, 3)
   assert.equal(h.state.data.at(-1)._dispTodayDurationText, '20分钟')
+  assert.deepEqual(h.state.data.at(-1)._dispTodayDurationSegments, [{ type: 'num', text: '20分钟', reveal: true }])
+  for (let index = 1; index < h.state.data.length - 1; index += 1) {
+    assert.equal(h.state.data[index]._dispTodayDurationSegments.reveal, undefined)
+  }
   assert.equal(h.state.timer, null)
   assert.equal(h.state.data.length, 13)
 })

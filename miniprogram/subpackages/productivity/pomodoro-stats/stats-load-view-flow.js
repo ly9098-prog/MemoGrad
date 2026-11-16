@@ -114,11 +114,15 @@ const { buildCumulativeSummaryPatch } = dependencies
     return buildCumulativeSummaryPatch(summary, requestedStart, page.data._todayDate, sec => page._fmtMin(sec))
   }
 
-function _getTodayDurationDisplayPatch(page, text) {
-    return {
-      _dispTodayDurationText: text,
-      _dispTodayDurationSegments: page._buildDurationSegments(text),
-    }
+function _getTodayDurationDisplayPatch(page, text, options) {
+  return _getTodayDurationDisplayPatchWithOptions(page, text, options)
+}
+
+function _getTodayDurationDisplayPatchWithOptions(page, text, { reveal = false } = {}) {
+  return {
+    _dispTodayDurationText: text,
+    _dispTodayDurationSegments: page._buildDurationSegments(text, reveal),
   }
+}
 
 module.exports = { _getLoadCommitController, _getLoadFailureController, _createLoadRequestController, _loadRequestControllerConfig, _loadRequestControllerCapabilities, _getLoadRequestController, _buildLoadViewState, _buildCumulativePatch, _reconcileFromServer, _formatSession, _cumulativeSummaryPatch, _getTodayDurationDisplayPatch }
