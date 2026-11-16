@@ -29,7 +29,7 @@ const SERIES: SeriesMeta[] = [
   { key: "audits", dataKey: "audits_total", label: "审计事件", color: "#52697A" },
 ];
 
-const VIEWBOX_HEIGHT = 238;
+const VIEWBOX_HEIGHT = 180;
 const PLOT = { left: 39, right: 12, top: 10, bottom: 25 };
 const PLOT_HEIGHT = VIEWBOX_HEIGHT - PLOT.top - PLOT.bottom;
 
@@ -119,11 +119,13 @@ function areaPath(points: Array<{ x: number; y: number }>, baseline: number) {
 export function DashboardTrendChart({
   data,
   loading,
+  error,
   period,
   onPeriodChange,
 }: {
   data?: DashboardDailyPoint[] | null;
   loading?: boolean;
+  error?: boolean;
   period: Period;
   onPeriodChange: (period: Period) => void;
 }) {
@@ -219,7 +221,7 @@ export function DashboardTrendChart({
     if (!rows.length) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
-    const localX = event.clientX - rect.left;
+    const localX = (event.clientX - rect.left) * chart.width / rect.width;
     const ratio = Math.max(0, Math.min(1, (localX - PLOT.left) / chart.plotWidth));
     const index = rows.length <= 1 ? 0 : Math.round(ratio * (rows.length - 1));
     setHoverIndex(index);
@@ -229,11 +231,11 @@ export function DashboardTrendChart({
     <section className={styles.trendPanel} aria-labelledby="dashboard-trend-title">
       <header className={styles.panelHeader}>
         <div>
-          <h2 id="dashboard-trend-title" className={styles.panelTitle}>平台动能</h2>
-          <p className={styles.panelSubtitle}>把用户、题库、导入与审计放进同一条运营脉搏。</p>
+          <h2 id="dashboard-trend-title" className={styles.panelTitle}>运营趋势</h2>
+          <p className={styles.panelSubtitle}>用户、题目、导入与审计的每日新增</p>
         </div>
 
-        <div className={styles.periodSwitch} aria-label="趋势周期">
+        <div className={styles.periodSwitch} role="group" aria-label="趋势周期">
           {(["7d", "30d"] as Period[]).map((item) => (
             <button
               type="button"
@@ -250,9 +252,21 @@ export function DashboardTrendChart({
       </header>
 
       <div className={styles.analysisBody}>
+        <div className={styles.summaryGrid} aria-label={`${periodLabel}趋势摘要`}>
+          {SERIES.map((item, index) => {
+            const value = hasData ? formatCount(chart.totals[item.key]) : "--";
+            return (
+              <div key={item.key} className={styles.summaryStat} data-disabled={!series[item.key]}>
+                <span><i className={styles.legendDot} style={{ backgroundColor: item.color }} />{item.label}</span>
+                <strong aria-label={loading ? "--" : value}>
+                  {loading ? "--" : <AnimatedDigits key={`${period}-${value}`} value={value} baseDelay={20 + index * 30} metricKey={`summary:${period}:${item.key}`} />}
+                </strong>
+              </div>
+            );
+          })}
+        </div>
         <div className={styles.analysisChart}>
           <div className={styles.legendBar}>
-            <span className={styles.legendCaption}>趋势序列</span>
             <div className={styles.legendRow}>
               {SERIES.map((item) => {
                 const enabled = series[item.key];
@@ -279,11 +293,12 @@ export function DashboardTrendChart({
 
           {loading ? (
             <div className={styles.chartLoading} aria-label="正在加载运营趋势" />
-          ) : hasData ? (
+          ) : hasData && Object.values(series).some(Boolean) ? (
             <div ref={chartContainerRef} className={styles.chartShell}>
               {hoveredRow ? (
                 <div
                   className={styles.chartTooltip}
+                  id="dashboard-trend-tooltip"
                   role="tooltip"
                   style={{ left: `${Math.min(82, Math.max(18, tooltipLeft))}%`, transform: "translateX(-50%)" }}
                 >
@@ -305,8 +320,18 @@ export function DashboardTrendChart({
             viewBox={`0 0 ${chart.width} ${VIEWBOX_HEIGHT}`}
             preserveAspectRatio="none"
             className={styles.chartSvg}
-            aria-label="近日新增用户、题目、导入与审计事件趋势图"
-            focusable="false"
+            role="img"
+            aria-describedby={hoveredRow ? "dashboard-trend-tooltip" : undefined}
+            aria-label="每日新增趋势图，使用左右方向键查看日期，Escape 关闭提示"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setHoverIndex(null);
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                setHoverIndex((current) => event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1 : current == null ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1))));
+              }
+            }}
+            onBlur={() => setHoverIndex(null)}
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIndex(null)}
           >
@@ -425,41 +450,10 @@ export function DashboardTrendChart({
           </svg>
             </div>
           ) : (
-            <div className={styles.chartState}>暂无趋势数据</div>
+            <div className={styles.chartState} role={error ? "alert" : "status"}>{hasData ? "选择上方任一序列查看趋势" : error ? "趋势加载失败，请刷新重试" : "当前周期暂无趋势记录"}</div>
           )}
+          {error && hasData ? <p className={styles.inlineWarning}>更新失败，当前显示上次读取的趋势</p> : null}
         </div>
-
-        <aside className={styles.analysisRail} aria-label={`${periodLabel}趋势摘要`}>
-          <p className={styles.summaryCaption}>{periodLabel}累计</p>
-          <div className={styles.summaryGrid}>
-            {SERIES.map((item, index) => {
-              const value = formatCount(chart.totals[item.key]);
-              return (
-                <div
-                  key={item.key}
-                  className={styles.summaryStat}
-                  data-disabled={!series[item.key]}
-                  data-series={item.key}
-                >
-                  <span>
-                    <i className={styles.legendDot} style={{ backgroundColor: item.color }} />
-                    {item.label}
-                  </span>
-                  <strong aria-label={loading ? "--" : value}>
-                    {loading ? "--" : (
-                      <AnimatedDigits
-                        key={`${period}-${value}`}
-                        value={value}
-                        baseDelay={20 + index * 30}
-                        metricKey={`summary:${period}:${item.key}`}
-                      />
-                    )}
-                  </strong>
-                </div>
-              );
-            })}
-          </div>
-        </aside>
       </div>
     </section>
   );

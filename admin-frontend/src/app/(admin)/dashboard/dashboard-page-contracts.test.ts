@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
     void query;
     return "?fixture";
   }),
+  fetchQuery: vi.fn(),
 }));
 vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
@@ -28,10 +29,11 @@ vi.mock("react", async (original) => ({
     const index = h.index++;
     const setter = vi.fn();
     h.setters.push(setter);
-    return [index in h.states ? h.states[index] : initial, setter];
+    return [index in h.states ? h.states[index] : typeof initial === "function" ? initial() : initial, setter];
   },
 }));
 vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ fetchQuery: h.fetchQuery }),
   useQuery: (query: Query) => {
     h.queries.push(query);
     const refetch = vi.fn().mockResolvedValue(undefined);
@@ -63,6 +65,7 @@ beforeEach(() => {
   h.authenticated = true; h.bootstrapping = false;
   h.permissions = ["dashboard:read", "system:read"];
   h.request.mockReset().mockResolvedValue({});
+  h.fetchQuery.mockReset().mockImplementation((query: Query) => query.queryFn());
 });
 afterEach(() => {
   vi.clearAllTimers();
@@ -74,11 +77,11 @@ describe("dashboard page request ownership", () => {
     { authenticated: false, bootstrapping: false },
     { authenticated: true, bootstrapping: true },
     { authenticated: false, bootstrapping: true },
-  ])("gates all six requests during authentication transition (%j)", (state) => {
+  ])("gates all seven requests during authentication transition (%j)", (state) => {
     h.authenticated = state.authenticated;
     h.bootstrapping = state.bootstrapping;
     DashboardPage();
-    expect(h.queries).toHaveLength(6);
+    expect(h.queries).toHaveLength(7);
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(h.request).not.toHaveBeenCalled();
   });
@@ -91,11 +94,12 @@ describe("dashboard page request ownership", () => {
       ["/dashboard/overview"], ["/dashboard/daily?fixture"],
       ["/dashboard/questions-stats"], ["/health/ready"],
       ["/dashboard/ai-stats?days=7"], ["/tasks/diagnostics"],
+      ["/dashboard/daily?fixture"],
     ]);
     expect(h.queries.map((query) => query.staleTime)).toEqual([
-      30_000, 30_000, 60_000, 30_000, 60_000, 30_000,
+      30_000, 30_000, 60_000, 30_000, 60_000, 30_000, 300_000,
     ]);
-    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false]);
+    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false, false]);
   });
 
   it("does not request shared task diagnostics without system:read", () => {
@@ -108,7 +112,7 @@ describe("dashboard page request ownership", () => {
   it("gates every dashboard request without dashboard:read", () => {
     h.permissions = [];
     DashboardPage();
-    expect(h.queries).toHaveLength(6);
+    expect(h.queries).toHaveLength(7);
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(h.request).not.toHaveBeenCalled();
   });
@@ -135,6 +139,19 @@ describe("dashboard page request ownership", () => {
     await h.queries[1].queryFn();
     expect(h.toQuery).toHaveBeenCalledExactlyOnceWith({ from, to: "2026-10-30" });
     expect(h.queries[1].queryKey).toEqual(["dashboard", "daily", { from, to: "2026-10-30" }]);
+  });
+
+  it("reads exactly 365 Shanghai calendar days for the activity chart with a five minute cache", async () => {
+    DashboardPage();
+    await h.queries[6].queryFn();
+    expect(h.toQuery).toHaveBeenCalledExactlyOnceWith({ from: "2025-10-31", to: "2026-10-30" });
+    expect(h.queries[6]).toMatchObject({
+      queryKey: ["dashboard", "activity", { from: "2025-10-31", to: "2026-10-30" }],
+      enabled: true,
+      staleTime: 300_000,
+      refetchOnWindowFocus: false,
+      retry: false,
+    });
   });
 
   it("passes the current period and period setter to the existing chart component", () => {
@@ -174,6 +191,8 @@ describe("dashboard page request ownership", () => {
       readyHealth: { data: undefined, isLoading: false },
       aiStats: { data: undefined, isLoading: false },
       taskDiagnostics: { data: undefined, isLoading: false },
+      activity: { data: [], isLoading: false },
+      activityRange: { from: "2025-10-31", to: "2026-10-30" },
       canReadSystem: false,
       canReadImports: true,
       canReadAudit: false,
@@ -191,7 +210,7 @@ describe("dashboard page request ownership", () => {
     h.refetches[2].mockRejectedValue(new Error("synthetic offline"));
     const button = find(root, (element) => element.type === "button")!;
     (button.props.onClick as () => void)();
-    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1, 1]);
     await Promise.resolve();
     expect(h.setters[1].mock.calls).toEqual([[true]]);
     release();
@@ -199,6 +218,23 @@ describe("dashboard page request ownership", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(h.setters[1].mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("refreshes a still-mounted dashboard across Shanghai midnight with both new date windows", async () => {
+    vi.setSystemTime(new Date("2026-10-29T15:59:00Z"));
+    const root = DashboardPage();
+    vi.setSystemTime(new Date("2026-10-29T16:01:00Z"));
+    const button = find(root, (element) => element.type === "button")!;
+    (button.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(h.fetchQuery).toHaveBeenCalledTimes(2);
+    expect(h.fetchQuery.mock.calls.map(([query]) => query.queryKey)).toEqual([
+      ["dashboard", "daily", { from: "2026-10-24", to: "2026-10-30" }],
+      ["dashboard", "activity", { from: "2025-10-31", to: "2026-10-30" }],
+    ]);
+    expect(h.refetches[1]).not.toHaveBeenCalled();
+    expect(h.refetches[6]).not.toHaveBeenCalled();
+    expect(h.setters[2]).toHaveBeenCalledWith(Date.now());
   });
 
   it("disables manual refresh while an earlier refresh is busy", () => {

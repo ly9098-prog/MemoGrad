@@ -12,7 +12,6 @@ import {
   Database,
   FileClock,
   HardDrive,
-  Layers3,
   Network,
   RefreshCw,
   Server,
@@ -33,15 +32,14 @@ import {
   computeQueueErrors,
   computeQueuePending,
   computeRedisStatus,
-  computeReviewRate,
   computeTaskQueueStatus,
   numberValue,
-  toPieData,
 } from "@/lib/dashboard-utils";
 import { BodyPortal } from "@/components/ui/body-portal";
 import { AnimatedDigits } from "./animated-digits";
 import { DashboardTrendChart } from "./dashboard-trend-chart";
-import { ReviewStatusChart } from "./review-status-chart";
+import { ActivitySkyline } from "./activity-skyline";
+import { QuestionDistribution } from "./question-distribution";
 import styles from "../dashboard-workspace.module.css";
 
 type Period = "7d" | "30d";
@@ -60,7 +58,7 @@ type QueryState<T> = {
 export interface DashboardWorkbenchProps {
   dateLabel: string;
   manualRefreshing: boolean;
-  refreshAll: () => Promise<void>;
+  refreshAll: (nowMs: number) => Promise<void>;
   period: Period;
   onPeriodChange: (period: Period) => void;
   overview: QueryState<DashboardOverview>;
@@ -69,6 +67,8 @@ export interface DashboardWorkbenchProps {
   readyHealth: QueryState<ReadyHealthResponse>;
   aiStats: QueryState<AIStatsResponse>;
   taskDiagnostics: QueryState<TaskDiagnosticsResponse>;
+  activity: QueryState<DashboardDailyPoint[]>;
+  activityRange: { from: string; to: string };
   canReadSystem: boolean;
   canReadImports: boolean;
   canReadAudit: boolean;
@@ -80,15 +80,6 @@ export interface DashboardWorkbenchProps {
 
 function StatusPill({ tone, children }: { tone: StatusTone; children: ReactNode }) {
   return <span className={styles.statusBadge} data-tone={tone}>{children}</span>;
-}
-
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.detailStat}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
 }
 
 function MetricCell({
@@ -184,24 +175,6 @@ function SystemRow({
   );
 }
 
-function subjectBarWidth(count: number, maxCount: number) {
-  return `${Math.max(8, Math.round((count / Math.max(1, maxCount)) * 100))}%`;
-}
-
-const SUBJECT_COLORS = ["#2C6E9B", "#2F8B7E", "#8A6E9E", "#B07A35", "#A7596D"];
-
-function subjectColor(name: string) {
-  if (/^\d+$/.test(name)) {
-    return SUBJECT_COLORS[Number(name) % SUBJECT_COLORS.length];
-  }
-  const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
-  return SUBJECT_COLORS[hash % SUBJECT_COLORS.length];
-}
-
-function subjectLabel(name: string) {
-  return /^\d+$/.test(name) ? `科目 ${name}` : name;
-}
-
 export function renderDashboardWorkbench({
   dateLabel,
   manualRefreshing,
@@ -214,6 +187,8 @@ export function renderDashboardWorkbench({
   readyHealth,
   aiStats,
   taskDiagnostics,
+  activity,
+  activityRange,
   canReadSystem,
   canReadImports,
   canReadAudit,
@@ -224,22 +199,15 @@ export function renderDashboardWorkbench({
 }: DashboardWorkbenchProps) {
   const dailyPoints = daily.data ?? [];
   const todayPoint = dailyPoints.at(-1);
-  const pieData = toPieData(stats.data?.by_review_status);
-  const reviewedRate = computeReviewRate(pieData);
-  const subjects = [...(stats.data?.by_subject ?? [])].filter((item) => item.count > 0);
-  const difficultyCount = (stats.data?.by_difficulty ?? []).filter((item) => item.count > 0).length;
-  const rankedSubjects = [...subjects].sort((a, b) => b.count - a.count).slice(0, 4);
-  const maxSubjectCount = Math.max(1, ...rankedSubjects.map((item) => item.count));
-  const topSubject = rankedSubjects[0];
   const queueTotals = taskDiagnostics.data?.redis.totals;
   const queuePending = computeQueuePending(queueTotals);
   const queueErrors = computeQueueErrors(queueTotals);
-  const usersToday = overview.data?.users_new_today ?? 0;
-  const questionsToday = todayPoint?.questions_new ?? 0;
-  const importsToday = todayPoint?.imports_new ?? 0;
-  const pendingReview = overview.data?.questions_pending_review ?? 0;
-  const pendingImports = overview.data?.imports_pending ?? 0;
-  const criticalAudit = overview.data?.audit_critical_today ?? 0;
+  const usersToday = overview.data?.users_new_today;
+  const questionsToday = todayPoint?.date === dateLabel ? todayPoint.questions_new : undefined;
+  const importsToday = todayPoint?.date === dateLabel ? todayPoint.imports_new : undefined;
+  const pendingReview = overview.data?.questions_pending_review;
+  const pendingImports = overview.data?.imports_pending;
+  const criticalAudit = overview.data?.audit_critical_today;
   const aiCallsToday = aiStats.data?.today_calls ?? 0;
   const aiHasCalls = aiStats.data != null && aiCallsToday > 0;
   const aiMetrics = aiHasCalls ? aiStats.data : undefined;
@@ -250,7 +218,7 @@ export function renderDashboardWorkbench({
   const taskQueueStatus = canReadSystem
     ? computeTaskQueueStatus(taskDiagnostics.isLoading, taskDiagnostics.data?.redis, queuePending, queueErrors)
     : { tone: "muted" as const, label: "无权限" };
-  const todoCount = (pendingReview > 0 ? 1 : 0) + (pendingImports > 0 ? 1 : 0) + (criticalAudit > 0 ? 1 : 0);
+  const todoCount = ((pendingReview ?? 0) > 0 ? 1 : 0) + ((pendingImports ?? 0) > 0 ? 1 : 0) + ((criticalAudit ?? 0) > 0 ? 1 : 0);
 
   return (
     <div className={styles.dashboard}>
@@ -272,7 +240,7 @@ export function renderDashboardWorkbench({
         <div className={styles.headerCopy}>
           <h1>运营总览</h1>
           <p className={styles.headerDescription}>
-            聚合用户、题库、审核、导入、AI 与系统状态的实时运营视图。
+            题库的积累、平台的增长，以及今天需要处理的事
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -283,7 +251,7 @@ export function renderDashboardWorkbench({
           </span>
           <button
             type="button"
-            onClick={() => { void refreshAll(); }}
+            onClick={() => { void refreshAll(Date.now()); }}
             disabled={manualRefreshing}
             className={styles.refreshButton}
           >
@@ -310,7 +278,7 @@ export function renderDashboardWorkbench({
             value={numberValue(overview.data?.questions_total)}
             hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(questionsToday)}`}
             icon={<Database size={15} />}
-            loading={overview.isLoading || daily.isLoading}
+            loading={overview.isLoading}
             accent="teal"
             motionOrder={1}
             metricKey="metric:questions_total"
@@ -318,10 +286,10 @@ export function renderDashboardWorkbench({
           <MetricCell
             label="待审核题目"
             value={numberValue(pendingReview)}
-            hint={pendingReview > 0 ? "当前审核队列有待处理项" : "当前无待审核"}
+            hint={overview.isError ? "数据暂不可用" : pendingReview == null ? "正在读取审核队列" : pendingReview > 0 ? "进入下方队列继续审核" : "当前无待审核"}
             icon={<ShieldCheck size={15} />}
             loading={overview.isLoading}
-            tone={pendingReview > 0 ? "alert" : "default"}
+            tone={(pendingReview ?? 0) > 0 ? "alert" : "default"}
             accent="amber"
             motionOrder={2}
             metricKey="metric:pending_review"
@@ -332,7 +300,7 @@ export function renderDashboardWorkbench({
             hint={`累计 ${numberValue(overview.data?.imports_total)} 批次 · 今日 +${numberValue(importsToday)}`}
             icon={<FileClock size={15} />}
             loading={overview.isLoading}
-            tone={pendingImports > 0 ? "alert" : "default"}
+            tone={(pendingImports ?? 0) > 0 ? "alert" : "default"}
             accent="violet"
             motionOrder={3}
             metricKey="metric:pending_imports"
@@ -344,12 +312,13 @@ export function renderDashboardWorkbench({
         <DashboardTrendChart
           data={daily.data}
           loading={daily.isLoading}
+          error={daily.isError}
           period={period}
           onPeriodChange={onPeriodChange}
         />
 
         <section
-          className={`${styles.todoPanel} ${styles.folderPanel}`}
+          className={styles.todoPanel}
           aria-labelledby="dashboard-todo-title"
         >
           <div className={styles.panelHeading}>
@@ -357,48 +326,48 @@ export function renderDashboardWorkbench({
               <h2 id="dashboard-todo-title">需要处理</h2>
               <p>按现有队列计数，进入对应工作区。</p>
             </div>
-            <div className={styles.panelAside}>
-              <span className={styles.folderTab}>
-                <ShieldCheck size={12} />
-                今日待办
-              </span>
-              <span className={styles.miniCount}>{todoCount > 0 ? `${todoCount} 个队列` : "暂无待办"}</span>
-            </div>
+            <span className={styles.miniCount}>{overview.data ? todoCount > 0 ? `${todoCount} 个队列` : "暂无待办" : "等待数据"}</span>
           </div>
           <div className={styles.todoList}>
             <TodoRow
               icon={<ShieldCheck size={16} />}
               label="待审核题目"
               value={numberValue(pendingReview)}
-              hint={reviewHint}
+              hint={overview.isError ? "队列计数暂不可用" : reviewHint}
               href={reviewHref}
-              tone={pendingReview > 0 ? "attention" : "default"}
+              tone={(pendingReview ?? 0) > 0 ? "attention" : "default"}
             />
             <TodoRow
               icon={<FileClock size={16} />}
               label="待处理导入"
               value={numberValue(pendingImports)}
-              hint={importsHint}
+              hint={overview.isError ? "队列计数暂不可用" : importsHint}
               href={canReadImports ? "/imports/review" : undefined}
-              tone={pendingImports > 0 ? "attention" : "default"}
+              tone={(pendingImports ?? 0) > 0 ? "attention" : "default"}
             />
             <TodoRow
               icon={<ShieldAlert size={16} />}
               label="关键审计"
               value={numberValue(criticalAudit)}
-              hint={auditHint}
+              hint={overview.isError ? "队列计数暂不可用" : auditHint}
               href={canReadAudit ? "/audit-logs" : undefined}
-              tone={criticalAudit > 0 ? "danger" : "default"}
+              tone={(criticalAudit ?? 0) > 0 ? "danger" : "default"}
             />
           </div>
+          <div className={styles.queueNote}><span>审核与导入均需人工确认</span><span>只读总览</span></div>
         </section>
+      </div>
+
+      <div className={styles.explorationGrid}>
+        <ActivitySkyline data={activity.data} loading={activity.isLoading} error={activity.isError} from={activityRange.from} to={activityRange.to} />
+        <QuestionDistribution data={stats.data} loading={stats.isLoading} error={stats.isError} />
       </div>
 
       <section className={styles.operationsSection} aria-labelledby="dashboard-operations-title">
         <header className={styles.operationsHeader}>
           <div>
-            <h2 id="dashboard-operations-title">运营详情</h2>
-            <p>题库结构、AI、异步任务与核心系统状态。</p>
+            <h2 id="dashboard-operations-title">系统运行</h2>
+            <p>AI 用量、异步任务与核心服务</p>
           </div>
           {canReadSystem ? (
             <Link href="/system/tasks" className={styles.sectionLink}>
@@ -409,75 +378,7 @@ export function renderDashboardWorkbench({
         </header>
 
         <div className={styles.operationsDeck}>
-          <section className={styles.structurePanel} aria-labelledby="dashboard-structure-title">
-            <div className={styles.blockHeader}>
-              <div className={styles.blockTitleRow}>
-                <span className={styles.blockIcon}><Layers3 size={15} /></span>
-                <div>
-                  <h3 id="dashboard-structure-title">题库结构</h3>
-                  <p>{topSubject ? `题量最多：${subjectLabel(topSubject.name)}` : "按当前题库统计"}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.detailStats}>
-              <DetailStat label="科目数" value={stats.isLoading ? "--" : String(subjects.length)} />
-              <DetailStat label="难度层级" value={stats.isLoading ? "--" : String(difficultyCount)} />
-              <DetailStat label="已通过占比" value={reviewedRate} />
-            </div>
-
-            <div className={styles.structureSplit}>
-              <div className={styles.subjectBars}>
-                {rankedSubjects.length > 0 ? (
-                  rankedSubjects.map((subject) => (
-                    <div key={subject.name} className={styles.subjectBar}>
-                      <span className={styles.subjectName} title={subjectLabel(subject.name)}>{subjectLabel(subject.name)}</span>
-                      <span className={styles.subjectTrack}>
-                        <span
-                          className={styles.subjectFill}
-                          style={{
-                            width: subjectBarWidth(subject.count, maxSubjectCount),
-                            backgroundColor: subjectColor(subject.name),
-                          }}
-                        />
-                      </span>
-                      <span className={styles.subjectValue}>{numberValue(subject.count)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className={styles.panelEmpty}>
-                    {stats.isLoading ? "正在读取题库结构" : "暂无科目分布数据"}
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.reviewBlock}>
-                <ReviewStatusChart
-                  data={pieData}
-                  loading={stats.isLoading}
-                  animationKey={stats.dataUpdatedAt}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.systemPanel} aria-labelledby="dashboard-system-title">
-            <div className={styles.blockHeader}>
-              <div className={styles.blockTitleRow}>
-                <span className={styles.blockIcon}><Server size={15} /></span>
-                <div>
-                  <h3 id="dashboard-system-title">系统运行</h3>
-                  <p>近 7 日 AI、异步任务与核心依赖状态。</p>
-                </div>
-              </div>
-              {canReadSystem ? (
-                <Link href="/system/tasks" className={styles.sectionLink}>
-                  查看详情
-                  <ChevronRight size={11} />
-                </Link>
-              ) : null}
-            </div>
-
+          <div className={styles.systemPanel}>
             <div className={styles.systemMetrics}>
               <div className={styles.systemGroup}>
                 <div className={styles.systemGroupTitle}>
@@ -611,7 +512,7 @@ export function renderDashboardWorkbench({
                 }
               />
             </div>
-          </section>
+          </div>
         </div>
       </section>
     </div>

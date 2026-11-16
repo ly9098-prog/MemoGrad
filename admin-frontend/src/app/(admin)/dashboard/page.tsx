@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { apiRequest, toQuery } from "@/lib/api/client";
@@ -21,6 +21,7 @@ import { renderDashboardWorkbench } from "./components/dashboard-workbench";
 type Period = "7d" | "30d";
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const permissions = useAuthStore((state) => state.permissions);
@@ -29,11 +30,14 @@ export default function DashboardPage() {
   const canReadSystem = hasPermission(permissions, "system:read");
   const [period, setPeriod] = useState<Period>("7d");
   const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [referenceTime, setReferenceTime] = useState(Date.now);
+  const dateLabel = chinaDateString(0, referenceTime);
 
   const dailyQuery = useMemo(() => ({
-    from: chinaDateString(-(period === "7d" ? 6 : 29)),
-    to: chinaDateString(),
-  }), [period]);
+    from: chinaDateString(-(period === "7d" ? 6 : 29), referenceTime),
+    to: dateLabel,
+  }), [period, referenceTime, dateLabel]);
+  const activityRange = useMemo(() => ({ from: chinaDateString(-364, referenceTime), to: dateLabel }), [referenceTime, dateLabel]);
 
   const overview = useQuery({
     queryKey: ["dashboard", "overview"],
@@ -74,6 +78,14 @@ export default function DashboardPage() {
     staleTime: 30_000,
     retry: false,
   });
+  const activity = useQuery({
+    queryKey: ["dashboard", "activity", activityRange],
+    queryFn: () => apiRequest<DashboardDailyPoint[]>(`/dashboard/daily${toQuery(activityRange)}`),
+    enabled: canRequestDashboard,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
 
   const canReviewQuestions = hasPermission(permissions, "question:review");
   const canReadQuestions = hasPermission(permissions, "question:read");
@@ -87,17 +99,33 @@ export default function DashboardPage() {
       : "无权限查看";
   const importsHint = canReadImports ? "进入导入审核" : "无权限查看";
   const auditHint = canReadAudit ? "查看审计日志" : "无权限查看";
-  const dateLabel = chinaDateString();
-
-  const refreshAll = async () => {
+  const refreshAll = async (nextTime: number) => {
+    const nextDate = chinaDateString(0, nextTime);
+    const dateChanged = nextDate !== dateLabel;
+    const nextDailyRange = { from: chinaDateString(-(period === "7d" ? 6 : 29), nextTime), to: nextDate };
+    const nextActivityRange = { from: chinaDateString(-364, nextTime), to: nextDate };
     setManualRefreshing(true);
+    setReferenceTime(nextTime);
     try {
       const refreshes: Array<Promise<unknown>> = [
         overview.refetch(),
-        daily.refetch(),
+        dateChanged
+          ? queryClient.fetchQuery({
+              queryKey: ["dashboard", "daily", nextDailyRange],
+              queryFn: () => apiRequest<DashboardDailyPoint[]>(`/dashboard/daily${toQuery(nextDailyRange)}`),
+              staleTime: 0,
+            })
+          : daily.refetch(),
         stats.refetch(),
         readyHealth.refetch(),
         aiStats.refetch(),
+        dateChanged
+          ? queryClient.fetchQuery({
+              queryKey: ["dashboard", "activity", nextActivityRange],
+              queryFn: () => apiRequest<DashboardDailyPoint[]>(`/dashboard/daily${toQuery(nextActivityRange)}`),
+              staleTime: 0,
+            })
+          : activity.refetch(),
       ];
       if (canReadSystem) refreshes.push(taskDiagnostics.refetch());
       await Promise.allSettled(refreshes);
@@ -145,6 +173,8 @@ export default function DashboardPage() {
     readyHealth,
     aiStats,
     taskDiagnostics,
+    activity,
+    activityRange,
     canReadSystem,
     canReadImports,
     canReadAudit,
