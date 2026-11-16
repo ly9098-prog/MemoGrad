@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle, AlertTriangle, CheckCircle2, Database,
@@ -9,12 +9,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api/client";
 import type { PipelinesListResponse, CleanupResponse, AlertItem } from "@/lib/api/types";
+import { ManagementNotice, PremiumSection, PremiumSectionHeader, PremiumStat, StatusBadge } from "@/components/admin/management-ui";
 
 const levelDot: Record<string, string> = {
   error: "bg-destructive",
   warning: "bg-warning",
   info: "bg-primary",
 };
+const tabOrder = ["alerts", "cleanup"] as const;
 
 export default function ImportMaintenancePage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -90,25 +92,85 @@ export default function ImportMaintenancePage() {
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <h1 className="sr-only">导入运维</h1>
-      {/* ===== Top bar ===== */}
-      <div className="flex items-center justify-end">
-        <Button
-          variant="secondary"
-          disabled={pipelines.isFetching}
-          onClick={() => pipelines.refetch()}
-          className="h-9 px-3.5 text-xs"
-        >
-          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${pipelines.isFetching ? "animate-spin" : ""}`} />
-          刷新
-        </Button>
-      </div>
+  const alertCount = recentAlerts.length;
+  const errorAlertCount = recentAlerts.filter((alert) => alert.level === "error").length;
+  const warningAlertCount = recentAlerts.filter((alert) => alert.level === "warning").length;
+  const alertStatusLabel = pipelines.isLoading
+    ? "正在读取流水线"
+    : pipelines.isError
+      ? "流水线读取失败"
+      : errorAlertCount > 0
+        ? "存在错误告警"
+        : warningAlertCount > 0
+          ? "存在警告"
+          : "暂无异常";
+  const alertStatusTone = pipelines.isLoading
+    ? "neutral"
+    : pipelines.isError || errorAlertCount > 0
+      ? "danger"
+      : warningAlertCount > 0
+        ? "warning"
+        : "success";
 
-      {/* ===== Message Banner ===== */}
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = tabOrder.indexOf(tab);
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabOrder.length - 1
+        : event.key === "ArrowRight"
+          ? (currentIndex + 1) % tabOrder.length
+          : (currentIndex - 1 + tabOrder.length) % tabOrder.length;
+    const nextTab = tabOrder[nextIndex];
+    setTab(nextTab);
+    document.getElementById(`import-maintenance-tab-${nextTab}`)?.focus();
+  }
+
+  return (
+    <div className="space-y-5">
+      <PremiumSection accent={errorAlertCount > 0 ? "rose" : warningAlertCount > 0 ? "amber" : "blue"}>
+        <PremiumSectionHeader
+          title="导入运维"
+          description="监控导入告警、扫描可清理产物，并分步执行 Dry-Run 与真实清理。"
+          icon={<ShieldAlert className="h-3.5 w-3.5" />}
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          meta={
+            <>
+              <StatusBadge tone={alertStatusTone}>{alertStatusLabel}</StatusBadge>
+              <span>{pipelines.isError ? "告警数据不可用，不能据此判断流水线健康状态" : "清理前必须先完成 Dry-Run 确认"}</span>
+            </>
+          }
+          aside={
+            <Button
+              variant="secondary"
+              disabled={pipelines.isFetching}
+              onClick={() => pipelines.refetch()}
+              className="h-10 rounded-[10px] border-white/72 bg-white/82 px-4 text-[13px] font-semibold text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-[#e1f0fa]"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${pipelines.isFetching ? "animate-spin" : ""}`} />
+              刷新
+            </Button>
+          }
+        />
+        {pipelines.isError ? (
+          <div className="border-b border-[var(--admin-line)] p-4 sm:p-5">
+            <ManagementNotice tone="danger" title="告警数据不可用">
+              流水线接口当前不可用。零告警不会被当作健康结果，请修复接口后刷新再执行清理判断。
+            </ManagementNotice>
+          </div>
+        ) : null}
+        <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-4">
+          <PremiumStat label="当前告警" value={alertCount} hint={pipelines.isError ? "数据不可用" : "最近 5 条已完成导入"} icon={<ShieldAlert className="h-3.5 w-3.5" />} accent={errorAlertCount > 0 ? "rose" : "blue"} tone={alertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="错误告警" value={errorAlertCount} hint={pipelines.isError ? "数据不可用" : "需要优先处理"} icon={<AlertCircle className="h-3.5 w-3.5" />} accent="rose" tone={errorAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="警告" value={warningAlertCount} hint={pipelines.isError ? "数据不可用" : "需人工确认的数据质量提示"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="amber" tone={warningAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="清理状态" value={cleanupResult?.dry_run ? "Dry-Run" : cleanupResult ? "已清理" : "未执行"} hint={pipelines.isLoading ? "正在读取流水线" : "扫描结果仅作确认依据"} icon={<Database className="h-3.5 w-3.5" />} accent="teal" />
+        </div>
+      </PremiumSection>
       {message ? (
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card/80 px-4 py-3 text-sm shadow-sm">
+        <div className="flex items-center gap-2.5 rounded-[14px] border border-[var(--admin-glass-border)] bg-white/82 px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_26px_rgba(31,72,100,0.055)]">
           {message.includes("失败") || message.includes("error") ? (
             <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
           ) : (
@@ -118,13 +180,16 @@ export default function ImportMaintenancePage() {
         </div>
       ) : null}
 
-      {/* ===== Unified card with tabs ===== */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-
-        {/* Tab bar */}
-        <div className="flex items-center border-b border-border bg-muted/40">
+      <PremiumSection inset={false} accent={tab === "alerts" ? "amber" : "teal"} className="overflow-hidden">
+        <div className="flex items-center border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.5),transparent)]" role="tablist" aria-label="导入运维视图">
           <button
             onClick={() => setTab("alerts")}
+            role="tab"
+            id="import-maintenance-tab-alerts"
+            aria-controls="import-maintenance-panel-alerts"
+            aria-selected={tab === "alerts"}
+            tabIndex={tab === "alerts" ? 0 : -1}
+            onKeyDown={handleTabKeyDown}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "alerts"
                 ? "text-foreground"
@@ -138,12 +203,16 @@ export default function ImportMaintenancePage() {
                 {recentAlerts.length}
               </span>
             )}
-            {tab === "alerts" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
-            )}
+            {tab === "alerts" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--premium-accent)]" />}
           </button>
           <button
             onClick={() => setTab("cleanup")}
+            role="tab"
+            id="import-maintenance-tab-cleanup"
+            aria-controls="import-maintenance-panel-cleanup"
+            aria-selected={tab === "cleanup"}
+            tabIndex={tab === "cleanup" ? 0 : -1}
+            onKeyDown={handleTabKeyDown}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "cleanup"
                 ? "text-foreground"
@@ -152,18 +221,16 @@ export default function ImportMaintenancePage() {
           >
             <Database className="h-3.5 w-3.5" />
             存储清理
-            {tab === "cleanup" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
-            )}
+            {tab === "cleanup" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--premium-accent)]" />}
           </button>
         </div>
 
         {/* ── Alerts tab ── */}
         {tab === "alerts" && (
-          <div className="divide-y divide-border/50">
+          <div id="import-maintenance-panel-alerts" role="tabpanel" aria-labelledby="import-maintenance-tab-alerts" tabIndex={0} className="divide-y divide-[var(--admin-line)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30">
             {recentAlerts.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-center">
-                <div className="mb-3 rounded-full bg-success-light p-3">
+                <div className="mb-3 rounded-full bg-success-light p-3 shadow-[0_0_0_1px_rgba(36,115,91,0.08)]">
                   <CheckCircle2 className="h-6 w-6 text-success" />
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">暂无告警</p>
@@ -173,7 +240,7 @@ export default function ImportMaintenancePage() {
               recentAlerts.map((alert, i) => (
                 <div
                   key={`${alert.pipeline_id}-${i}`}
-                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
+                  className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-[rgba(234,242,248,0.48)]"
                 >
                   <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${levelDot[alert.level] ?? "bg-muted-foreground"}`} />
                   <div className="min-w-0 flex-1">
@@ -205,9 +272,9 @@ export default function ImportMaintenancePage() {
 
         {/* ── Cleanup tab ── */}
         {tab === "cleanup" && (
-          <div className="space-y-5 p-5">
+          <div id="import-maintenance-panel-cleanup" role="tabpanel" aria-labelledby="import-maintenance-tab-cleanup" tabIndex={0} className="space-y-5 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30">
             {/* Description */}
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <p className="text-[12.5px] leading-relaxed text-[#52697a]">
               清理过期 pipeline artifact 和 OCR 缓存文件，释放磁盘空间。建议先运行 Dry-Run 预览可清理量，确认后再执行。
             </p>
 
@@ -219,15 +286,13 @@ export default function ImportMaintenancePage() {
                 const active = i === 0 ? hasResult : i === 1 ? isDry : isDry && showConfirm;
                 return (
                   <div key={label} className="flex items-center gap-0">
-                    {i > 0 && (
-                      <div className={`h-px w-8 ${active ? "bg-border" : "bg-border/40"}`} />
-                    )}
+                    {i > 0 && <span aria-hidden="true" className={`h-[2px] w-8 rounded-full ${active ? "bg-[var(--admin-primary)]" : "bg-[rgba(84,110,129,0.18)]"}`} />}
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
                           active
-                            ? "bg-foreground text-background"
-                            : "bg-muted text-muted-foreground/70"
+                            ? "bg-[var(--admin-primary)] text-white"
+                            : "bg-[rgba(234,242,248,0.8)] text-[#52697a]"
                         }`}
                       >
                         {i + 1}
@@ -278,10 +343,10 @@ export default function ImportMaintenancePage() {
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                   {isDryRunning ? "正在扫描..." : cleanupResult?.dry_run ? "Dry-Run 结果（未删除任何文件）" : "清理结果"}
                 </p>
-                <div className="overflow-hidden rounded-lg border border-border">
+                <div className="overflow-hidden rounded-[12px] border border-[var(--admin-line)]">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-muted text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <tr className="bg-[rgba(234,242,248,0.62)] text-[11px] font-semibold tracking-[0.01em] text-[#52697a]">
                         <th className="px-3 py-2.5 text-left">目标</th>
                         <th className="px-3 py-2.5 text-right">扫描数</th>
                         <th className="px-3 py-2.5 text-right">可清理</th>
@@ -289,7 +354,7 @@ export default function ImportMaintenancePage() {
                         <th className="px-3 py-2.5 text-right">跳过</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-[var(--admin-line)]">
                       {isDryRunning && !cleanupResult ? (
                         <tr>
                           <td className="px-3 py-8 text-center text-muted-foreground/70" colSpan={5}>扫描中...</td>
@@ -335,7 +400,7 @@ export default function ImportMaintenancePage() {
                   </table>
                 </div>
                 {cleanupResult?.dry_run ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-warning-light px-3 py-2 text-[11px] text-warning-foreground">
+                  <div className="flex items-center gap-2 rounded-[10px] bg-warning-light px-3 py-2 text-[11px] text-warning-foreground">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     Dry-Run 仅扫描不删除，请检查后确认执行
                   </div>
@@ -344,7 +409,7 @@ export default function ImportMaintenancePage() {
             ) : null}
           </div>
         )}
-      </div>
+      </PremiumSection>
     </div>
   );
 }

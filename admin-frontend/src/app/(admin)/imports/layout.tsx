@@ -19,10 +19,10 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <ManagementPage className="space-y-6 pb-10">
+    <ManagementPage className="pb-10">
       <nav
         aria-label="导入工作区导航"
-        className="admin-filter-surface flex flex-wrap gap-1 rounded-[18px] p-2"
+        className="admin-premium-panel admin-premium-inset relative isolate flex flex-wrap gap-1 rounded-[20px] p-2"
       >
         {importTabs.map((tab) => {
           const Icon = tab.icon;
@@ -34,7 +34,7 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
               className={cn(
                 "inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors",
                 active
-                  ? "border-primary/25 bg-accent text-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+                  ? "border-white/72 bg-white/82 text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_rgba(31,72,100,0.05)]"
                   : "border-transparent text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
               )}
             >

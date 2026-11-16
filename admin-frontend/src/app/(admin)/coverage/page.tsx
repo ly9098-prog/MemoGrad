@@ -22,10 +22,9 @@ import {
   FieldLabel,
   ManagementNotice,
   ManagementPage,
-  ManagementPageHeader,
-  ManagementPanel,
-  MetricCard,
-  MetricStrip,
+  PremiumSection,
+  PremiumSectionHeader,
+  PremiumStat,
   StatusBadge,
   ManagementProgress,
 } from "@/components/admin/management-ui";
@@ -159,34 +158,30 @@ export default function CoveragePage() {
   };
 
   return (
-    <ManagementPage className="space-y-6">
-      <ManagementPageHeader
-        icon={<BarChart3 className="h-5 w-5" />}
-        title="题库覆盖"
-        description="按考纲版本查看知识点题量、真题年份、难度结构和内容质量，优先定位最需要补题或治理的区域。"
-        meta={reportQuery.data ? (
-          <>
-            <StatusBadge tone="accent">{reportQuery.data.syllabus.name}</StatusBadge>
-            <span>生效年份 {reportQuery.data.syllabus.effective_year}</span>
-            <span>题量阈值 {minQuestions}</span>
-          </>
-        ) : <span>选择考纲版本后生成覆盖报告</span>}
-      />
-
-      <ManagementPanel
-        variant="quiet"
-        title="治理范围"
-        description="切换考纲、科目、题量阈值与年份范围，报告会自动重新计算。"
-        icon={<Filter className="h-4 w-4" />}
-        actions={hasScopeFilters ? (
-          <Button variant="ghost" size="sm" onClick={resetScope} className="text-muted-foreground transition-colors hover:bg-[var(--mgmt-steel)] hover:text-foreground">
-            <RotateCcw className="h-3.5 w-3.5" />
-            重置范围
-          </Button>
-        ) : <StatusBadge tone="neutral">默认范围</StatusBadge>}
-      >
-        <div className="grid gap-x-4 gap-y-3 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_210px_145px_145px] xl:items-end">
-          <label>
+    <ManagementPage className="space-y-5">
+      <PremiumSection accent={summary ? "teal" : "blue"}>
+        <PremiumSectionHeader
+          icon={<BarChart3 className="h-4 w-4" />}
+          title="题库覆盖"
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          description="按考纲版本查看知识点题量、真题年份、难度结构和内容质量，优先定位最需要补题或治理的区域。"
+          meta={reportQuery.data ? (
+            <>
+              <StatusBadge tone="accent">{reportQuery.data.syllabus.name}</StatusBadge>
+              <span>生效年份 {reportQuery.data.syllabus.effective_year}</span>
+              <span>题量阈值 {minQuestions}</span>
+            </>
+          ) : <span>选择考纲版本后生成覆盖报告</span>}
+          aside={hasScopeFilters ? (
+            <Button variant="secondary" size="sm" onClick={resetScope}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              重置范围
+            </Button>
+          ) : <StatusBadge tone="neutral">默认范围</StatusBadge>}
+        />
+        <div className="grid gap-x-4 gap-y-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(240,248,253,0.44),rgba(255,255,255,0.12))] px-5 py-4 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_210px_145px_145px] xl:items-end">
+          <label className="min-w-0">
             <FieldLabel>考纲版本</FieldLabel>
             <CustomSelect
               value={versionId}
@@ -199,7 +194,7 @@ export default function CoveragePage() {
               clearable={false}
             />
           </label>
-          <label>
+          <label className="min-w-0">
             <FieldLabel>科目范围</FieldLabel>
             <CustomSelect
               value={subjectId}
@@ -208,68 +203,69 @@ export default function CoveragePage() {
               placeholder="全部核心科目"
             />
           </label>
-          <label>
+          <label className="min-w-0">
             <FieldLabel>题量不足阈值</FieldLabel>
-            <div className="flex min-w-0 gap-2.5">
-              <Input className="min-w-0" inputMode="numeric" value={minQuestionsInput} onChange={(event) => setMinQuestionsInput(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={applyMinQuestions} />
-              <Button variant="secondary" onClick={applyMinQuestions} className="px-3.5">应用</Button>
+            <div className="flex min-w-0 gap-2">
+              <Input className="w-0 min-w-0 flex-1" inputMode="numeric" value={minQuestionsInput} onChange={(event) => setMinQuestionsInput(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={applyMinQuestions} />
+              <Button variant="secondary" onClick={applyMinQuestions} className="shrink-0 px-3.5">应用</Button>
             </div>
           </label>
-          <label>
+          <label className="min-w-0">
             <FieldLabel>起始年份</FieldLabel>
             <Input inputMode="numeric" placeholder="自动" value={yearFrom} onChange={(event) => setYearFrom(event.target.value.replace(/\D/g, "").slice(0, 4))} />
           </label>
-          <label>
+          <label className="min-w-0">
             <FieldLabel>结束年份</FieldLabel>
             <Input inputMode="numeric" placeholder="自动" value={yearTo} onChange={(event) => setYearTo(event.target.value.replace(/\D/g, "").slice(0, 4))} />
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--mgmt-line)] pt-3 text-[11px] leading-5 text-muted-foreground/70">
-          <span className="rounded-md bg-[var(--mgmt-steel)] px-2 py-1 font-medium text-accent-foreground">自动范围</span>
+        <div className="flex flex-wrap items-center gap-2 border-t border-[var(--admin-line)] px-5 py-2.5 text-[11px] leading-5 text-muted-foreground/70">
+          <span className="rounded-md bg-[rgba(231,243,250,0.82)] px-2 py-1 font-medium text-accent-foreground">自动范围</span>
           <span>年份留空时使用系统已知真题卷区间；填写起止年份后，会把缺失年份直接纳入完整性检查。</span>
         </div>
-      </ManagementPanel>
 
-      {reportQuery.isError ? (
-        <ManagementNotice tone="danger" title="覆盖报告加载失败">请确认当前账号具备题库与知识点读取权限，并检查所选考纲版本。</ManagementNotice>
-      ) : null}
+        {reportQuery.isError ? (
+          <div className="border-t border-[var(--admin-line)] p-4 sm:p-5">
+            <ManagementNotice tone="danger" title="覆盖报告加载失败">请确认当前账号具备题库与知识点读取权限，并检查所选考纲版本。</ManagementNotice>
+          </div>
+        ) : null}
 
-      {summary ? (
-        <>
-          <MetricStrip className="sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              icon={<FileQuestion className="h-4 w-4" />}
-              label="有效题目"
-              value={summary.total_questions}
-              hint={`已映射 ${summary.mapped_questions} · 未映射 ${summary.unmapped_questions}`}
-              tone="accent"
-            />
-            <MetricCard
-              icon={<BookOpen className="h-4 w-4" />}
-              label="考纲知识点"
-              value={summary.total_knowledge_points}
-              hint={`健康 ${summary.healthy_knowledge_points} · 无题 ${summary.empty_knowledge_points} · 健康率 ${healthyRate}%`}
-              tone={summary.total_knowledge_points > 0 ? "default" : "warning"}
-              progress={healthyRate}
-            />
-            <MetricCard
-              icon={<BarChart3 className="h-4 w-4" />}
-              label="题目映射率"
-              value={`${mappedRate}%`}
-              hint={`已映射 ${summary.mapped_questions} / ${summary.total_questions} 道有效题目`}
-              tone={summary.unmapped_questions > 0 ? "warning" : "success"}
-              progress={mappedRate}
-            />
-            <MetricCard
-              icon={<ShieldAlert className="h-4 w-4" />}
-              label="待治理知识点"
-              value={lowCoverageCount}
-              hint={`无题 ${summary.empty_knowledge_points} · 不足 ${summary.insufficient_knowledge_points} · 失衡 ${summary.imbalanced_knowledge_points} · 内容问题 ${qualityIssueCount}`}
-              tone={lowCoverageCount > 0 || qualityIssueCount > 0 ? "warning" : "success"}
-            />
-          </MetricStrip>
+        {summary ? (
+          <>
+            <div className="grid gap-px border-t border-[var(--admin-line)] sm:grid-cols-2 xl:grid-cols-4">
+              <PremiumStat
+                icon={<FileQuestion className="h-3.5 w-3.5" />}
+                label="有效题目"
+                value={summary.total_questions}
+                hint={`已映射 ${summary.mapped_questions} · 未映射 ${summary.unmapped_questions}`}
+              />
+              <PremiumStat
+                icon={<BookOpen className="h-3.5 w-3.5" />}
+                label="考纲知识点"
+                value={summary.total_knowledge_points}
+                hint={`健康 ${summary.healthy_knowledge_points} · 无题 ${summary.empty_knowledge_points} · 健康率 ${healthyRate}%`}
+                accent={summary.total_knowledge_points > 0 ? "teal" : "amber"}
+                tone={summary.total_knowledge_points > 0 ? "default" : "alert"}
+              />
+              <PremiumStat
+                icon={<BarChart3 className="h-3.5 w-3.5" />}
+                label="题目映射率"
+                value={`${mappedRate}%`}
+                hint={`已映射 ${summary.mapped_questions} / ${summary.total_questions} 道有效题目`}
+                accent={summary.unmapped_questions > 0 ? "amber" : "teal"}
+                tone={summary.unmapped_questions > 0 ? "alert" : "default"}
+              />
+              <PremiumStat
+                icon={<ShieldAlert className="h-3.5 w-3.5" />}
+                label="待治理知识点"
+                value={lowCoverageCount}
+                hint={`无题 ${summary.empty_knowledge_points} · 不足 ${summary.insufficient_knowledge_points} · 失衡 ${summary.imbalanced_knowledge_points} · 内容问题 ${qualityIssueCount}`}
+                accent={lowCoverageCount > 0 || qualityIssueCount > 0 ? "rose" : "teal"}
+                tone={lowCoverageCount > 0 || qualityIssueCount > 0 ? "alert" : "default"}
+              />
+            </div>
 
-          <div className="grid gap-px overflow-hidden rounded-[16px] border border-[var(--mgmt-line)] bg-[var(--mgmt-line)] sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-px border-t border-[var(--admin-line)] bg-[var(--admin-line)] sm:grid-cols-2 xl:grid-cols-4">
             {([
               ["healthy", "健康", statusCounts.healthy, "success" as const],
               ["insufficient", "题量不足", statusCounts.insufficient, "warning" as const],
@@ -284,7 +280,7 @@ export default function CoveragePage() {
                   type="button"
                   key={value}
                   onClick={() => setStatus((current) => current === value ? "" : value)}
-                  className={`min-w-0 bg-[var(--mgmt-paper)] px-5 py-4 text-left transition-[background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-[var(--mgmt-steel)] shadow-[inset_0_-2px_0_var(--primary)]" : "hover:bg-card"}`}
+                  className={`min-w-0 bg-[rgba(249,253,255,0.8)] px-5 py-3.5 text-left transition-[background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-[rgba(229,243,251,0.88)] shadow-[inset_0_-2px_0_var(--primary)]" : "hover:bg-white/82"}`}
                   aria-pressed={active}
                   title={active ? `取消“${label}”筛选` : `只看“${label}”知识点`}
                 >
@@ -300,8 +296,15 @@ export default function CoveragePage() {
           </div>
 
           {integrityIssueCount > 0 ? (
-            <ManagementPanel variant="quiet" title="完整性诊断" description="仅在存在结构问题时展示，避免正常的 0 值占用整块页面。" contentClassName="p-0">
-              <div className="grid divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+            <div className="border-t border-[var(--admin-line)]">
+              <div className="flex items-start gap-2.5 px-5 py-3.5">
+                <span className="admin-premium-icon"><AlertTriangle className="h-3.5 w-3.5" /></span>
+                <div>
+                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">完整性诊断</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">仅在存在结构问题时展示，避免正常的 0 值占用整块页面。</p>
+                </div>
+              </div>
+              <div className="grid divide-y divide-[var(--admin-line)] border-t border-[var(--admin-line)] sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
                 {[
                   ["题目版本缺口", summary.unversioned_questions, "已审核且启用的题目缺少 current_version_id"],
                   ["考纲快照缺口", summary.syllabus_snapshot_missing_questions, "题目版本知识点关联缺少 syllabus snapshot"],
@@ -318,16 +321,17 @@ export default function CoveragePage() {
                   </div>
                 ))}
               </div>
-            </ManagementPanel>
+            </div>
           ) : null}
-        </>
-      ) : null}
+          </>
+        ) : null}
+      </PremiumSection>
 
-      <ManagementPanel
-        variant="focus"
-        title="知识点覆盖矩阵"
-        description="真题与模拟题计数来自试卷固定的题目版本快照，题库后续知识点编辑不会反向改变历史统计。"
-        actions={
+      <PremiumSection className="overflow-hidden">
+        <PremiumSectionHeader
+          title="知识点覆盖矩阵"
+          description="真题与模拟题计数来自试卷固定的题目版本快照，题库后续知识点编辑不会反向改变历史统计。"
+          aside={
           <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">
             <label className="relative block w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
@@ -353,9 +357,8 @@ export default function CoveragePage() {
               </Button>
             ) : null}
           </div>
-        }
-        contentClassName="p-0"
-      >
+          }
+        />
         <div className="max-h-[680px] overflow-auto">
           <table className="w-full min-w-[1260px] text-sm">
             <thead className="sticky top-0 z-10 bg-secondary/95 text-left text-[11px] font-semibold text-muted-foreground shadow-[0_1px_0_var(--border)] backdrop-blur-md">
@@ -418,15 +421,15 @@ export default function CoveragePage() {
             </tbody>
           </table>
         </div>
-      </ManagementPanel>
+      </PremiumSection>
 
       {examYears.length > 0 ? (
-      <ManagementPanel
-        title="真题选择题年份完整性"
-        description="复用试卷发布校验，并把缺解析、固定题目版本缺知识点等问题作为额外质量警告。"
-        icon={<BookOpen className="h-4 w-4" />}
-        contentClassName="p-0"
-      >
+      <PremiumSection className="overflow-hidden">
+        <PremiumSectionHeader
+          title="真题选择题年份完整性"
+          description="复用试卷发布校验，并把缺解析、固定题目版本缺知识点等问题作为额外质量警告。"
+          icon={<BookOpen className="h-4 w-4" />}
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[940px] text-sm">
             <thead className="bg-[rgba(74,111,138,0.045)] text-left text-xs font-medium text-muted-foreground">
@@ -468,82 +471,103 @@ export default function CoveragePage() {
             </tbody>
           </table>
         </div>
-      </ManagementPanel>
+      </PremiumSection>
 
       ) : null}
 
       {qualitySampleCount > 0 || hasGraphIssuesResult ? (
-        <div className={`grid gap-5 ${qualitySampleCount > 0 && hasGraphIssuesResult ? "xl:grid-cols-2" : ""}`}>
-          {qualitySampleCount > 0 ? (
-            <ManagementPanel variant="quiet" title="题库质量样本" description="从每类异常中抽取可直接定位的题目样本。" icon={<ShieldAlert className="h-4 w-4" />}>
-          {quality ? (
-            <div className="space-y-4">
-              {[
-                ["未映射当前考纲", quality.unmapped_question_ids],
-                ["缺少解析", quality.missing_analysis_question_ids],
-                ["图片引用结构异常", quality.image_reference_anomaly_question_ids],
-                ["缺少 current version", quality.unversioned_question_ids],
-                ["缺少考纲语义快照", quality.syllabus_snapshot_missing_question_ids],
-              ].filter(([, ids]) => (ids as number[]).length > 0).map(([label, ids]) => {
-                const values = ids as number[];
-                return (
-                  <div key={label as string} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{label as string}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">样本 {values.length}</p>
-                    </div>
-                    <div className="flex min-h-7 flex-wrap gap-1.5">
-                      {values.slice(0, 12).map((id) => <Link key={id} href={questionIdHref(id)} className="rounded-md border border-border/60 bg-card px-2 py-1 text-[11px] font-semibold text-accent-foreground transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-[rgba(74,111,138,0.28)] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.22)] motion-reduce:transform-none">#{id}</Link>)}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {quality.duplicate_groups.length > 0 ? (
-                <div className="border-t border-border/60 pt-4">
-                  <p className="text-sm font-medium text-foreground">重复疑似 hash 组</p>
-                  <div className="mt-2 space-y-2">
-                    {quality.duplicate_groups.slice(0, 8).map((group) => (
-                      <div key={group.question_hash} className="rounded-xl border border-border/60 bg-card px-3 py-2.5">
-                        <p className="truncate font-mono text-[10px] text-muted-foreground/70">{group.question_hash}</p>
-                        <div className="mt-1.5 flex flex-wrap gap-2">
-                          {group.question_ids.map((id) => <Link key={id} href={questionIdHref(id)} className="text-xs font-semibold text-accent-foreground hover:underline">#{id}</Link>)}
-                        </div>
-                      </div>
-                    ))}
+        <PremiumSection>
+          <PremiumSectionHeader
+            icon={<ShieldAlert className="h-4 w-4" />}
+            title="质量样本与图谱联动"
+            description="从异常题目中抽取可直接定位的样本，并复用 Knowledge Quality Report 检查当前考纲范围。"
+          />
+          <div className={`grid divide-y divide-[var(--admin-line)] ${qualitySampleCount > 0 && hasGraphIssuesResult ? "xl:grid-cols-2 xl:divide-x xl:divide-y-0" : ""}`}>
+            {qualitySampleCount > 0 ? (
+              <section className="min-w-0 p-5">
+                <div className="flex items-start gap-2.5">
+                  <span className="admin-premium-icon"><ShieldAlert className="h-3.5 w-3.5" /></span>
+                  <div>
+                    <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">题库质量样本</h3>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">从每类异常中抽取可直接定位的题目样本。</p>
                   </div>
                 </div>
-              ) : null}
-            </div>
-          ) : <EmptyState>正在加载质量样本...</EmptyState>}
-            </ManagementPanel>
-          ) : null}
+                {quality ? (
+                  <div className="mt-4 space-y-4">
+                    {[
+                      ["未映射当前考纲", quality.unmapped_question_ids],
+                      ["缺少解析", quality.missing_analysis_question_ids],
+                      ["图片引用结构异常", quality.image_reference_anomaly_question_ids],
+                      ["缺少 current version", quality.unversioned_question_ids],
+                      ["缺少考纲语义快照", quality.syllabus_snapshot_missing_question_ids],
+                    ].filter(([, ids]) => (ids as number[]).length > 0).map(([label, ids]) => {
+                      const values = ids as number[];
+                      return (
+                        <div key={label as string} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{label as string}</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">样本 {values.length}</p>
+                          </div>
+                          <div className="flex min-h-7 flex-wrap gap-1.5">
+                            {values.slice(0, 12).map((id) => <Link key={id} href={questionIdHref(id)} className="rounded-md border border-[var(--admin-line)] bg-white/56 px-2 py-1 text-[11px] font-semibold text-accent-foreground transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.22)] motion-reduce:transform-none">#{id}</Link>)}
+                          </div>
+                        </div>
+                      );
+                    })}
 
-          {hasGraphIssuesResult ? (
-            <ManagementPanel variant="quiet" title="知识图谱联动" description="复用现有 Knowledge Quality Report，并将统计范围限制到当前考纲知识点。" icon={<CircleHelp className="h-4 w-4" />}>
-          <div className="space-y-4">
-            {(graph?.warnings ?? []).length ? (
-              <div className="space-y-2">
-                {(graph?.warnings ?? []).map((warning) => (
-                  <div key={warning} className="flex gap-2 rounded-xl border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{warning}</span>
+                    {quality.duplicate_groups.length > 0 ? (
+                      <div className="border-t border-[var(--admin-line)] pt-4">
+                        <p className="text-sm font-medium text-foreground">重复疑似 hash 组</p>
+                        <div className="mt-2 space-y-2">
+                          {quality.duplicate_groups.slice(0, 8).map((group) => (
+                            <div key={group.question_hash} className="rounded-[12px] border border-[var(--admin-line)] bg-white/48 px-3 py-2.5">
+                              <p className="truncate font-mono text-[10px] text-muted-foreground/70">{group.question_hash}</p>
+                              <div className="mt-1.5 flex flex-wrap gap-2">
+                                {group.question_ids.map((id) => <Link key={id} href={questionIdHref(id)} className="text-xs font-semibold text-accent-foreground hover:underline">#{id}</Link>)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
-                图谱存在结构异常：孤立点 {Number(graph?.summary?.isolated_count ?? 0)}，循环 {Number(graph?.summary?.cycle_count ?? 0)}。
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-              <Link href="/knowledge-graph" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition hover:border-primary hover:bg-accent"><Filter className="h-4 w-4" />进入知识图谱治理<ArrowUpRight className="h-3.5 w-3.5" /></Link>
-              <Link href="/syllabus" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition hover:border-primary hover:bg-accent"><BookOpen className="h-4 w-4" />考纲版本<ArrowUpRight className="h-3.5 w-3.5" /></Link>
-            </div>
+                ) : <EmptyState>正在加载质量样本...</EmptyState>}
+              </section>
+            ) : null}
+
+            {hasGraphIssuesResult ? (
+              <section className="min-w-0 p-5">
+                <div className="flex items-start gap-2.5">
+                  <span className="admin-premium-icon"><CircleHelp className="h-3.5 w-3.5" /></span>
+                  <div>
+                    <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">知识图谱联动</h3>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">复用现有 Knowledge Quality Report，并将统计范围限制到当前考纲知识点。</p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-4">
+                  {(graph?.warnings ?? []).length ? (
+                    <div className="space-y-2">
+                      {(graph?.warnings ?? []).map((warning) => (
+                        <div key={warning} className="flex gap-2 rounded-[12px] border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-[12px] border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
+                      图谱存在结构异常：孤立点 {Number(graph?.summary?.isolated_count ?? 0)}，循环 {Number(graph?.summary?.cycle_count ?? 0)}。
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 border-t border-[var(--admin-line)] pt-4">
+                    <Link href="/knowledge-graph" className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[var(--admin-line)] bg-white/56 px-4 text-sm font-semibold text-foreground transition hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82"><Filter className="h-4 w-4" />进入知识图谱治理<ArrowUpRight className="h-3.5 w-3.5" /></Link>
+                    <Link href="/syllabus" className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[var(--admin-line)] bg-white/56 px-4 text-sm font-semibold text-foreground transition hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82"><BookOpen className="h-4 w-4" />考纲版本<ArrowUpRight className="h-3.5 w-3.5" /></Link>
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </div>
-            </ManagementPanel>
-          ) : null}
-        </div>
+        </PremiumSection>
       ) : null}
     </ManagementPage>
   );

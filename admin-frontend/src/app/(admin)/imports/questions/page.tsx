@@ -15,8 +15,8 @@ import {
   XCircle,
   Globe,
   AlertTriangle,
+  ArrowUpRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PremiumSection, PremiumSectionHeader, PremiumStat } from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getQuestionTypeLabel, canonicalizeQuestionType } from "@/lib/question-types";
 import type { ImportQuestionItem, PaginatedResponse } from "@/lib/api/types";
@@ -166,7 +167,7 @@ function DetailModal({
           查看导入题目的题干、答案、解析及 OCR/AI 原始数据。
         </DialogDescription>
         {/* ===== Header with large close hit area ===== */}
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-border px-5 py-3 pr-14">
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-[var(--admin-line)] px-5 py-3 pr-14">
           <div className="flex items-center gap-3 min-w-0">
             <span className="shrink-0 font-mono text-xs text-muted-foreground/70">#{item.id}</span>
             <DialogTitle className="truncate font-display text-base font-bold text-foreground">导入题目详情</DialogTitle>
@@ -214,7 +215,7 @@ function DetailModal({
             <div className="space-y-3">
               <section>
                 <p className="mb-1 text-xs font-semibold text-muted-foreground">题干</p>
-                <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{textFromImport(item) || "—"}</pre>
+                <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{textFromImport(item) || "—"}</pre>
               </section>
 
               {isMultiBlankChoice(item) ? (
@@ -225,7 +226,7 @@ function DetailModal({
                       const groups = item?.parsed_content?.blank_option_groups;
                       const list: BlankOptionGroup[] = Array.isArray(groups) ? (groups as BlankOptionGroup[]) : [];
                       return list.length > 0 ? list.map((group, gi) => (
-                        <div key={gi} className="rounded-xl border border-border bg-muted p-2.5">
+                        <div key={gi} className="rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3">
                           <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">空 {group.id ?? gi + 1}</p>
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                             {group.options?.map((opt, oi) => (
@@ -240,18 +241,18 @@ function DetailModal({
               ) : (
                 <section>
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">选项</p>
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{renderOptions(optionDataFromImport(item))}</pre>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{renderOptions(optionDataFromImport(item))}</pre>
                 </section>
               )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <section>
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">答案</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{item.parsed_answer || "—"}</pre>
+                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_answer || "—"}</pre>
                 </section>
                 <section>
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 text-xs leading-relaxed text-muted-foreground">{item.parsed_analysis || "—"}</pre>
+                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_analysis || "—"}</pre>
                 </section>
               </div>
             </div>
@@ -265,7 +266,7 @@ function DetailModal({
               ].map(({ title, data }) => (
                 <section key={title}>
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">{title}</p>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-muted p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground">{renderJson(data)}</pre>
+                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 font-mono text-[11px] leading-relaxed text-[#2d4758]">{renderJson(data)}</pre>
                 </section>
               ))}
             </div>
@@ -311,127 +312,127 @@ export default function ImportQuestionsPage() {
     setPreviewId(null);
   };
 
+  const pendingCount = items.filter((item) => item.status === "pending").length;
+  const duplicateCount = items.filter((item) => item.duplicate_status === "possible_duplicate").length;
+
   return (
-    <div className="space-y-6">
-      <Card className="overflow-hidden">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="font-display text-2xl font-bold text-foreground">导入题目列表</h1>
-              <p className="mt-1 text-sm text-muted-foreground">查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。</p>
-            </div>
-            <Link href="/imports/review" className="inline-flex h-11 items-center justify-center rounded-2xl border border-primary bg-accent px-4 text-sm font-semibold text-accent-foreground transition hover:bg-card">
+    <div className="space-y-5">
+      <PremiumSection>
+        <PremiumSectionHeader
+          title="导入题目列表"
+          description="查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。"
+          icon={<Search className="h-3.5 w-3.5" />}
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          meta={
+            <>
+              <StatusBadge tone="accent">question_imports</StatusBadge>
+              <span>查看详情不会改变审核状态</span>
+            </>
+          }
+          aside={
+            <Link href="/imports/review" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/72 bg-white/82 px-4 text-[13px] font-semibold text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:bg-[#e1f0fa]">
               进入审核
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <label className="relative xl:col-span-2">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-              <Input className="pl-9" placeholder="搜索题干 / OCR 原文" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
-            </label>
-            <Input placeholder="批次 ID" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
-            <Input placeholder="科目 ID" value={filters.subject_id} onChange={(event) => updateFilter("subject_id", event.target.value)} />
-            <CustomSelect
-              value={filters.status}
-              onChange={(value) => updateFilter("status", value)}
-              placeholder="全部状态"
-              options={[
-                { value: "", label: "全部状态" },
-                { value: "pending", label: "pending" },
-                { value: "approved", label: "approved" },
-                { value: "rejected", label: "rejected" },
-                { value: "published", label: "published" },
-              ]}
-              className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {/* ===== Continuous question list ===== */}
-          <section className="divide-y divide-border">
-            {items.map((item) => {
-              const StatusIcon = statusIcon(item.status);
-              return (
-                <div
-                  key={item.id}
-                  className="px-4 py-3.5 transition-colors hover:bg-accent/20"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    {/* Left: main content */}
-                    <div className="min-w-0 flex-1 space-y-2">
-                      {/* Top row: status + metadata */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {/* Status */}
-                        <div className="flex items-center gap-1.5">
-                          <StatusIcon className={`h-4 w-4 ${statusColor(item.status)}`} />
-                          <StatusBadge tone={statusTone(item.status)}>
-                            {statusLabel(item.status)}
-                          </StatusBadge>
-                        </div>
-
-                        {/* Duplicate badge */}
-                        {item.duplicate_status ? (
-                          <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
-                            <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
-                            {item.duplicate_status === "possible_duplicate" ? "疑似重复" : item.duplicate_status}
-                          </StatusBadge>
-                        ) : null}
-
-                        {/* Separator */}
-                        <span className="hidden h-3 w-px bg-border sm:block" />
-
-                        {/* Subject + type pills */}
-                        {item.subject_name || item.subject_code ? (
-                          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
-                            {item.subject_name || item.subject_code}
-                          </span>
-                        ) : null}
-                        <span className="text-[11px] text-muted-foreground/70">
-                          {typeLabel(item.question_type)}
-                        </span>
-
-                        {/* Batch ID */}
-                        <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground/70 sm:ml-0" title={item.batch_id}>
-                          {item.batch_id}
-                        </span>
+          }
+        />
+        <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-2 xl:grid-cols-4">
+          <PremiumStat label="匹配总数" value={questions.data?.total ?? items.length} hint={questions.isError ? "导入题目接口不可用" : "当前筛选的全部匹配结果"} icon={<FileText className="h-3.5 w-3.5" />} loading={questions.isLoading} />
+          <PremiumStat label="本页记录" value={items.length} hint="单页最多展示 50 条" icon={<Search className="h-3.5 w-3.5" />} loading={questions.isLoading} />
+          <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页 pending 记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
+          <PremiumStat label="本页疑似重复" value={duplicateCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页重复检测命中"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="violet" tone={duplicateCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
+        </div>
+        <div className="grid gap-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(239,248,254,0.48),rgba(255,255,255,0.12))] px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
+          <label className="relative xl:col-span-2">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+            <Input className="pl-9" placeholder="搜索题干 / OCR 原文" aria-label="搜索导入题目" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
+          </label>
+          <Input placeholder="批次 ID" aria-label="按批次 ID 筛选" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
+          <Input placeholder="科目 ID" aria-label="按科目 ID 筛选" value={filters.subject_id} onChange={(event) => updateFilter("subject_id", event.target.value)} />
+          <CustomSelect
+            value={filters.status}
+            onChange={(value) => updateFilter("status", value)}
+            placeholder="全部状态"
+            options={[
+              { value: "", label: "全部状态" },
+              { value: "pending", label: "待审核" },
+              { value: "approved", label: "已通过" },
+              { value: "rejected", label: "已拒绝" },
+              { value: "published", label: "已发布" },
+            ]}
+            className="h-11 w-full justify-between rounded-[10px] border border-border bg-card px-3 text-sm"
+          />
+        </div>
+        <section className="divide-y divide-[var(--admin-line)]">
+          {items.map((item) => {
+            const StatusIcon = statusIcon(item.status);
+            return (
+              <div key={item.id} className="group px-4 py-4 transition-colors hover:bg-[rgba(239,247,252,0.54)] sm:px-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <StatusIcon className={`h-4 w-4 ${statusColor(item.status)}`} />
+                        <StatusBadge tone={statusTone(item.status)}>
+                          {statusLabel(item.status)}
+                        </StatusBadge>
                       </div>
 
-                      {/* Stem preview */}
-                      <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                        {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
-                      </p>
+                      {item.duplicate_status ? (
+                        <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
+                          <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
+                          {item.duplicate_status === "possible_duplicate" ? "疑似重复" : item.duplicate_status}
+                        </StatusBadge>
+                      ) : null}
+
+                      <span className="hidden h-3 w-px bg-border sm:block" />
+
+                      {item.subject_name || item.subject_code ? (
+                        <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
+                          {item.subject_name || item.subject_code}
+                        </span>
+                      ) : null}
+                      <span className="text-[11px] text-muted-foreground/70">
+                        {typeLabel(item.question_type)}
+                      </span>
+
+                      <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground/70 sm:ml-0" title={item.batch_id}>
+                        {item.batch_id}
+                      </span>
                     </div>
 
-                    {/* Right: action */}
-                    <div className="flex shrink-0 items-start sm:pl-3">
-                      <Button
-                        variant="ghost"
-                        className="h-9 gap-1.5 px-3 text-xs font-medium"
-                        onClick={(event) => {
-                          previewTriggerRef.current = event.currentTarget;
-                          setPreviewId(item.id);
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                        查看
-                      </Button>
-                    </div>
+                    <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                      {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-start sm:pl-3">
+                    <Button
+                      variant="ghost"
+                      className="h-9 gap-1.5 px-3 text-xs font-medium"
+                      onClick={(event) => {
+                        previewTriggerRef.current = event.currentTarget;
+                        setPreviewId(item.id);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                      查看
+                    </Button>
                   </div>
                 </div>
-              );
-            })}
-            {!questions.isLoading && items.length === 0 ? (
-              <p className="px-4 py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
-            ) : null}
-          </section>
-
-          {questions.isError ? (
-            <p className="border-t border-border px-4 py-3 text-sm text-destructive">导入题目接口当前不可用。</p>
+              </div>
+            );
+          })}
+          {!questions.isLoading && items.length === 0 ? (
+            <p className="px-4 py-16 text-center text-sm text-muted-foreground/70">暂无导入题目</p>
           ) : null}
-        </CardContent>
-      </Card>
+        </section>
+        {questions.isError ? (
+          <p className="border-t border-[var(--admin-line)] px-5 py-3 text-sm text-destructive">导入题目接口当前不可用。</p>
+        ) : null}
+      </PremiumSection>
 
-      {/* ===== Detail modal ===== */}
       {previewItem ? (
         <DetailModal
           item={previewItem}

@@ -6,12 +6,11 @@ import { CircleCheck, Layers3, ListTree, LoaderCircle, RefreshCw, Search, Shield
 import {
   ManagementNotice,
   ManagementPage,
-  ManagementPageHeader,
-  ManagementPanel,
   ManagementProgress,
   ManagementSkeletonRows,
-  MetricCard,
-  MetricStrip,
+  PremiumSection,
+  PremiumSectionHeader,
+  PremiumStat,
   StatusBadge,
 } from "@/components/admin/management-ui";
 import { Button } from "@/components/ui/button";
@@ -171,64 +170,71 @@ export default function SubjectsPage() {
   }
 
   return (
-    <ManagementPage>
-      <ManagementPageHeader
-        icon={<ListTree className="h-5 w-5" />}
-        title="科目治理"
-        description="维护产品科目树与启停边界。启停只影响当前产品入口和可选范围，不删除历史题目、练习记录与错题数据。"
-        meta={
-          <>
-            <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "产品范围完整" : "范围需要检查"}</StatusBadge>
-            <span>{canWrite ? "可编辑启停状态" : "当前账号仅可查看"}</span>
-          </>
-        }
-        actions={
-          <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
-            <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
-        }
-      />
-
-      <MetricStrip className="sm:grid-cols-3">
-        <MetricCard
-          label="核心科目启用"
-          value={`${activeCoreCount}/4`}
-          hint="数据结构、组成原理、操作系统、计算机网络"
-          tone={activeCoreCount === 4 ? "success" : "warning"}
-          progress={(activeCoreCount / 4) * 100}
-          icon={<ShieldCheck className="h-4 w-4" />}
+    <ManagementPage className="space-y-5">
+      <PremiumSection accent={scopeReady ? "teal" : "amber"}>
+        <PremiumSectionHeader
+          icon={<ListTree className="h-4 w-4" />}
+          title="科目治理"
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          description="维护产品科目树与启停边界。启停只影响当前产品入口和可选范围，不删除历史题目、练习记录与错题数据。"
+          meta={
+            <>
+              <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "产品范围完整" : "范围需要检查"}</StatusBadge>
+              <span>{canWrite ? "可编辑启停状态" : "当前账号仅可查看"}</span>
+            </>
+          }
+          aside={
+            <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
+              <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+              刷新
+            </Button>
+          }
         />
-        <MetricCard
-          label="产品根科目"
-          value={productRoot?.is_active ? "启用" : "关闭"}
-          hint={productRoot?.name ?? "未找到产品根科目"}
-          tone={productRoot?.is_active ? "success" : "warning"}
-          icon={<Layers3 className="h-4 w-4" />}
-        />
-        <MetricCard
-          label="当前停用科目"
-          value={inactiveSubjectCount}
-          hint="可按业务需要重新启用，历史数据始终保留"
-        />
-      </MetricStrip>
+        <div className="grid gap-px sm:grid-cols-3">
+          <PremiumStat
+            label="核心科目启用"
+            value={`${activeCoreCount}/4`}
+            hint="数据结构、组成原理、操作系统、计算机网络"
+            icon={<ShieldCheck className="h-3.5 w-3.5" />}
+            accent={activeCoreCount === 4 ? "teal" : "amber"}
+            tone={activeCoreCount === 4 ? "default" : "alert"}
+          />
+          <PremiumStat
+            label="产品根科目"
+            value={productRoot?.is_active ? "启用" : "关闭"}
+            hint={productRoot?.name ?? "未找到产品根科目"}
+            icon={<Layers3 className="h-3.5 w-3.5" />}
+            accent={productRoot?.is_active ? "teal" : "rose"}
+            tone={productRoot?.is_active ? "default" : "alert"}
+          />
+          <PremiumStat
+            label="当前停用科目"
+            value={inactiveSubjectCount}
+            hint="可按业务需要重新启用，历史数据始终保留"
+            icon={<CircleCheck className="h-3.5 w-3.5" />}
+            accent="violet"
+          />
+        </div>
+        {!scopeReady && !query.isLoading ? (
+          <div className="border-t border-[var(--admin-line)] p-4 sm:p-5">
+            <ManagementNotice tone="warning" title="产品科目范围不完整">
+              请确认根科目处于启用状态，并检查数据结构、计算机组成原理、操作系统、计算机网络四个核心科目是否全部启用。
+            </ManagementNotice>
+          </div>
+        ) : null}
+      </PremiumSection>
 
-      {!scopeReady && !query.isLoading ? (
-        <ManagementNotice tone="warning" title="产品科目范围不完整">
-          请确认根科目处于启用状态，并检查数据结构、计算机组成原理、操作系统、计算机网络四个核心科目是否全部启用。
-        </ManagementNotice>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_332px] xl:items-start">
-        <ManagementPanel
-          variant="focus"
+      <PremiumSection overflow="visible">
+        <PremiumSectionHeader
+          icon={<ListTree className="h-4 w-4" />}
           title="科目目录"
-          description={normalizedKeyword ? `正在显示 ${filteredFlat.length} / ${flat.length} 个匹配节点` : "按层级查看科目树。启用子科目会自动补齐上级状态；父科目只有在全部下级停用后才能关闭。"}
-          actions={
+          description={normalizedKeyword ? `正在显示 ${filteredFlat.length} / ${flat.length} 个匹配节点` : "启用子科目会自动补齐上级状态；父科目只有在全部下级停用后才能关闭。"}
+          aside={
             <label className="relative block w-full sm:w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
-                className={`h-9 bg-card pl-9 ${keyword ? "pr-9" : "pr-3"}`}
+                className={`h-10 bg-card pl-9 ${keyword ? "pr-9" : "pr-3"}`}
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 placeholder="搜索科目、编码或路径"
@@ -246,8 +252,9 @@ export default function SubjectsPage() {
               ) : null}
             </label>
           }
-          contentClassName="p-0"
-        >
+        />
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_322px] xl:items-start">
+          <div className="min-w-0 border-b border-[var(--admin-line)] xl:border-b-0 xl:border-r">
           {query.isLoading ? (
             <ManagementSkeletonRows rows={6} />
           ) : query.isError ? (
@@ -343,52 +350,60 @@ export default function SubjectsPage() {
               </div>
             </div>
           )}
-        </ManagementPanel>
+          </div>
 
-        <div className="space-y-5 xl:sticky xl:top-5">
-          <ManagementPanel
-            variant="quiet"
-            title="范围健康度"
-            description="核心科目全部在线时，产品范围才视为完整。"
-            icon={<CircleCheck className="h-4 w-4" />}
-          >
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[28px] font-semibold leading-none tracking-[-0.04em] tabular-nums text-foreground">{activeCoreCount}<span className="ml-1 text-sm font-medium text-muted-foreground/70">/ 4</span></p>
-                <p className="mt-2 text-xs text-muted-foreground">核心科目已启用</p>
-              </div>
-              <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "完整" : "待修复"}</StatusBadge>
-            </div>
-            <ManagementProgress className="mt-4" value={activeCoreCount} max={4} tone={activeCoreCount === 4 ? "success" : "warning"} />
-            <div className="mt-4 divide-y divide-[var(--mgmt-line)] border-y border-[var(--mgmt-line)]">
-              {coreSubjects.slice(0, 4).map((subject) => (
-                <div key={subject.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <span className="min-w-0 truncate text-muted-foreground">{subject.name}</span>
-                  <StatusBadge tone={subject.is_active ? "success" : "warning"}>{subject.is_active ? "在线" : "停用"}</StatusBadge>
+          <aside className="min-w-0 bg-[linear-gradient(180deg,rgba(238,247,253,0.46),rgba(255,255,255,0.18))] xl:sticky xl:top-5">
+            <section className="border-b border-[var(--admin-line)] p-5">
+              <div className="flex items-start gap-2.5">
+                <span className="admin-premium-icon"><CircleCheck className="h-3.5 w-3.5" /></span>
+                <div className="min-w-0">
+                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">范围健康度</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">核心科目全部在线时，产品范围才视为完整。</p>
                 </div>
-              ))}
-            </div>
-          </ManagementPanel>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[30px] font-medium leading-none tracking-[-0.045em] tabular-nums text-foreground">{activeCoreCount}<span className="ml-1 text-sm font-medium text-muted-foreground/70">/ 4</span></p>
+                  <p className="mt-2 text-xs text-muted-foreground">核心科目已启用</p>
+                </div>
+                <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "完整" : "待修复"}</StatusBadge>
+              </div>
+              <ManagementProgress className="mt-4" value={activeCoreCount} max={4} tone={activeCoreCount === 4 ? "success" : "warning"} />
+              <div className="mt-4 divide-y divide-[var(--admin-line)] border-y border-[var(--admin-line)]">
+                {coreSubjects.slice(0, 4).map((subject) => (
+                  <div key={subject.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <span className="min-w-0 truncate text-muted-foreground">{subject.name}</span>
+                    <StatusBadge tone={subject.is_active ? "success" : "warning"}>{subject.is_active ? "在线" : "停用"}</StatusBadge>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-          <ManagementPanel title="治理边界" description="启停影响产品可见范围，但不改变历史数据归属。" icon={<ShieldCheck className="h-4 w-4" />}>
-            <div className="space-y-4 text-sm leading-6 text-muted-foreground">
-              <div className="border-l-2 border-primary pl-3">
-                <p className="font-semibold text-foreground">根科目控制产品入口</p>
-                <p className="mt-1">关闭根科目会整体隐藏相关刷题入口，因此需要二次确认。</p>
+            <section className="border-b border-[var(--admin-line)] p-5">
+              <div className="flex items-start gap-2.5">
+                <span className="admin-premium-icon"><ShieldCheck className="h-3.5 w-3.5" /></span>
+                <div className="min-w-0">
+                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">治理边界</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">启停影响产品可见范围，但不改变历史数据归属。</p>
+                </div>
               </div>
-              <div className="border-l-2 border-[var(--mgmt-line)] pl-3">
-                <p className="font-semibold text-foreground">父级停用受下级状态保护</p>
-                <p className="mt-1">只要任意下级仍在线，父科目的停用操作就会被拦截；请从最末级开始逐层停用。</p>
+              <div className="mt-4 space-y-4 text-sm leading-6 text-muted-foreground">
+                <div className="border-l-2 border-primary pl-3">
+                  <p className="font-semibold text-foreground">根科目控制产品入口</p>
+                  <p className="mt-1">关闭根科目会整体隐藏相关刷题入口，因此需要二次确认。</p>
+                </div>
+                <div className="border-l-2 border-[var(--admin-line)] pl-3">
+                  <p className="font-semibold text-foreground">父级停用受下级状态保护</p>
+                  <p className="mt-1">只要任意下级仍在线，父科目的停用操作就会被拦截；请从最末级开始逐层停用。</p>
+                </div>
+                <div className="border-l-2 border-[var(--admin-line)] pl-3">
+                  <p className="font-semibold text-foreground">子科目启用会补齐上级状态</p>
+                  <p className="mt-1">重新启用任意子科目时，系统会自动启用其父级及更高层级，避免出现“子级在线、父级关闭”的不可达状态。</p>
+                </div>
               </div>
-              <div className="border-l-2 border-[var(--mgmt-line)] pl-3">
-                <p className="font-semibold text-foreground">子科目启用会补齐上级状态</p>
-                <p className="mt-1">重新启用任意子科目时，系统会自动启用其父级及更高层级，避免出现“子级在线、父级关闭”的不可达状态。</p>
-              </div>
-            </div>
-          </ManagementPanel>
+            </section>
 
-          <ManagementPanel variant="quiet" title="当前写入权限">
-            <div className="flex items-center justify-between gap-4">
+            <section className="flex items-center justify-between gap-4 p-5">
               <div>
                 <p className="text-sm font-semibold text-foreground">{canWrite ? "允许变更" : "只读模式"}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -396,10 +411,10 @@ export default function SubjectsPage() {
                 </p>
               </div>
               <StatusBadge tone={canWrite ? "success" : "neutral"}>{canWrite ? "可写" : "只读"}</StatusBadge>
-            </div>
-          </ManagementPanel>
+            </section>
+          </aside>
         </div>
-      </div>
+      </PremiumSection>
 
       {actionNotice ? (
         <div

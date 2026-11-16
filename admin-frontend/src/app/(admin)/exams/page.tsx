@@ -10,11 +10,10 @@ import {
   FieldLabel,
   ManagementNotice,
   ManagementPage,
-  ManagementPageHeader,
-  ManagementPanel,
   ManagementSkeletonRows,
-  MetricCard,
-  MetricStrip,
+  PremiumSection,
+  PremiumSectionHeader,
+  PremiumStat,
   StatusBadge,
 } from "@/components/admin/management-ui";
 import { Button } from "@/components/ui/button";
@@ -230,60 +229,60 @@ export default function ExamPapersPage() {
   const statusSegments = buildStatusSegments(papers, summary);
 
   return (
-    <ManagementPage className="space-y-6">
-      <ManagementPageHeader
-        icon={<ClipboardCheck className="h-5 w-5" />}
-        title="试卷管理"
-        description="集中维护历年真题与模拟卷的题序、分值和发布状态。已发布试卷固定题目版本，题库后续编辑不会影响历史作答。"
-        meta={
-          <>
-            <StatusBadge tone="accent">仅支持单选题</StatusBadge>
-            <span>发布后冻结题序与题目版本</span>
-          </>
-        }
-        actions={
-          <>
-            {canWrite ? (
-              <Button onClick={() => setShowCreateForm((value) => !value)} aria-expanded={showCreateForm}>
-                <Plus className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${showCreateForm ? "rotate-45" : ""}`} />
-                {showCreateForm ? "收起新建" : "新建试卷"}
+    <ManagementPage className="space-y-5">
+      <PremiumSection>
+        <PremiumSectionHeader
+          icon={<ClipboardCheck className="h-4 w-4" />}
+          title="试卷管理"
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          description="集中维护历年真题与模拟卷的题序、分值和发布状态。已发布试卷固定题目版本，题库后续编辑不会影响历史作答。"
+          meta={
+            <>
+              <StatusBadge tone="accent">仅支持单选题</StatusBadge>
+              <span>发布后冻结题序与题目版本</span>
+            </>
+          }
+          aside={
+            <>
+              {canWrite ? (
+                <Button onClick={() => setShowCreateForm((value) => !value)} aria-expanded={showCreateForm}>
+                  <Plus className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${showCreateForm ? "rotate-45" : ""}`} />
+                  {showCreateForm ? "收起新建" : "新建试卷"}
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
+                <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+                刷新
               </Button>
-            ) : null}
-            <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
-              <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
-              刷新
-            </Button>
-          </>
-        }
-      />
+            </>
+          }
+        />
+        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-4">
+          <PremiumStat icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="全部试卷" value={summary.total} hint="包含草稿、已发布与已归档" />
+          <PremiumStat icon={<Plus className="h-3.5 w-3.5" />} label="待整理草稿" value={summary.draft} hint="仍可调整题目和基础信息" accent="amber" tone={summary.draft > 0 ? "alert" : "default"} />
+          <PremiumStat icon={<Archive className="h-3.5 w-3.5" />} label="已发布" value={summary.published} hint="题目版本已冻结" accent="teal" />
+          <PremiumStat icon={<History className="h-3.5 w-3.5" />} label="历史作答" value={summary.attempts} hint="所有试卷累计作答次数" accent="violet" />
+        </div>
 
-      <MetricStrip className="sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<ClipboardCheck className="h-4 w-4" />} label="全部试卷" value={summary.total} hint="包含草稿、已发布与已归档" />
-        <MetricCard icon={<Plus className="h-4 w-4" />} label="待整理草稿" value={summary.draft} hint="仍可调整题目和基础信息" tone={summary.draft > 0 ? "warning" : "default"} />
-        <MetricCard icon={<Archive className="h-4 w-4" />} label="已发布" value={summary.published} hint="题目版本已冻结" tone="success" progress={summary.total ? (summary.published / summary.total) * 100 : 0} />
-        <MetricCard icon={<History className="h-4 w-4" />} label="历史作答" value={summary.attempts} hint="所有试卷累计作答次数" tone="accent" />
-      </MetricStrip>
-
-      {canWrite ? (
-        <div
-          aria-hidden={!showCreateForm}
-          inert={!showCreateForm}
-          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-        >
-          <div className="overflow-hidden">
-            <ManagementPanel
-              variant="quiet"
-              title="新建试卷"
-              description="先建立草稿，再进入组卷页补充题目、分值和来源信息。"
-              icon={<Plus className="h-4 w-4" />}
-              actions={
+        {canWrite ? (
+          <div
+            aria-hidden={!showCreateForm}
+            inert={!showCreateForm}
+            className={`grid border-t border-[var(--admin-line)] transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+          >
+            <div className="overflow-hidden bg-[linear-gradient(180deg,rgba(240,248,253,0.42),rgba(255,255,255,0.12))]">
+              <div className="flex items-start justify-between gap-3 px-5 pt-4">
+                <div>
+                  <h2 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">新建试卷</h2>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">先建立草稿，再进入组卷页补充题目、分值和来源信息。</p>
+                </div>
                 <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>
                   收起
                   <ChevronDown className="h-4 w-4 rotate-180" />
                 </Button>
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_140px_170px_minmax(124px,auto)] xl:items-end">
+              </div>
+              <div className="grid gap-4 px-5 pb-5 pt-3 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_140px_170px_minmax(124px,auto)] xl:items-end">
                 <label>
                   <FieldLabel>试卷名称</FieldLabel>
                   <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：2025 年真题选择题" />
@@ -321,20 +320,20 @@ export default function ExamPapersPage() {
                 </Button>
               </div>
               {createMutation.isError ? (
-                <ManagementNotice className="mt-3" tone="danger">
+                <ManagementNotice className="mx-5 mb-5 mt-0" tone="danger">
                   {createMutation.error instanceof Error ? createMutation.error.message : "创建失败，请检查名称、年份和时长后重试。"}
                 </ManagementNotice>
               ) : null}
-            </ManagementPanel>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </PremiumSection>
 
-      <ManagementPanel
-        variant="focus"
-        title="试卷列表"
-        description={query.isLoading ? "正在读取试卷数据" : `显示 ${filteredPapers.length} / ${papers.length} 份试卷，点击任意一行进入组卷详情。`}
-        actions={
+      <PremiumSection className="overflow-hidden">
+        <PremiumSectionHeader
+          title="试卷列表"
+          description={query.isLoading ? "正在读取试卷数据" : `显示 ${filteredPapers.length} / ${papers.length} 份试卷，点击任意一行进入组卷详情。`}
+          aside={
           <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center">
             <div className="hidden items-center rounded-[11px] border border-border bg-secondary/50 p-1 sm:flex" role="group" aria-label="按状态筛选试卷">
               {statusSegments.map((segment) => {
@@ -359,9 +358,8 @@ export default function ExamPapersPage() {
             </label>
             <CustomSelect className="h-10 w-full bg-card sm:hidden" value={statusFilter} onChange={setStatusFilter} options={statusOptions} placeholder="全部状态" />
           </div>
-        }
-        contentClassName="p-0"
-      >
+          }
+        />
         {query.isLoading ? (
           <div className="min-h-[300px]">
             <ManagementSkeletonRows rows={4} />
@@ -471,7 +469,7 @@ export default function ExamPapersPage() {
             </div>
           </div>
         )}
-      </ManagementPanel>
+      </PremiumSection>
     </ManagementPage>
   );
 }

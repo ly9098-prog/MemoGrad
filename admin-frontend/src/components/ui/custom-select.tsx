@@ -206,7 +206,7 @@ export function CustomSelect({
   };
 
   return (
-    <div ref={ref} className="relative" onKeyDown={handleKeyDown}>
+    <div ref={ref} className="relative min-w-0" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => !disabled && setOpen((v) => !v)}
