@@ -9,7 +9,7 @@ export function ManagementPage({ children, className }: { children: ReactNode; c
   return (
     <div
       className={cn(
-        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--border)] [--mgmt-muted:var(--muted-foreground)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_16px_50px_rgba(23,43,54,0.045)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[rgba(35,104,121,0.055)] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(244,247,248,0.86))] after:pointer-events-none after:absolute after:-left-5 after:top-0 after:-z-10 after:h-28 after:w-px after:bg-[linear-gradient(180deg,var(--primary),transparent)]",
+        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--admin-line)] [--mgmt-muted:var(--admin-ink-muted)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_18px_44px_rgba(31,72,100,0.06)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[var(--admin-line)] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(243,247,251,0.66))] after:pointer-events-none after:absolute after:-left-5 after:top-0 after:-z-10 after:h-28 after:w-px after:bg-[linear-gradient(180deg,var(--admin-primary),transparent)]",
         className,
       )}
     >
@@ -32,11 +32,11 @@ export function ManagementPageHeader({
   meta?: ReactNode;
 }) {
   return (
-    <header className="relative border-b border-border pb-5">
+    <header className="relative border-b border-[var(--admin-line-strong)] pb-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-3.5">
           {icon ? (
-            <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-border bg-secondary/60 text-primary">
+            <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-white/70 bg-white/55 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_rgba(31,72,100,0.04)] backdrop-blur-md">
               {icon}
             </div>
           ) : null}
@@ -70,7 +70,7 @@ export function MetricStrip({ children, className }: { children: ReactNode; clas
   return (
     <section
       className={cn(
-        "grid gap-px overflow-hidden rounded-[18px] border border-border bg-border shadow-[0_12px_34px_rgba(24,35,45,0.035)]",
+        "admin-metric-strip grid gap-px",
         className,
       )}
     >
@@ -102,10 +102,10 @@ export function ManagementPanel({
   return (
     <section
       className={cn(
-        "relative overflow-hidden border border-border bg-card transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
-        variant === "default" && "rounded-[16px] shadow-[0_1px_2px_rgba(23,43,54,0.025),0_10px_28px_rgba(23,43,54,0.035)]",
-        variant === "quiet" && "rounded-[16px] bg-card/65 shadow-none",
-        variant === "focus" && "rounded-[18px] border-primary/30 shadow-[var(--mgmt-shadow)]",
+        "relative overflow-hidden transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
+        variant === "default" && "admin-panel rounded-[18px]",
+        variant === "quiet" && "admin-panel-quiet rounded-[18px]",
+        variant === "focus" && "admin-panel-focus rounded-[18px]",
         className,
       )}
     >
@@ -169,7 +169,7 @@ export function MetricCard({
   }[tone];
 
   return (
-    <div className="group relative min-w-0 bg-card px-4 py-4 transition-[background-color] duration-200 hover:bg-accent/35 sm:px-5 sm:py-[18px] motion-reduce:transition-none">
+    <div className="admin-metric-cell group relative min-w-0 px-4 py-4 transition-[background-color] duration-200 hover:brightness-[1.015] sm:px-5 sm:py-[18px] motion-reduce:transition-none">
       <span aria-hidden="true" className={cn("absolute left-4 top-0 h-[2px] w-8 origin-left scale-x-50 rounded-full opacity-55 transition-[transform,opacity] duration-300 group-hover:scale-x-100 group-hover:opacity-100 sm:left-5 motion-reduce:transition-none", markerClass)} />
       <div className="flex items-start justify-between gap-3">
         <p className="text-[11px] font-medium leading-5 text-muted-foreground sm:text-xs">{label}</p>

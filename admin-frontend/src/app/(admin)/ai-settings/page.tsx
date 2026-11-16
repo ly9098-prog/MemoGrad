@@ -1,12 +1,24 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Ban, Power, Save, Sparkles, SlidersHorizontal, CheckCircle2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Ban,
+  Bot,
+  LayoutDashboard,
+  Power,
+  Save,
+  ScanText,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Toggle } from "@/components/ui/toggle";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -22,13 +34,13 @@ import { resolveAiModels, computeUsageRate } from "@/lib/ai-model-resolver";
 
 type Tab = "overview" | "models" | "ocr" | "completion" | "vector" | "system";
 
-const TABS: { key: Tab; label: string; icon: string; color: string }[] = [
-  { key: "overview", label: "总览", icon: "📊", color: "#5b7b9a" },
-  { key: "models", label: "模型", icon: "🤖", color: "#6b9b6b" },
-  { key: "ocr", label: "OCR", icon: "📝", color: "#c49a6b" },
-  { key: "completion", label: "补全", icon: "✨", color: "#9a7aba" },
-  { key: "vector", label: "向量", icon: "🔍", color: "#5b7b9a" },
-  { key: "system", label: "系统", icon: "⚙️", color: "#c47a7a" },
+const TABS: { key: Tab; label: string; icon: ReactNode; color: string }[] = [
+  { key: "overview", label: "总览", icon: <LayoutDashboard className="h-3.5 w-3.5" />, color: "#5b7b9a" },
+  { key: "models", label: "模型", icon: <Bot className="h-3.5 w-3.5" />, color: "#6b9b6b" },
+  { key: "ocr", label: "OCR", icon: <ScanText className="h-3.5 w-3.5" />, color: "#c49a6b" },
+  { key: "completion", label: "补全", icon: <Sparkles className="h-3.5 w-3.5" />, color: "#9a7aba" },
+  { key: "vector", label: "向量", icon: <Search className="h-3.5 w-3.5" />, color: "#5b7b9a" },
+  { key: "system", label: "系统", icon: <Settings2 className="h-3.5 w-3.5" />, color: "#c47a7a" },
 ];
 
 export default function AISettingsPage() {
@@ -125,18 +137,11 @@ export default function AISettingsPage() {
 
   return (
     <ManagementPage className="space-y-5">
-    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)] animate-rise-in">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-        <div>
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground/70">
-            AI Operations Center
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-foreground">AI 解析设置</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            管理 OCR 纠错、题目补全、AI 解析生成等能力
-          </p>
-        </div>
+    <ManagementPageHeader
+      icon={<Sparkles className="h-4 w-4" />}
+      title="AI 解析设置"
+      description="管理 OCR 纠错、题目补全、AI 解析生成等能力。"
+      actions={
         <span
           className={cn(
             "rounded-full px-3 py-1 text-[11px] font-semibold",
@@ -147,8 +152,9 @@ export default function AISettingsPage() {
         >
           {current?.ai_parse_enabled ? "● 解析开启" : "● 全局关闭"}
         </span>
-      </div>
-
+      }
+    />
+    <div className="admin-panel overflow-hidden rounded-2xl animate-rise-in">
       {/* ── Tab bar ── */}
       <div className="flex border-b border-border/60 bg-muted/30">
         {TABS.map((t) => {
@@ -167,7 +173,7 @@ export default function AISettingsPage() {
                 borderBottom: active ? `2px solid ${t.color}` : "2px solid transparent",
               }}
             >
-              <span className="text-sm">{t.icon}</span>
+              {t.icon}
               {t.label}
             </button>
           );

@@ -3,12 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl border font-semibold leading-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0 active:scale-[0.985] disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-50 motion-reduce:transition-none motion-reduce:transform-none",
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[10px] border font-semibold leading-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0 active:scale-[0.985] disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-50 motion-reduce:transition-none motion-reduce:transform-none",
   {
     variants: {
       variant: {
         primary:
-          "border-primary-hover bg-primary text-primary-foreground shadow-[var(--shadow-crisp)] hover:-translate-y-px hover:bg-primary-hover hover:shadow-[0_8px_18px_rgba(45,80,104,0.13)]",
+          "border-primary-hover bg-primary text-primary-foreground shadow-[0_5px_14px_rgba(27,79,112,0.14)] hover:-translate-y-px hover:bg-primary-hover hover:shadow-[0_8px_18px_rgba(27,79,112,0.17)]",
         secondary:
           "border-border bg-card/90 text-foreground shadow-[0_3px_10px_rgba(31,49,61,0.025)] hover:-translate-y-px hover:border-primary/40 hover:bg-accent",
         danger:

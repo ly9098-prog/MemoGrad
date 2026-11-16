@@ -9,7 +9,7 @@ type InputProps = ComponentProps<"input"> & {
 
 const variants: Record<InputVariant, string> = {
   default:
-    "h-11 rounded-xl border border-input bg-muted px-3 focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/15 aria-invalid:border-destructive aria-invalid:ring-destructive/15",
+    "h-11 rounded-[9px] border border-input bg-muted px-3 focus:border-ring focus:bg-card focus:ring-4 focus:ring-ring/15 aria-invalid:border-destructive aria-invalid:ring-destructive/15",
   ghost: "h-full rounded-none border-0 bg-transparent px-0 focus:bg-transparent focus:ring-0",
 };
 

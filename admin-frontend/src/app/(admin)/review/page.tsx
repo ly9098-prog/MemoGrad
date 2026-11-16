@@ -442,7 +442,7 @@ export default function ReviewPage() {
         }
         meta={<span>批量操作上限 50 项；拒绝与回滚需填写原因。</span>}
       />
-      <section className="overflow-visible rounded-[16px] border border-border bg-card shadow-[var(--shadow-card)]">
+      <section className="admin-panel overflow-visible rounded-[18px]">
         <div className="border-b border-border px-4 py-4 lg:px-5">
           <ReviewToolbar
             tab={tab}

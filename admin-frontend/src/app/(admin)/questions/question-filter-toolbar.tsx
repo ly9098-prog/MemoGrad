@@ -79,7 +79,7 @@ export function QuestionFilterToolbar({
 }: QuestionFilterToolbarProps) {
   return (
     <div className="relative z-20 space-y-3">
-      <section className="overflow-visible rounded-[18px] border border-border bg-card shadow-[var(--shadow-card)]">
+      <section className="admin-filter-surface overflow-visible rounded-[18px]">
         <div className="flex flex-col gap-2 border-b border-border p-3 sm:flex-row sm:items-center">
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-[10px] bg-secondary/50 px-3 transition-colors focus-within:bg-card focus-within:ring-2 focus-within:ring-ring/15">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
@@ -614,25 +614,24 @@ export default function FormulasPage() {
 
   return (
     <ManagementPage className="space-y-5 pb-24">
-      {/* ── Header ── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground md:text-[30px]">
-            408 速记卡管理
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            {canReview ? "统一管理公式、定义、易混点、陷阱与对比卡，审核通过后自动发布" : "分类、列表与详情同屏管理 408 速记卡"}
-          </p>
-        </div>
-        {canWrite && (
-          <Link href="/formulas/new">
-            <Button variant="primary" size="md">
-              <Plus className="h-4 w-4" />
-              新建速记卡
-            </Button>
-          </Link>
-        )}
-      </div>
+      <ManagementPageHeader
+        title="408 速记卡管理"
+        description={
+          canReview
+            ? "统一管理公式、定义、易混点、陷阱与对比卡，审核通过后自动发布"
+            : "分类、列表与详情同屏管理 408 速记卡"
+        }
+        actions={
+          canWrite ? (
+            <Link href="/formulas/new">
+              <Button variant="primary" size="md">
+                <Plus className="h-4 w-4" />
+                新建速记卡
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {/* ── Floating toast notification ── */}
       {message && (

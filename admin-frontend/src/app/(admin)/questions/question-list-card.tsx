@@ -181,7 +181,7 @@ export function QuestionListCard({
   onSetPage,
 }: QuestionListCardProps) {
   return (
-    <section className="min-w-0 overflow-visible rounded-[18px] border border-border bg-card shadow-[var(--shadow-card)]">
+    <section className="admin-table-surface min-w-0 overflow-visible rounded-[18px]">
       <QuestionListToolbar
         itemCount={items.length}
         total={total}

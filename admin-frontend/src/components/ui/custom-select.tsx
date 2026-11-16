@@ -216,7 +216,7 @@ export function CustomSelect({
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
         className={cn(
-          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-xl border bg-muted pl-3 pr-2 text-sm outline-none transition-all duration-150",
+          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-[9px] border bg-muted pl-3 pr-2 text-sm outline-none transition-all duration-150",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
           open
             ? "border-primary bg-card ring-4 ring-primary/15"

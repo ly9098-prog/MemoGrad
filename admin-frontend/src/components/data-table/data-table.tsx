@@ -31,7 +31,7 @@ export function DataTable<TData>({
   className?: string;
 }) {
   return (
-    <div className={cn("overflow-hidden rounded-[14px] border border-border bg-card", className)}>
+    <div className={cn("admin-table-surface overflow-hidden rounded-[16px]", className)}>
       <TableContainer>
         <Table className="min-w-[760px]">
           <TableHeader className="bg-secondary/55">

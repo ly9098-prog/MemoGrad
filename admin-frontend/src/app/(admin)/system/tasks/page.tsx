@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { BodyPortal } from "@/components/ui/body-portal";
 import { apiRequest } from "@/lib/api/client";
@@ -639,22 +639,18 @@ export default function SystemTasksPage() {
           </div>
         </BodyPortal>
       ) : null}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-foreground">异步任务诊断</h1>
-          </div>
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-            聚合 Outbox、Redis 队列、Worker 与答题投影，快速定位积压、重试和永久失败。
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-xl border border-border bg-card/65 px-3 py-1.5 text-[11px] text-muted-foreground sm:flex">
+      <ManagementPageHeader
+        icon={<Activity className="h-4 w-4" />}
+        title="异步任务诊断"
+        description="聚合 Outbox、Redis 队列、Worker 与答题投影，快速定位积压、重试和永久失败。"
+        meta={
+          <span className="inline-flex items-center gap-2 rounded-[7px] border border-white/70 bg-white/55 px-2.5 py-1 text-[11px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md">
             <Clock3 className="h-3.5 w-3.5" />
-            <span>15s 自动刷新</span>
+            15s 自动刷新
             {data ? <span className="text-muted-foreground/70">· {formatTime(data.generated_at)}</span> : null}
-          </div>
+          </span>
+        }
+        actions={
           <Button
             size="sm"
             variant="secondary"
@@ -665,8 +661,8 @@ export default function SystemTasksPage() {
             <RefreshCw className={`h-3.5 w-3.5 ${manualRefreshing ? "animate-spin" : ""}`} />
             {manualRefreshing ? "刷新中…" : "刷新"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {!data || !health ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

@@ -116,6 +116,11 @@
   --admin-primary-hover: #1b4f70;
   --admin-line: rgba(84, 110, 129, 0.14);
   --admin-line-strong: rgba(84, 110, 129, 0.22);
+  --admin-ambient-blue: rgba(75, 136, 173, 0.18);
+  --admin-ambient-violet: rgba(179, 151, 197, 0.13);
+  --admin-ambient-teal: rgba(119, 177, 161, 0.11);
+  --admin-glass-highlight: rgba(255, 255, 255, 0.94);
+  --admin-glass-border: rgba(255, 255, 255, 0.72);
   --admin-success: #24735b;
   --admin-warning: #96601f;
   --admin-danger: #b33e50;
@@ -246,15 +251,101 @@ a {
 
 /* ── Semantic surface card ── */
 .surface-card {
-  border: 1px solid var(--border);
-  background: var(--card);
-  box-shadow: 0 1px 2px rgba(23, 43, 54, 0.025), 0 10px 28px rgba(23, 43, 54, 0.035);
+  border: 1px solid var(--admin-glass-border);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(246, 252, 255, 0.62) 62%, rgba(232, 244, 253, 0.52)),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    0 16px 40px rgba(31, 72, 100, 0.055);
+  -webkit-backdrop-filter: blur(18px) saturate(122%);
+  backdrop-filter: blur(18px) saturate(122%);
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .surface-card:hover {
-  border-color: color-mix(in srgb, var(--border) 72%, var(--primary));
-  box-shadow: 0 2px 4px rgba(23, 43, 54, 0.03), 0 14px 34px rgba(23, 43, 54, 0.045);
+  border-color: color-mix(in srgb, var(--admin-glass-border) 72%, var(--primary));
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    0 18px 44px rgba(31, 72, 100, 0.07);
+}
+
+/* Shared management surfaces. Keep panels continuous and restrained; cards
+   are reserved for grouping or an explicit interaction boundary. */
+@layer components {
+.admin-panel {
+  border: 1px solid var(--admin-glass-border);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.80), rgba(246, 252, 255, 0.58) 62%, rgba(232, 244, 253, 0.46)),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    inset 0 0 0 1px rgba(117, 144, 163, 0.045),
+    0 18px 44px rgba(31, 72, 100, 0.06);
+  -webkit-backdrop-filter: blur(24px) saturate(128%);
+  backdrop-filter: blur(24px) saturate(128%);
+}
+
+.admin-panel-quiet {
+  border: 1px solid var(--admin-line);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(18px) saturate(118%);
+  backdrop-filter: blur(18px) saturate(118%);
+}
+
+.admin-panel-focus {
+  border: 1px solid color-mix(in srgb, var(--admin-primary) 30%, var(--admin-glass-border));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(241, 249, 255, 0.64) 64%, rgba(225, 240, 250, 0.48)),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    0 18px 44px rgba(31, 72, 100, 0.08);
+  -webkit-backdrop-filter: blur(26px) saturate(130%);
+  backdrop-filter: blur(26px) saturate(130%);
+}
+
+.admin-metric-strip {
+  overflow: hidden;
+  border: 1px solid var(--admin-glass-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(241, 249, 255, 0.50)),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    inset 0 0 0 1px rgba(117, 144, 163, 0.045),
+    0 16px 38px rgba(31, 72, 100, 0.055);
+  -webkit-backdrop-filter: blur(24px) saturate(128%);
+  backdrop-filter: blur(24px) saturate(128%);
+}
+
+.admin-metric-cell {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(235, 245, 252, 0.16));
+}
+
+.admin-filter-surface {
+  border: 1px solid var(--admin-glass-border);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(243, 250, 255, 0.50)),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    0 14px 34px rgba(31, 72, 100, 0.045);
+  -webkit-backdrop-filter: blur(20px) saturate(124%);
+  backdrop-filter: blur(20px) saturate(124%);
+}
+
+.admin-table-surface {
+  border: 1px solid var(--admin-glass-border);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    inset 0 1px 0 var(--admin-glass-highlight),
+    0 16px 38px rgba(31, 72, 100, 0.05);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  backdrop-filter: blur(18px) saturate(120%);
+}
 }
 
 /* ── Blueprint panel (academic grid aesthetic) ── */

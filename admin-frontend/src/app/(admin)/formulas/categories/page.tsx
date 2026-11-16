@@ -22,7 +22,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { FormulaCategoryDialog } from "@/components/formulas/formula-category-dialog";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
@@ -250,17 +250,17 @@ export default function FormulaCategoriesPage() {
 
   return (
     <ManagementPage className="space-y-5 pb-24">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground md:text-[30px]">公式分类管理</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">科目 → 章节 → 分组，使用结构化配置台维护分类体系</p>
-        </div>
-        {canWrite ? (
-          <Button variant="primary" onClick={() => openCreateDialog(null)}>
-            <Plus className="h-4 w-4" /> 新建分类
-          </Button>
-        ) : null}
-      </div>
+      <ManagementPageHeader
+        title="公式分类管理"
+        description="科目 → 章节 → 分组，使用结构化配置台维护分类体系"
+        actions={
+          canWrite ? (
+            <Button variant="primary" onClick={() => openCreateDialog(null)}>
+              <Plus className="h-4 w-4" /> 新建分类
+            </Button>
+          ) : undefined
+        }
+      />
 
       {message ? (
         <div className="fixed right-6 top-24 z-50 flex animate-drop-in items-center gap-3 rounded-full border border-border bg-card/92 py-2 pl-5 pr-2 text-sm font-medium shadow-lg backdrop-blur-xl">

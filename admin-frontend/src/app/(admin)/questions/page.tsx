@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ManagementPage } from "@/components/admin/management-ui";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { buildVersionLabels } from "./question-version-labels";
@@ -284,19 +284,15 @@ export default function QuestionsPage() {
 
   return (
     <ManagementPage className="space-y-5 pb-10">
-      <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">正式题库</h1>
-            <span className="inline-flex h-7 items-center rounded-[7px] border border-border bg-card px-2.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
-              全库 {questions.data?.total?.toLocaleString("zh-CN") ?? "--"} 题
-            </span>
-          </div>
-          <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
-            检索、审核与维护正式题目；列表用于快速扫描，右侧预览用于阅读，完整详情用于编辑。
-          </p>
-        </div>
-      </header>
+      <ManagementPageHeader
+        title="正式题库"
+        description="检索、审核与维护正式题目；列表用于快速扫描，右侧预览用于阅读，完整详情用于编辑。"
+        meta={
+          <span className="inline-flex h-7 items-center rounded-[7px] border border-white/70 bg-white/55 px-2.5 font-semibold tabular-nums text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md">
+            全库 {questions.data?.total?.toLocaleString("zh-CN") ?? "--"} 题
+          </span>
+        }
+      />
 
       <QuestionFilterToolbar
         filters={filters}
@@ -353,7 +349,7 @@ export default function QuestionsPage() {
           />
 
           <aside className="hidden self-stretch @min-[1080px]:block">
-            <div className="sticky top-0 flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden rounded-[18px] border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+            <div className="admin-panel sticky top-0 flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden rounded-[18px] p-5">
               <QuestionSideDetailPanel
                 questionId={selectedQuestionId}
                 question={selectedQuestion}
