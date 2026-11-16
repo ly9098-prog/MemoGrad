@@ -5,11 +5,16 @@
 
 .formula-card-wrap { padding: 0; color: #23483C; }
 
+.fc-flip-shell {
+  perspective: 500px;
+}
+
 .fc-flip-stage {
   position: relative;
   min-height: 300rpx;
   transform-style: preserve-3d;
-  transition: transform 620ms cubic-bezier(.22, 1, .36, 1);
+  transition: transform 520ms cubic-bezier(.4, 0, .2, 1);
+  will-change: transform;
 }
 
 .fc-flip-stage.is-flipped { transform: rotateY(180deg); }
@@ -202,6 +207,7 @@
   .fc-flip-stage,
   .fc-flip-face {
     transition: none !important;
+    will-change: auto !important;
   }
 
   .fc-collapse-header,

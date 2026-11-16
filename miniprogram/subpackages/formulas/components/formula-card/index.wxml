@@ -1,4 +1,5 @@
 <view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
+  <view class="fc-flip-shell">
   <view
     class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}"
     bindtap="toggleCardFlip"
@@ -51,6 +52,7 @@
       </view>
       <view class="fc-flip-hint" aria-hidden="true">再次点击翻回正面</view>
     </view>
+  </view>
   </view>
 
   <view class="fc-detail-body">
