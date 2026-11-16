@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   statusMeta,
   paperKindLabel,
+  paperTypeLabel,
+  paperYearBadgeLabel,
   computePaperSummary,
   filterPapers,
   buildStatusSegments,
@@ -51,6 +53,25 @@ describe("paperKindLabel", () => {
   });
   it("labels mock exam without year", () => {
     expect(paperKindLabel(makePaper({ paper_type: "mock_choice", year: null }))).toBe("模拟卷");
+  });
+});
+
+describe("paperTypeLabel", () => {
+  it("omits the year from the type column", () => {
+    expect(paperTypeLabel(makePaper({ paper_type: "past_exam_choice", year: 2025 }))).toBe("真题");
+    expect(paperTypeLabel(makePaper({ paper_type: "mock_choice", year: 2024 }))).toBe("模拟卷");
+  });
+});
+
+describe("paperYearBadgeLabel", () => {
+  it("shows a badge when the title does not repeat the year", () => {
+    expect(paperYearBadgeLabel(makePaper({ title: "数据结构模拟卷", year: 2025 }))).toBe("2025");
+  });
+  it("hides the badge when the title already contains the year", () => {
+    expect(paperYearBadgeLabel(makePaper({ title: "2025 年真题选择题", year: 2025 }))).toBeNull();
+  });
+  it("returns null without a year", () => {
+    expect(paperYearBadgeLabel(makePaper({ year: null }))).toBeNull();
   });
 });
 

@@ -307,9 +307,9 @@ export default function SubjectsPage() {
                             </>
                           ) : null}
                           <span
-                            className={`relative h-2.5 w-2.5 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-200 ${
+                            className={`relative h-2.5 w-2.5 shrink-0 rounded-full border transition-colors duration-200 ${
                               subject.is_active
-                                ? "border-primary bg-primary shadow-[0_0_0_3px_rgba(74,111,138,0.10)]"
+                                ? "border-primary bg-primary"
                                 : "border-border bg-card"
                             }`}
                             aria-hidden="true"
@@ -352,7 +352,7 @@ export default function SubjectsPage() {
           )}
           </div>
 
-          <aside className="min-w-0 bg-[linear-gradient(180deg,rgba(238,247,253,0.46),rgba(255,255,255,0.18))] xl:sticky xl:top-5">
+          <aside className="min-w-0 bg-secondary/15 xl:sticky xl:top-5">
             <section className="border-b border-[var(--admin-line)] p-5">
               <div className="flex items-start gap-2.5">
                 <span className="admin-premium-icon"><CircleCheck className="h-3.5 w-3.5" /></span>
@@ -363,7 +363,7 @@ export default function SubjectsPage() {
               </div>
               <div className="mt-4 flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-[30px] font-medium leading-none tracking-[-0.045em] tabular-nums text-foreground">{activeCoreCount}<span className="ml-1 text-sm font-medium text-muted-foreground/70">/ 4</span></p>
+                  <p className="text-[30px] font-medium leading-none tracking-[-0.04em] tabular-nums text-foreground">{activeCoreCount}<span className="ml-1 text-sm font-medium text-muted-foreground/70">/ 4</span></p>
                   <p className="mt-2 text-xs text-muted-foreground">核心科目已启用</p>
                 </div>
                 <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "完整" : "待修复"}</StatusBadge>

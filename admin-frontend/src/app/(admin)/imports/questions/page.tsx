@@ -356,7 +356,7 @@ export default function ImportQuestionsPage() {
           <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页待审核记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
           <PremiumStat label="本页疑似重复" value={duplicateCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页重复检测命中"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="violet" tone={duplicateCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
         </div>
-        <div className="grid gap-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(239,248,254,0.48),rgba(255,255,255,0.12))] px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
+        <div className="grid gap-3 border-b border-[var(--admin-line)] bg-secondary/20 px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
           <label className="relative xl:col-span-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
             <Input className="pl-9" placeholder="搜索题干 / OCR 原文" aria-label="搜索导入题目" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />

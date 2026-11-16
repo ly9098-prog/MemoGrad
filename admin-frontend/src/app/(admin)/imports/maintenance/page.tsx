@@ -163,9 +163,9 @@ export default function ImportMaintenancePage() {
           </div>
         ) : null}
         <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-4">
-          <PremiumStat label="当前告警" value={alertCount} hint={pipelines.isError ? "数据不可用" : "最近 5 条已完成导入"} icon={<ShieldAlert className="h-3.5 w-3.5" />} accent={errorAlertCount > 0 ? "rose" : "blue"} tone={alertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
-          <PremiumStat label="错误告警" value={errorAlertCount} hint={pipelines.isError ? "数据不可用" : "需要优先处理"} icon={<AlertCircle className="h-3.5 w-3.5" />} accent="rose" tone={errorAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
-          <PremiumStat label="警告" value={warningAlertCount} hint={pipelines.isError ? "数据不可用" : "需人工确认的数据质量提示"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="amber" tone={warningAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="当前告警" value={pipelines.isError ? "—" : alertCount} hint={pipelines.isError ? "数据不可用" : "最近 5 条已完成导入"} icon={<ShieldAlert className="h-3.5 w-3.5" />} accent={errorAlertCount > 0 ? "rose" : "blue"} tone={!pipelines.isError && alertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="错误告警" value={pipelines.isError ? "—" : errorAlertCount} hint={pipelines.isError ? "数据不可用" : "需要优先处理"} icon={<AlertCircle className="h-3.5 w-3.5" />} accent="rose" tone={!pipelines.isError && errorAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
+          <PremiumStat label="警告" value={pipelines.isError ? "—" : warningAlertCount} hint={pipelines.isError ? "数据不可用" : "需人工确认的数据质量提示"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="amber" tone={!pipelines.isError && warningAlertCount > 0 ? "alert" : "default"} loading={pipelines.isLoading} />
           <PremiumStat label="清理状态" value={cleanupResult?.dry_run ? "Dry-Run" : cleanupResult ? "已清理" : "未执行"} hint={pipelines.isLoading ? "正在读取流水线" : "扫描结果仅作确认依据"} icon={<Database className="h-3.5 w-3.5" />} accent="teal" />
         </div>
       </PremiumSection>
@@ -181,7 +181,7 @@ export default function ImportMaintenancePage() {
       ) : null}
 
       <PremiumSection inset={false} accent={tab === "alerts" ? "amber" : "teal"} className="overflow-hidden">
-        <div className="flex items-center border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.5),transparent)]" role="tablist" aria-label="导入运维视图">
+        <div className="flex items-center border-b border-[var(--admin-line)] bg-secondary/20" role="tablist" aria-label="导入运维视图">
           <button
             onClick={() => setTab("alerts")}
             role="tab"
@@ -192,8 +192,8 @@ export default function ImportMaintenancePage() {
             onKeyDown={handleTabKeyDown}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "alerts"
-                ? "text-foreground"
-                : "text-muted-foreground/70 hover:text-muted-foreground"
+                ? "bg-card text-foreground"
+                : "text-muted-foreground/70 hover:bg-card/45 hover:text-muted-foreground"
             }`}
           >
             <ShieldAlert className="h-3.5 w-3.5" />
@@ -203,7 +203,6 @@ export default function ImportMaintenancePage() {
                 {recentAlerts.length}
               </span>
             )}
-            {tab === "alerts" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--premium-accent)]" />}
           </button>
           <button
             onClick={() => setTab("cleanup")}
@@ -215,13 +214,12 @@ export default function ImportMaintenancePage() {
             onKeyDown={handleTabKeyDown}
             className={`relative flex items-center gap-1.5 px-5 py-3 text-xs font-semibold transition-colors ${
               tab === "cleanup"
-                ? "text-foreground"
-                : "text-muted-foreground/70 hover:text-muted-foreground"
+                ? "bg-card text-foreground"
+                : "text-muted-foreground/70 hover:bg-card/45 hover:text-muted-foreground"
             }`}
           >
             <Database className="h-3.5 w-3.5" />
             存储清理
-            {tab === "cleanup" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--premium-accent)]" />}
           </button>
         </div>
 
@@ -275,7 +273,7 @@ export default function ImportMaintenancePage() {
           <div id="import-maintenance-panel-cleanup" role="tabpanel" aria-labelledby="import-maintenance-tab-cleanup" tabIndex={0} className="space-y-5 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30">
             {/* Description */}
             <p className="text-[12.5px] leading-relaxed text-[#52697a]">
-              清理过期 pipeline artifact 和 OCR 缓存文件，释放磁盘空间。建议先运行 Dry-Run 预览可清理量，确认后再执行。
+              清理过期的导入流水线产物和 OCR 缓存文件，释放磁盘空间。建议先运行 Dry-Run 预览可清理量，确认后再执行。
             </p>
 
             {/* Stepper */}

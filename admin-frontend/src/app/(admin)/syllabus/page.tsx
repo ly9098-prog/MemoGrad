@@ -281,7 +281,7 @@ export default function SyllabusPage() {
           description={`${versionsQuery.data?.length ?? 0} 个版本 · 在左侧选择版本，右侧调整范围、覆盖与映射关系。`}
         />
         <div className="grid xl:grid-cols-[310px_minmax(0,1fr)] xl:items-start">
-          <aside className="min-w-0 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(239,248,254,0.42),rgba(255,255,255,0.12))] xl:sticky xl:top-5 xl:border-b-0 xl:border-r">
+          <aside className="min-w-0 border-b border-[var(--admin-line)] bg-secondary/15 xl:sticky xl:top-5 xl:border-b-0 xl:border-r">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--admin-line)] px-4 py-3.5">
               <div>
                 <p className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">版本索引</p>
@@ -358,7 +358,7 @@ export default function SyllabusPage() {
           </aside>
 
           <div className="min-w-0">
-            <div className="flex flex-col gap-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.36),transparent)] px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex flex-col gap-3 border-b border-[var(--admin-line)] bg-secondary/10 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-[18px] font-semibold tracking-[-0.025em] text-foreground">{detail?.name ?? "版本范围"}</h2>
@@ -515,7 +515,7 @@ export default function SyllabusPage() {
                   </div>
                   <div className="mt-4 flex items-end justify-between gap-4">
                     <div>
-                      <p className="text-[30px] font-medium leading-none tracking-[-0.045em] tabular-nums text-foreground">{coverageQuery.data?.covered_knowledge_points ?? 0}<span className="text-sm font-medium text-muted-foreground/70"> / {coverageQuery.data?.total_knowledge_points ?? 0}</span></p>
+                      <p className="text-[30px] font-medium leading-none tracking-[-0.04em] tabular-nums text-foreground">{coverageQuery.data?.covered_knowledge_points ?? 0}<span className="text-sm font-medium text-muted-foreground/70"> / {coverageQuery.data?.total_knowledge_points ?? 0}</span></p>
                       <p className="mt-1.5 text-xs text-muted-foreground">覆盖率 {coveragePct}%</p>
                     </div>
                     <StatusBadge tone={coveragePct >= 90 ? "success" : "warning"}>{coveragePct >= 90 ? "覆盖良好" : "仍有缺口"}</StatusBadge>
@@ -537,7 +537,7 @@ export default function SyllabusPage() {
                       <p className="mt-1 text-[11px] leading-5 text-muted-foreground">自动关系与手工关系统一在当前版本下查看。</p>
                     </div>
                   </div>
-                  <p className="mt-4 text-[30px] font-medium leading-none tracking-[-0.045em] tabular-nums text-foreground">{mappingsQuery.data?.length ?? 0}</p>
+                  <p className="mt-4 text-[30px] font-medium leading-none tracking-[-0.04em] tabular-nums text-foreground">{mappingsQuery.data?.length ?? 0}</p>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">激活时自动生成 unchanged、renamed、added、removed；合并、拆分、替换关系可手工补充。</p>
                 </div>
               </div>

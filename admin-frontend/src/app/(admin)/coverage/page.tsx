@@ -180,7 +180,7 @@ export default function CoveragePage() {
             </Button>
           ) : <StatusBadge tone="neutral">默认范围</StatusBadge>}
         />
-        <div className="grid gap-x-4 gap-y-3 border-b border-[var(--admin-line)] bg-[linear-gradient(180deg,rgba(240,248,253,0.44),rgba(255,255,255,0.12))] px-5 py-4 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_210px_145px_145px] xl:items-end">
+        <div className="grid gap-x-4 gap-y-3 border-b border-[var(--admin-line)] bg-secondary/20 px-5 py-4 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_210px_145px_145px] xl:items-end">
           <label className="min-w-0">
             <FieldLabel>考纲版本</FieldLabel>
             <CustomSelect
@@ -280,7 +280,7 @@ export default function CoveragePage() {
                   type="button"
                   key={value}
                   onClick={() => setStatus((current) => current === value ? "" : value)}
-                  className={`min-w-0 bg-[rgba(249,253,255,0.8)] px-5 py-3.5 text-left transition-[background-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-[rgba(229,243,251,0.88)] shadow-[inset_0_-2px_0_var(--primary)]" : "hover:bg-white/82"}`}
+                  className={`min-w-0 bg-[rgba(249,253,255,0.8)] px-5 py-3.5 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-card" : "hover:bg-white/82"}`}
                   aria-pressed={active}
                   title={active ? `取消“${label}”筛选` : `只看“${label}”知识点`}
                 >

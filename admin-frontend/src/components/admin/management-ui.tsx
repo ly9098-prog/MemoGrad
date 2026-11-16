@@ -119,7 +119,7 @@ export function ManagementPage({ children, className }: { children: ReactNode; c
   return (
     <div
       className={cn(
-        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--admin-line)] [--mgmt-muted:var(--admin-ink-muted)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_18px_44px_rgba(31,72,100,0.06)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[var(--admin-line)] before:bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(243,247,251,0.66))] after:pointer-events-none after:absolute after:-left-5 after:top-0 after:-z-10 after:h-28 after:w-px after:bg-[linear-gradient(180deg,var(--admin-primary),transparent)]",
+        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--admin-line)] [--mgmt-muted:var(--admin-ink-muted)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_18px_44px_rgba(31,72,100,0.06)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[var(--admin-line)] before:bg-[rgba(255,255,255,0.18)]",
         className,
       )}
     >
