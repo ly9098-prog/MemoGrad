@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement } from "react";
 import DashboardPage from "./page";
 import { DashboardTrendChart } from "./components/dashboard-trend-chart";
+import { renderDashboardWorkbench } from "./components/dashboard-workbench";
 import { BodyPortal } from "@/components/ui/body-portal";
 import { ManagementPanel } from "@/components/admin/management-ui";
 
@@ -143,6 +144,44 @@ describe("dashboard page request ownership", () => {
     const onPeriodChange = chart.props.onPeriodChange as (value: string) => void;
     onPeriodChange("7d");
     expect(h.setters[0]).toHaveBeenCalledWith("7d");
+  });
+
+  it("routes pending imports to the review workspace", () => {
+    const tree = renderDashboardWorkbench({
+      dateLabel: "2026-10-30",
+      manualRefreshing: false,
+      refreshAll: async () => {},
+      period: "7d",
+      onPeriodChange: () => {},
+      overview: {
+        data: {
+          users_total: 700,
+          users_new_today: 0,
+          questions_total: 3403,
+          questions_pending_review: 0,
+          imports_total: 483,
+          imports_pending: 1,
+          audit_critical_today: 0,
+          cache: {},
+        },
+        isLoading: false,
+      },
+      daily: { data: [], isLoading: false },
+      stats: {
+        data: { by_subject: [], by_review_status: [], by_difficulty: [] },
+        isLoading: false,
+      },
+      readyHealth: { data: undefined, isLoading: false },
+      aiStats: { data: undefined, isLoading: false },
+      taskDiagnostics: { data: undefined, isLoading: false },
+      canReadSystem: false,
+      canReadImports: true,
+      canReadAudit: false,
+      reviewHint: "无权限查看",
+      importsHint: "进入导入审核",
+      auditHint: "无权限查看",
+    });
+    expect(find(tree, (element) => element.props.href === "/imports/review")).toBeDefined();
   });
 
   it("waits for every refresh despite one rejection and clears the busy state last", async () => {

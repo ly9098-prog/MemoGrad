@@ -301,6 +301,7 @@ export function Sidebar({
                   }}
                   aria-expanded={expanded}
                   aria-controls={groupId(item.key)}
+                  data-active={groupActive ? "true" : undefined}
                   aria-label={item.label}
                   title={isRail ? item.label : undefined}
                   className={cn(rowClass, "w-full text-left", groupActive ? "font-medium text-primary" : "text-muted-foreground", "hover:bg-accent/60 hover:text-sidebar-foreground")}

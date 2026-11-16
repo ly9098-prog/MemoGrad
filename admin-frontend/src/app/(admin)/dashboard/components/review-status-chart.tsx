@@ -5,17 +5,17 @@ import styles from "../dashboard-workspace.module.css";
 type ReviewStatusDatum = { name: string; count: number };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  pending: { label: "待审核", color: "#6768e8" },
-  reviewing: { label: "审核中", color: "#348de5" },
-  approved: { label: "已审核", color: "#1fae9e" },
-  published: { label: "已发布", color: "#147c78" },
-  rejected: { label: "已驳回", color: "#dd7a9b" },
-  error: { label: "异常", color: "#cf5d6b" },
-  draft: { label: "草稿", color: "#8fa8aa" },
-  archived: { label: "已归档", color: "#b2c4c1" },
+  pending: { label: "待审核", color: "#246B96" },
+  reviewing: { label: "审核中", color: "#147A83" },
+  approved: { label: "已审核", color: "#24735B" },
+  published: { label: "已发布", color: "#1B5E82" },
+  rejected: { label: "已驳回", color: "#96601F" },
+  error: { label: "异常", color: "#B33E50" },
+  draft: { label: "草稿", color: "#756A91" },
+  archived: { label: "已归档", color: "#8A9CAB" },
 };
 
-const FALLBACK_COLORS = ["#6768e8", "#1fae9e", "#348de5", "#dd7a9b", "#8fa8aa"];
+const FALLBACK_COLORS = ["#246B96", "#147A83", "#8172A6", "#52697A", "#8A9CAB"];
 
 function formatCount(value: number) {
   return value.toLocaleString("zh-CN");

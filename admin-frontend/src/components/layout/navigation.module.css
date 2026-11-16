@@ -4,19 +4,38 @@
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
-  background: var(--background);
-  background: color-mix(in srgb, var(--background) 82%, var(--card));
+  background:
+    radial-gradient(90% 60% at 0% 0%, rgba(255, 255, 255, 0.96) 0%, rgba(240, 248, 253, 0.76) 42%, transparent 72%),
+    linear-gradient(180deg, #eef6fb 0%, #e6f0f7 100%);
 }
 
 .sidebar {
+  --sidebar: rgba(255, 255, 255, 0.86);
+  --sidebar-foreground: #152b3b;
+  --sidebar-border: rgba(84, 110, 129, 0.18);
+  --sidebar-accent: #e1f0fa;
+  --sidebar-accent-foreground: #25638a;
+  --foreground: #152b3b;
+  --muted-foreground: #52697a;
+  --primary: #25638a;
+  --primary-hover: #1b4f70;
+  --primary-foreground: #ffffff;
+  --accent: #e1f0fa;
+  --accent-foreground: #25638a;
+  --ring: #25638a;
+  --destructive: #b33e50;
+  --destructive-light: #fbe9ed;
   min-width: 0;
   min-height: 0;
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  background: var(--background);
-  background: color-mix(in srgb, var(--background) 82%, var(--card));
+  background:
+    radial-gradient(95% 38% at 12% 0%, rgba(143, 212, 255, 0.2) 0%, rgba(225, 240, 250, 0.12) 38%, transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 249, 254, 0.84) 100%);
   color: var(--sidebar-foreground);
+  -webkit-backdrop-filter: blur(18px) saturate(1.06);
+  backdrop-filter: blur(18px) saturate(1.06);
 }
 
 .brand {
@@ -90,7 +109,12 @@
 
 .searchField {
   height: 44px;
+  border: 1px solid var(--sidebar-border);
+  background: rgba(255, 255, 255, 0.68);
   color: var(--muted-foreground);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(37, 99, 138, 0.04);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .searchField:focus-within {
@@ -254,6 +278,29 @@
   transform: translateX(3px);
 }
 
+.sidebar:not([data-collapsed="true"]) .row[aria-current="page"],
+.sidebar:not([data-collapsed="true"]) .row[data-active="true"] {
+  position: relative;
+}
+
+.sidebar .row[aria-current="page"],
+.sidebar .row[data-active="true"] {
+  color: var(--sidebar-accent-foreground);
+}
+
+.sidebar:not([data-collapsed="true"]) .row[aria-current="page"]::before,
+.sidebar:not([data-collapsed="true"]) .row[data-active="true"]::before {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8fd4ff 0%, #25638a 100%);
+  content: "";
+  transform: translateY(-50%);
+}
+
 .sidebar[data-collapsed="true"] .brand {
   padding-inline: 16px;
 }
@@ -294,7 +341,7 @@
   border-bottom: 0;
   border-radius: 20px 0 0 0;
   background: var(--admin-canvas, var(--card));
-  border-color: var(--sidebar-border);
+  border-color: var(--admin-line-strong, var(--border));
 }
 
 .mobileNavigationButton {
@@ -306,17 +353,17 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid #d5e1eb;
   border-radius: 12px;
-  background: var(--card);
-  color: var(--muted-foreground);
-  box-shadow: var(--shadow-card);
+  background: rgba(255, 255, 255, 0.92);
+  color: #52697a;
+  box-shadow: 0 8px 24px rgba(37, 99, 138, 0.08);
   transition: background-color 160ms var(--ease-out-ui), color 160ms var(--ease-out-ui);
 }
 
 .mobileNavigationButton:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: #e1f0fa;
+  color: #25638a;
 }
 
 .mobileNavigationButton:focus-visible {
@@ -344,6 +391,12 @@
 
 .sidebar[data-variant="mobile"] .row {
   min-height: 44px;
+}
+
+.sidebar[data-variant="mobile"] {
+  background:
+    radial-gradient(95% 38% at 12% 0%, rgba(143, 212, 255, 0.2) 0%, rgba(225, 240, 250, 0.12) 38%, transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(242, 249, 254, 0.9) 100%);
 }
 
 @media (min-width: 1024px) {

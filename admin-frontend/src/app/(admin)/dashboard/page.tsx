@@ -85,7 +85,7 @@ export default function DashboardPage() {
     : canReadQuestions
       ? "查看题库列表"
       : "无权限查看";
-  const importsHint = canReadImports ? "查看导入任务" : "无权限查看";
+  const importsHint = canReadImports ? "进入导入审核" : "无权限查看";
   const auditHint = canReadAudit ? "查看审计日志" : "无权限查看";
   const dateLabel = chinaDateString();
 

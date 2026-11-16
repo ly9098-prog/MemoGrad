@@ -39,6 +39,7 @@ import {
   toPieData,
 } from "@/lib/dashboard-utils";
 import { BodyPortal } from "@/components/ui/body-portal";
+import { AnimatedDigits } from "./animated-digits";
 import { DashboardTrendChart } from "./dashboard-trend-chart";
 import { ReviewStatusChart } from "./review-status-chart";
 import styles from "../dashboard-workspace.module.css";
@@ -46,6 +47,8 @@ import styles from "../dashboard-workspace.module.css";
 type Period = "7d" | "30d";
 type StatusTone = "ok" | "warning" | "error" | "muted";
 type MetricTone = "default" | "alert";
+type TodoTone = "default" | "attention" | "danger";
+type MetricAccent = "blue" | "teal" | "amber" | "violet";
 
 type QueryState<T> = {
   data?: T;
@@ -95,6 +98,9 @@ function MetricCell({
   hint,
   loading = false,
   tone = "default",
+  accent = "blue",
+  motionOrder = 0,
+  metricKey,
 }: {
   icon: ReactNode;
   label: string;
@@ -102,9 +108,12 @@ function MetricCell({
   hint: string;
   loading?: boolean;
   tone?: MetricTone;
+  accent?: MetricAccent;
+  motionOrder?: number;
+  metricKey: string;
 }) {
   return (
-    <div className={styles.metricCell} data-tone={tone}>
+    <div className={styles.metricCell} data-tone={tone} data-accent={accent} data-ready={!loading}>
       <div className={styles.metricTopline}>
         <span className={styles.metricLabel}>{label}</span>
         <span className={styles.metricIcon}>{icon}</span>
@@ -112,7 +121,9 @@ function MetricCell({
       {loading ? (
         <span className={styles.metricSkeleton} aria-label={`正在加载${label}`} />
       ) : (
-        <strong className={styles.metricValue}>{value}</strong>
+        <strong className={styles.metricValue} aria-label={value}>
+          <AnimatedDigits key={value} value={value} baseDelay={20 + motionOrder * 40} metricKey={metricKey} />
+        </strong>
       )}
       <p className={styles.metricHint} data-alert={tone === "alert"}>{hint}</p>
     </div>
@@ -132,7 +143,7 @@ function TodoRow({
   value: string;
   hint: string;
   href?: string;
-  tone?: "default" | "warning" | "danger";
+  tone?: TodoTone;
 }) {
   const content = (
     <>
@@ -177,6 +188,16 @@ function subjectBarWidth(count: number, maxCount: number) {
   return `${Math.max(8, Math.round((count / Math.max(1, maxCount)) * 100))}%`;
 }
 
+const SUBJECT_COLORS = ["#2C6E9B", "#2F8B7E", "#8A6E9E", "#B07A35", "#A7596D"];
+
+function subjectColor(name: string) {
+  if (/^\d+$/.test(name)) {
+    return SUBJECT_COLORS[Number(name) % SUBJECT_COLORS.length];
+  }
+  const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
+  return SUBJECT_COLORS[hash % SUBJECT_COLORS.length];
+}
+
 function subjectLabel(name: string) {
   return /^\d+$/.test(name) ? `科目 ${name}` : name;
 }
@@ -219,6 +240,9 @@ export function renderDashboardWorkbench({
   const pendingReview = overview.data?.questions_pending_review ?? 0;
   const pendingImports = overview.data?.imports_pending ?? 0;
   const criticalAudit = overview.data?.audit_critical_today ?? 0;
+  const aiCallsToday = aiStats.data?.today_calls ?? 0;
+  const aiHasCalls = aiStats.data != null && aiCallsToday > 0;
+  const aiMetrics = aiHasCalls ? aiStats.data : undefined;
   const redisConfigured = taskDiagnostics.data?.redis.configured === true;
   const redisStatus = canReadSystem
     ? computeRedisStatus(taskDiagnostics.isLoading, taskDiagnostics.data?.redis)
@@ -277,6 +301,9 @@ export function renderDashboardWorkbench({
             hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(usersToday)}`}
             icon={<Users size={15} />}
             loading={overview.isLoading}
+            accent="blue"
+            motionOrder={0}
+            metricKey="metric:users_total"
           />
           <MetricCell
             label="题目总量"
@@ -284,6 +311,9 @@ export function renderDashboardWorkbench({
             hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(questionsToday)}`}
             icon={<Database size={15} />}
             loading={overview.isLoading || daily.isLoading}
+            accent="teal"
+            motionOrder={1}
+            metricKey="metric:questions_total"
           />
           <MetricCell
             label="待审核题目"
@@ -292,6 +322,9 @@ export function renderDashboardWorkbench({
             icon={<ShieldCheck size={15} />}
             loading={overview.isLoading}
             tone={pendingReview > 0 ? "alert" : "default"}
+            accent="amber"
+            motionOrder={2}
+            metricKey="metric:pending_review"
           />
           <MetricCell
             label="待处理导入"
@@ -300,6 +333,9 @@ export function renderDashboardWorkbench({
             icon={<FileClock size={15} />}
             loading={overview.isLoading}
             tone={pendingImports > 0 ? "alert" : "default"}
+            accent="violet"
+            motionOrder={3}
+            metricKey="metric:pending_imports"
           />
         </div>
       </section>
@@ -316,16 +352,18 @@ export function renderDashboardWorkbench({
           className={`${styles.todoPanel} ${styles.folderPanel}`}
           aria-labelledby="dashboard-todo-title"
         >
-          <div className={styles.folderTab}>
-            <ShieldCheck size={13} />
-            今日待办
-          </div>
           <div className={styles.panelHeading}>
             <div>
               <h2 id="dashboard-todo-title">需要处理</h2>
-              <p>按现有计数汇总运营队列，点击进入已有工作区。</p>
+              <p>按现有队列计数，进入对应工作区。</p>
             </div>
-            <span className={styles.miniCount}>{todoCount > 0 ? `${todoCount} 个队列` : "暂无待办"}</span>
+            <div className={styles.panelAside}>
+              <span className={styles.folderTab}>
+                <ShieldCheck size={12} />
+                今日待办
+              </span>
+              <span className={styles.miniCount}>{todoCount > 0 ? `${todoCount} 个队列` : "暂无待办"}</span>
+            </div>
           </div>
           <div className={styles.todoList}>
             <TodoRow
@@ -334,15 +372,15 @@ export function renderDashboardWorkbench({
               value={numberValue(pendingReview)}
               hint={reviewHint}
               href={reviewHref}
-              tone={pendingReview > 0 ? "warning" : "default"}
+              tone={pendingReview > 0 ? "attention" : "default"}
             />
             <TodoRow
               icon={<FileClock size={16} />}
               label="待处理导入"
               value={numberValue(pendingImports)}
               hint={importsHint}
-              href={canReadImports ? "/imports/tasks" : undefined}
-              tone={pendingImports > 0 ? "warning" : "default"}
+              href={canReadImports ? "/imports/review" : undefined}
+              tone={pendingImports > 0 ? "attention" : "default"}
             />
             <TodoRow
               icon={<ShieldAlert size={16} />}
@@ -397,7 +435,10 @@ export function renderDashboardWorkbench({
                       <span className={styles.subjectTrack}>
                         <span
                           className={styles.subjectFill}
-                          style={{ width: subjectBarWidth(subject.count, maxSubjectCount) }}
+                          style={{
+                            width: subjectBarWidth(subject.count, maxSubjectCount),
+                            backgroundColor: subjectColor(subject.name),
+                          }}
                         />
                       </span>
                       <span className={styles.subjectValue}>{numberValue(subject.count)}</span>
@@ -442,31 +483,40 @@ export function renderDashboardWorkbench({
                 <div className={styles.systemGroupTitle}>
                   <Cpu size={12} />
                   AI 运行
-                  {aiStats.data ? <span>今日 {numberValue(aiStats.data.today_calls)} 次</span> : null}
+                  {aiStats.data ? <span>今日 {numberValue(aiCallsToday)} 次</span> : null}
                 </div>
-                {aiStats.data ? (
+                {aiMetrics ? (
                   <div className={styles.systemGroupValues}>
                     <div className={styles.systemGroupValue}>
-                      <strong>{aiStats.data.success_rate.toFixed(1)}%</strong>
+                      <strong>{aiMetrics.success_rate.toFixed(1)}%</strong>
                       <span>成功率</span>
                     </div>
                     <div className={styles.systemGroupValue}>
-                      <strong>{(aiStats.data.avg_latency_ms / 1000).toFixed(1)}s</strong>
+                      <strong>{(aiMetrics.avg_latency_ms / 1000).toFixed(1)}s</strong>
                       <span>平均响应</span>
                     </div>
                     <div className={styles.systemGroupValue}>
                       <strong>
-                        {aiStats.data.total_tokens >= 1000
-                          ? `${(aiStats.data.total_tokens / 1000).toFixed(1)}k`
-                          : aiStats.data.total_tokens}
+                        {aiMetrics.total_tokens >= 1000
+                          ? `${(aiMetrics.total_tokens / 1000).toFixed(1)}k`
+                          : aiMetrics.total_tokens}
                       </strong>
                       <span>7 日 Token</span>
                     </div>
                   </div>
+                ) : aiStats.data ? (
+                  <div className={styles.systemEmptyState}>
+                    <span>今日暂无调用</span>
+                    <small>成功率与平均响应暂不适用</small>
+                  </div>
                 ) : (
                   <div className={styles.systemMessage}>
                     <AlertTriangle size={12} />
-                    {aiStats.isLoading ? "正在读取 AI 指标" : "AI 运行指标暂不可用。"}
+                    {aiStats.isLoading
+                      ? "正在读取 AI 指标"
+                      : aiStats.isError
+                        ? "AI 指标请求失败。"
+                        : "AI 运行指标暂不可用。"}
                   </div>
                 )}
               </div>
@@ -507,7 +557,7 @@ export function renderDashboardWorkbench({
 
             <div className={styles.systemRows}>
               <SystemRow
-                icon={<Server size={12} className="text-[#3f7a7d]" />}
+                icon={<Server size={12} className={styles.systemIcon} />}
                 label="Dashboard API"
                 status={
                   overview.isError
@@ -518,7 +568,7 @@ export function renderDashboardWorkbench({
                 }
               />
               <SystemRow
-                icon={<Database size={12} className="text-[#3f7a7d]" />}
+                icon={<Database size={12} className={styles.systemIcon} />}
                 label="数据库"
                 status={
                   readyHealth.data?.db === "ok"
@@ -529,17 +579,17 @@ export function renderDashboardWorkbench({
                 }
               />
               <SystemRow
-                icon={<HardDrive size={12} className={redisConfigured ? "text-[#3f7a7d]" : "text-[#789092]"} />}
+                icon={<HardDrive size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
                 label="Redis"
                 status={redisStatus}
               />
               <SystemRow
-                icon={<Network size={12} className={redisConfigured ? "text-[#3f7a7d]" : "text-[#789092]"} />}
+                icon={<Network size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
                 label="Task Queue"
                 status={taskQueueStatus}
               />
               <SystemRow
-                icon={<BrainCircuit size={12} className="text-[#789092]" />}
+                icon={<BrainCircuit size={12} className={styles.systemIconMuted} />}
                 label="AI Metrics API"
                 status={
                   aiStats.data
@@ -550,7 +600,7 @@ export function renderDashboardWorkbench({
                 }
               />
               <SystemRow
-                icon={<CheckCircle2 size={12} className="text-[#4b8a69]" />}
+                icon={<CheckCircle2 size={12} className={styles.systemIconOk} />}
                 label="系统就绪"
                 status={
                   readyHealth.data?.status === "ok"
