@@ -126,6 +126,27 @@ def test_get_import_batch_detail(monkeypatch):
     assert resp.json()["items"][0]["parsed_answer"] == "A"
 
 
+def test_list_pipelines_uses_static_route(monkeypatch):
+    list_pipelines = AsyncMock(return_value={"items": [], "total": 0, "page": 1, "page_size": 20})
+    detail = AsyncMock()
+    monkeypatch.setattr(admin_imports, "_list_pipelines_impl", list_pipelines)
+    monkeypatch.setattr(admin_imports, "get_import_batch_detail", detail)
+    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        resp = client.get(
+            "/api/admin/v1/imports/pipelines"
+            "?page=1&page_size=20&sort_by=started_at"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+    list_pipelines.assert_awaited_once()
+    detail.assert_not_called()
+
+
 def test_create_enrich_task_and_status(monkeypatch):
     now = datetime(2026, 5, 29)
     task = AdminImportEnrichResponse(task_id="task-1", batch_id="batch-1", status="pending", created_at=now)
