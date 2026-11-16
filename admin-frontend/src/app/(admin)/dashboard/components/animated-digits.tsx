@@ -1,9 +1,23 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import styles from "../dashboard-workspace.module.css";
 
 const seenValues = new Map<string, string>();
+
+type AnimationDecision = {
+  metricKey?: string;
+  value: string;
+  shouldAnimate: boolean;
+};
+
+function resolveAnimationDecision(metricKey: string | undefined, value: string): AnimationDecision {
+  return {
+    metricKey,
+    value,
+    shouldAnimate: metricKey === undefined || seenValues.get(metricKey) !== value,
+  };
+}
 
 export function AnimatedDigits({
   value,
@@ -14,15 +28,19 @@ export function AnimatedDigits({
   baseDelay?: number;
   metricKey?: string;
 }) {
-  const shouldAnimate = metricKey === undefined || seenValues.get(metricKey) !== value;
+  const [decision, setDecision] = useState<AnimationDecision>(() =>
+    resolveAnimationDecision(metricKey, value),
+  );
+  let currentDecision = decision;
+  if (decision.metricKey !== metricKey || decision.value !== value) {
+    currentDecision = resolveAnimationDecision(metricKey, value);
+    setDecision(currentDecision);
+  }
 
   useEffect(() => {
     if (!metricKey) return;
-    const digitCount = Array.from(value).filter((character) => /\d/.test(character)).length;
-    const settleDelay = baseDelay + Math.max(0, digitCount - 1) * 35 + 820 + 120;
-    const timer = window.setTimeout(() => seenValues.set(metricKey, value), settleDelay);
-    return () => window.clearTimeout(timer);
-  }, [baseDelay, metricKey, value]);
+    seenValues.set(metricKey, value);
+  }, [metricKey, value]);
 
   let digitIndex = 0;
   return (
@@ -44,9 +62,9 @@ export function AnimatedDigits({
             data-digit={character}
           >
             <span
-              className={`${styles.animatedDigit}${shouldAnimate ? "" : ` ${styles.digitSettled}`}`}
+              className={`${styles.animatedDigit}${currentDecision.shouldAnimate ? "" : ` ${styles.digitSettled}`}`}
               data-direction={currentDigit % 2 === 0 ? "top" : "bottom"}
-              data-animate={shouldAnimate ? "true" : "false"}
+              data-animate={currentDecision.shouldAnimate ? "true" : "false"}
               style={{ animationDelay: `${baseDelay + currentDigit * 35}ms` }}
             >
               {character}
