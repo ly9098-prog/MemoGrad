@@ -10,16 +10,11 @@ import {
   FileText,
   Code2,
   X,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Globe,
   AlertTriangle,
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CustomSelect } from "@/components/ui/custom-select";
 import { StatusBadge } from "@/components/status-badge";
 import {
   Dialog,
@@ -31,17 +26,30 @@ import {
 } from "@/components/ui/dialog";
 import {
   EmptyState,
-  ManagementNotice,
   ManagementSkeletonRows,
-  PremiumSection,
-  PremiumSectionHeader,
-  PremiumStat,
 } from "@/components/admin/management-ui";
+import {
+  WorkspacePage,
+  WorkspaceHeader,
+  WorkspaceSurface,
+  WorkspaceFilters,
+  WorkspaceSectionHeader,
+  WorkspaceMetrics,
+  WorkspaceMetric,
+  WorkspaceNotice,
+  WorkspaceSelect,
+  workspaceStyles as ws,
+} from "@/components/admin/workspace";
 import { apiRequest, toQuery } from "@/lib/api/client";
-import { getQuestionTypeLabel, canonicalizeQuestionType } from "@/lib/question-types";
+import {
+  getQuestionTypeLabel,
+  canonicalizeQuestionType,
+} from "@/lib/question-types";
 import type { ImportQuestionItem, PaginatedResponse } from "@/lib/api/types";
 
-function isMultiBlankChoice(item: ImportQuestionItem | null | undefined): boolean {
+function isMultiBlankChoice(
+  item: ImportQuestionItem | null | undefined,
+): boolean {
   return canonicalizeQuestionType(item?.question_type) === "multi_blank_choice";
 }
 
@@ -54,21 +62,39 @@ function textFromImport(item: ImportQuestionItem | null | undefined) {
   if (!item) return "";
   const content = item.parsed_content;
   const raw = item.raw_data;
-  const candidate = content?.stem ?? content?.text ?? content?.question ?? raw?.stem ?? raw?.text ?? raw?.question;
+  const candidate =
+    content?.stem ??
+    content?.text ??
+    content?.question ??
+    raw?.stem ??
+    raw?.text ??
+    raw?.question;
   if (typeof candidate === "string") return candidate;
   return "";
 }
 
 function renderJson(value: unknown) {
   if (value === undefined || value === null || value === "") return "—";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  )
+    return String(value);
   return JSON.stringify(value, null, 2);
 }
 
 function optionDataFromImport(item: ImportQuestionItem | null | undefined) {
   if (!item) return null;
   const raw = item.raw_data;
-  return item.parsed_options ?? raw?.options ?? raw?.parsed_options ?? raw?.option_text ?? raw?.optionText ?? null;
+  return (
+    item.parsed_options ??
+    raw?.options ??
+    raw?.parsed_options ??
+    raw?.option_text ??
+    raw?.optionText ??
+    null
+  );
 }
 
 function renderOptions(value: unknown) {
@@ -81,8 +107,19 @@ function renderOptions(value: unknown) {
         if (item && typeof item === "object") {
           const entry = item as Record<string, unknown>;
           const label = entry.label ?? entry.key ?? entry.name;
-          const content = [entry.content, entry.text, entry.stem, entry.option, entry.value, entry.answer]
-            .map((part) => (typeof part === "string" || typeof part === "number" ? String(part) : ""))
+          const content = [
+            entry.content,
+            entry.text,
+            entry.stem,
+            entry.option,
+            entry.value,
+            entry.answer,
+          ]
+            .map((part) =>
+              typeof part === "string" || typeof part === "number"
+                ? String(part)
+                : "",
+            )
             .find(Boolean);
           const prefix = label ? `${label}: ` : `选项${index + 1}: `;
           if (content) return `${prefix}${content}`;
@@ -96,7 +133,11 @@ function renderOptions(value: unknown) {
     if (entries.length > 0) {
       return entries
         .map(([key, item]) => {
-          if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
+          if (
+            typeof item === "string" ||
+            typeof item === "number" ||
+            typeof item === "boolean"
+          ) {
             return `${key}: ${item}`;
           }
           return `${key}: ${renderJson(item)}`;
@@ -105,20 +146,6 @@ function renderOptions(value: unknown) {
     }
   }
   return renderJson(value);
-}
-
-function statusIcon(status: string) {
-  if (status === "approved") return CheckCircle2;
-  if (status === "rejected") return XCircle;
-  if (status === "published") return Globe;
-  return Clock;
-}
-
-function statusColor(status: string) {
-  if (status === "approved") return "text-success";
-  if (status === "rejected") return "text-destructive";
-  if (status === "published") return "text-primary";
-  return "text-warning-foreground";
 }
 
 function statusTone(status: string) {
@@ -136,12 +163,6 @@ function statusLabel(status: string) {
   return status;
 }
 
-function duplicateStatusTone(status: string | null | undefined) {
-  if (status === "possible_duplicate") return "warning" as const;
-  if (status === "normal") return "success" as const;
-  return "neutral" as const;
-}
-
 function duplicateStatusLabel(status: string) {
   if (status === "possible_duplicate") return "疑似重复";
   if (status === "normal") return "无重复";
@@ -152,22 +173,31 @@ function typeLabel(t: string | null | undefined) {
   return getQuestionTypeLabel(t);
 }
 
-/** Compact detail modal */
 function DetailModal({
   item,
   onClose,
   returnFocusRef,
+  loading,
+  failed,
 }: {
   item: ImportQuestionItem;
   onClose: () => void;
   returnFocusRef: RefObject<HTMLElement | null>;
+  loading: boolean;
+  failed: boolean;
 }) {
-  const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
-
+  const [detailView, setDetailView] = useState<"formatted" | "json">(
+    "formatted",
+  );
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent
-        className="admin-content-theme top-6 max-h-[calc(100dvh-3rem)] max-w-2xl translate-y-0 overflow-hidden rounded-2xl p-0"
+        className={`admin-content-theme ${ws.overlay} top-6 max-h-[calc(100dvh-3rem)] max-w-3xl translate-y-0 overflow-hidden p-0`}
         showCloseButton={false}
         onCloseAutoFocus={(event) => {
           const target = returnFocusRef.current;
@@ -177,113 +207,168 @@ function DetailModal({
         }}
       >
         <DialogDescription className="sr-only">
-          查看导入题目的题干、答案、解析及 OCR/AI 原始数据。
+          查看题干、答案、解析及 OCR/AI 原始数据，不改变审核状态。
         </DialogDescription>
-        {/* ===== Header with large close hit area ===== */}
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-[var(--admin-line)] px-5 py-3 pr-14">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 font-mono text-xs text-muted-foreground/70">#{item.id}</span>
-            <DialogTitle className="truncate font-display text-base font-bold text-foreground">导入题目详情</DialogTitle>
+        <DialogHeader className={ws.detailHeader}>
+          <div>
+            <DialogTitle>导入题目详情</DialogTitle>
+            <p className={`${ws.caption} mt-1`}>
+              #{item.id} · {item.subject_name || "未分配科目"}
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex overflow-hidden rounded-lg border border-border">
-              <button
-                type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "formatted" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
-                onClick={() => setDetailView("formatted")}
-              >
-                <FileText className="h-3 w-3" />文本
-              </button>
-              <button
-                type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "json" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
-                onClick={() => setDetailView("json")}
-              >
-                <Code2 className="h-3 w-3" />JSON
-              </button>
-            </div>
-            <Link
-              className="hidden sm:inline text-xs font-semibold text-accent-foreground underline"
-              href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}
+          <div className={ws.segments} role="group" aria-label="详情显示方式">
+            <button
+              type="button"
+              aria-pressed={detailView === "formatted"}
+              onClick={() => setDetailView("formatted")}
             >
-              审核批次
-            </Link>
+              <FileText size={14} aria-hidden="true" />
+              文本
+            </button>
+            <button
+              type="button"
+              aria-pressed={detailView === "json"}
+              onClick={() => setDetailView("json")}
+            >
+              <Code2 size={14} aria-hidden="true" />
+              JSON
+            </button>
           </div>
         </DialogHeader>
-
-        {/* Large close button — positioned absolutely to avoid crowded header */}
         <DialogClose asChild>
           <button
             type="button"
             aria-label="关闭导入题目详情"
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border transition hover:bg-secondary hover:text-foreground hover:ring-muted-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={ws.closeButton}
           >
-            <X className="h-5 w-5" aria-hidden="true" />
+            <X size={20} aria-hidden="true" />
           </button>
         </DialogClose>
-
-        {/* ===== Scrollable body ===== */}
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+        <div className={ws.detailBody} aria-busy={loading}>
+          {loading ? (
+            <p className={`${ws.caption} mb-4`} role="status">
+              正在读取完整详情…
+            </p>
+          ) : null}
+          {failed ? (
+            <WorkspaceNotice tone="warning">
+              完整详情读取失败，当前显示列表中的暂存内容。关闭后可重新打开重试。
+            </WorkspaceNotice>
+          ) : null}
           {detailView === "formatted" ? (
-            <div className="space-y-3">
+            <div>
               <section>
-                <p className="mb-1 text-xs font-semibold text-muted-foreground">题干</p>
-                <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{textFromImport(item) || "—"}</pre>
+                <h3>题干</h3>
+                <pre className={ws.detailPre}>
+                  {textFromImport(item) || item.content_preview || "—"}
+                </pre>
               </section>
-
               {isMultiBlankChoice(item) ? (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项组</p>
-                  <div className="space-y-2">
-                    {(() => {
-                      const groups = item?.parsed_content?.blank_option_groups;
-                      const list: BlankOptionGroup[] = Array.isArray(groups) ? (groups as BlankOptionGroup[]) : [];
-                      return list.length > 0 ? list.map((group, gi) => (
-                        <div key={gi} className="rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3">
-                          <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">空 {group.id ?? gi + 1}</p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                            {group.options?.map((opt, oi) => (
-                              <span key={oi}><span className="font-bold text-foreground">{opt.key}.</span> {opt.text}</span>
-                            ))}
-                          </div>
+                  <h3>选项组</h3>
+                  {(() => {
+                    const groups = item.parsed_content?.blank_option_groups;
+                    const list: BlankOptionGroup[] = Array.isArray(groups)
+                      ? (groups as BlankOptionGroup[])
+                      : [];
+                    return list.length ? (
+                      list.map((group, gi) => (
+                        <div key={gi} className={`${ws.detailPre} mb-2`}>
+                          <p className={ws.caption}>空 {group.id ?? gi + 1}</p>
+                          {group.options?.map((opt, oi) => (
+                            <p key={oi}>
+                              {opt.key}. {opt.text}
+                            </p>
+                          ))}
                         </div>
-                      )) : <p className="text-xs text-muted-foreground/70">暂无选项组数据</p>;
-                    })()}
-                  </div>
+                      ))
+                    ) : (
+                      <p className={ws.caption}>暂无选项组数据</p>
+                    );
+                  })()}
                 </section>
               ) : (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项</p>
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{renderOptions(optionDataFromImport(item))}</pre>
+                  <h3>选项</h3>
+                  <pre className={ws.detailPre}>
+                    {renderOptions(optionDataFromImport(item))}
+                  </pre>
                 </section>
               )}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <section>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">答案</p>
-                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_answer || "—"}</pre>
-                </section>
-                <section>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
-                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_analysis || "—"}</pre>
-                </section>
-              </div>
+              <section>
+                <h3>答案</h3>
+                <pre className={ws.detailPre}>{item.parsed_answer || "—"}</pre>
+              </section>
+              <section>
+                <h3>解析</h3>
+                <pre className={ws.detailPre}>
+                  {item.parsed_analysis || "—"}
+                </pre>
+              </section>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {[
-                { title: "基础信息", data: { id: item.id, batch_id: item.batch_id, source_type: item.source_type, subject_id: item.subject_id, subject_name: item.subject_name, question_type: item.question_type, status: item.status, ai_generated: item.ai_generated, ai_answer_flag: item.ai_answer_flag, created_at: item.created_at, updated_at: item.updated_at } },
-                { title: "解析数据", data: { parsed_content: item.parsed_content, parsed_options: item.parsed_options, parsed_answer: item.parsed_answer, parsed_analysis: item.parsed_analysis } },
-                { title: "重复检测", data: { duplicate_status: item.duplicate_status, duplicate_of_question_id: item.duplicate_of_question_id, duplicate_of_import_id: item.duplicate_of_import_id, question_hash: item.question_hash } },
-                { title: "OCR / AI 原始数据", data: { raw_data: item.raw_data, ai_metadata: item.ai_metadata } },
+                {
+                  title: "基础信息",
+                  data: {
+                    id: item.id,
+                    batch_id: item.batch_id,
+                    source_type: item.source_type,
+                    subject_id: item.subject_id,
+                    subject_name: item.subject_name,
+                    question_type: item.question_type,
+                    status: item.status,
+                    ai_generated: item.ai_generated,
+                    ai_answer_flag: item.ai_answer_flag,
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
+                  },
+                },
+                {
+                  title: "解析数据",
+                  data: {
+                    parsed_content: item.parsed_content,
+                    parsed_options: item.parsed_options,
+                    parsed_answer: item.parsed_answer,
+                    parsed_analysis: item.parsed_analysis,
+                  },
+                },
+                {
+                  title: "重复检测",
+                  data: {
+                    duplicate_status: item.duplicate_status,
+                    duplicate_of_question_id: item.duplicate_of_question_id,
+                    duplicate_of_import_id: item.duplicate_of_import_id,
+                    question_hash: item.question_hash,
+                  },
+                },
+                {
+                  title: "OCR / AI 原始数据",
+                  data: {
+                    raw_data: item.raw_data,
+                    ai_metadata: item.ai_metadata,
+                  },
+                },
               ].map(({ title, data }) => (
                 <section key={title}>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">{title}</p>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 font-mono text-[11px] leading-relaxed text-[#2d4758]">{renderJson(data)}</pre>
+                  <h3>{title}</h3>
+                  <pre className={`${ws.detailPre} ${ws.codePre}`}>
+                    {renderJson(data)}
+                  </pre>
                 </section>
               ))}
             </div>
           )}
+          <div className="mt-6">
+            <Link
+              className={ws.textLink}
+              href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}
+            >
+              审核此批次
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -293,18 +378,35 @@ function DetailModal({
 export default function ImportQuestionsPage() {
   const searchParams = useSearchParams();
   const batchIdParam = searchParams.get("batch_id") || "";
-  const [filters, setFilters] = useState({ batch_id: "", status: "", subject_id: "", source_type: "", keyword: "" });
+  const [filters, setFilters] = useState({
+    batch_id: "",
+    status: "",
+    subject_id: "",
+    source_type: "",
+    keyword: "",
+  });
   const [previewId, setPreviewId] = useState<number | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
 
   const queryParams = useMemo(
-    () => ({ page: 1, page_size: 50, batch_id: filters.batch_id || batchIdParam, status: filters.status, subject_id: filters.subject_id ? Number(filters.subject_id) : undefined, source_type: filters.source_type, keyword: filters.keyword }),
+    () => ({
+      page: 1,
+      page_size: 50,
+      batch_id: filters.batch_id || batchIdParam,
+      status: filters.status,
+      subject_id: filters.subject_id ? Number(filters.subject_id) : undefined,
+      source_type: filters.source_type,
+      keyword: filters.keyword,
+    }),
     [batchIdParam, filters],
   );
 
   const questions = useQuery({
     queryKey: ["import-questions", queryParams],
-    queryFn: () => apiRequest<PaginatedResponse<ImportQuestionItem>>(`/imports/review-queue${toQuery(queryParams)}`),
+    queryFn: () =>
+      apiRequest<PaginatedResponse<ImportQuestionItem>>(
+        `/imports/review-queue${toQuery(queryParams)}`,
+      ),
     retry: false,
   });
 
@@ -313,12 +415,14 @@ export default function ImportQuestionsPage() {
   // Fetch full detail when modal opens
   const detail = useQuery({
     queryKey: ["import-question-detail", previewId],
-    queryFn: () => apiRequest<ImportQuestionItem>(`/imports/questions/${previewId}`),
+    queryFn: () =>
+      apiRequest<ImportQuestionItem>(`/imports/questions/${previewId}`),
     enabled: previewId !== null,
     retry: false,
   });
 
-  const previewItem = detail.data ?? (items.find((item) => item.id === previewId) ?? null);
+  const previewItem =
+    detail.data ?? items.find((item) => item.id === previewId) ?? null;
 
   const updateFilter = (key: keyof typeof filters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -326,138 +430,210 @@ export default function ImportQuestionsPage() {
   };
 
   const pendingCount = items.filter((item) => item.status === "pending").length;
-  const duplicateCount = items.filter((item) => item.duplicate_status === "possible_duplicate").length;
+  const duplicateCount = items.filter(
+    (item) => item.duplicate_status === "possible_duplicate",
+  ).length;
+  const additionalFilterCount = [
+    filters.batch_id || batchIdParam,
+    filters.subject_id,
+    filters.status,
+  ].filter(Boolean).length;
 
   return (
-    <div className="space-y-5">
-      <PremiumSection>
-        <PremiumSectionHeader
-          title="导入题目列表"
-          description="查看导入暂存题目、重复检测与 OCR/AI 元数据。"
-          icon={<Search className="h-3.5 w-3.5" />}
-          titleAs="h1"
-          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
-          meta={
-            <>
-              <StatusBadge tone="accent">导入暂存</StatusBadge>
-              <span>查看详情不会改变审核状态</span>
-            </>
-          }
-          aside={
-            <Link href="/imports/review" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/72 bg-white/82 px-4 text-[13px] font-semibold text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:bg-[#e1f0fa]">
-              进入审核
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          }
-        />
-        <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-2 xl:grid-cols-4">
-          <PremiumStat label="匹配总数" value={questions.data?.total ?? items.length} hint={questions.isError ? "导入题目接口不可用" : "当前筛选的全部匹配结果"} icon={<FileText className="h-3.5 w-3.5" />} loading={questions.isLoading} />
-          <PremiumStat label="本页记录" value={items.length} hint="单页最多展示 50 条" icon={<Search className="h-3.5 w-3.5" />} loading={questions.isLoading} />
-          <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页待审核记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
-          <PremiumStat label="本页疑似重复" value={duplicateCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页重复检测命中"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="violet" tone={duplicateCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
-        </div>
-        <div className="grid gap-3 border-b border-[var(--admin-line)] bg-secondary/20 px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
-          <label className="relative xl:col-span-2">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-            <Input className="pl-9" placeholder="搜索题干 / OCR 原文" aria-label="搜索导入题目" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
-          </label>
-          <Input placeholder="批次 ID" aria-label="按批次 ID 筛选" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
-          <Input placeholder="科目 ID" aria-label="按科目 ID 筛选" value={filters.subject_id} onChange={(event) => updateFilter("subject_id", event.target.value)} />
-          <CustomSelect
-            value={filters.status}
-            onChange={(value) => updateFilter("status", value)}
-            placeholder="全部状态"
-            options={[
-              { value: "", label: "全部状态" },
-              { value: "pending", label: "待审核" },
-              { value: "approved", label: "已通过" },
-              { value: "rejected", label: "已拒绝" },
-              { value: "published", label: "已发布" },
-            ]}
-            className="h-11 w-full justify-between rounded-[10px] border border-border bg-card px-3 text-sm"
+    <WorkspacePage embedded>
+      <WorkspaceHeader
+        title="导入题目列表"
+        description="检索暂存题目，检查重复检测与解析内容"
+        meta={<span>查看详情不会改变审核状态，发布仍需人工审核</span>}
+        actions={
+          <Link
+            href="/imports/review"
+            className={`${ws.actionLink} ${ws.primaryLink}`}
+          >
+            进入审核
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </Link>
+        }
+      />
+      <WorkspaceSurface>
+        <WorkspaceMetrics>
+          <WorkspaceMetric
+            label="匹配总数"
+            value={
+              questions.isError ? "—" : (questions.data?.total ?? items.length)
+            }
+            hint="当前筛选的全部结果"
+            loading={questions.isLoading}
           />
+          <WorkspaceMetric
+            label="本页记录"
+            value={questions.isError ? "—" : items.length}
+            hint="每页最多 50 条"
+            loading={questions.isLoading}
+          />
+          <WorkspaceMetric
+            label="本页待审核"
+            value={questions.isError ? "—" : pendingCount}
+            hint="等待人工确认"
+            loading={questions.isLoading}
+            tone={pendingCount ? "attention" : "default"}
+          />
+          <WorkspaceMetric
+            label="本页疑似重复"
+            value={questions.isError ? "—" : duplicateCount}
+            hint="发布前核对原题"
+            loading={questions.isLoading}
+            tone={duplicateCount ? "attention" : "default"}
+          />
+        </WorkspaceMetrics>
+        <WorkspaceSectionHeader title="暂存题目" />
+        <div className={ws.questionFilters}>
+          <label className={ws.field}>
+            <span>搜索内容</span>
+            <span className={ws.search}>
+              <Search aria-hidden="true" />
+              <Input
+                placeholder="题干或 OCR 原文"
+                aria-label="搜索导入题目"
+                value={filters.keyword}
+                onChange={(event) =>
+                  updateFilter("keyword", event.target.value)
+                }
+              />
+            </span>
+          </label>
+          <WorkspaceFilters
+            title="更多筛选"
+            summary={
+              additionalFilterCount
+                ? `${additionalFilterCount} 项已应用`
+                : "批次、科目与审核状态"
+            }
+            className={ws.questionFilterDisclosure}
+          >
+            <label className={ws.field}>
+              <span>批次 ID</span>
+              <Input
+                placeholder="全部批次"
+                aria-label="按批次 ID 筛选"
+                value={filters.batch_id || batchIdParam}
+                onChange={(event) =>
+                  updateFilter("batch_id", event.target.value)
+                }
+              />
+            </label>
+            <label className={ws.field}>
+              <span>科目 ID</span>
+              <Input
+                placeholder="全部科目"
+                inputMode="numeric"
+                aria-label="按科目 ID 筛选"
+                value={filters.subject_id}
+                onChange={(event) =>
+                  updateFilter("subject_id", event.target.value)
+                }
+              />
+            </label>
+            <label className={ws.field}>
+              <span>审核状态</span>
+              <WorkspaceSelect
+                aria-label="审核状态"
+                value={filters.status}
+                onChange={(value) => updateFilter("status", value)}
+                options={[
+                  { value: "", label: "全部状态" },
+                  { value: "pending", label: "待审核" },
+                  { value: "approved", label: "已通过" },
+                  { value: "rejected", label: "已拒绝" },
+                  { value: "published", label: "已发布" },
+                ]}
+              />
+            </label>
+          </WorkspaceFilters>
         </div>
         {questions.isError ? (
-          <div className="border-b border-[var(--admin-line)] p-4 sm:p-5">
-            <ManagementNotice tone="danger" title="导入题目接口不可用">
-              当前无法读取导入暂存列表。请检查接口状态或稍后重试，现有筛选条件不会被清空。
-            </ManagementNotice>
-          </div>
+          <WorkspaceNotice tone="danger" title="导入题目读取失败">
+            现有筛选条件已保留。
+            <Button variant="ghost" onClick={() => questions.refetch()}>
+              重新读取
+            </Button>
+          </WorkspaceNotice>
         ) : null}
-        <section aria-busy={questions.isLoading} className="divide-y divide-[var(--admin-line)]">
-          {questions.isLoading ? <ManagementSkeletonRows rows={5} /> : null}
-          {!questions.isLoading ? items.map((item) => {
-            const StatusIcon = statusIcon(item.status);
-            return (
-              <div key={item.id} className="group px-4 py-4 transition-colors hover:bg-[rgba(239,247,252,0.54)] sm:px-5">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <StatusIcon className={`h-4 w-4 ${statusColor(item.status)}`} />
-                        <StatusBadge tone={statusTone(item.status)}>
-                          {statusLabel(item.status)}
-                        </StatusBadge>
-                      </div>
-
-                      {item.duplicate_status ? (
-                        <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
-                          <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
-                          {duplicateStatusLabel(item.duplicate_status)}
-                        </StatusBadge>
-                      ) : null}
-
-                      <span className="hidden h-3 w-px bg-border sm:block" />
-
-                      {item.subject_name || item.subject_code ? (
-                        <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
-                          {item.subject_name || item.subject_code}
-                        </span>
-                      ) : null}
-                      <span className="text-[11px] text-muted-foreground/70">
-                        {typeLabel(item.question_type)}
+        <section aria-label="暂存题目结果" aria-busy={questions.isLoading}>
+          {questions.isLoading ? (
+            <ManagementSkeletonRows rows={5} />
+          ) : (
+            items.map((item) => (
+              <article key={item.id} className={ws.questionRow}>
+                <span className={ws.questionId}>#{item.id}</span>
+                <div className="min-w-0">
+                  <div className={ws.questionMeta}>
+                    <StatusBadge tone={statusTone(item.status)}>
+                      {statusLabel(item.status)}
+                    </StatusBadge>
+                    <span>
+                      {item.subject_name || item.subject_code || "未分配科目"}
+                    </span>
+                    <span>{typeLabel(item.question_type)}</span>
+                    {item.duplicate_status ? (
+                      <span
+                        className={
+                          item.duplicate_status === "possible_duplicate"
+                            ? "text-warning-foreground"
+                            : ""
+                        }
+                      >
+                        {item.duplicate_status === "possible_duplicate" ? (
+                          <AlertTriangle
+                            size={12}
+                            aria-hidden="true"
+                            className="mr-1 inline"
+                          />
+                        ) : null}
+                        {duplicateStatusLabel(item.duplicate_status)}
                       </span>
-
-                      <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground/70 sm:ml-0" title={item.batch_id}>
-                        {item.batch_id}
-                      </span>
-                    </div>
-
-                    <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                      {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
-                    </p>
+                    ) : null}
                   </div>
-
-                  <div className="flex shrink-0 items-start sm:pl-3">
-                    <Button
-                      variant="ghost"
-                      className="h-9 gap-1.5 px-3 text-xs font-medium"
-                      onClick={(event) => {
-                        previewTriggerRef.current = event.currentTarget;
-                        setPreviewId(item.id);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                      查看
-                    </Button>
-                  </div>
+                  <p className={ws.questionText}>
+                    {item.content_preview ||
+                      textFromImport(item) ||
+                      `导入题目 #${item.id}`}
+                  </p>
+                  <span className={ws.questionBatch} title={item.batch_id}>
+                    {item.batch_id}
+                  </span>
                 </div>
-              </div>
-            );
-          }) : null}
-          {!questions.isLoading && !questions.isError && items.length === 0 ? (
-            <EmptyState>当前筛选没有导入题目。调整状态、批次或关键词后再试。</EmptyState>
+                <Button
+                  variant="ghost"
+                  className={ws.questionView}
+                  aria-label={`查看题目 #${item.id}`}
+                  onClick={(event) => {
+                    previewTriggerRef.current = event.currentTarget;
+                    setPreviewId(item.id);
+                  }}
+                >
+                  <Eye size={16} aria-hidden="true" />
+                  查看
+                </Button>
+              </article>
+            ))
+          )}
+          {!questions.isLoading && !questions.isError && !items.length ? (
+            <EmptyState>
+              当前筛选没有导入题目。调整状态、批次或关键词后再试。
+            </EmptyState>
           ) : null}
         </section>
-      </PremiumSection>
-
+      </WorkspaceSurface>
       {previewItem ? (
         <DetailModal
           item={previewItem}
           onClose={() => setPreviewId(null)}
           returnFocusRef={previewTriggerRef}
+          loading={detail.isFetching}
+          failed={detail.isError}
         />
       ) : null}
-    </div>
+    </WorkspacePage>
   );
 }

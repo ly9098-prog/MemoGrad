@@ -3,33 +3,26 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  BarChart3,
-  BookOpen,
-  CircleHelp,
-  FileQuestion,
-  Filter,
-  Import,
-  Search,
-  ShieldAlert,
-  RotateCcw,
-  ArrowUpRight,
-} from "lucide-react";
-
+import { ArrowUpRight, ChevronDown, Search, RotateCcw } from "lucide-react";
 import {
   EmptyState,
-  FieldLabel,
-  ManagementNotice,
-  ManagementPage,
-  PremiumSection,
-  PremiumSectionHeader,
-  PremiumStat,
+  ManagementSkeletonRows,
   StatusBadge,
-  ManagementProgress,
 } from "@/components/admin/management-ui";
+import {
+  WorkspacePage,
+  WorkspaceHeader,
+  WorkspaceSurface,
+  WorkspaceFilters,
+  WorkspaceSectionHeader,
+  WorkspaceMetrics,
+  WorkspaceMetric,
+  WorkspaceNotice,
+  WorkspaceSelect,
+  workspaceStyles as ws,
+} from "@/components/admin/workspace";
+import { getQuestionTypeLabel } from "@/lib/question-types";
 import { Button } from "@/components/ui/button";
-import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type {
@@ -65,7 +58,8 @@ export default function CoveragePage() {
 
   const versionsQuery = useQuery({
     queryKey: ["syllabus", "versions", "coverage"],
-    queryFn: () => apiRequest<SyllabusVersionSummary[]>("/knowledge/syllabus/versions"),
+    queryFn: () =>
+      apiRequest<SyllabusVersionSummary[]>("/knowledge/syllabus/versions"),
     retry: false,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -73,7 +67,9 @@ export default function CoveragePage() {
 
   useEffect(() => {
     if (versionId || !versionsQuery.data?.length) return;
-    const active = versionsQuery.data.find((item) => item.status === "active") ?? versionsQuery.data[0];
+    const active =
+      versionsQuery.data.find((item) => item.status === "active") ??
+      versionsQuery.data[0];
     if (active) setVersionId(String(active.id));
   }, [versionId, versionsQuery.data]);
 
@@ -87,26 +83,37 @@ export default function CoveragePage() {
   });
 
   const subjectOptions = useMemo(
-    () => (subjectsQuery.data ?? []).map((item) => ({ label: item.name, value: String(item.id) })),
+    () =>
+      (subjectsQuery.data ?? []).map((item) => ({
+        label: item.name,
+        value: String(item.id),
+      })),
     [subjectsQuery.data],
   );
 
   useEffect(() => {
     if (!subjectId) return;
-    if (!subjectOptions.some((item) => item.value === subjectId)) setSubjectId("");
+    if (!subjectOptions.some((item) => item.value === subjectId))
+      setSubjectId("");
   }, [subjectId, subjectOptions]);
 
-  const reportParams = useMemo(() => ({
-    syllabus_version_id: selectedVersionId,
-    subject_id: subjectId ? Number(subjectId) : undefined,
-    min_questions: minQuestions,
-    year_from: yearFrom.length === 4 ? Number(yearFrom) : undefined,
-    year_to: yearTo.length === 4 ? Number(yearTo) : undefined,
-  }), [selectedVersionId, subjectId, minQuestions, yearFrom, yearTo]);
+  const reportParams = useMemo(
+    () => ({
+      syllabus_version_id: selectedVersionId,
+      subject_id: subjectId ? Number(subjectId) : undefined,
+      min_questions: minQuestions,
+      year_from: yearFrom.length === 4 ? Number(yearFrom) : undefined,
+      year_to: yearTo.length === 4 ? Number(yearTo) : undefined,
+    }),
+    [selectedVersionId, subjectId, minQuestions, yearFrom, yearTo],
+  );
 
   const reportQuery = useQuery({
     queryKey: ["coverage", "report", reportParams],
-    queryFn: () => apiRequest<CoverageReportResponse>(`/coverage/report${toQuery(reportParams)}`),
+    queryFn: () =>
+      apiRequest<CoverageReportResponse>(
+        `/coverage/report${toQuery(reportParams)}`,
+      ),
     enabled: Boolean(selectedVersionId),
     retry: false,
     staleTime: 60_000,
@@ -124,17 +131,25 @@ export default function CoveragePage() {
 
   const applyMinQuestions = () => {
     const parsed = Number(minQuestionsInput);
-    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 500) setMinQuestions(Math.floor(parsed));
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 500)
+      setMinQuestions(Math.floor(parsed));
   };
 
   const qualityIssueCount = summary
-    ? summary.missing_analysis_questions + summary.image_reference_anomaly_questions + summary.duplicate_suspect_questions
+    ? summary.missing_analysis_questions +
+      summary.image_reference_anomaly_questions +
+      summary.duplicate_suspect_questions
     : 0;
   const lowCoverageCount = summary
-    ? summary.empty_knowledge_points + summary.insufficient_knowledge_points + summary.imbalanced_knowledge_points
+    ? summary.empty_knowledge_points +
+      summary.insufficient_knowledge_points +
+      summary.imbalanced_knowledge_points
     : 0;
   const healthyRate = summary?.total_knowledge_points
-    ? Math.round((summary.healthy_knowledge_points / summary.total_knowledge_points) * 100)
+    ? Math.round(
+        (summary.healthy_knowledge_points / summary.total_knowledge_points) *
+          100,
+      )
     : 0;
   const mappedRate = summary?.total_questions
     ? Math.round((summary.mapped_questions / summary.total_questions) * 100)
@@ -143,7 +158,13 @@ export default function CoveragePage() {
     return computeStatusCounts(reportQuery.data?.items ?? []);
   }, [reportQuery.data?.items]);
   const hasLocalFilters = Boolean(keyword.trim() || status);
-  const hasScopeFilters = Boolean(subjectId || yearFrom || yearTo || minQuestions !== 10 || minQuestionsInput !== "10");
+  const hasScopeFilters = Boolean(
+    subjectId ||
+    yearFrom ||
+    yearTo ||
+    minQuestions !== 10 ||
+    minQuestionsInput !== "10",
+  );
   const integrityIssueCount = computeIntegrityIssueCount(summary, graph);
   const qualitySampleCount = computeQualitySampleCount(quality);
   const hasGraphIssuesResult = hasGraphIssues(graph);
@@ -158,417 +179,701 @@ export default function CoveragePage() {
   };
 
   return (
-    <ManagementPage className="space-y-5">
-      <PremiumSection accent={summary ? "teal" : "blue"}>
-        <PremiumSectionHeader
-          icon={<BarChart3 className="h-4 w-4" />}
-          title="题库覆盖"
-          titleAs="h1"
-          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
-          description="按考纲版本查看知识点题量、真题年份、难度结构和内容质量，优先定位最需要补题或治理的区域。"
-          meta={reportQuery.data ? (
+    <WorkspacePage>
+      <WorkspaceHeader
+        title="题库覆盖"
+        description="按考纲检查题量、难度与内容质量，找到最需要补题的区域"
+        meta={
+          reportQuery.data ? (
             <>
-              <StatusBadge tone="accent">{reportQuery.data.syllabus.name}</StatusBadge>
+              <StatusBadge tone="accent">
+                {reportQuery.data.syllabus.name}
+              </StatusBadge>
               <span>生效年份 {reportQuery.data.syllabus.effective_year}</span>
-              <span>题量阈值 {minQuestions}</span>
+              <span>题量阈值 {reportQuery.data.summary.min_questions}</span>
             </>
-          ) : <span>选择考纲版本后生成覆盖报告</span>}
-          aside={hasScopeFilters ? (
-            <Button variant="secondary" size="sm" onClick={resetScope}>
-              <RotateCcw className="h-3.5 w-3.5" />
+          ) : (
+            <span>选择考纲版本后生成覆盖报告</span>
+          )
+        }
+        actions={
+          hasScopeFilters ? (
+            <Button variant="secondary" onClick={resetScope}>
+              <RotateCcw size={14} aria-hidden="true" />
               重置范围
             </Button>
-          ) : <StatusBadge tone="neutral">默认范围</StatusBadge>}
-        />
-        <div className="grid gap-x-4 gap-y-3 border-b border-[var(--admin-line)] bg-secondary/20 px-5 py-4 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_210px_145px_145px] xl:items-end">
-          <label className="min-w-0">
-            <FieldLabel>考纲版本</FieldLabel>
-            <CustomSelect
-              value={versionId}
-              onChange={(value) => { setVersionId(value); setSubjectId(""); }}
-              options={(versionsQuery.data ?? []).map((item) => ({
-                label: `${item.name} · ${item.effective_year} · ${item.status}`,
-                value: String(item.id),
-              }))}
-              placeholder="选择考纲版本"
-              clearable={false}
-            />
-          </label>
-          <label className="min-w-0">
-            <FieldLabel>科目范围</FieldLabel>
-            <CustomSelect
-              value={subjectId}
-              onChange={setSubjectId}
-              options={[{ label: "全部核心科目", value: "" }, ...subjectOptions]}
-              placeholder="全部核心科目"
-            />
-          </label>
-          <label className="min-w-0">
-            <FieldLabel>题量不足阈值</FieldLabel>
-            <div className="flex min-w-0 gap-2">
-              <Input className="w-0 min-w-0 flex-1" inputMode="numeric" value={minQuestionsInput} onChange={(event) => setMinQuestionsInput(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={applyMinQuestions} />
-              <Button variant="secondary" onClick={applyMinQuestions} className="shrink-0 px-3.5">应用</Button>
-            </div>
-          </label>
-          <label className="min-w-0">
-            <FieldLabel>起始年份</FieldLabel>
-            <Input inputMode="numeric" placeholder="自动" value={yearFrom} onChange={(event) => setYearFrom(event.target.value.replace(/\D/g, "").slice(0, 4))} />
-          </label>
-          <label className="min-w-0">
-            <FieldLabel>结束年份</FieldLabel>
-            <Input inputMode="numeric" placeholder="自动" value={yearTo} onChange={(event) => setYearTo(event.target.value.replace(/\D/g, "").slice(0, 4))} />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-[var(--admin-line)] px-5 py-2.5 text-[11px] leading-5 text-muted-foreground/70">
-          <span className="rounded-md bg-[rgba(231,243,250,0.82)] px-2 py-1 font-medium text-accent-foreground">自动范围</span>
-          <span>年份留空时使用系统已知真题卷区间；填写起止年份后，会把缺失年份直接纳入完整性检查。</span>
-        </div>
-
-        {reportQuery.isError ? (
-          <div className="border-t border-[var(--admin-line)] p-4 sm:p-5">
-            <ManagementNotice tone="danger" title="覆盖报告加载失败">请确认当前账号具备题库与知识点读取权限，并检查所选考纲版本。</ManagementNotice>
-          </div>
-        ) : null}
-
-        {summary ? (
-          <>
-            <div className="grid gap-px border-t border-[var(--admin-line)] sm:grid-cols-2 xl:grid-cols-4">
-              <PremiumStat
-                icon={<FileQuestion className="h-3.5 w-3.5" />}
-                label="有效题目"
-                value={summary.total_questions}
-                hint={`已映射 ${summary.mapped_questions} · 未映射 ${summary.unmapped_questions}`}
+          ) : undefined
+        }
+      />
+      <WorkspaceSurface>
+        <WorkspaceFilters
+          title="报告范围与阈值"
+          summary={`${minQuestions} 题 · ${yearFrom || yearTo ? "自定义年份" : "自动年份"}`}
+        >
+          <div className={ws.coverageFilters}>
+            <label className={ws.field}>
+              <span>考纲版本</span>
+              <WorkspaceSelect
+                value={versionId}
+                onChange={(value) => {
+                  setVersionId(value);
+                  setSubjectId("");
+                }}
+                options={(versionsQuery.data ?? []).map((item) => ({
+                  label: `${item.name} · ${item.status === "active" ? "当前生效" : item.status === "draft" ? "草稿" : "已归档"}`,
+                  value: String(item.id),
+                }))}
+                placeholder="选择考纲版本"
+                clearable={false}
               />
-              <PremiumStat
-                icon={<BookOpen className="h-3.5 w-3.5" />}
-                label="考纲知识点"
-                value={summary.total_knowledge_points}
-                hint={`健康 ${summary.healthy_knowledge_points} · 无题 ${summary.empty_knowledge_points} · 健康率 ${healthyRate}%`}
-                accent={summary.total_knowledge_points > 0 ? "teal" : "amber"}
-                tone={summary.total_knowledge_points > 0 ? "default" : "alert"}
-              />
-              <PremiumStat
-                icon={<BarChart3 className="h-3.5 w-3.5" />}
-                label="题目映射率"
-                value={`${mappedRate}%`}
-                hint={`已映射 ${summary.mapped_questions} / ${summary.total_questions} 道有效题目`}
-                accent={summary.unmapped_questions > 0 ? "amber" : "teal"}
-                tone={summary.unmapped_questions > 0 ? "alert" : "default"}
-              />
-              <PremiumStat
-                icon={<ShieldAlert className="h-3.5 w-3.5" />}
-                label="待治理知识点"
-                value={lowCoverageCount}
-                hint={`无题 ${summary.empty_knowledge_points} · 不足 ${summary.insufficient_knowledge_points} · 失衡 ${summary.imbalanced_knowledge_points} · 内容问题 ${qualityIssueCount}`}
-                accent={lowCoverageCount > 0 || qualityIssueCount > 0 ? "rose" : "teal"}
-                tone={lowCoverageCount > 0 || qualityIssueCount > 0 ? "alert" : "default"}
-              />
-            </div>
-
-            <div className="grid gap-px border-t border-[var(--admin-line)] bg-[var(--admin-line)] sm:grid-cols-2 xl:grid-cols-4">
-            {([
-              ["healthy", "健康", statusCounts.healthy, "success" as const],
-              ["insufficient", "题量不足", statusCounts.insufficient, "warning" as const],
-              ["imbalanced", "结构失衡", statusCounts.imbalanced, "warning" as const],
-              ["empty", "无题", statusCounts.empty, "danger" as const],
-            ] as Array<[CoverageStatus, string, number, "success" | "warning" | "danger"]>).map(([value, label, count, tone]) => {
-              const amount = Number(count);
-              const total = summary.total_knowledge_points || 1;
-              const active = status === value;
-              return (
-                <button
-                  type="button"
-                  key={value}
-                  onClick={() => setStatus((current) => current === value ? "" : value)}
-                  className={`min-w-0 bg-[rgba(249,253,255,0.8)] px-5 py-3.5 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-card" : "hover:bg-white/82"}`}
-                  aria-pressed={active}
-                  title={active ? `取消“${label}”筛选` : `只看“${label}”知识点`}
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <StatusBadge tone={tone}>{label}</StatusBadge>
-                    <span className={`text-sm font-semibold tabular-nums ${active ? "text-accent-foreground" : "text-muted-foreground"}`}>{amount}</span>
-                  </div>
-                  <ManagementProgress value={amount} max={total} tone={tone === "success" ? "success" : "warning"} />
-                  <p className="mt-2 text-[10px] text-muted-foreground/70">{active ? "已作为矩阵筛选条件" : "点击聚焦此状态"}</p>
-                </button>
-              );
-            })}
-          </div>
-
-          {integrityIssueCount > 0 ? (
-            <div className="border-t border-[var(--admin-line)]">
-              <div className="flex items-start gap-2.5 px-5 py-3.5">
-                <span className="admin-premium-icon"><AlertTriangle className="h-3.5 w-3.5" /></span>
-                <div>
-                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">完整性诊断</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">仅在存在结构问题时展示，避免正常的 0 值占用整块页面。</p>
-                </div>
-              </div>
-              <div className="grid divide-y divide-[var(--admin-line)] border-t border-[var(--admin-line)] sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
-                {[
-                  ["题目版本缺口", summary.unversioned_questions, "已审核且启用的题目缺少 current_version_id"],
-                  ["考纲快照缺口", summary.syllabus_snapshot_missing_questions, "题目版本知识点关联缺少 syllabus snapshot"],
-                  ["知识图谱孤立点", Number(graph?.summary?.isolated_count ?? 0), "当前考纲范围内没有有效关系的知识点"],
-                  ["知识图谱循环", Number(graph?.summary?.cycle_count ?? 0), "prerequisite 关系循环检查"],
-                ].filter(([, value]) => Number(value) > 0).map(([label, value, hint]) => (
-                  <div key={String(label)} className="px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold text-foreground">{String(label)}</p>
-                      <StatusBadge tone="warning">需处理</StatusBadge>
-                    </div>
-                    <p className="mt-1.5 text-2xl font-semibold tabular-nums text-foreground">{Number(value)}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{String(hint)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          </>
-        ) : null}
-      </PremiumSection>
-
-      <PremiumSection className="overflow-hidden">
-        <PremiumSectionHeader
-          title="知识点覆盖矩阵"
-          description="真题与模拟题计数来自试卷固定的题目版本快照，题库后续知识点编辑不会反向改变历史统计。"
-          aside={
-          <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center">
-            <label className="relative block w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-              <Input className="pl-9" placeholder="搜索知识点" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
             </label>
-            <CustomSelect
-              className="w-full sm:w-36"
-              value={status}
-              onChange={(value) => setStatus(value as CoverageStatus | "")}
-              options={[
-                { label: "全部状态", value: "" },
-                { label: "无题", value: "empty" },
-                { label: "题量不足", value: "insufficient" },
-                { label: "结构失衡", value: "imbalanced" },
-                { label: "良好", value: "healthy" },
-              ]}
-              placeholder="全部状态"
-            />
-            {hasLocalFilters ? (
-              <Button variant="ghost" size="sm" className="h-10 px-3 text-muted-foreground hover:bg-[var(--mgmt-steel)]" onClick={() => { setKeyword(""); setStatus(""); }}>
-                <RotateCcw className="h-3.5 w-3.5" />
-                清除
-              </Button>
-            ) : null}
+            <label className={ws.field}>
+              <span>科目范围</span>
+              <WorkspaceSelect
+                value={subjectId}
+                onChange={setSubjectId}
+                options={[
+                  { label: "全部核心科目", value: "" },
+                  ...subjectOptions,
+                ]}
+              />
+            </label>
+            <div className={ws.field}>
+              <label htmlFor="coverage-min-questions">题量不足阈值</label>
+              <span className="flex min-w-0 gap-2">
+                <Input
+                  id="coverage-min-questions"
+                  className="w-0 min-w-0 flex-1"
+                  inputMode="numeric"
+                  value={minQuestionsInput}
+                  onChange={(event) =>
+                    setMinQuestionsInput(
+                      event.target.value.replace(/\D/g, "").slice(0, 3),
+                    )
+                  }
+                  onBlur={applyMinQuestions}
+                />
+                <Button variant="secondary" onClick={applyMinQuestions}>
+                  应用
+                </Button>
+              </span>
+            </div>
+            <label className={ws.field}>
+              <span>起始年份</span>
+              <Input
+                inputMode="numeric"
+                placeholder="自动"
+                value={yearFrom}
+                onChange={(event) =>
+                  setYearFrom(event.target.value.replace(/\D/g, "").slice(0, 4))
+                }
+              />
+            </label>
+            <label className={ws.field}>
+              <span>结束年份</span>
+              <Input
+                inputMode="numeric"
+                placeholder="自动"
+                value={yearTo}
+                onChange={(event) =>
+                  setYearTo(event.target.value.replace(/\D/g, "").slice(0, 4))
+                }
+              />
+            </label>
           </div>
+          <p className={ws.scopeHint}>
+            年份留空时按已收录真题区间检查；填写范围后，缺失年份也会列入完整性检查。年份范围仅约束真题年份报告。
+            当前题量来自有效题库，真题与模拟题计数来自试卷固定的题目版本快照。
+          </p>
+        </WorkspaceFilters>
+        {versionsQuery.isError || subjectsQuery.isError ? (
+          <WorkspaceNotice tone="danger" title="报告范围读取失败">
+            请刷新页面重试，当前无法读取
+            {versionsQuery.isError ? "考纲版本" : "科目目录"}。
+          </WorkspaceNotice>
+        ) : null}
+        {reportQuery.isError ? (
+          <WorkspaceNotice tone="danger" title="覆盖报告加载失败">
+            {reportQuery.data
+              ? "下方保留最近一次成功报告，可能与当前范围不同。"
+              : "请确认读取权限与考纲版本。"}
+            <Button variant="ghost" onClick={() => reportQuery.refetch()}>
+              重新读取
+            </Button>
+          </WorkspaceNotice>
+        ) : reportQuery.isPlaceholderData ? (
+          <div role="status">
+            <WorkspaceNotice>
+              正在更新报告，下方暂时显示上一范围的数据。
+            </WorkspaceNotice>
+          </div>
+        ) : null}
+        <WorkspaceMetrics>
+          <WorkspaceMetric
+            label="有效题目"
+            value={summary ? summary.total_questions.toLocaleString() : "—"}
+            hint={
+              summary
+                ? `已映射 ${summary.mapped_questions.toLocaleString()} · 未映射 ${summary.unmapped_questions}`
+                : "按当前有效题库统计"
+            }
+            loading={reportQuery.isLoading}
+          />
+          <WorkspaceMetric
+            label="考纲知识点"
+            value={summary?.total_knowledge_points ?? "—"}
+            hint={
+              summary
+                ? `健康 ${summary.healthy_knowledge_points} · 无题 ${summary.empty_knowledge_points} · 健康率 ${healthyRate}%`
+                : "按所选考纲范围统计"
+            }
+            loading={reportQuery.isLoading}
+          />
+          <WorkspaceMetric
+            label="题目映射率"
+            value={summary ? `${mappedRate}%` : "—"}
+            hint={
+              summary
+                ? `${summary.mapped_questions.toLocaleString()} / ${summary.total_questions.toLocaleString()} 道有效题目`
+                : "知识点归属完整度"
+            }
+            loading={reportQuery.isLoading}
+          />
+          <WorkspaceMetric
+            label="待治理知识点"
+            value={summary ? lowCoverageCount : "—"}
+            hint={
+              summary
+                ? `无题 ${summary.empty_knowledge_points} · 不足 ${summary.insufficient_knowledge_points} · 失衡 ${summary.imbalanced_knowledge_points}`
+                : "定位题量和结构缺口"
+            }
+            tone={lowCoverageCount ? "attention" : "default"}
+            loading={reportQuery.isLoading}
+          />
+        </WorkspaceMetrics>
+        {integrityIssueCount > 0 && summary ? (
+          <div className={ws.integrity}>
+            <h3>完整性诊断</h3>
+            {[
+              ["题目版本缺口", summary.unversioned_questions],
+              ["考纲快照缺口", summary.syllabus_snapshot_missing_questions],
+              ["图谱孤立点", Number(graph?.summary?.isolated_count ?? 0)],
+              ["图谱循环", Number(graph?.summary?.cycle_count ?? 0)],
+            ]
+              .filter(([, value]) => Number(value) > 0)
+              .map(([label, value]) => (
+                <span key={String(label)}>
+                  {label}{" "}
+                  <strong className="font-medium">{Number(value)}</strong>
+                </span>
+              ))}
+          </div>
+        ) : null}
+        <WorkspaceSectionHeader
+          title="知识点覆盖矩阵"
+          actions={
+            <div className={ws.coverageLocalFilters}>
+              <label className={ws.search}>
+                <Search aria-hidden="true" />
+                <Input
+                  placeholder="搜索知识点"
+                  aria-label="搜索覆盖知识点"
+                  value={keyword}
+                  onChange={(event) => setKeyword(event.target.value)}
+                />
+              </label>
+              <label className={ws.coverageStatusSelect}>
+                <span className="sr-only">覆盖状态</span>
+                <WorkspaceSelect
+                  aria-label="覆盖状态"
+                  value={status}
+                  onChange={(value) => setStatus(value as CoverageStatus | "")}
+                  clearable={false}
+                  options={[
+                    {
+                      value: "",
+                      label: `全部 ${reportQuery.data?.items.length ?? "—"}`,
+                    },
+                    ...(
+                      [
+                        "healthy",
+                        "insufficient",
+                        "imbalanced",
+                        "empty",
+                      ] as const
+                    ).map((value) => ({
+                      value,
+                      label: `${STATUS_LABEL[value]} ${summary ? statusCounts[value] : "—"}`,
+                    })),
+                  ]}
+                />
+              </label>
+            </div>
           }
         />
-        <div className="max-h-[680px] overflow-auto">
-          <table className="w-full min-w-[1260px] text-sm">
-            <thead className="sticky top-0 z-10 bg-secondary/95 text-left text-[11px] font-semibold text-muted-foreground shadow-[0_1px_0_var(--border)] backdrop-blur-md">
-              <tr className="border-b border-border/60 text-[10px] tracking-[0.04em] text-muted-foreground/70">
-                <th rowSpan={2} className="sticky left-0 z-20 min-w-[360px] bg-secondary px-5 py-3 align-bottom text-[11px] tracking-normal text-muted-foreground">知识点</th>
-                <th colSpan={3} className="px-3 py-2 text-center">题源</th>
-                <th colSpan={3} className="px-3 py-2 text-center">难度</th>
-                <th colSpan={2} className="px-3 py-2 text-center">质量</th>
-                <th rowSpan={2} className="px-5 py-3 text-right align-bottom text-[11px] tracking-normal text-muted-foreground">处理</th>
-              </tr>
-              <tr>
-                <th className="px-3 py-2.5 text-right">总题数</th>
-                <th className="px-3 py-2.5 text-right">真题选择</th>
-                <th className="px-3 py-2.5 text-right">模拟选择</th>
-                <th className="px-3 py-2.5 text-right">简单</th>
-                <th className="px-3 py-2.5 text-right">中等</th>
-                <th className="px-3 py-2.5 text-right">困难</th>
-                <th className="px-3 py-2.5 text-right">缺解析</th>
-                <th className="px-3 py-2.5">状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item: CoverageMatrixItem) => (
-                <tr key={item.syllabus_knowledge_point_id} className="group border-b border-border/60 align-top transition-[background-color] duration-200 hover:bg-[rgba(74,111,138,0.045)]">
-                  <td className="sticky left-0 z-[1] border-r border-border/60 bg-[var(--mgmt-paper)] px-5 py-4 shadow-[10px_0_18px_-18px_rgba(31,49,61,0.35)] transition-colors duration-200 group-hover:bg-card">
-                    <p className="font-semibold text-foreground">{item.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground/70">{item.subject_name} · KP #{item.knowledge_point_id}</p>
-                    {item.years.length || Object.keys(item.question_type_counts).length || item.sources.length ? (
-                      <div className="mt-1 flex max-w-lg flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-5 text-muted-foreground">
-                        {item.years.length ? <span>年份 {item.years.slice(0, 6).join("/")}</span> : null}
-                        {Object.keys(item.question_type_counts).length ? <span>题型 {Object.entries(item.question_type_counts).map(([type, count]) => `${type}:${count}`).join(" / ")}</span> : null}
-                        {item.sources.length ? <span className="max-w-full truncate" title={item.sources.join(" / ")}>来源 {item.sources.join(" / ")}</span> : null}
-                      </div>
-                    ) : null}
-                    {item.issues.length ? <p className="mt-2 max-w-lg text-xs leading-5 text-warning-foreground">{item.issues.join("；")}</p> : null}
-                  </td>
-                  <td className="px-3 py-4 text-right font-semibold tabular-nums text-foreground">{item.total_question_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.past_exam_choice_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.mock_choice_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.difficulty_easy_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.difficulty_medium_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.difficulty_hard_count}</td>
-                  <td className="px-3 py-4 text-right tabular-nums">{item.missing_analysis_count}</td>
-                  <td className="px-3 py-4"><StatusBadge tone={coverageTone(item.status)}>{STATUS_LABEL[item.status]}</StatusBadge></td>
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Link href={questionBankHref(item.knowledge_point_id)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--mgmt-line)] bg-card px-3 text-xs font-semibold !text-accent-foreground transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-[rgba(74,111,138,0.34)] hover:bg-[var(--mgmt-steel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.22)] active:translate-y-0 motion-reduce:transform-none"><FileQuestion className="h-3.5 w-3.5" />看题库</Link>
-                      <Link href="/imports/text-import" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-xs font-semibold !text-primary-foreground shadow-[0_4px_12px_rgba(45,80,104,0.15)] transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-px hover:bg-primary-hover hover:shadow-[0_6px_16px_rgba(45,80,104,0.19)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(49,95,122,0.28)] active:translate-y-0 motion-reduce:transform-none"><Import className="h-3.5 w-3.5" />去导题</Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!reportQuery.isLoading && filteredItems.length === 0 ? <tr><td colSpan={10}><EmptyState>当前筛选没有知识点。</EmptyState></td></tr> : null}
-              {reportQuery.isLoading ? Array.from({ length: 5 }).map((_, index) => (
-                <tr key={`loading-${index}`} className="border-b border-border/60">
-                  <td className="sticky left-0 bg-[var(--mgmt-paper)] px-5 py-5"><div className="mgmt-skeleton h-4 w-48 rounded-full" /><div className="mgmt-skeleton mt-2 h-2.5 w-32 rounded-full" /></td>
-                  {Array.from({ length: 9 }).map((__, cell) => <td key={cell} className="px-3 py-5"><div className="mgmt-skeleton ml-auto h-3 w-10 rounded-full" /></td>)}
-                </tr>
-              )) : null}
-            </tbody>
-          </table>
+        <div
+          className={ws.coverageStates}
+          role="group"
+          aria-label="按覆盖状态筛选"
+        >
+          <button
+            type="button"
+            onClick={() => setStatus("")}
+            aria-pressed={status === ""}
+          >
+            全部<strong>{reportQuery.data?.items.length ?? "—"}</strong>
+          </button>
+          {(
+            [
+              ["healthy", "健康"],
+              ["insufficient", "题量不足"],
+              ["imbalanced", "结构失衡"],
+              ["empty", "无题"],
+            ] as Array<[CoverageStatus, string]>
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() =>
+                setStatus((current) => (current === value ? "" : value))
+              }
+              aria-pressed={status === value}
+            >
+              {label}
+              <strong>{summary ? statusCounts[value] : "—"}</strong>
+            </button>
+          ))}
+          {hasLocalFilters ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setKeyword("");
+                setStatus("");
+              }}
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              清除
+            </Button>
+          ) : null}
         </div>
-      </PremiumSection>
-
-      {examYears.length > 0 ? (
-      <PremiumSection className="overflow-hidden">
-        <PremiumSectionHeader
-          title="真题选择题年份完整性"
-          description="复用试卷发布校验，并把缺解析、固定题目版本缺知识点等问题作为额外质量警告。"
-          icon={<BookOpen className="h-4 w-4" />}
-        />
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[940px] text-sm">
-            <thead className="bg-[rgba(74,111,138,0.045)] text-left text-xs font-medium text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3">年份</th>
-                <th className="px-4 py-3">状态</th>
-                <th className="px-4 py-3">代表试卷</th>
-                <th className="px-4 py-3 text-right">题数</th>
-                <th className="px-4 py-3 text-right">选择题分</th>
-                <th className="px-4 py-3">问题</th>
-                <th className="px-5 py-3 text-right">处理</th>
-              </tr>
-            </thead>
-            <tbody>
-              {examYears.map((item) => (
-                <tr key={item.year} className="group border-t border-border/60 align-top transition-colors duration-200 hover:bg-[rgba(74,111,138,0.025)]">
-                  <td className="px-5 py-4 font-semibold tabular-nums text-foreground">{item.year}</td>
-                  <td className="px-4 py-4"><StatusBadge tone={examStatusTone(item.status)}>{EXAM_STATUS_LABEL[item.status]}</StatusBadge></td>
-                  <td className="px-4 py-4">
-                    <p className="font-medium text-foreground">{item.paper_title ?? "暂无试卷"}</p>
-                    {item.paper_version ? <p className="mt-1 text-xs text-muted-foreground/70">v{item.paper_version} · {item.paper_status}</p> : null}
-                  </td>
-                  <td className="px-4 py-4 text-right tabular-nums">{item.question_count}</td>
-                  <td className="px-4 py-4 text-right tabular-nums">{item.total_choice_score}</td>
-                  <td className="px-4 py-4">
-                    <div className="max-w-xl space-y-1 text-xs leading-5">
-                      {item.validation_errors.map((message) => <p key={`e-${message}`} className="text-destructive">{message}</p>)}
-                      {item.quality_warnings.map((message) => <p key={`w-${message}`} className="text-warning-foreground">{message}</p>)}
-                      {!item.validation_errors.length && !item.quality_warnings.length ? <span className="text-success">完整性检查通过</span> : null}
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <Link href={item.paper_ref ? `/exams/${item.paper_ref}` : "/exams"} className="inline-flex items-center gap-1 text-sm font-semibold text-accent-foreground transition-[color,transform] hover:translate-x-0.5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.25)] motion-reduce:transform-none">
-                      {item.paper_ref ? "查看试卷" : "去建卷"}<ArrowUpRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </PremiumSection>
-
-      ) : null}
-
-      {qualitySampleCount > 0 || hasGraphIssuesResult ? (
-        <PremiumSection>
-          <PremiumSectionHeader
-            icon={<ShieldAlert className="h-4 w-4" />}
-            title="质量样本与图谱联动"
-            description="从异常题目中抽取可直接定位的样本，并复用 Knowledge Quality Report 检查当前考纲范围。"
-          />
-          <div className={`grid divide-y divide-[var(--admin-line)] ${qualitySampleCount > 0 && hasGraphIssuesResult ? "xl:grid-cols-2 xl:divide-x xl:divide-y-0" : ""}`}>
-            {qualitySampleCount > 0 ? (
-              <section className="min-w-0 p-5">
-                <div className="flex items-start gap-2.5">
-                  <span className="admin-premium-icon"><ShieldAlert className="h-3.5 w-3.5" /></span>
-                  <div>
-                    <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">题库质量样本</h3>
-                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">从每类异常中抽取可直接定位的题目样本。</p>
-                  </div>
-                </div>
-                {quality ? (
-                  <div className="mt-4 space-y-4">
-                    {[
-                      ["未映射当前考纲", quality.unmapped_question_ids],
-                      ["缺少解析", quality.missing_analysis_question_ids],
-                      ["图片引用结构异常", quality.image_reference_anomaly_question_ids],
-                      ["缺少 current version", quality.unversioned_question_ids],
-                      ["缺少考纲语义快照", quality.syllabus_snapshot_missing_question_ids],
-                    ].filter(([, ids]) => (ids as number[]).length > 0).map(([label, ids]) => {
-                      const values = ids as number[];
-                      return (
-                        <div key={label as string} className="grid gap-2 sm:grid-cols-[150px_1fr] sm:items-start">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{label as string}</p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">样本 {values.length}</p>
-                          </div>
-                          <div className="flex min-h-7 flex-wrap gap-1.5">
-                            {values.slice(0, 12).map((id) => <Link key={id} href={questionIdHref(id)} className="rounded-md border border-[var(--admin-line)] bg-white/56 px-2 py-1 text-[11px] font-semibold text-accent-foreground transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(74,111,138,0.22)] motion-reduce:transform-none">#{id}</Link>)}
-                          </div>
+        {reportQuery.isLoading ? (
+          <ManagementSkeletonRows rows={5} />
+        ) : !reportQuery.data && !reportQuery.isError ? (
+          <EmptyState>
+            {versionsQuery.isLoading
+              ? "正在读取考纲版本…"
+              : "选择一个考纲版本后，即可查看覆盖矩阵。"}
+          </EmptyState>
+        ) : filteredItems.length === 0 ? (
+          <EmptyState>
+            {reportQuery.isError
+              ? "报告尚未成功读取，请重试。"
+              : "当前筛选没有知识点。调整关键词或切换覆盖状态。"}
+          </EmptyState>
+        ) : (
+          <>
+            <div
+              className={`${ws.tableScroll} ${ws.paperDesktop} max-h-[680px]`}
+              tabIndex={0}
+              role="region"
+              aria-label="知识点覆盖矩阵，可横向滚动"
+            >
+              <table className={`${ws.table} ${ws.matrix}`}>
+                <caption className="sr-only">
+                  知识点题源、难度与质量覆盖矩阵
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className={ws.knowledgeCell}>
+                      知识点
+                    </th>
+                    <th scope="col" className="text-right">
+                      总题量
+                    </th>
+                    <th scope="col" className="text-right">
+                      真题
+                    </th>
+                    <th scope="col" className="text-right">
+                      模拟
+                    </th>
+                    <th scope="col" className="text-right">
+                      简单
+                    </th>
+                    <th scope="col" className="text-right">
+                      中等
+                    </th>
+                    <th scope="col" className="text-right">
+                      困难
+                    </th>
+                    <th scope="col" className="text-right">
+                      缺解析
+                    </th>
+                    <th scope="col">状态</th>
+                    <th scope="col" className="text-right">
+                      处理
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item: CoverageMatrixItem) => (
+                    <tr key={item.syllabus_knowledge_point_id}>
+                      <td className={ws.knowledgeCell}>
+                        <p>{item.name}</p>
+                        <p className={ws.caption}>
+                          {item.subject_name} · KP #{item.knowledge_point_id}
+                        </p>
+                        {item.years.length ? (
+                          <p className={ws.caption}>
+                            年份 {item.years.slice(0, 6).join(" / ")}
+                          </p>
+                        ) : null}
+                        {Object.keys(item.question_type_counts).length ? (
+                          <p className={ws.caption}>
+                            {Object.entries(item.question_type_counts)
+                              .map(
+                                ([type, count]) =>
+                                  `${getQuestionTypeLabel(type)} ${count}`,
+                              )
+                              .join(" · ")}
+                          </p>
+                        ) : null}
+                        {item.sources.length ? (
+                          <p
+                            className={ws.caption}
+                            title={item.sources.join(" / ")}
+                          >
+                            来源 {item.sources.join(" / ")}
+                          </p>
+                        ) : null}
+                        {item.issues.length ? (
+                          <p className="mt-2 text-xs leading-5 text-warning-foreground">
+                            {item.issues.join("；")}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td className="text-right font-medium">
+                        {item.total_question_count}
+                      </td>
+                      <td className="text-right">
+                        {item.past_exam_choice_count}
+                      </td>
+                      <td className="text-right">{item.mock_choice_count}</td>
+                      <td className="text-right">
+                        {item.difficulty_easy_count}
+                      </td>
+                      <td className="text-right">
+                        {item.difficulty_medium_count}
+                      </td>
+                      <td className="text-right">
+                        {item.difficulty_hard_count}
+                      </td>
+                      <td className="text-right">
+                        {item.missing_analysis_count}
+                      </td>
+                      <td>
+                        <StatusBadge tone={coverageTone(item.status)}>
+                          {STATUS_LABEL[item.status]}
+                        </StatusBadge>
+                      </td>
+                      <td>
+                        <div className={ws.matrixAction}>
+                          <Link
+                            href={questionBankHref(item.knowledge_point_id)}
+                            className={ws.textLink}
+                          >
+                            看题库
+                          </Link>
+                          <Link
+                            href="/imports/text-import"
+                            className={ws.textLink}
+                          >
+                            去导题
+                            <ArrowUpRight size={12} aria-hidden="true" />
+                          </Link>
                         </div>
-                      );
-                    })}
-
-                    {quality.duplicate_groups.length > 0 ? (
-                      <div className="border-t border-[var(--admin-line)] pt-4">
-                        <p className="text-sm font-medium text-foreground">重复疑似 hash 组</p>
-                        <div className="mt-2 space-y-2">
-                          {quality.duplicate_groups.slice(0, 8).map((group) => (
-                            <div key={group.question_hash} className="rounded-[12px] border border-[var(--admin-line)] bg-white/48 px-3 py-2.5">
-                              <p className="truncate font-mono text-[10px] text-muted-foreground/70">{group.question_hash}</p>
-                              <div className="mt-1.5 flex flex-wrap gap-2">
-                                {group.question_ids.map((id) => <Link key={id} href={questionIdHref(id)} className="text-xs font-semibold text-accent-foreground hover:underline">#{id}</Link>)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : <EmptyState>正在加载质量样本...</EmptyState>}
-              </section>
-            ) : null}
-
-            {hasGraphIssuesResult ? (
-              <section className="min-w-0 p-5">
-                <div className="flex items-start gap-2.5">
-                  <span className="admin-premium-icon"><CircleHelp className="h-3.5 w-3.5" /></span>
-                  <div>
-                    <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">知识图谱联动</h3>
-                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">复用现有 Knowledge Quality Report，并将统计范围限制到当前考纲知识点。</p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-4">
-                  {(graph?.warnings ?? []).length ? (
-                    <div className="space-y-2">
-                      {(graph?.warnings ?? []).map((warning) => (
-                        <div key={warning} className="flex gap-2 rounded-[12px] border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>{warning}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={ws.matrixMobile}>
+              {filteredItems.map((item) => (
+                <details key={item.syllabus_knowledge_point_id}>
+                  <summary>
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.subject_name} · {item.total_question_count} 道题
+                      </small>
+                    </span>
+                    <StatusBadge tone={coverageTone(item.status)}>
+                      {STATUS_LABEL[item.status]}
+                    </StatusBadge>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </summary>
+                  <div className={ws.matrixMobileBody}>
+                    <dl>
+                      {[
+                        ["真题选择", item.past_exam_choice_count],
+                        ["模拟选择", item.mock_choice_count],
+                        ["简单", item.difficulty_easy_count],
+                        ["中等", item.difficulty_medium_count],
+                        ["困难", item.difficulty_hard_count],
+                        ["缺解析", item.missing_analysis_count],
+                      ].map(([label, value]) => (
+                        <div key={String(label)}>
+                          <dt>{label}</dt>
+                          <dd>{value}</dd>
                         </div>
                       ))}
+                    </dl>
+                    <p className={ws.caption}>
+                      KP #{item.knowledge_point_id}
+                      {item.years.length
+                        ? ` · 年份 ${item.years.join(" / ")}`
+                        : ""}
+                    </p>
+                    {item.sources.length ? (
+                      <p className={ws.caption}>
+                        来源 {item.sources.join(" / ")}
+                      </p>
+                    ) : null}
+                    {Object.keys(item.question_type_counts).length ? (
+                      <p className={ws.caption}>
+                        {Object.entries(item.question_type_counts)
+                          .map(
+                            ([type, count]) =>
+                              `${getQuestionTypeLabel(type)} ${count}`,
+                          )
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                    {item.issues.length ? (
+                      <p className="mt-2 text-xs leading-5 text-warning-foreground">
+                        {item.issues.join("；")}
+                      </p>
+                    ) : null}
+                    <div className={`${ws.actions} mt-3`}>
+                      <Link
+                        href={questionBankHref(item.knowledge_point_id)}
+                        className={ws.actionLink}
+                      >
+                        看题库
+                      </Link>
+                      <Link href="/imports/text-import" className={ws.textLink}>
+                        去导题
+                        <ArrowUpRight size={14} aria-hidden="true" />
+                      </Link>
                     </div>
-                  ) : (
-                    <div className="rounded-[12px] border border-warning/30 bg-warning-light px-3 py-2.5 text-sm leading-5 text-warning-foreground">
-                      图谱存在结构异常：孤立点 {Number(graph?.summary?.isolated_count ?? 0)}，循环 {Number(graph?.summary?.cycle_count ?? 0)}。
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-2 border-t border-[var(--admin-line)] pt-4">
-                    <Link href="/knowledge-graph" className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[var(--admin-line)] bg-white/56 px-4 text-sm font-semibold text-foreground transition hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82"><Filter className="h-4 w-4" />进入知识图谱治理<ArrowUpRight className="h-3.5 w-3.5" /></Link>
-                    <Link href="/syllabus" className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[var(--admin-line)] bg-white/56 px-4 text-sm font-semibold text-foreground transition hover:border-[rgba(74,111,138,0.28)] hover:bg-white/82"><BookOpen className="h-4 w-4" />考纲版本<ArrowUpRight className="h-3.5 w-3.5" /></Link>
                   </div>
+                </details>
+              ))}
+            </div>
+          </>
+        )}
+      </WorkspaceSurface>
+      {examYears.length > 0 ? (
+        <WorkspaceSurface>
+          <WorkspaceSectionHeader
+            title="真题年份完整性"
+            description="按试卷发布规则检查题数与分值，同时提示解析和知识点快照缺口"
+          />
+          <div
+            className={ws.tableScroll}
+            tabIndex={0}
+            role="region"
+            aria-label="真题年份完整性，可横向滚动"
+          >
+            <table className={`${ws.table} min-w-[880px]`}>
+              <caption className="sr-only">各年份真题完整性</caption>
+              <thead>
+                <tr>
+                  <th scope="col">年份</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">代表试卷</th>
+                  <th scope="col" className="text-right">
+                    题目 / 分值
+                  </th>
+                  <th scope="col">问题</th>
+                  <th scope="col">
+                    <span className="sr-only">处理</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {examYears.map((item) => (
+                  <tr key={item.year}>
+                    <td>
+                      <span className={ws.yearNumber}>{item.year}</span>
+                    </td>
+                    <td>
+                      <StatusBadge tone={examStatusTone(item.status)}>
+                        {EXAM_STATUS_LABEL[item.status]}
+                      </StatusBadge>
+                    </td>
+                    <td className="max-w-[380px]">
+                      <p className={ws.tableTitle}>
+                        {item.paper_title ?? "暂无试卷"}
+                      </p>
+                      {item.paper_version ? (
+                        <p className={ws.caption}>
+                          v{item.paper_version} ·{" "}
+                          {item.paper_status === "published"
+                            ? "已发布"
+                            : item.paper_status === "draft"
+                              ? "草稿"
+                              : "已归档"}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="text-right">
+                      {item.question_count}
+                      <span className={ws.muted}>
+                        {" "}
+                        / {item.total_choice_score} 分
+                      </span>
+                    </td>
+                    <td>
+                      {item.validation_errors.map((message) => (
+                        <p key={message} className="text-xs text-destructive">
+                          {message}
+                        </p>
+                      ))}
+                      {item.quality_warnings.map((message) => (
+                        <p
+                          key={message}
+                          className="text-xs text-warning-foreground"
+                        >
+                          {message}
+                        </p>
+                      ))}
+                      {!item.validation_errors.length &&
+                      !item.quality_warnings.length ? (
+                        <span className={ws.caption}>检查通过</span>
+                      ) : null}
+                    </td>
+                    <td>
+                      <Link
+                        href={
+                          item.paper_ref ? `/exams/${item.paper_ref}` : "/exams"
+                        }
+                        className={`${ws.textLink} whitespace-nowrap`}
+                      >
+                        {item.paper_ref ? "查看试卷" : "去建卷"}
+                        <ArrowUpRight size={14} aria-hidden="true" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </WorkspaceSurface>
+      ) : null}
+      {qualitySampleCount > 0 || hasGraphIssuesResult ? (
+        <WorkspaceSurface>
+          <WorkspaceSectionHeader
+            title="内容质量与图谱"
+            description={
+              summary
+                ? `${qualityIssueCount} 项内容问题记录 · 从样本进入题目或图谱检查`
+                : "查看可直接定位的质量样本"
+            }
+          />
+          <div className={ws.qualityGrid}>
+            {qualitySampleCount > 0 && quality ? (
+              <section>
+                <h3>题库质量样本</h3>
+                {[
+                  ["未映射当前考纲", quality.unmapped_question_ids],
+                  ["缺少解析", quality.missing_analysis_question_ids],
+                  [
+                    "图片引用异常",
+                    quality.image_reference_anomaly_question_ids,
+                  ],
+                  ["缺少题目版本", quality.unversioned_question_ids],
+                  [
+                    "缺少考纲快照",
+                    quality.syllabus_snapshot_missing_question_ids,
+                  ],
+                ]
+                  .filter(([, ids]) => (ids as number[]).length > 0)
+                  .map(([label, ids]) => (
+                    <div key={String(label)} className={ws.qualityRow}>
+                      <span>
+                        {String(label)} · 样本 {(ids as number[]).length}
+                      </span>
+                      <span className="flex flex-wrap gap-2">
+                        {(ids as number[]).slice(0, 12).map((id) => (
+                          <Link key={id} href={questionIdHref(id)}>
+                            #{id}
+                          </Link>
+                        ))}
+                      </span>
+                    </div>
+                  ))}
+                {quality.duplicate_groups.length ? (
+                  <div className="mt-4">
+                    <p className={ws.caption}>疑似重复组</p>
+                    {quality.duplicate_groups.slice(0, 8).map((group) => (
+                      <div key={group.question_hash} className={ws.qualityRow}>
+                        <span
+                          className="max-w-full truncate font-mono text-[11px]"
+                          title={group.question_hash}
+                        >
+                          {group.question_hash}
+                        </span>
+                        <span className="flex flex-wrap gap-2">
+                          {group.question_ids.map((id) => (
+                            <Link key={id} href={questionIdHref(id)}>
+                              #{id}
+                            </Link>
+                          ))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+            {hasGraphIssuesResult ? (
+              <section>
+                <h3>知识图谱联动</h3>
+                <p className={`${ws.caption} mb-4`}>
+                  检查范围限定为当前考纲知识点
+                </p>
+                {graph?.warnings?.length ? (
+                  graph.warnings.map((warning) => (
+                    <p
+                      key={warning}
+                      className="mb-3 text-sm leading-6 text-warning-foreground"
+                    >
+                      {warning}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm leading-6 text-warning-foreground">
+                    孤立点 {Number(graph?.summary?.isolated_count ?? 0)} · 循环{" "}
+                    {Number(graph?.summary?.cycle_count ?? 0)}
+                  </p>
+                )}
+                <div className={`${ws.actions} mt-6`}>
+                  <Link href="/knowledge-graph" className={ws.actionLink}>
+                    进入知识图谱
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </Link>
+                  <Link href="/syllabus" className={ws.textLink}>
+                    考纲版本
+                    <ArrowUpRight size={14} aria-hidden="true" />
+                  </Link>
                 </div>
               </section>
             ) : null}
           </div>
-        </PremiumSection>
+        </WorkspaceSurface>
       ) : null}
-    </ManagementPage>
+    </WorkspacePage>
   );
 }

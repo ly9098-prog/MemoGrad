@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleCheck, Layers3, ListTree, LoaderCircle, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
+import { LoaderCircle, RefreshCw, Search, X } from "lucide-react";
 import {
-  ManagementNotice,
-  ManagementPage,
-  ManagementProgress,
+  EmptyState,
   ManagementSkeletonRows,
-  PremiumSection,
-  PremiumSectionHeader,
-  PremiumStat,
   StatusBadge,
 } from "@/components/admin/management-ui";
+import {
+  WorkspacePage,
+  WorkspaceHeader,
+  WorkspaceSurface,
+  WorkspaceSectionHeader,
+  WorkspaceMetrics,
+  WorkspaceMetric,
+  WorkspaceNotice,
+  workspaceStyles as ws,
+} from "@/components/admin/workspace";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -56,47 +61,72 @@ export default function SubjectsPage() {
 
   const query = useQuery({
     queryKey: ["subjects", "include-inactive"],
-    queryFn: () => apiRequest<AdminSubjectListResponse>("/subjects?include_inactive=true"),
+    queryFn: () =>
+      apiRequest<AdminSubjectListResponse>("/subjects?include_inactive=true"),
   });
 
   const mutation = useMutation({
-    mutationFn: async ({ subject, nextActive }: Exclude<PendingToggle, null>) => {
+    mutationFn: async ({
+      subject,
+      nextActive,
+    }: Exclude<PendingToggle, null>) => {
       const body: AdminSubjectUpdateRequest = { is_active: nextActive };
-      if (subject.is_product_root && !nextActive) body.confirm_core_disable = true;
+      if (subject.is_product_root && !nextActive)
+        body.confirm_core_disable = true;
       return apiRequest<AdminSubjectNode>(`/subjects/${subject.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
       });
     },
     onMutate: async ({ subject, nextActive }) => {
-      await queryClient.cancelQueries({ queryKey: ["subjects", "include-inactive"] });
-      const previous = queryClient.getQueryData<AdminSubjectListResponse>(["subjects", "include-inactive"]);
+      await queryClient.cancelQueries({
+        queryKey: ["subjects", "include-inactive"],
+      });
+      const previous = queryClient.getQueryData<AdminSubjectListResponse>([
+        "subjects",
+        "include-inactive",
+      ]);
       const inactiveAncestors = previous
-        ? buildSubjectRelations(previous.items).inactiveAncestorsById.get(subject.id) || []
+        ? buildSubjectRelations(previous.items).inactiveAncestorsById.get(
+            subject.id,
+          ) || []
         : [];
 
       if (previous) {
-        queryClient.setQueryData<AdminSubjectListResponse>(["subjects", "include-inactive"], {
-          ...previous,
-          items: updateSubjectTreeStatus(previous.items, subject.id, nextActive),
-        });
+        queryClient.setQueryData<AdminSubjectListResponse>(
+          ["subjects", "include-inactive"],
+          {
+            ...previous,
+            items: updateSubjectTreeStatus(
+              previous.items,
+              subject.id,
+              nextActive,
+            ),
+          },
+        );
       }
       return { previous, inactiveAncestors };
     },
     onError: (_error, variables, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(["subjects", "include-inactive"], context.previous);
+        queryClient.setQueryData(
+          ["subjects", "include-inactive"],
+          context.previous,
+        );
       }
       setPendingToggle(null);
       setActionNotice({
         tone: "danger",
         title: `未能${variables.nextActive ? "启用" : "停用"}「${variables.subject.name}」`,
-        message: "界面状态已恢复，请刷新数据后重试；如果问题持续，请检查当前账号权限与接口状态。",
+        message:
+          "界面状态已恢复，请刷新数据后重试；如果问题持续，请检查当前账号权限与接口状态。",
       });
     },
     onSuccess: (_data, variables, context) => {
       setPendingToggle(null);
-      const autoEnabledAncestors = variables.nextActive ? context?.inactiveAncestors || [] : [];
+      const autoEnabledAncestors = variables.nextActive
+        ? context?.inactiveAncestors || []
+        : [];
       setActionNotice({
         tone: "success",
         title: `已${variables.nextActive ? "启用" : "停用"}「${variables.subject.name}」`,
@@ -113,18 +143,30 @@ export default function SubjectsPage() {
     },
   });
 
-  const flat = useMemo(() => flattenSubjects(query.data?.items || []), [query.data]);
+  const flat = useMemo(
+    () => flattenSubjects(query.data?.items || []),
+    [query.data],
+  );
   const productRoot = flat.find((item) => item.is_product_root);
-  const coreSubjects = flat.filter((item) => item.product_scope === "exam408" && !item.is_product_root);
+  const coreSubjects = flat.filter(
+    (item) => item.product_scope === "exam408" && !item.is_product_root,
+  );
   const activeCoreCount = coreSubjects.filter((item) => item.is_active).length;
   const inactiveSubjectCount = flat.filter((item) => !item.is_active).length;
   const scopeReady = Boolean(productRoot?.is_active) && activeCoreCount >= 4;
   const normalizedKeyword = keyword.trim().toLowerCase();
   const filteredFlat = useMemo(() => {
     if (!normalizedKeyword) return flat;
-    return flat.filter((subject) => `${subject.name} ${subject.code} ${subject.path}`.toLowerCase().includes(normalizedKeyword));
+    return flat.filter((subject) =>
+      `${subject.name} ${subject.code} ${subject.path}`
+        .toLowerCase()
+        .includes(normalizedKeyword),
+    );
   }, [flat, normalizedKeyword]);
-  const { activeDescendantsById } = useMemo(() => buildSubjectRelations(query.data?.items || []), [query.data]);
+  const { activeDescendantsById } = useMemo(
+    () => buildSubjectRelations(query.data?.items || []),
+    [query.data],
+  );
 
   useEffect(() => {
     if (!actionNotice) return;
@@ -170,278 +212,286 @@ export default function SubjectsPage() {
   }
 
   return (
-    <ManagementPage className="space-y-5">
-      <PremiumSection accent={scopeReady ? "teal" : "amber"}>
-        <PremiumSectionHeader
-          icon={<ListTree className="h-4 w-4" />}
-          title="科目治理"
-          titleAs="h1"
-          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
-          description="维护产品科目树与启停边界。启停只影响当前产品入口和可选范围，不删除历史题目、练习记录与错题数据。"
-          meta={
-            <>
-              <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "产品范围完整" : "范围需要检查"}</StatusBadge>
-              <span>{canWrite ? "可编辑启停状态" : "当前账号仅可查看"}</span>
-            </>
-          }
-          aside={
-            <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
-              <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
-              刷新
-            </Button>
-          }
-        />
-        <div className="grid gap-px sm:grid-cols-3">
-          <PremiumStat
+    <WorkspacePage>
+      <WorkspaceHeader
+        title="科目治理"
+        description="维护科目目录与产品范围，启停状态不影响历史题目和学习记录"
+        meta={
+          <>
+            <StatusBadge
+              tone={
+                query.isLoading || query.isError
+                  ? "neutral"
+                  : scopeReady
+                    ? "success"
+                    : "warning"
+              }
+            >
+              {query.isLoading
+                ? "正在读取目录"
+                : query.isError
+                  ? "目录读取失败"
+                  : scopeReady
+                    ? "产品范围完整"
+                    : "范围需要检查"}
+            </StatusBadge>
+            <span>{canWrite ? "可调整启停状态" : "当前账号仅可查看"}</span>
+          </>
+        }
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCw
+              size={14}
+              aria-hidden="true"
+              className={query.isFetching ? "animate-spin" : ""}
+            />
+            刷新
+          </Button>
+        }
+      />
+      <WorkspaceSurface>
+        <WorkspaceMetrics columns={3}>
+          <WorkspaceMetric
             label="核心科目启用"
-            value={`${activeCoreCount}/4`}
+            value={query.isError ? "—" : `${activeCoreCount} / 4`}
             hint="数据结构、组成原理、操作系统、计算机网络"
-            icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            accent={activeCoreCount === 4 ? "teal" : "amber"}
-            tone={activeCoreCount === 4 ? "default" : "alert"}
+            loading={query.isLoading}
+            tone={!scopeReady && !query.isError ? "attention" : "default"}
           />
-          <PremiumStat
+          <WorkspaceMetric
             label="产品根科目"
-            value={productRoot?.is_active ? "启用" : "关闭"}
-            hint={productRoot?.name ?? "未找到产品根科目"}
-            icon={<Layers3 className="h-3.5 w-3.5" />}
-            accent={productRoot?.is_active ? "teal" : "rose"}
-            tone={productRoot?.is_active ? "default" : "alert"}
+            value={
+              query.isError ? "—" : productRoot?.is_active ? "启用" : "关闭"
+            }
+            hint={
+              query.isError
+                ? "目录数据不可用"
+                : (productRoot?.name ?? "未找到产品根科目")
+            }
+            loading={query.isLoading}
           />
-          <PremiumStat
+          <WorkspaceMetric
             label="当前停用科目"
-            value={inactiveSubjectCount}
-            hint="可按业务需要重新启用，历史数据始终保留"
-            icon={<CircleCheck className="h-3.5 w-3.5" />}
-            accent="violet"
+            value={query.isError ? "—" : inactiveSubjectCount}
+            hint="历史数据保留，可重新启用"
+            loading={query.isLoading}
           />
-        </div>
-        {!scopeReady && !query.isLoading ? (
-          <div className="border-t border-[var(--admin-line)] p-4 sm:p-5">
-            <ManagementNotice tone="warning" title="产品科目范围不完整">
-              请确认根科目处于启用状态，并检查数据结构、计算机组成原理、操作系统、计算机网络四个核心科目是否全部启用。
-            </ManagementNotice>
-          </div>
+        </WorkspaceMetrics>
+        {!scopeReady && !query.isLoading && !query.isError ? (
+          <WorkspaceNotice tone="warning" title="产品科目范围不完整">
+            请确认根科目和四个核心科目已全部启用。
+          </WorkspaceNotice>
         ) : null}
-      </PremiumSection>
-
-      <PremiumSection overflow="visible">
-        <PremiumSectionHeader
-          icon={<ListTree className="h-4 w-4" />}
+        <WorkspaceSectionHeader
           title="科目目录"
-          description={normalizedKeyword ? `正在显示 ${filteredFlat.length} / ${flat.length} 个匹配节点` : "启用子科目会自动补齐上级状态；父科目只有在全部下级停用后才能关闭。"}
-          aside={
-            <label className="relative block w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+          description={
+            normalizedKeyword
+              ? `显示 ${filteredFlat.length} / ${flat.length} 个节点`
+              : `${flat.length} 个节点 · 按产品层级排列`
+          }
+          actions={
+            <div className={ws.search}>
+              <Search aria-hidden="true" />
               <Input
-                className={`h-10 bg-card pl-9 ${keyword ? "pr-9" : "pr-3"}`}
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 placeholder="搜索科目、编码或路径"
                 aria-label="搜索科目"
+                className="pr-10"
               />
               {keyword ? (
                 <button
                   type="button"
                   onClick={() => setKeyword("")}
-                  className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-[var(--mgmt-steel)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+                  className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-md"
                   aria-label="清空搜索"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X size={14} aria-hidden="true" />
                 </button>
               ) : null}
-            </label>
+            </div>
           }
         />
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_322px] xl:items-start">
-          <div className="min-w-0 border-b border-[var(--admin-line)] xl:border-b-0 xl:border-r">
-          {query.isLoading ? (
-            <ManagementSkeletonRows rows={6} />
-          ) : query.isError ? (
-            <div className="px-6 py-16 text-center text-sm text-destructive">科目加载失败，请刷新重试。</div>
-          ) : filteredFlat.length === 0 ? (
-            <div className="px-6 py-16 text-center text-sm text-muted-foreground">没有匹配的科目。尝试缩短关键词或清空搜索。</div>
-          ) : (
-            <div role="tree" aria-label="科目目录">
-              <div className="grid grid-cols-[minmax(0,1fr)_104px] border-b border-[var(--mgmt-line)] bg-[rgba(237,243,246,0.55)] px-5 py-2.5 text-[11px] font-semibold text-muted-foreground/70 sm:grid-cols-[minmax(0,1fr)_130px_160px]">
-                <span>科目与层级</span>
-                <span className="hidden sm:block">范围</span>
-                <span className="text-right">状态</span>
-              </div>
-              <div className="divide-y divide-[var(--mgmt-line)]">
-                {filteredFlat.map((subject) => {
-                  const editable = canWrite;
-                  const isUpdating = mutation.isPending && mutation.variables?.subject.id === subject.id;
-                  const activeDescendants = activeDescendantsById.get(subject.id) || [];
-                  const hasActiveDescendants = subject.is_active && activeDescendants.length > 0;
-                  const toggleHint = !editable
-                    ? "当前账号没有科目写入权限"
-                    : mutation.isPending && !isUpdating
-                      ? "正在保存另一项科目变更，请稍候"
-                      : hasActiveDescendants
-                        ? `需先停用全部下级科目（当前 ${activeDescendants.length} 个下级在线）`
-                        : subject.is_active
-                          ? "停用该科目"
-                          : "启用该科目";
-                  return (
-                    <div
-                      key={subject.id}
-                      role="treeitem"
-                      aria-selected={false}
-                      aria-level={subject.depth + 1}
-                      aria-label={`${subject.name}，${subject.is_active ? "已启用" : "已停用"}`}
-                      className={`group grid grid-cols-[minmax(0,1fr)_104px] items-center gap-3 px-5 py-3.5 transition-colors duration-200 motion-reduce:transition-none sm:grid-cols-[minmax(0,1fr)_130px_160px] ${
-                        blockedSubjectId === subject.id
-                          ? "bg-warning-light/70"
-                          : subject.is_product_root
-                            ? "bg-[rgba(237,243,246,0.48)]"
-                            : "hover:bg-[rgba(237,243,246,0.36)]"
-                      }`}
-                    >
-                      <div className="min-w-0" style={{ paddingLeft: `${subject.depth * 24}px` }}>
-                        <div className="relative flex min-w-0 items-center gap-3">
-                          {subject.depth > 0 ? (
-                            <>
-                              <span className="absolute -left-4 -top-5 bottom-1/2 w-px bg-[var(--mgmt-line)]" aria-hidden="true" />
-                              <span className="absolute -left-4 top-1/2 h-px w-3 bg-[var(--mgmt-line)]" aria-hidden="true" />
-                            </>
-                          ) : null}
-                          <span
-                            className={`relative h-2.5 w-2.5 shrink-0 rounded-full border transition-colors duration-200 ${
-                              subject.is_active
-                                ? "border-primary bg-primary"
-                                : "border-border bg-card"
-                            }`}
-                            aria-hidden="true"
-                          />
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="truncate text-sm font-semibold leading-5 text-foreground">{subject.name}</span>
-                              {isUpdating ? <StatusBadge tone="accent"><LoaderCircle className="h-3 w-3 animate-spin" />更新中</StatusBadge> : !subject.is_active ? <StatusBadge tone="warning">已停用</StatusBadge> : null}
+        <div className={ws.subjectLayout}>
+          <div className="min-w-0">
+            {query.isLoading ? (
+              <ManagementSkeletonRows rows={6} />
+            ) : query.isError ? (
+              <WorkspaceNotice tone="danger" title="科目目录加载失败">
+                请使用右上角刷新重试。
+              </WorkspaceNotice>
+            ) : !filteredFlat.length ? (
+              <EmptyState>
+                没有匹配的科目。尝试缩短关键词或清空搜索。
+              </EmptyState>
+            ) : (
+              <table className={ws.subjectTable}>
+                <caption className="sr-only">
+                  科目目录、所属范围与启停状态
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">科目与层级</th>
+                    <th scope="col" className={ws.subjectScope}>
+                      范围
+                    </th>
+                    <th scope="col" className="text-right">
+                      状态
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFlat.map((subject) => {
+                    const isUpdating =
+                      mutation.isPending &&
+                      mutation.variables?.subject.id === subject.id;
+                    const activeDescendants =
+                      activeDescendantsById.get(subject.id) || [];
+                    const hasActiveDescendants =
+                      subject.is_active && activeDescendants.length > 0;
+                    const toggleHint = !canWrite
+                      ? "当前账号没有科目写入权限"
+                      : mutation.isPending && !isUpdating
+                        ? "正在保存另一项科目变更"
+                        : hasActiveDescendants
+                          ? `需先停用全部下级科目（${activeDescendants.length} 个下级在线）`
+                          : subject.is_active
+                            ? "停用该科目"
+                            : "启用该科目";
+                    return (
+                      <tr
+                        key={subject.id}
+                        className={ws.subjectRow}
+                        data-root={subject.is_product_root}
+                        data-blocked={blockedSubjectId === subject.id}
+                      >
+                        <td>
+                          <div
+                            className={ws.subjectName}
+                            style={
+                              {
+                                "--subject-depth": subject.depth,
+                              } as CSSProperties
+                            }
+                          >
+                            <div>
+                              <strong>{subject.name}</strong>
+                              {isUpdating ? (
+                                <LoaderCircle
+                                  size={14}
+                                  className="animate-spin"
+                                  aria-label="正在更新"
+                                />
+                              ) : !subject.is_active ? (
+                                <StatusBadge tone="neutral">已停用</StatusBadge>
+                              ) : null}
                             </div>
-                            <p className="mt-1 truncate text-[11px] leading-4 text-muted-foreground/70" title={subject.path}>
-                              <span>{subject.code}</span>
-                              <span className="mx-1.5 text-muted-foreground/60">/</span>
-                              L{subject.level} · 排序 {subject.sort_order} · {subject.path}
-                            </p>
+                            <small>
+                              {subject.code} · L{subject.level} · 排序{" "}
+                              {subject.sort_order}
+                            </small>
+                            <small title={subject.path}>{subject.path}</small>
                           </div>
-                        </div>
-                      </div>
-                      <div className="hidden sm:block">
-                        <StatusBadge tone={scopeTone(subject)}>{scopeLabel(subject)}</StatusBadge>
-                      </div>
-                      <div className="flex items-center justify-end gap-3">
-                        {hasActiveDescendants ? (
-                          <span className="hidden whitespace-nowrap text-[10px] font-medium text-muted-foreground/70 xl:inline">
-                            {activeDescendants.length} 个下级在线
-                          </span>
-                        ) : null}
-                        <div className="shrink-0" title={toggleHint}>
-                          <Toggle
-                            checked={subject.is_active}
-                            disabled={!editable || mutation.isPending}
-                            onChange={() => requestToggle(subject)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                        </td>
+                        <td className={ws.subjectScope}>
+                          <StatusBadge tone={scopeTone(subject)}>
+                            {scopeLabel(subject)}
+                          </StatusBadge>
+                        </td>
+                        <td>
+                          <div className={ws.subjectState}>
+                            <label
+                              title={toggleHint}
+                              className={ws.switchTarget}
+                            >
+                              <span className="sr-only">
+                                {subject.name}启用状态
+                              </span>
+                              <Toggle
+                                checked={subject.is_active}
+                                disabled={!canWrite || mutation.isPending}
+                                onChange={() => requestToggle(subject)}
+                                color="var(--ws-blue)"
+                              />
+                            </label>
+                          </div>
+                          <span className="sr-only">{toggleHint}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
-
-          <aside className="min-w-0 bg-secondary/15 xl:sticky xl:top-5">
-            <section className="border-b border-[var(--admin-line)] p-5">
-              <div className="flex items-start gap-2.5">
-                <span className="admin-premium-icon"><CircleCheck className="h-3.5 w-3.5" /></span>
-                <div className="min-w-0">
-                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">范围健康度</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">核心科目全部在线时，产品范围才视为完整。</p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-[30px] font-medium leading-none tracking-[-0.04em] tabular-nums text-foreground">{activeCoreCount}<span className="ml-1 text-sm font-medium text-muted-foreground/70">/ 4</span></p>
-                  <p className="mt-2 text-xs text-muted-foreground">核心科目已启用</p>
-                </div>
-                <StatusBadge tone={scopeReady ? "success" : "warning"}>{scopeReady ? "完整" : "待修复"}</StatusBadge>
-              </div>
-              <ManagementProgress className="mt-4" value={activeCoreCount} max={4} tone={activeCoreCount === 4 ? "success" : "warning"} />
-              <div className="mt-4 divide-y divide-[var(--admin-line)] border-y border-[var(--admin-line)]">
-                {coreSubjects.slice(0, 4).map((subject) => (
-                  <div key={subject.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                    <span className="min-w-0 truncate text-muted-foreground">{subject.name}</span>
-                    <StatusBadge tone={subject.is_active ? "success" : "warning"}>{subject.is_active ? "在线" : "停用"}</StatusBadge>
+          <aside className={ws.subjectAside} aria-label="科目范围与治理规则">
+            <section>
+              <h3>408 核心范围</h3>
+              {query.isLoading ? (
+                <p>正在读取科目状态…</p>
+              ) : query.isError ? (
+                <p>目录数据不可用</p>
+              ) : (
+                coreSubjects.slice(0, 4).map((subject) => (
+                  <div
+                    key={subject.id}
+                    className="flex items-center justify-between gap-3 py-3 text-xs"
+                  >
+                    <span>{subject.name}</span>
+                    <span className={ws.caption}>
+                      {subject.is_active ? "已启用" : "已停用"}
+                    </span>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </section>
-
-            <section className="border-b border-[var(--admin-line)] p-5">
-              <div className="flex items-start gap-2.5">
-                <span className="admin-premium-icon"><ShieldCheck className="h-3.5 w-3.5" /></span>
-                <div className="min-w-0">
-                  <h3 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">治理边界</h3>
-                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">启停影响产品可见范围，但不改变历史数据归属。</p>
-                </div>
-              </div>
-              <div className="mt-4 divide-y divide-[var(--admin-line)] text-sm leading-6 text-muted-foreground">
-                <div className="py-4 first:pt-0">
-                  <p className="font-semibold text-foreground">根科目控制产品入口</p>
-                  <p className="mt-1">关闭根科目会整体隐藏相关刷题入口，因此需要二次确认。</p>
-                </div>
-                <div className="py-4">
-                  <p className="font-semibold text-foreground">父级停用受下级状态保护</p>
-                  <p className="mt-1">只要任意下级仍在线，父科目的停用操作就会被拦截；请从最末级开始逐层停用。</p>
-                </div>
-                <div className="py-4 last:pb-0">
-                  <p className="font-semibold text-foreground">子科目启用会补齐上级状态</p>
-                  <p className="mt-1">重新启用任意子科目时，系统会自动启用其父级及更高层级，避免出现“子级在线、父级关闭”的不可达状态。</p>
-                </div>
-              </div>
-            </section>
-
-            <section className="flex items-center justify-between gap-4 p-5">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{canWrite ? "允许变更" : "只读模式"}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {canWrite ? "所有科目的启停操作都会立即写入，并在失败时自动回滚界面状态。" : "需要 subject:write 权限才能调整启停状态。"}
-                </p>
-              </div>
-              <StatusBadge tone={canWrite ? "success" : "neutral"}>{canWrite ? "可写" : "只读"}</StatusBadge>
+            <section>
+              <h3>启停规则</h3>
+              <p>
+                <strong>从下级开始停用</strong>仍有下级启用时，父科目不能关闭。
+              </p>
+              <p className="mt-4">
+                <strong>启用子级会补齐上级</strong>
+                系统自动启用父级及祖先，保持目录可达。
+              </p>
+              <p className="mt-4">
+                <strong>产品根科目需确认</strong>
+                关闭后会隐藏相关刷题入口，历史数据保留。
+              </p>
+              <p className="mt-6">
+                {canWrite
+                  ? "状态修改立即保存，失败时恢复原状态。"
+                  : "需要 subject:write 权限才能调整启停状态。"}
+              </p>
             </section>
           </aside>
         </div>
-      </PremiumSection>
-
+      </WorkspaceSurface>
       {actionNotice ? (
         <div
-          className="pointer-events-none fixed inset-x-4 bottom-5 z-[70] sm:left-auto sm:right-6 sm:w-[420px]"
-          role={actionNotice.tone === "warning" || actionNotice.tone === "danger" ? "alert" : "status"}
-          aria-live={actionNotice.tone === "warning" || actionNotice.tone === "danger" ? "assertive" : "polite"}
+          className={ws.toast}
+          role={
+            actionNotice.tone === "danger" || actionNotice.tone === "warning"
+              ? "alert"
+              : "status"
+          }
         >
-          <div className="pointer-events-auto relative">
-            <ManagementNotice
-              tone={actionNotice.tone}
-              title={actionNotice.title}
-              className="pr-12 shadow-[0_18px_50px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.03] backdrop-blur-sm"
-            >
-              {actionNotice.message}
-            </ManagementNotice>
-            <button
-              type="button"
-              onClick={() => setActionNotice(null)}
-              className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-lg text-current opacity-55 transition-[background-color,opacity,transform] duration-150 hover:bg-black/[0.06] hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-1 motion-reduce:transition-none"
-              aria-label="关闭操作提示"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <WorkspaceNotice tone={actionNotice.tone} title={actionNotice.title}>
+            {actionNotice.message}
+          </WorkspaceNotice>
+          <button
+            type="button"
+            onClick={() => setActionNotice(null)}
+            aria-label="关闭操作提示"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
         </div>
       ) : null}
-
       <ConfirmDialog
         open={Boolean(pendingToggle)}
         title="确认停用产品根科目？"
@@ -452,6 +502,6 @@ export default function SubjectsPage() {
         onCancel={() => setPendingToggle(null)}
         onConfirm={() => pendingToggle && mutation.mutate(pendingToggle)}
       />
-    </ManagementPage>
+    </WorkspacePage>
   );
 }

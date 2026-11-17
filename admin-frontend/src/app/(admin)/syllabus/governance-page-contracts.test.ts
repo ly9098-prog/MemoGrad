@@ -13,12 +13,19 @@ type Query = {
   placeholderData?: (data: unknown) => unknown;
 };
 type Variables = { subject: AdminSubjectNode; nextActive: boolean };
-type Context = { previous?: { items: AdminSubjectNode[] }; inactiveAncestors: AdminSubjectNode[] };
+type Context = {
+  previous?: { items: AdminSubjectNode[] };
+  inactiveAncestors: AdminSubjectNode[];
+};
 type Mutation = {
   mutationFn: (input?: Variables | number) => Promise<unknown>;
   onMutate?: (input: Variables) => Promise<Context>;
   onError?: (error: unknown, input: Variables, context: Context) => void;
-  onSuccess: (result: { id: number }, input?: Variables, context?: Context) => Promise<void> | void;
+  onSuccess: (
+    result: { id: number },
+    input?: Variables,
+    context?: Context,
+  ) => Promise<void> | void;
   onSettled?: () => Promise<void>;
 };
 const h = vi.hoisted(() => ({
@@ -28,6 +35,9 @@ const h = vi.hoisted(() => ({
   effects: [] as (() => unknown)[],
   queries: [] as Query[],
   mutations: [] as Mutation[],
+  mutateCalls: [] as ReturnType<typeof vi.fn>[],
+  resetCalls: [] as ReturnType<typeof vi.fn>[],
+  mutationErrors: new Set<number>(),
   data: {} as Record<string, unknown>,
   request: vi.fn(),
   toQuery: vi.fn(() => "?fixture"),
@@ -38,10 +48,12 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("react", async (original) => ({
-  ...await original<typeof import("react")>(),
+  ...(await original<typeof import("react")>()),
   useMemo: (compute: () => unknown) => compute(),
   useRef: (current: unknown) => ({ current }),
-  useEffect: (effect: () => unknown) => { h.effects.push(effect); },
+  useEffect: (effect: () => unknown) => {
+    h.effects.push(effect);
+  },
   useState: (initial: unknown) => {
     const index = h.stateIndex++;
     const setter = vi.fn();
@@ -58,18 +70,35 @@ vi.mock("@tanstack/react-query", () => ({
   }),
   useQuery: (query: Query) => {
     h.queries.push(query);
-    return { data: h.data[JSON.stringify(query.queryKey)], isLoading: false, isFetching: false };
+    return {
+      data: h.data[JSON.stringify(query.queryKey)],
+      isLoading: false,
+      isFetching: false,
+    };
   },
   useMutation: (mutation: Mutation) => {
+    const index = h.mutations.length;
     h.mutations.push(mutation);
-    return { mutate: vi.fn(), isPending: false };
+    const mutate = vi.fn();
+    const reset = vi.fn();
+    h.mutateCalls.push(mutate);
+    h.resetCalls.push(reset);
+    return {
+      mutate,
+      reset,
+      isPending: false,
+      isError: h.mutationErrors.has(index),
+    };
   },
 }));
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: { permissions: string[] }) => unknown) =>
     select({ permissions: ["subject:write", "knowledge:write"] }),
 }));
-vi.mock("@/lib/api/client", () => ({ apiRequest: h.request, toQuery: h.toQuery }));
+vi.mock("@/lib/api/client", () => ({
+  apiRequest: h.request,
+  toQuery: h.toQuery,
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -79,6 +108,9 @@ beforeEach(() => {
   h.effects = [];
   h.queries = [];
   h.mutations = [];
+  h.mutateCalls = [];
+  h.resetCalls = [];
+  h.mutationErrors = new Set();
   h.data = {};
   h.request.mockReset().mockResolvedValue({ id: 12 });
   h.getData.mockReset();
@@ -88,7 +120,9 @@ describe("coverage and graph page request contracts", () => {
   it("keeps coverage reports disabled until a version is selected", () => {
     CoveragePage();
     expect(h.queries.map((q) => q.queryKey.slice(0, 2))).toEqual([
-      ["syllabus", "versions"], ["knowledge-graph", "subjects"], ["coverage", "report"],
+      ["syllabus", "versions"],
+      ["knowledge-graph", "subjects"],
+      ["coverage", "report"],
     ]);
     expect(h.queries[2].enabled).toBe(false);
     expect(h.queries.every((q) => q.retry === false)).toBe(true);
@@ -99,11 +133,16 @@ describe("coverage and graph page request contracts", () => {
     CoveragePage();
     await Promise.all(h.queries.map((q) => q.queryFn()));
     expect(h.toQuery).toHaveBeenCalledWith({
-      syllabus_version_id: 12, subject_id: 4, min_questions: 21,
-      year_from: 2020, year_to: undefined,
+      syllabus_version_id: 12,
+      subject_id: 4,
+      min_questions: 21,
+      year_from: 2020,
+      year_to: undefined,
     });
     expect(h.request.mock.calls.map(([path]) => path)).toEqual([
-      "/knowledge/syllabus/versions", "/knowledge/subjects", "/coverage/report?fixture",
+      "/knowledge/syllabus/versions",
+      "/knowledge/subjects",
+      "/coverage/report?fixture",
     ]);
     const previous = { items: [] };
     expect(h.queries[2].placeholderData?.(previous)).toBe(previous);
@@ -111,7 +150,8 @@ describe("coverage and graph page request contracts", () => {
 
   it("selects the active coverage version before the first listed version", () => {
     h.data['["syllabus","versions","coverage"]'] = [
-      { id: 5, status: "draft" }, { id: 12, status: "active" },
+      { id: 5, status: "draft" },
+      { id: 12, status: "active" },
     ];
     CoveragePage();
     h.effects[0]();
@@ -127,43 +167,84 @@ describe("coverage and graph page request contracts", () => {
     { center: null, search: "", max: 24 },
     { center: 7, search: "", max: 36 },
     { center: null, search: "alias", max: 36 },
-  ])("keeps graph focus/search scope and node budget: %j", async ({ center, search, max }) => {
-    h.states = ["4", "parent", "3", "uncommitted", search, false, center];
-    KnowledgeGraphPage();
-    await h.queries[0].queryFn();
-    await h.queries[1].queryFn();
-    expect(h.queries[1].queryKey).toEqual(["knowledge-graph", "4", "parent", "3", search, center]);
-    expect(h.toQuery).toHaveBeenCalledWith({
-      subject_id: 4, relation_type: "parent", knowledge_point_id: center ?? undefined,
-      search: search || undefined, depth: 3, max_nodes: max,
-    });
-    expect(h.request.mock.calls.map(([path]) => path)).toEqual([
-      "/knowledge/subjects", "/knowledge/graph?fixture",
-    ]);
-  });
+  ])(
+    "keeps graph focus/search scope and node budget: %j",
+    async ({ center, search, max }) => {
+      h.states = ["4", "parent", "3", "uncommitted", search, false, center];
+      KnowledgeGraphPage();
+      await h.queries[0].queryFn();
+      await h.queries[1].queryFn();
+      expect(h.queries[1].queryKey).toEqual([
+        "knowledge-graph",
+        "4",
+        "parent",
+        "3",
+        search,
+        center,
+      ]);
+      expect(h.toQuery).toHaveBeenCalledWith({
+        subject_id: 4,
+        relation_type: "parent",
+        knowledge_point_id: center ?? undefined,
+        search: search || undefined,
+        depth: 3,
+        max_nodes: max,
+      });
+      expect(h.request.mock.calls.map(([path]) => path)).toEqual([
+        "/knowledge/subjects",
+        "/knowledge/graph?fixture",
+      ]);
+    },
+  );
 });
 
 describe("syllabus page mutation contracts", () => {
   function setup() {
-    h.states = [12, new Set([9, 2]), {
-      code: " next ", name: " next syllabus ", effective_year: 2027, description: " ",
-    }, 5, {
-      from_syllabus_knowledge_point_id: 41, to_syllabus_knowledge_point_id: 52,
-      relation_type: "split", note: " reason ",
-    }];
+    h.states = [
+      12,
+      new Set([9, 2]),
+      {
+        code: " next ",
+        name: " next syllabus ",
+        effective_year: 2027,
+        description: " ",
+      },
+      5,
+      {
+        from_syllabus_knowledge_point_id: 41,
+        to_syllabus_knowledge_point_id: 52,
+        relation_type: "split",
+        note: " reason ",
+      },
+    ];
     SyllabusPage();
   }
 
   it("keeps six version/read scopes independent and disabled without IDs", () => {
     SyllabusPage();
-    expect(h.queries.map((q) => q.enabled)).toEqual([undefined, false, false, false, false, false]);
+    expect(h.queries.map((q) => q.enabled)).toEqual([
+      undefined,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
     expect(h.queries.map((q) => q.queryKey[1])).toEqual([
-      "versions", "detail", "catalog", "coverage", "mappings", "mapping-source",
+      "versions",
+      "detail",
+      "catalog",
+      "coverage",
+      "mappings",
+      "mapping-source",
     ]);
   });
 
   it("prefers a draft for editing even if an active version is listed first", () => {
-    h.data['["syllabus","versions"]'] = [{ id: 5, status: "active" }, { id: 12, status: "draft" }];
+    h.data['["syllabus","versions"]'] = [
+      { id: 5, status: "active" },
+      { id: 12, status: "draft" },
+    ];
     SyllabusPage();
     h.effects[0]();
     expect(h.setters[0]).toHaveBeenCalledWith(12);
@@ -173,9 +254,12 @@ describe("syllabus page mutation contracts", () => {
     setup();
     await Promise.all(h.queries.map((q) => q.queryFn()));
     expect(h.request.mock.calls.map(([path]) => path)).toEqual([
-      "/knowledge/syllabus/versions", "/knowledge/syllabus/versions/12",
-      "/knowledge/syllabus/versions/12/catalog", "/knowledge/syllabus/versions/12/coverage",
-      "/knowledge/syllabus/versions/12/mappings", "/knowledge/syllabus/versions/5",
+      "/knowledge/syllabus/versions",
+      "/knowledge/syllabus/versions/12",
+      "/knowledge/syllabus/versions/12/catalog",
+      "/knowledge/syllabus/versions/12/coverage",
+      "/knowledge/syllabus/versions/12/mappings",
+      "/knowledge/syllabus/versions/5",
     ]);
   });
 
@@ -184,18 +268,39 @@ describe("syllabus page mutation contracts", () => {
     for (const mutation of h.mutations.slice(0, 5)) await mutation.mutationFn();
     await h.mutations[5].mutationFn(63);
     expect(h.request.mock.calls).toEqual([
-      ["/knowledge/syllabus/versions", { method: "POST", body: JSON.stringify({
-        code: "next", name: "next syllabus", effective_year: 2027, description: null,
-      }) }],
-      ["/knowledge/syllabus/versions/12/knowledge-points", {
-        method: "PUT", body: JSON.stringify({ knowledge_point_ids: [2, 9] }),
-      }],
+      [
+        "/knowledge/syllabus/versions",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            code: "next",
+            name: "next syllabus",
+            effective_year: 2027,
+            description: null,
+          }),
+        },
+      ],
+      [
+        "/knowledge/syllabus/versions/12/knowledge-points",
+        {
+          method: "PUT",
+          body: JSON.stringify({ knowledge_point_ids: [2, 9] }),
+        },
+      ],
       ["/knowledge/syllabus/versions/12/activate", { method: "POST" }],
       ["/knowledge/syllabus/versions/12/archive", { method: "POST" }],
-      ["/knowledge/syllabus/mappings", { method: "POST", body: JSON.stringify({
-        from_syllabus_knowledge_point_id: 41, to_syllabus_knowledge_point_id: 52,
-        relation_type: "split", note: "reason",
-      }) }],
+      [
+        "/knowledge/syllabus/mappings",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            from_syllabus_knowledge_point_id: 41,
+            to_syllabus_knowledge_point_id: 52,
+            relation_type: "split",
+            note: "reason",
+          }),
+        },
+      ],
       ["/knowledge/syllabus/mappings/63", { method: "DELETE" }],
     ]);
   });
@@ -205,8 +310,12 @@ describe("syllabus page mutation contracts", () => {
     await h.mutations[0].onSuccess({ id: 13 });
     expect(h.setters[0]).toHaveBeenCalledWith(13);
     expect(h.invalidate.mock.calls.map(([q]) => q.queryKey)).toEqual([
-      ["syllabus", "versions"], ["syllabus", "detail"], ["syllabus", "catalog"],
-      ["syllabus", "coverage"], ["syllabus", "mappings"], ["syllabus", "mapping-source"],
+      ["syllabus", "versions"],
+      ["syllabus", "detail"],
+      ["syllabus", "catalog"],
+      ["syllabus", "coverage"],
+      ["syllabus", "mappings"],
+      ["syllabus", "mapping-source"],
     ]);
   });
 
@@ -221,12 +330,28 @@ describe("syllabus page mutation contracts", () => {
 
 describe("subject page optimistic mutation contracts", () => {
   const child: AdminSubjectNode = {
-    id: 2, code: "data_structure", name: "Data", level: 2, path: "/exam408/data_structure",
-    parent_id: 1, sort_order: 1, is_active: false, created_at: "", updated_at: "", children: [],
+    id: 2,
+    code: "data_structure",
+    name: "Data",
+    level: 2,
+    path: "/exam408/data_structure",
+    parent_id: 1,
+    sort_order: 1,
+    is_active: false,
+    created_at: "",
+    updated_at: "",
+    children: [],
   };
   const root: AdminSubjectNode = {
-    ...child, id: 1, code: "exam408", name: "408", level: 1, path: "/exam408",
-    parent_id: null, is_product_root: true, children: [child],
+    ...child,
+    id: 1,
+    code: "exam408",
+    name: "408",
+    level: 1,
+    path: "/exam408",
+    parent_id: null,
+    is_product_root: true,
+    children: [child],
   };
 
   it("requires explicit confirmation only when disabling the product root", async () => {
@@ -236,8 +361,20 @@ describe("subject page optimistic mutation contracts", () => {
     await h.mutations[0].mutationFn({ subject: child, nextActive: true });
     expect(h.request.mock.calls).toEqual([
       ["/subjects?include_inactive=true"],
-      ["/subjects/1", { method: "PATCH", body: JSON.stringify({ is_active: false, confirm_core_disable: true }) }],
-      ["/subjects/2", { method: "PATCH", body: JSON.stringify({ is_active: true }) }],
+      [
+        "/subjects/1",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            is_active: false,
+            confirm_core_disable: true,
+          }),
+        },
+      ],
+      [
+        "/subjects/2",
+        { method: "PATCH", body: JSON.stringify({ is_active: true }) },
+      ],
     ]);
   });
 
@@ -248,14 +385,22 @@ describe("subject page optimistic mutation contracts", () => {
     const input = { subject: child, nextActive: true };
     const mutation = h.mutations[0];
     let release!: () => void;
-    h.cancel.mockReturnValueOnce(new Promise<void>((resolve) => { release = resolve; }));
+    h.cancel.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
     const pending = mutation.onMutate!(input);
     expect(h.getData).not.toHaveBeenCalled();
     expect(h.setData).not.toHaveBeenCalled();
     release();
     const context = await pending;
-    expect(h.cancel).toHaveBeenCalledWith({ queryKey: ["subjects", "include-inactive"] });
-    expect(h.cancel.mock.invocationCallOrder[0]).toBeLessThan(h.getData.mock.invocationCallOrder[0]);
+    expect(h.cancel).toHaveBeenCalledWith({
+      queryKey: ["subjects", "include-inactive"],
+    });
+    expect(h.cancel.mock.invocationCallOrder[0]).toBeLessThan(
+      h.getData.mock.invocationCallOrder[0],
+    );
     expect(context.inactiveAncestors).toEqual([root]);
     const optimistic = h.setData.mock.calls[0][1];
     expect(optimistic.items[0].is_active).toBe(true);
@@ -265,5 +410,175 @@ describe("subject page optimistic mutation contracts", () => {
     expect(h.setData.mock.lastCall?.[1]).toBe(previous);
     await mutation.onSettled!();
     expect(h.invalidate).toHaveBeenCalledWith({ queryKey: ["subjects"] });
+  });
+});
+
+type PageElement = { props: Record<string, unknown> & { children?: unknown } };
+
+function findPageElement(
+  node: unknown,
+  predicate: (element: PageElement) => boolean,
+): PageElement | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findPageElement(child, predicate);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (!node || typeof node !== "object" || !("props" in node)) return undefined;
+  const element = node as PageElement;
+  return predicate(element)
+    ? element
+    : findPageElement(element.props.children, predicate);
+}
+
+function elementText(node: unknown): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(elementText).join("");
+  if (node && typeof node === "object" && "props" in node)
+    return elementText((node as PageElement).props.children);
+  return "";
+}
+
+describe("syllabus destructive-action confirmation contracts", () => {
+  function render(pending: unknown = null, dirty = false) {
+    h.states[0] = 12;
+    h.states[1] = new Set(dirty ? [9] : [2]);
+    h.states[8] = pending;
+    h.data['["syllabus","detail",12]'] = {
+      id: 12,
+      name: "2027 考纲",
+      status: "draft",
+      knowledge_points: [],
+    };
+    h.data['["syllabus","catalog",12]'] = {
+      items: [
+        {
+          knowledge_point_id: 2,
+          included: true,
+          subject_id: 1,
+          subject_name: "数据结构",
+          name: "数组",
+        },
+      ],
+    };
+    return SyllabusPage();
+  }
+
+  it("opens the activation confirmation without sending a mutation", () => {
+    const tree = render();
+    const activate = findPageElement(
+      tree,
+      (element) =>
+        typeof element.props.onClick === "function" &&
+        elementText(element.props.children) === "设为当前版本",
+    );
+    expect(activate).toBeDefined();
+    expect(activate!.props.disabled).toBe(false);
+    (activate!.props.onClick as () => void)();
+    expect(h.setters[8]).toHaveBeenCalledWith({ kind: "activate" });
+    expect(
+      h.mutateCalls.every((mutate) => mutate.mock.calls.length === 0),
+    ).toBe(true);
+  });
+
+  it("blocks activation while the selected membership has not been saved", () => {
+    const tree = render(null, true);
+    const activate = findPageElement(
+      tree,
+      (element) =>
+        typeof element.props.onClick === "function" &&
+        elementText(element.props.children) === "设为当前版本",
+    );
+    expect(activate!.props.disabled).toBe(true);
+    expect(activate!.props.title).toBe("请先保存范围，再激活版本");
+  });
+
+  it.each([
+    { action: { kind: "activate" }, index: 2, argument: undefined },
+    { action: { kind: "archive" }, index: 3, argument: undefined },
+    {
+      action: { kind: "delete-mapping", mappingId: 63 },
+      index: 5,
+      argument: 63,
+    },
+  ])(
+    "confirms only the selected action: $action.kind",
+    ({ action, index, argument }) => {
+      const tree = render(action);
+      const dialog = findPageElement(
+        tree,
+        (element) => typeof element.props.onConfirm === "function",
+      );
+      expect(dialog!.props.open).toBe(true);
+      (dialog!.props.onConfirm as () => void)();
+      expect(h.mutateCalls[index].mock.calls).toEqual(
+        argument === undefined ? [[]] : [[argument]],
+      );
+      expect(
+        h.mutateCalls
+          .filter((_, i) => i !== index)
+          .every((mutate) => mutate.mock.calls.length === 0),
+      ).toBe(true);
+    },
+  );
+
+  it("cancels a pending action without sending a mutation", () => {
+    const tree = render({ kind: "activate" });
+    const dialog = findPageElement(
+      tree,
+      (element) => typeof element.props.onConfirm === "function",
+    );
+    (dialog!.props.onCancel as () => void)();
+    expect(h.setters[8]).toHaveBeenCalledWith(null);
+    expect(h.resetCalls[2]).toHaveBeenCalledOnce();
+    expect(
+      h.resetCalls
+        .filter((_, index) => index !== 2)
+        .every((reset) => reset.mock.calls.length === 0),
+    ).toBe(true);
+    expect(
+      h.mutateCalls.every((mutate) => mutate.mock.calls.length === 0),
+    ).toBe(true);
+  });
+
+  it.each([
+    { action: { kind: "activate" }, index: 2 },
+    { action: { kind: "archive" }, index: 3 },
+    { action: { kind: "delete-mapping", mappingId: 63 }, index: 5 },
+  ])(
+    "keeps failed $action.kind feedback inside its confirmation",
+    ({ action, index }) => {
+      h.mutationErrors.add(index);
+      const tree = render(action);
+      const dialog = findPageElement(
+        tree,
+        (element) => typeof element.props.onConfirm === "function",
+      );
+      const alert = findPageElement(
+        dialog!.props.children,
+        (element) => element.props.role === "alert",
+      );
+      expect(alert).toBeDefined();
+      expect(elementText(alert!.props.children)).toContain(
+        "当前确认内容已保留",
+      );
+    },
+  );
+
+  it("does not show an unrelated mutation error inside a new confirmation", () => {
+    h.mutationErrors.add(1);
+    const tree = render({ kind: "activate" });
+    const dialog = findPageElement(
+      tree,
+      (element) => typeof element.props.onConfirm === "function",
+    );
+    expect(
+      findPageElement(
+        dialog!.props.children,
+        (element) => element.props.role === "alert",
+      ),
+    ).toBeUndefined();
   });
 });
