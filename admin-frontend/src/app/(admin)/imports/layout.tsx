@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardCheck, FileQuestion, FileText, Images, UploadCloud, Wrench } from "lucide-react";
+import { ManagementPage } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
 
 const importTabs = [
@@ -18,8 +19,11 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <div className="space-y-6">
-      <nav className="flex flex-wrap gap-2 rounded-3xl border border-[var(--color-border)] bg-white/70 p-2 shadow-[var(--shadow-crisp)]">
+    <ManagementPage className="pb-10">
+      <nav
+        aria-label="导入工作区导航"
+        className="admin-premium-panel admin-premium-inset relative isolate flex flex-wrap gap-1 rounded-[20px] p-2"
+      >
         {importTabs.map((tab) => {
           const Icon = tab.icon;
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -28,19 +32,19 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
               key={tab.href}
               href={tab.href}
               className={cn(
-                "inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition",
+                "inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors",
                 active
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                  : "border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-white hover:text-[var(--ink)]",
+                  ? "border-white/72 bg-white/82 text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_20px_rgba(31,72,100,0.05)]"
+                  : "border-transparent text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
               )}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {tab.label}
             </Link>
           );
         })}
       </nav>
       {children}
-    </div>
+    </ManagementPage>
   );
 }

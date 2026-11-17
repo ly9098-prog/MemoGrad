@@ -90,11 +90,11 @@ export function LatexRenderer({
     if (showSourceOnError) {
       return (
         <span className={`inline-flex items-center gap-1 ${className}`}>
-          <span className="text-red-400" title="KaTeX 渲染失败">{latex}</span>
+          <span className="text-destructive/70" title="KaTeX 渲染失败">{latex}</span>
         </span>
       );
     }
-    return <span className="text-red-400" title="KaTeX 渲染失败" />;
+    return <span className="text-destructive/70" title="KaTeX 渲染失败" />;
   }
 
   if (!html) return null;

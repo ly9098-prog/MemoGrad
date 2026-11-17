@@ -155,7 +155,7 @@ var pageConfig = {
     // Animated display values
     _dispTodaySessions: 0,
     _dispTodayDurationText: '0分钟',
-    _dispTodayDurationSegments: [{ type: 'num', text: '0', key: '0-0', direction: 'top', delay: 0 }, { type: 'unit', text: '分钟', key: '1-分钟' }],
+    _dispTodayDurationSegments: [{ type: 'num', text: '0', key: 'pos-0' }, { type: 'unit', text: '分钟', key: 'pos-1' }],
     durationValueAnimating: false,
     _dispWeekSessions: 0,
     _dispWeekDurationText: '0分钟',
@@ -622,8 +622,8 @@ return canvasPage._getCloseDetailController(this, { createCloseDetailController 
 
   noop() {},
 
-  _getTodayDurationDisplayPatch(text) {
-return loadViewFlow._getTodayDurationDisplayPatch(this, text)
+  _getTodayDurationDisplayPatch(text, options) {
+return loadViewFlow._getTodayDurationDisplayPatch(this, text, options)
 },
 
   _buildDurationSegments(text) {

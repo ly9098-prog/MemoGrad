@@ -51,14 +51,14 @@ describe("image answer result views", () => {
     const html = renderPreview();
     const rows = html.match(/<tbody>(.*?)<\/tbody>/)?.[1].match(/<tr\b.*?<\/tr>/g) ?? [];
     const labels = ["已匹配", "歧义", "未匹配", "未匹配"];
-    const colors = ["text-emerald-600", "text-amber-600", "text-gray-400", "text-gray-400"];
+    const colors = ["text-success", "text-warning-foreground", "text-muted-foreground/70", "text-muted-foreground/70"];
     expect(rows).toHaveLength(4);
     rows.forEach((row, index) => expect(row).toContain(` ${colors[index]}">${labels[index]}</td>`));
     expect(rows[0]).toMatch(/<td[^>]*><\/td>/);
     expect(rows[1]).toMatch(/<td[^>]*>0<\/td>/);
     expect(rows[2]).toMatch(/<td[^>]*>\?<\/td>/);
     expect(rows[0]).toContain("stem &lt;unsafe&gt;");
-    expect(rows[1].match(/text-\[var\(--color-text-hint\)\]">—<\/span>/g)).toHaveLength(3);
+    expect(rows[1].match(/text-muted-foreground\/70">—<\/span>/g)).toHaveLength(3);
     expect(html).toContain("warning &lt;unsafe&gt;");
     expect(html).toContain("warning two");
   });
@@ -87,7 +87,7 @@ describe("image answer result views", () => {
     data.summary.writable_analysis_count = 0;
     const html = renderPreview(data);
     expect(html).toContain("<tbody></tbody>");
-    for (const text of ["未匹配", "歧义", "可写答案", "可写解析", "<details", "border-amber-200"]) {
+    for (const text of ["未匹配", "歧义", "可写答案", "可写解析", "<details", "border-warning/30"]) {
       expect(html).not.toContain(text);
     }
   });
@@ -120,8 +120,8 @@ describe("image answer result views", () => {
     const view = ImageAnswerResult({ result, onClose });
     const html = renderToStaticMarkup(view);
     expect(html).toContain("图片答案导入完成");
-    expect(html).toContain('text-emerald-600">3</p>');
-    expect(html).toContain('text-emerald-600">4</p>');
+    expect(html).toContain('text-success">3</p>');
+    expect(html).toContain('text-success">4</p>');
     expect(html).toContain("跳过已有答案 5");
     expect(html).toContain("跳过已有解析 6");
     button(view).onClick();

@@ -24,11 +24,11 @@ export function QuestionStemEditor(props: QuestionStemEditorProps) {
     props.fallbackImageUrls.length > 0;
 
   return (
-    <section className="border-b border-slate-200 py-5">
+    <section className="border-b border-border py-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-950">题干</p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="text-sm font-semibold text-foreground">题干</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/60">
             编辑题目正文、代码块与题干图片
           </p>
         </div>
@@ -36,12 +36,12 @@ export function QuestionStemEditor(props: QuestionStemEditorProps) {
       <textarea
         wrap="soft"
         spellCheck={false}
-        className="min-h-36 w-full resize-y overflow-x-hidden whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm leading-7 text-slate-800 outline-none transition [overflow-wrap:anywhere] placeholder:text-slate-300 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100"
+        className="min-h-36 w-full resize-y overflow-x-hidden whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm leading-7 text-foreground outline-none transition [overflow-wrap:anywhere] placeholder:text-muted-foreground/50 focus:border-primary focus:bg-card focus:ring-2 focus:ring-accent"
         value={props.stemText}
         onChange={(event) => props.setStemText(event.target.value)}
       />
       <div className="mt-4">
-        <p className="mb-2 text-xs font-medium text-slate-500">题干图片</p>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">题干图片</p>
         {hasImages ? (
           <div className="space-y-3">
             {props.segments.map((segment, index) =>

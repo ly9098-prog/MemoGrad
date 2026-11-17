@@ -27,7 +27,7 @@ describe("review JSON view", () => {
     expect(html).toContain("OCR / AI 原始数据");
     expect(html).toContain("&quot;parsed_answer&quot;: &quot;A&quot;");
     expect(html).toContain("&quot;raw_text&quot;: &quot;raw&quot;");
-    expect(html).toContain("#5b7b9a18");
+    expect(html).toContain("background-color:var(--primary)");
   });
 
   it("preserves null and empty nested values in the existing JSON serialization", () => {

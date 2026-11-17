@@ -41,17 +41,17 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
       : parsedAnswer.map((item) => item.blankId);
 
     return (
-      <section className="border-b border-slate-200 py-5">
+      <section className="border-b border-border py-5">
         <div className="mb-4">
-          <p className="text-sm font-semibold text-slate-950">答案</p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="text-sm font-semibold text-foreground">答案</p>
+          <p className="mt-1 text-[11px] text-muted-foreground/60">
             {multiSelect
               ? "点击选项可快速多选或取消；也可手动填写多个字母（如 A,C）"
               : "点击选项可快速填入单选答案；再次点击已选项可清空"}
           </p>
         </div>
         {blankIds.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
             {blankIds.map((blankId, index) => {
               const group = groups.find((item) => item.id === blankId);
               const currentLetters = (parsedAnswerMap.get(blankId) ?? "")
@@ -61,9 +61,9 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
               return (
                 <div
                   key={`${blankId}-${index}`}
-                  className="flex items-center gap-4 border-b border-slate-100 px-4 py-3 last:border-b-0"
+                  className="flex items-center gap-4 border-b border-border/60 px-4 py-3 last:border-b-0"
                 >
-                  <span className="w-8 shrink-0 text-sm font-medium text-slate-900">{blankId}</span>
+                  <span className="w-8 shrink-0 text-sm font-medium text-foreground">{blankId}</span>
                   <div className="min-w-0 flex-1 space-y-2">
                     {group && group.options.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -76,8 +76,8 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
                               type="button"
                               className={`inline-flex h-8 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
                                 selected
-                                  ? "border-slate-900 bg-slate-900 text-white"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                                  ? "border-foreground bg-foreground text-background"
+                                  : "border-border bg-card text-muted-foreground hover:border-muted-foreground hover:text-foreground"
                               }`}
                               title={opt.text ? `${opt.key}. ${opt.text}` : `选择 ${opt.key}`}
                               aria-pressed={selected}
@@ -104,7 +104,7 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
                       value={parsedAnswerMap.get(blankId) ?? ""}
                       aria-label={`${blankId} 答案`}
                       placeholder={multiSelect ? "如 A,C" : "如 A"}
-                      className="h-8 max-w-32 border-slate-200 bg-slate-50/60 text-center text-xs shadow-none focus:bg-white"
+                      className="h-8 max-w-32 border-border bg-muted/40 text-center text-xs shadow-none focus:bg-card"
                       onChange={(event) =>
                         setEditForm((current) => ({
                           ...current,
@@ -125,7 +125,7 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
         ) : (
           <Input
             value={editForm.answer ?? ""}
-            className="border-slate-200 bg-slate-50/60 shadow-none focus:bg-white"
+            className="border-border bg-muted/40 shadow-none focus:bg-card"
             onChange={(event) => setAnswer(setEditForm, event.target.value)}
           />
         )}
@@ -136,12 +136,12 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
   const options = optionsToKeyValueList(editForm.options);
   if (options.length === 0) {
     return (
-      <section className="border-b border-slate-200 py-5">
-        <p className="mb-3 text-sm font-semibold text-slate-950">答案</p>
+      <section className="border-b border-border py-5">
+        <p className="mb-3 text-sm font-semibold text-foreground">答案</p>
         <div>
           <Input
             value={editForm.answer ?? ""}
-            className="border-slate-200 bg-slate-50/60 shadow-none focus:bg-white"
+            className="border-border bg-muted/40 shadow-none focus:bg-card"
             onChange={(event) => setAnswer(setEditForm, event.target.value)}
           />
         </div>
@@ -150,14 +150,14 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
   }
 
   return (
-    <section className="border-b border-slate-200 py-5">
+    <section className="border-b border-border py-5">
       <div className="mb-4">
-        <p className="text-sm font-semibold text-slate-950">答案</p>
-        <p className="mt-1 text-[11px] text-slate-400">快速选择正确选项，也可直接编辑答案内容</p>
+        <p className="text-sm font-semibold text-foreground">答案</p>
+        <p className="mt-1 text-[11px] text-muted-foreground/60">快速选择正确选项，也可直接编辑答案内容</p>
       </div>
-      <p className="mb-2 text-[11px] font-medium text-slate-500">快速选择</p>
+      <p className="mb-2 text-[11px] font-medium text-muted-foreground">快速选择</p>
       {editForm.question_type && isMultiChoice(editForm.question_type) ? (
-        <p className="mb-2 text-[10px] text-[var(--color-text-hint)]">
+        <p className="mb-2 text-[10px] text-muted-foreground/70">
           多选：单击切换各选项，以逗号分隔
         </p>
       ) : null}
@@ -173,8 +173,8 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
               type="button"
               className={`inline-flex h-8 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
                 selected
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-card text-muted-foreground hover:border-muted-foreground hover:text-foreground"
               }`}
               onClick={() => {
                 if (isMultiChoice(questionType)) {
@@ -197,10 +197,10 @@ export function QuestionAnswerEditor({ editForm, setEditForm }: AnswerEditorProp
         })}
       </div>
       <div className="mt-4 space-y-1.5">
-        <p className="text-[11px] font-medium text-slate-500">答案内容</p>
+        <p className="text-[11px] font-medium text-muted-foreground">答案内容</p>
         <Input
           value={editForm.answer ?? ""}
-          className="border-slate-200 bg-slate-50/60 shadow-none focus:bg-white"
+          className="border-border bg-muted/40 shadow-none focus:bg-card"
           onChange={(event) => setAnswer(setEditForm, event.target.value)}
         />
       </div>

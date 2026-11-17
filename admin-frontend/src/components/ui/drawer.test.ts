@@ -1,0 +1,21 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+describe("Drawer", () => {
+  it("delegates Escape ownership to the top modal and allows focus passthrough", () => {
+    const source = readFileSync(new URL("./drawer.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain(
+      'import {\n  hasOpenTransientOverlay,\n  isFocusPassthroughTarget,\n  isTopModalSurface,\n} from "@/lib/modal-focus";',
+    );
+    expect(source).toContain(
+      "!hasOpenTransientOverlay()",
+    );
+    expect(source).toContain(
+      "if (isFocusPassthroughTarget(e.target)) return;",
+    );
+    expect(source).toContain(
+      '"admin-content-theme fixed inset-0 z-50 flex justify-end',
+    );
+  });
+});

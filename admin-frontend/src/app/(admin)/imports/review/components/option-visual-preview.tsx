@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { useState, useCallback } from "react";
+import { AlertTriangle } from "lucide-react";
 import { MathFormula } from "@/components/ui/math-formula";
 import { resolveAssetUrl } from "@/lib/asset-url";
 import { MissingOptionImageAlert } from "./missing-option-image-alert";
@@ -38,7 +38,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
     return (
       <div className="space-y-3">
         {/* Group image */}
-        <div className="overflow-hidden rounded-xl border border-[var(--color-border)]/60 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
           {isFailed || !resolvedUrl ? (
             <ImageErrorCard segment={gi} url={resolvedUrl} />
           ) : (
@@ -81,7 +81,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
             <div key={key} className="flex items-center gap-1.5">
               <span className="option-chip">{key}</span>
               {model.legacy ? (
-                <span className="text-[10px] text-[var(--color-text-hint)]">图形见上方选项图</span>
+                <span className="text-[10px] text-muted-foreground/70">图形见上方选项图</span>
               ) : null}
             </div>
           ))}
@@ -89,8 +89,8 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
 
         {/* Legacy warning */}
         {model.legacy ? (
-          <div className="rounded-lg border border-amber-200/60 bg-amber-50/70 p-2">
-            <p className="text-[10px] font-medium text-amber-700">
+          <div className="rounded-lg border border-warning/30 bg-warning-light/70 p-2">
+            <p className="text-[10px] font-medium text-warning-foreground">
               兼容模式：此选项组使用旧格式识别，可能缺少元数据。建议重新生成。
             </p>
           </div>
@@ -100,7 +100,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
         {model.issues.length > 0 ? (
           <div className="space-y-1">
             {model.issues.map((issue, i) => (
-              <p key={i} className="flex items-center gap-1 text-[10px] text-amber-600">
+              <p key={i} className="flex items-center gap-1 text-[10px] text-warning-foreground">
                 <AlertTriangle className="h-3 w-3 shrink-0" />
                 {issue}
               </p>
@@ -124,7 +124,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
               <div className="min-w-0 flex-1 space-y-1">
                 {/* Text (if any) */}
                 {opt?.text && (
-                  <span className="text-sm text-[var(--color-text-secondary)]">
+                  <span className="text-sm text-muted-foreground">
                     <MathFormula text={opt.text} />
                   </span>
                 )}
@@ -138,7 +138,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
                         return <ImageErrorCard key={ii} segment={img} url={imgUrl} compact />;
                       }
                       return (
-                        <div key={ii} className="group/img relative overflow-hidden rounded-lg border border-[var(--color-border)]/50">
+                        <div key={ii} className="group/img relative overflow-hidden rounded-lg border border-border/50">
                           <img
                             src={imgUrl}
                             alt={img.alt || `选项${key}`}
@@ -151,7 +151,7 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
                     })}
                   </div>
                 ) : (
-                  <span className="text-[10px] text-amber-600">（选项 {key} 无对应图片）</span>
+                  <span className="text-[10px] text-warning-foreground">（选项 {key} 无对应图片）</span>
                 )}
               </div>
             </div>
@@ -175,12 +175,12 @@ export function OptionVisualPreview({ model, options, onRuntimeIssue }: OptionVi
   return (
     <div className="space-y-2">
       {options.length === 0 ? (
-        <p className="text-sm text-[var(--color-text-hint)]">（无选项）</p>
+        <p className="text-sm text-muted-foreground/70">（无选项）</p>
       ) : (
         options.map((opt) => (
           <div key={opt.key} className="flex items-center gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center option-chip">{opt.key}</span>
-            <span className="text-sm text-[var(--color-text-secondary)]">
+            <span className="text-sm text-muted-foreground">
               <MathFormula text={opt.text} />
             </span>
           </div>
@@ -203,15 +203,15 @@ function ImageErrorCard({
 }) {
   return (
     <div
-      className={`rounded-lg border border-dashed border-red-300 bg-red-50/50 ${
+      className={`rounded-lg border border-dashed border-destructive/30 bg-destructive-light/50 ${
         compact ? "max-w-28 p-2" : "p-3"
       }`}
     >
-      <div className="flex items-center gap-1.5 text-red-600">
+      <div className="flex items-center gap-1.5 text-destructive">
         <AlertTriangle className="h-3 w-3 shrink-0" />
         <span className="text-[10px] font-medium">图片加载失败</span>
       </div>
-      <div className="mt-1 space-y-0.5 text-[9px] text-red-500">
+      <div className="mt-1 space-y-0.5 text-[9px] text-destructive/80">
         <p className="truncate" title={url || segment.url}>
           URL: {url || segment.url || "无"}
         </p>

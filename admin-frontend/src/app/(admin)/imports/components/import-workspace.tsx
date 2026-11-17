@@ -93,16 +93,16 @@ export function ImportWorkspaceHeader({
     <>
       <style>{motionStyles}</style>
       <header className="relative import-enter">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 items-start gap-3.5">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[rgba(74,111,138,0.22)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] shadow-[0_6px_20px_rgba(45,80,104,0.07)] import-soft-pop">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-border bg-secondary/60 text-primary import-soft-pop">
               <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-display text-[26px] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] sm:text-[30px]">
+              <h1 className="text-[28px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground sm:text-[30px]">
                 {title}
-              </h2>
-              <p className="mt-1.5 max-w-[68ch] text-sm leading-6 text-[var(--color-text-secondary)]">{description}</p>
+              </h1>
+              <p className="mt-2 max-w-[68ch] text-[13px] leading-6 text-muted-foreground">{description}</p>
             </div>
           </div>
           {(meta || actions) ? (
@@ -111,9 +111,6 @@ export function ImportWorkspaceHeader({
               {actions}
             </div>
           ) : null}
-        </div>
-        <div className="mt-5 h-px bg-[var(--color-border-light)]">
-          <div className="h-px w-20 bg-[var(--color-primary)]" />
         </div>
       </header>
     </>
@@ -132,10 +129,10 @@ export function ImportPanelHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex min-h-16 items-center justify-between gap-4 border-b border-[var(--color-border-light)] px-5 py-3.5", className)}>
+    <div className={cn("flex min-h-16 items-center justify-between gap-4 border-b border-border/60 px-5 py-3.5", className)}>
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold tracking-[-0.01em] text-[var(--ink)]">{title}</h3>
-        {description ? <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-hint)]">{description}</p> : null}
+        <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">{title}</h3>
+        {description ? <p className="mt-0.5 text-xs leading-5 text-muted-foreground/70">{description}</p> : null}
       </div>
       {trailing ? <div className="shrink-0">{trailing}</div> : null}
     </div>
@@ -154,17 +151,17 @@ export function ImportMetric({
   className?: string;
 }) {
   const toneClass = {
-    neutral: "text-[var(--ink)]",
-    primary: "text-[var(--color-primary-dark)]",
-    success: "text-[var(--color-success)]",
-    warning: "text-[var(--color-text-primary)]",
-    danger: "text-[var(--color-danger)]",
+    neutral: "text-foreground",
+    primary: "text-accent-foreground",
+    success: "text-success",
+    warning: "text-warning-foreground",
+    danger: "text-destructive",
   }[tone];
 
   return (
-    <div className={cn("min-w-0 px-4 py-3 import-interactive hover:bg-white/55", className)}>
+    <div className={cn("min-w-0 px-4 py-3 import-interactive hover:bg-muted/40", className)}>
       <div className={cn("text-xl font-semibold leading-none tabular-nums tracking-[-0.02em]", toneClass)}>{value}</div>
-      <div className="mt-1.5 text-[11px] font-medium text-[var(--color-text-hint)]">{label}</div>
+      <div className="mt-1.5 text-[11px] font-medium text-muted-foreground/70">{label}</div>
     </div>
   );
 }
@@ -184,14 +181,14 @@ export function ImportProgressBar({
 }) {
   const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   const fillClass = {
-    primary: "bg-[var(--color-primary)]",
-    success: "bg-[var(--color-success)]",
-    danger: "bg-[var(--color-danger)]",
+    primary: "bg-primary",
+    success: "bg-success",
+    danger: "bg-destructive",
   }[tone];
 
   return (
     <div
-      className={cn("relative h-2 overflow-hidden rounded-full bg-[var(--color-bg-input)]", active && "import-progress-active", className)}
+      className={cn("relative h-2 overflow-hidden rounded-full bg-muted", active && "import-progress-active", className)}
       role="progressbar"
       aria-label={label}
       aria-valuemin={0}

@@ -52,11 +52,11 @@ type ReviewQuestionListProps = {
 };
 
 const difficultyTones = [
-  "border-emerald-200 bg-emerald-50 text-emerald-700",
-  "border-green-200 bg-green-50 text-green-700",
-  "border-amber-200 bg-amber-50 text-amber-700",
-  "border-orange-200 bg-orange-50 text-orange-700",
-  "border-red-200 bg-red-50 text-red-700",
+  "border-success/25 bg-success-light text-success",
+  "border-success/25 bg-success-light text-success",
+  "border-warning/30 bg-warning-light text-warning-foreground",
+  "border-warning/40 bg-warning-light text-warning-foreground",
+  "border-destructive/30 bg-destructive-light text-destructive",
 ];
 
 function DifficultyPill({ value }: { value: number | string | null | undefined }) {
@@ -76,7 +76,7 @@ function DifficultyPill({ value }: { value: number | string | null | undefined }
 
 function TypePill({ type }: { type: string | null | undefined }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] bg-white/80 px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]">
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-card/80 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
       <Layers className="h-3 w-3" aria-hidden="true" />
       {getQuestionTypeLabel(type)}
     </span>
@@ -110,13 +110,13 @@ function ReviewRow({
 
   return (
     <article
-      className={
+      className={`group border-l-2 transition-colors duration-150 motion-reduce:transition-none ${
         checked
-          ? "group rounded-[1.2rem] border border-[var(--color-primary)] bg-[var(--color-primary-light)]/25 shadow-sm transition-all duration-200"
-          : "group rounded-[1.2rem] border border-[var(--color-border)] bg-white/85 shadow-sm transition-all duration-200 hover:border-[var(--color-primary)]/45 hover:bg-white hover:shadow-[var(--shadow-card)]"
-      }
+          ? "border-primary bg-accent/30"
+          : "border-transparent hover:bg-secondary/30"
+      }`}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start gap-3 px-4 py-3.5">
         {canSelect ? (
           <CustomCheckbox
             checked={checked}
@@ -130,10 +130,10 @@ function ReviewRow({
           <button
             type="button"
             onClick={onOpenPreview}
-            className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40 focus-visible:ring-offset-2"
+            className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2"
           >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-[var(--color-primary-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary-dark)]">
+            <span className="inline-flex items-center rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground">
               #{String(question.id).padStart(4, "0")}
             </span>
             <StatusBadge tone={statusTone(question.review_status)}>
@@ -146,11 +146,11 @@ function ReviewRow({
             ) : null}
           </div>
 
-          <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[var(--ink)]">
+          <div className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-foreground">
             {looksLikeProgrammingCode(stem) ? stem : <MathFormula text={stem} />}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--color-text-hint)]">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
             <span className="inline-flex items-center gap-1">
               <BookOpen className="h-3 w-3" aria-hidden="true" />
               {question.subject_name || question.subject_code || "未分类"}
@@ -212,11 +212,11 @@ function ReviewRow({
 
 function LoadingRows() {
   return (
-    <div className="space-y-2.5" aria-hidden="true">
+    <div className="divide-y divide-border border-y border-border" aria-hidden="true">
       {Array.from({ length: 5 }, (_, index) => (
         <div
           key={index}
-          className="h-[104px] animate-pulse rounded-[1.2rem] border border-[var(--color-border)] bg-white/60"
+          className="h-[104px] animate-pulse bg-secondary/25"
         />
       ))}
     </div>
@@ -265,7 +265,7 @@ export function ReviewQuestionList({
 
   return (
     <section className="space-y-3" aria-busy={isFetching}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-[var(--color-border)] bg-white px-3 py-2.5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-secondary/20 px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {canBatchReview ? (
             <CustomCheckbox
@@ -275,7 +275,7 @@ export function ReviewQuestionList({
               disabled={items.length === 0}
             />
           ) : null}
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Loader2
               className={`h-3.5 w-3.5 ${
                 isFetching && !isLoading ? "animate-spin" : "opacity-0"
@@ -285,13 +285,13 @@ export function ReviewQuestionList({
             当前页 {items.length} 题
           </span>
           {selectedIds.size > 0 ? (
-            <span className="inline-flex h-7 items-center rounded-full bg-[var(--color-primary-light)] px-2.5 text-xs font-semibold text-[var(--color-primary-dark)]">
+            <span className="inline-flex h-7 items-center rounded-full bg-accent px-2.5 text-xs font-semibold text-accent-foreground">
               已选 {selectedIds.size} 项
             </span>
           ) : null}
         </div>
         {canBatchReview ? (
-          <p className="text-[11px] text-[var(--color-text-hint)]">
+          <p className="text-[11px] text-muted-foreground/70">
             批量操作上限 50 项
           </p>
         ) : null}
@@ -299,36 +299,38 @@ export function ReviewQuestionList({
 
       {isLoading ? <LoadingRows /> : null}
 
-      <div
-        className={`space-y-2.5 ${animateEnter ? "stagger-enter" : ""}`}
-      >
-        {items.map((question) => (
-          <ReviewRow
-            key={question.id}
-            question={question}
-            tab={tab}
-            checked={selectedIds.has(question.id)}
-            canSelect={canBatchReview}
-            canReview={canReview}
-            onToggle={() => onToggleOne(question.id)}
-            onOpenPreview={() => onOpenPreview(question.id)}
-            onApprove={() => onApprove(question.id)}
-            onReject={() => onReject(question.id)}
-          />
-        ))}
-      </div>
+      {items.length > 0 ? (
+        <div
+          className={`divide-y divide-border border-y border-border ${animateEnter ? "stagger-enter" : ""}`}
+        >
+          {items.map((question) => (
+            <ReviewRow
+              key={question.id}
+              question={question}
+              tab={tab}
+              checked={selectedIds.has(question.id)}
+              canSelect={canBatchReview}
+              canReview={canReview}
+              onToggle={() => onToggleOne(question.id)}
+              onOpenPreview={() => onOpenPreview(question.id)}
+              onApprove={() => onApprove(question.id)}
+              onReject={() => onReject(question.id)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {emptyVisible ? (
-        <div className="flex flex-col items-center gap-3 rounded-[1.6rem] border border-dashed border-[var(--color-border)] bg-white/60 py-16 text-center animate-fade-in">
-          <EmptyIcon className="h-12 w-12 text-[var(--color-text-hint)]" aria-hidden="true" />
-          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-border bg-secondary/20 py-14 text-center animate-fade-in">
+          <EmptyIcon className="h-12 w-12 text-muted-foreground/70" aria-hidden="true" />
+          <p className="text-sm font-semibold text-muted-foreground">
             {hasActiveFilters
               ? "没有匹配的题目"
               : tab === "re_pending"
                 ? "当前没有待重审题目"
                 : "没有已驳回题目"}
           </p>
-          <p className="max-w-sm text-xs leading-5 text-[var(--color-text-hint)]">
+          <p className="max-w-sm text-xs leading-5 text-muted-foreground/70">
             {hasActiveFilters
               ? "尝试调整搜索关键词或科目筛选。"
               : tab === "re_pending"
@@ -344,11 +346,11 @@ export function ReviewQuestionList({
       ) : null}
 
       {isError ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-red-200 bg-red-50/45 py-12 text-center animate-fade-in">
-          <AlertCircle className="h-9 w-9 text-red-400" aria-hidden="true" />
+        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-destructive/30 bg-destructive-light/45 py-12 text-center animate-fade-in">
+          <AlertCircle className="h-9 w-9 text-destructive" aria-hidden="true" />
           <div>
-            <p className="text-sm font-semibold text-red-700">{errorTitle}</p>
-            <p className="mt-1 text-xs text-red-500">{errorHint}</p>
+            <p className="text-sm font-semibold text-destructive">{errorTitle}</p>
+            <p className="mt-1 text-xs text-destructive/80">{errorHint}</p>
           </div>
           <Button variant="secondary" size="sm" onClick={onRetry}>
             {forbidden ? "重新检查" : "重新加载"}

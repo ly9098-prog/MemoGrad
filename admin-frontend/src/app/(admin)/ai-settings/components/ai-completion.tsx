@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { WandSparkles, ArrowRight, FileQuestion, ListChecks, MessageSquareText, CheckCircle2 } from "lucide-react";
+import { WandSparkles, ArrowRight, FileQuestion, ListChecks, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -11,7 +11,7 @@ import type { AdminAiConfigsResponse, AdminAiConfigsPatchRequest } from "@/lib/a
 
 function showToast(msg: string) {
   const el = document.createElement("div");
-  el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-[var(--color-success)]/30 bg-white px-5 py-3 text-sm font-semibold text-[var(--color-success)] shadow-[var(--shadow-card)] animate-rise-in";
+  el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
   el.innerHTML = `<svg class="-mt-0.5 mr-1.5 inline-block h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${msg}`;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
@@ -107,15 +107,15 @@ export function AiCompletionPreview({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border)]/60 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
         <div>
-          <h3 className="font-display text-xl font-bold text-[var(--ink)]">AI 补全配置</h3>
-          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">配置题目补全策略并实时预览生成效果</p>
+          <h3 className="font-display text-xl font-bold text-foreground">AI 补全配置</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground">配置题目补全策略并实时预览生成效果</p>
         </div>
         {modelName && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)]/60 bg-white/60 px-3 py-1.5 text-xs text-[var(--color-text-secondary)]">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-muted-foreground">
             <WandSparkles className="h-3.5 w-3.5" />
             {modelName}
           </span>
@@ -123,33 +123,33 @@ export function AiCompletionPreview({
       </div>
 
       {saveMutation.isError && (
-        <div className="border-b border-[var(--color-border)]/40 px-5 py-2.5">
-          <p className="text-xs text-[var(--color-danger)]">{getErrorMessage(saveMutation.error)}</p>
+        <div className="border-b border-border/40 px-5 py-2.5">
+          <p className="text-xs text-destructive">{getErrorMessage(saveMutation.error)}</p>
         </div>
       )}
 
       {/* Two-column body */}
       <div className="flex min-h-[420px]">
         {/* ── Left: Config ── */}
-        <div className="flex-1 space-y-4 border-r border-[var(--color-border)]/60 p-5">
+        <div className="flex-1 space-y-4 border-r border-border/60 p-5">
           {/* Prompt */}
           <div>
-            <span className={cn("text-[11px] font-medium text-[var(--color-text-hint)]", "font-semibold uppercase tracking-wider")}>补全 Prompt</span>
+            <span className={cn("text-[11px] font-medium text-muted-foreground/70", "font-semibold uppercase tracking-wider")}>补全 Prompt</span>
             <div className="relative mt-1.5">
               <textarea
                 value={loading ? "加载中..." : (prompt || savedPrompt)}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="h-28 w-full resize-none rounded-xl border border-[var(--color-border)] bg-white p-3 pr-10 text-sm outline-none transition-colors focus:border-[var(--color-primary)] disabled:opacity-50"
+                className="h-28 w-full resize-none rounded-xl border border-border bg-card p-3 pr-10 text-sm outline-none transition-colors focus:border-primary disabled:opacity-50"
                 placeholder="输入补全提示词..."
                 disabled={loading}
               />
-              <WandSparkles className="absolute right-3 top-3 h-4 w-4 text-[var(--color-text-hint)]" />
+              <WandSparkles className="absolute right-3 top-3 h-4 w-4 text-muted-foreground/70" />
             </div>
             {prompt !== savedPrompt && !loading && (
               <button
                 onClick={() => saveMutation.mutate({ configs: { completion_prompt: prompt } })}
                 disabled={saveMutation.isPending}
-                className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary-dark)] bg-[var(--color-primary)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="mt-2 inline-flex items-center gap-1 rounded-lg border border-accent-foreground bg-primary px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-all hover:bg-accent-foreground disabled:opacity-50"
               >
                 {saveMutation.isPending ? "保存中..." : "💾 保存 Prompt"}
               </button>
@@ -158,7 +158,7 @@ export function AiCompletionPreview({
 
           {/* Toggles */}
           <div>
-            <span className={cn("text-[11px] font-medium text-[var(--color-text-hint)]", "font-semibold uppercase tracking-wider")}>补全维度</span>
+            <span className={cn("text-[11px] font-medium text-muted-foreground/70", "font-semibold uppercase tracking-wider")}>补全维度</span>
             <div className="mt-2 space-y-1.5">
               {toggles.map((item) => (
                 <label
@@ -166,11 +166,11 @@ export function AiCompletionPreview({
                   className={cn(
                     "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors",
                     Boolean(data[item.key])
-                      ? "border-[var(--color-primary)]/20 bg-[var(--color-primary-light)]"
-                      : "border-[var(--color-border)]/60 bg-white/60",
+                      ? "border-primary/20 bg-accent"
+                      : "border-border/60 bg-card/60",
                   )}
                 >
-                  <span className="text-sm text-[var(--ink)]">{item.label}</span>
+                  <span className="text-sm text-foreground">{item.label}</span>
                   <Toggle
                     checked={Boolean(data[item.key])}
                     onChange={() => toggleConfig(item.key)}
@@ -182,11 +182,11 @@ export function AiCompletionPreview({
             </div>
 
             {/* Repair structure */}
-            <div className="mt-3 rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning-light)] px-3 py-2.5">
+            <div className="mt-3 rounded-lg border border-warning/25 bg-warning-light px-3 py-2.5">
               <label className="flex items-center justify-between gap-2">
                 <div>
-                  <span className="text-sm font-semibold text-[var(--ink)]">修复题目结构</span>
-                  <p className="text-[11px] text-[var(--color-text-hint)]">AI 重建完整题目结构，覆盖以上字段</p>
+                  <span className="text-sm font-semibold text-foreground">修复题目结构</span>
+                  <p className="text-[11px] text-muted-foreground/70">AI 重建完整题目结构，覆盖以上字段</p>
                 </div>
                 <Toggle
                   checked={Boolean(data["completion_repair_structure"])}
@@ -203,7 +203,7 @@ export function AiCompletionPreview({
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !(prompt || savedPrompt) || loading}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-primary-dark)] bg-[var(--color-primary)] text-sm font-semibold text-white shadow-[var(--shadow-crisp)] transition-all hover:-translate-y-0.5 hover:bg-[var(--color-primary-dark)] disabled:pointer-events-none disabled:opacity-50"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-accent-foreground bg-primary text-sm font-semibold text-white shadow-[var(--shadow-crisp)] transition-all hover:-translate-y-0.5 hover:bg-accent-foreground disabled:pointer-events-none disabled:opacity-50"
           >
             {isGenerating ? (
               <>
@@ -220,10 +220,10 @@ export function AiCompletionPreview({
         </div>
 
         {/* ── Right: Preview ── */}
-        <div className="flex w-[340px] shrink-0 flex-col bg-[var(--color-bg-input)]/20 p-5">
+        <div className="flex w-[340px] shrink-0 flex-col bg-muted/20 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <span className={cn("text-[11px] font-medium text-[var(--color-text-hint)]", "font-semibold uppercase tracking-wider")}>效果预览</span>
-            <span className="text-[10px] text-[var(--color-text-hint)]">实时</span>
+            <span className={cn("text-[11px] font-medium text-muted-foreground/70", "font-semibold uppercase tracking-wider")}>效果预览</span>
+            <span className="text-[10px] text-muted-foreground/70">实时</span>
           </div>
 
           {/* Preview type tabs */}
@@ -238,7 +238,7 @@ export function AiCompletionPreview({
                     "flex-1 rounded-md py-1.5 text-center text-[11px] font-semibold transition-all",
                     isActive
                       ? "text-white shadow-sm"
-                      : "border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40",
+                      : "border border-border bg-card text-muted-foreground hover:border-primary/40",
                   )}
                   style={{ backgroundColor: isActive ? item.color : undefined }}
                 >
@@ -250,7 +250,7 @@ export function AiCompletionPreview({
 
           {/* Preview content */}
           <div
-            className="relative flex-1 overflow-hidden rounded-xl border border-[var(--color-border)]/60"
+            className="relative flex-1 overflow-hidden rounded-xl border border-border/60"
             style={{
               background: "linear-gradient(180deg, rgba(247,245,240,0.3) 0%, rgba(255,255,255,0.8) 100%)",
             }}
@@ -259,16 +259,16 @@ export function AiCompletionPreview({
               <div className="flex h-full items-center justify-center p-4">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--color-primary)]" />
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--color-primary)] [animation-delay:200ms]" />
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--color-primary)] [animation-delay:400ms]" />
-                    <span className="ml-2 text-sm text-[var(--color-text-hint)]">AI 正在生成...</span>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary [animation-delay:200ms]" />
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary [animation-delay:400ms]" />
+                    <span className="ml-2 text-sm text-muted-foreground/70">AI 正在生成...</span>
                   </div>
                   <div className="space-y-2">
                     {[80, 60, 90, 40, 70].map((w, i) => (
                       <div
                         key={i}
-                        className="h-3 animate-pulse rounded-full bg-[var(--color-border)]"
+                        className="h-3 animate-pulse rounded-full bg-border"
                         style={{ width: `${w}%`, animationDelay: `${i * 100}ms` }}
                       />
                     ))}
@@ -291,13 +291,13 @@ export function AiCompletionPreview({
                 </div>
 
                 {/* Prompt context */}
-                <div className="mb-3 flex items-start gap-1.5 text-[11px] text-[var(--color-text-hint)]">
+                <div className="mb-3 flex items-start gap-1.5 text-[11px] text-muted-foreground/70">
                   <ArrowRight className="mt-0.5 h-3 w-3 shrink-0" />
                   <span className="line-clamp-2">Prompt: {loading ? "加载中..." : (prompt || savedPrompt).slice(0, 60)}...</span>
                 </div>
 
                 {/* Content */}
-                <div className="whitespace-pre-wrap rounded-lg border border-[var(--color-border)]/40 bg-white/60 p-3 font-mono text-xs leading-6 text-[var(--ink)]">
+                <div className="whitespace-pre-wrap rounded-lg border border-border/40 bg-card/60 p-3 font-mono text-xs leading-6 text-foreground">
                   {currentPreview.content}
                 </div>
               </div>

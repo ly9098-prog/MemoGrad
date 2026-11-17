@@ -40,11 +40,11 @@ export function ReviewStemEditor({ stem, segments, onStemChange, onSegmentsChang
   return (
     <>
       <label className="block space-y-1.5 animate-fade-up drawer-section-delay-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]/60" />
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
           题干
         </span>
-        <textarea className="min-h-36 w-full rounded-xl border border-[var(--color-border)] bg-white/90 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15" value={stem} onChange={(event) => onStemChange(event.target.value)} />
+        <textarea className="min-h-36 w-full rounded-xl border border-border bg-card/90 px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" value={stem} onChange={(event) => onStemChange(event.target.value)} />
       </label>
       <StemTables segments={segments} onSegmentsChange={onSegmentsChange} />
     </>

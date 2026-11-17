@@ -13,8 +13,6 @@ interface ToggleProps {
 export function Toggle({ checked, onChange, disabled, size = "md", color }: ToggleProps) {
   const height = size === "sm" ? 5 : 6;
   const width = size === "sm" ? 9 : 11;
-  const knob = size === "sm" ? 3.5 : 5;
-  const translate = size === "sm" ? 120 : 100;
 
   return (
     <button
@@ -24,22 +22,22 @@ export function Toggle({ checked, onChange, disabled, size = "md", color }: Togg
       onClick={onChange}
       disabled={disabled}
       className={cn(
-        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         disabled && "cursor-not-allowed opacity-50",
       )}
       style={{
         height: `${height * 0.25}rem`,
         width: `${width * 0.25}rem`,
         backgroundColor: checked
-          ? color ?? "var(--color-success)"
-          : "var(--color-bg-input)",
+          ? color ?? "var(--success)"
+          : "var(--muted)",
         borderColor: checked
           ? "transparent"
-          : "var(--color-border)",
+          : "var(--border)",
       }}
     >
       <span
-        className="absolute inline-block rounded-full bg-white shadow-sm transition-transform duration-200"
+        className="absolute inline-block rounded-full bg-card shadow-sm transition-transform duration-200"
         style={{
           left: "2px",
           top: "2px",

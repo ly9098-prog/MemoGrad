@@ -137,6 +137,28 @@ describe("login and shell ownership", () => {
     h.effects[0]();
     expect(h.replace).toHaveBeenCalledWith("/login?next=%2Froles");
   });
+
+  it.each(["/formulas/new", "/formulas/new/preview", "/formulas/42"])(
+    "allows hover and keyboard expansion inside focused editor %s",
+    (pathname) => {
+      h.auth.isAuthenticated = true;
+      h.path = pathname;
+
+      for (const states of [[null, true, false], [null, false, true]]) {
+        h.states = states;
+        h.stateIndex = 0;
+        const shell = AdminShell({ children: null }) as Element;
+        const children = shell.props.children as Element[];
+        const sidebar = children[0];
+        const workspace = findElement(shell, "main")!;
+
+        expect(shell.props["data-navigation-expanded"]).toBe("true");
+        expect(sidebar.props.collapsed).toBe(false);
+        expect(workspace.props["data-focused-editor"]).toBe("true");
+        expect(workspace.props.className).toContain("p-0");
+      }
+    },
+  );
 });
 
 describe("Admin user request ownership", () => {

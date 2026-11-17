@@ -2,7 +2,13 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ClipboardList } from "lucide-react";
 import { apiRequest, toQuery } from "@/lib/api/client";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+  ManagementPanel,
+} from "@/components/admin/management-ui";
 import { AuditLogFilters } from "@/components/audit-logs/audit-log-filters";
 import { AuditLogList } from "@/components/audit-logs/audit-log-list";
 import { AuditLogDrawer } from "@/components/audit-logs/audit-log-drawer";
@@ -92,15 +98,24 @@ export default function AuditLogsPage() {
 
   // ── Render ──
   return (
-    <div className="space-y-5">
-      {/* ── Filters (no title above) ── */}
-      <AuditLogFilters
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onReset={handleReset}
-        onRefresh={() => logs.refetch()}
-        isRefreshing={logs.isFetching}
+    <ManagementPage className="space-y-5">
+      <ManagementPageHeader
+        icon={<ClipboardList className="h-5 w-5" />}
+        title="审计日志"
+        description="检索后台关键操作、资源变更与失败记录，并查看结构化审计详情。"
+        meta={<span>只读页面；筛选、分页与详情字段保持现有 Admin API 契约。</span>}
       />
+
+      {/* ── Filters ── */}
+      <ManagementPanel variant="quiet" contentClassName="p-4">
+        <AuditLogFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onReset={handleReset}
+          onRefresh={() => logs.refetch()}
+          isRefreshing={logs.isFetching}
+        />
+      </ManagementPanel>
 
       {/* ── List ── */}
       <AuditLogList
@@ -120,6 +135,6 @@ export default function AuditLogsPage() {
 
       {/* ── Detail Drawer ── */}
       <AuditLogDrawer detailId={detailId} onClose={closeDetail} />
-    </div>
+    </ManagementPage>
   );
 }

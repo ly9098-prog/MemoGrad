@@ -45,9 +45,9 @@ describe("batch answer result views", () => {
     }));
     const rows = html.match(/<tbody>(.*?)<\/tbody>/)?.[1].match(/<tr\b.*?<\/tr>/g) ?? [];
     const labels = ["跳过", "相同", "无效", "不支持", "异常", "future_status", "—", "将写入"];
-    const colors = ["text-amber-600", "text-amber-600", "text-red-600", "text-gray-400",
-      "text-[var(--color-text-secondary)]", "text-[var(--color-text-secondary)]",
-      "text-[var(--color-text-secondary)]", "text-emerald-600"];
+    const colors = ["text-warning-foreground", "text-warning-foreground", "text-destructive", "text-muted-foreground/70",
+      "text-muted-foreground", "text-muted-foreground",
+      "text-muted-foreground", "text-success"];
     expect(rows).toHaveLength(labels.length);
     rows.forEach((row, index) => {
       expect(row).toContain(` ${colors[index]}">${labels[index]}</td>`);
@@ -56,7 +56,7 @@ describe("batch answer result views", () => {
     expect(rows[1]).toMatch(/<td[^>]*>0<\/td>/);
     expect(rows[2]).toMatch(/<td[^>]*>\?<\/td>/);
     expect(rows[0]).toContain("stem &lt;0&gt;");
-    expect(rows[2]).toContain('text-[var(--color-text-hint)]">—</span>');
+    expect(rows[2]).toContain('text-muted-foreground/70">—</span>');
     expect(html).toContain("warning &lt;unsafe&gt;");
     expect(html).toContain("warning two");
     expect(html).toContain("跳过已有");
@@ -76,7 +76,7 @@ describe("batch answer result views", () => {
     expect(html).not.toContain("跳过已有");
     expect(html).not.toContain("无效");
     expect(html).not.toContain("不支持");
-    expect(html).not.toContain("border-amber-200");
+    expect(html).not.toContain("border-warning/30");
   });
 
   it("keeps the apply callback and disables writes for zero capacity or pending requests", () => {
@@ -100,9 +100,9 @@ describe("batch answer result views", () => {
     const view = BatchAnswerResult({ result, onClose });
     const html = renderToStaticMarkup(view);
     expect(html).toContain("批量答案写入完成");
-    expect(html).toContain('text-emerald-600">3</p>');
-    expect(html).toContain('text-amber-600">2</p>');
-    expect(html).toContain('text-[var(--color-text-secondary)]">4</p>');
+    expect(html).toContain('text-success">3</p>');
+    expect(html).toContain('text-warning-foreground">2</p>');
+    expect(html).toContain('text-muted-foreground">4</p>');
     button(view).onClick();
     expect(onClose).toHaveBeenCalledOnce();
   });

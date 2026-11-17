@@ -22,6 +22,15 @@ export function paperKindLabel(paper: AdminExamPaperListItem): string {
   return paper.year ? `${paper.year} 模拟卷` : "模拟卷";
 }
 
+export function paperTypeLabel(paper: AdminExamPaperListItem): string {
+  return paper.paper_type === "past_exam_choice" ? "真题" : "模拟卷";
+}
+
+export function paperYearBadgeLabel(paper: AdminExamPaperListItem): string | null {
+  if (!paper.year) return null;
+  return paper.title.includes(String(paper.year)) ? null : String(paper.year);
+}
+
 interface PaperSummary {
   total: number;
   draft: number;

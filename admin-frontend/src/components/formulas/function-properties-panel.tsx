@@ -25,9 +25,9 @@ function PropertyRow({ label, value }: { label: string; value: unknown }) {
   if (!hasValue(value)) return null;
 
   return (
-    <div className="grid gap-1 border-b border-[var(--color-border-light)] py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-      <dt className="font-semibold text-[var(--ink)]">{label}</dt>
-      <dd className="min-w-0 leading-7 text-[var(--color-text-secondary)]">
+    <div className="grid gap-1 border-b border-border/60 py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+      <dt className="font-semibold text-foreground">{label}</dt>
+      <dd className="min-w-0 leading-7 text-muted-foreground">
         <MixedLatexRenderer text={decodeApiText(value)} />
       </dd>
     </div>
@@ -38,10 +38,10 @@ function ArrayPropertyRow({ label, value }: { label: string; value: unknown }) {
   if (!Array.isArray(value) || value.length === 0) return null;
 
   return (
-    <div className="grid gap-1 border-b border-[var(--color-border-light)] py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-      <dt className="font-semibold text-[var(--ink)]">{label}</dt>
+    <div className="grid gap-1 border-b border-border/60 py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+      <dt className="font-semibold text-foreground">{label}</dt>
       <dd className="min-w-0">
-        <ul className="space-y-1.5 text-[var(--color-text-secondary)]">
+        <ul className="space-y-1.5 text-muted-foreground">
           {value.map((item, index) => (
             <li key={index} className="flex gap-2 leading-7">
               <span aria-hidden className="mt-[0.72rem] h-1 w-1 shrink-0 rounded-full bg-current opacity-50" />
@@ -60,12 +60,12 @@ function TransformationsRow({ value }: { value: unknown }) {
   if (!entries.length) return null;
 
   return (
-    <div className="grid gap-1 border-b border-[var(--color-border-light)] py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-      <dt className="font-semibold text-[var(--ink)]">等价形式</dt>
-      <dd className="min-w-0 space-y-1.5 text-[var(--color-text-secondary)]">
+    <div className="grid gap-1 border-b border-border/60 py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+      <dt className="font-semibold text-foreground">等价形式</dt>
+      <dd className="min-w-0 space-y-1.5 text-muted-foreground">
         {entries.map(([name, expression]) => (
           <div key={name} className="leading-7">
-            <span className="mr-2 text-xs font-semibold text-[var(--color-text-hint)]">{name}</span>
+            <span className="mr-2 text-xs font-semibold text-muted-foreground/70">{name}</span>
             <MixedLatexRenderer text={decodeApiText(expression)} />
           </div>
         ))}
@@ -78,14 +78,14 @@ export function FunctionPropertiesPanel({ properties, className = "" }: Function
   const templateType = decodeApiText(properties.graph_template_type);
 
   return (
-    <section className={`rounded-[1.6rem] border border-[var(--color-primary-light)] bg-[var(--porcelain)] p-4 ${className}`}>
-      <p className="font-semibold text-[var(--ink)]">函数属性</p>
+    <section className={`rounded-[1.6rem] border border-accent bg-[var(--porcelain)] p-4 ${className}`}>
+      <p className="font-semibold text-foreground">函数属性</p>
       <dl className="mt-2 text-sm">
         <PropertyRow label="表达式" value={properties.function_expression} />
         {templateType && (
-          <div className="grid gap-1 border-b border-[var(--color-border-light)] py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-            <dt className="font-semibold text-[var(--ink)]">坐标模板</dt>
-            <dd className="leading-7 text-[var(--color-text-secondary)]">
+          <div className="grid gap-1 border-b border-border/60 py-2 last:border-b-0 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+            <dt className="font-semibold text-foreground">坐标模板</dt>
+            <dd className="leading-7 text-muted-foreground">
               {TEMPLATE_LABELS[templateType] ?? templateType}
             </dd>
           </div>

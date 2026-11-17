@@ -105,8 +105,8 @@ function ContentSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
-      <h3 className="mb-3 text-sm font-semibold text-[var(--ink)]">{title}</h3>
+    <section className="rounded-2xl border border-border bg-card p-4">
+      <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -114,39 +114,39 @@ function ContentSection({
 
 function DuplicateAlert({ record }: { record: AdminQuestionImportSummary }) {
   return (
-    <section className="rounded-2xl border border-[var(--color-warning)]/45 bg-[var(--color-warning-light)] p-4">
+    <section className="rounded-2xl border border-warning/45 bg-warning-light p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" aria-hidden="true" />
-        <p className="text-sm font-semibold text-[var(--ink)]">疑似重复题目</p>
+        <AlertTriangle className="h-4 w-4 text-warning-foreground" aria-hidden="true" />
+        <p className="text-sm font-semibold text-foreground">疑似重复题目</p>
         <StatusBadge tone="warning">疑似重复</StatusBadge>
       </div>
-      <p className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)]">
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
         需要人工核对来源关系后再决定是否通过。
       </p>
       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-        <div className="rounded-xl border border-[var(--color-border)] bg-white/60 p-2.5">
-          <p className="text-[11px] text-[var(--color-text-hint)]">题目 hash</p>
-          <p className="mt-1 break-all font-mono text-[11px] text-[var(--ink)]">
+        <div className="rounded-xl border border-border bg-card/60 p-2.5">
+          <p className="text-[11px] text-muted-foreground/70">题目 hash</p>
+          <p className="mt-1 break-all font-mono text-[11px] text-foreground">
             {record.question_hash || "—"}
           </p>
         </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-white/60 p-2.5">
-          <p className="text-[11px] text-[var(--color-text-hint)]">重复正式题</p>
+        <div className="rounded-xl border border-border bg-card/60 p-2.5">
+          <p className="text-[11px] text-muted-foreground/70">重复正式题</p>
           {record.duplicate_of_question_id ? (
             <Link
               href={`/questions?selected_id=${record.duplicate_of_question_id}`}
-              className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[var(--color-primary-dark)] underline decoration-[var(--color-primary)]/40 underline-offset-2 hover:decoration-[var(--color-primary)]"
+              className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-accent-foreground underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
             >
               #{record.duplicate_of_question_id}
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </Link>
           ) : (
-            <p className="mt-1 font-mono text-[11px] text-[var(--color-text-secondary)]">—</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">—</p>
           )}
         </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-white/60 p-2.5">
-          <p className="text-[11px] text-[var(--color-text-hint)]">重复导入项</p>
-          <p className="mt-1 font-mono text-[11px] text-[var(--ink)]">
+        <div className="rounded-xl border border-border bg-card/60 p-2.5">
+          <p className="text-[11px] text-muted-foreground/70">重复导入项</p>
+          <p className="mt-1 font-mono text-[11px] text-foreground">
             {record.duplicate_of_import_id ? `#${record.duplicate_of_import_id}` : "—"}
           </p>
         </div>
@@ -166,9 +166,9 @@ function DiffPanel({
   const unchangedLabels = rows.filter((row) => !row.changed).map((row) => row.label);
 
   return (
-    <div className="mt-4 rounded-2xl border border-[var(--color-border)] bg-[var(--porcelain)] p-4">
+    <div className="mt-4 rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-[var(--ink)]">
+        <p className="text-sm font-semibold text-foreground">
           当前内容与 v{baselineVersion} 对比
         </p>
         <StatusBadge tone={changedRows.length > 0 ? "warning" : "success"}>
@@ -181,23 +181,23 @@ function DiffPanel({
           {changedRows.map((row) => (
             <div
               key={row.key}
-              className="rounded-xl border border-[var(--color-warning)]/35 bg-[var(--color-warning-light)]/45 p-3"
+              className="rounded-xl border border-warning/35 bg-warning-light/45 p-3"
             >
-              <p className="text-xs font-semibold text-[var(--ink)]">{row.label}</p>
+              <p className="text-xs font-semibold text-foreground">{row.label}</p>
               <div className="mt-2 grid gap-2 lg:grid-cols-2">
-                <div className="rounded-lg border border-[var(--color-border)]/70 bg-white/55 px-3 py-2">
-                  <p className="text-[11px] font-semibold text-[var(--color-text-hint)]">
+                <div className="rounded-lg border border-border/70 bg-card/55 px-3 py-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground/70">
                     变更前
                   </p>
-                  <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[var(--color-text-secondary)]">
+                  <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
                     {row.previous || "—"}
                   </div>
                 </div>
-                <div className="rounded-lg border border-[var(--color-success)]/25 bg-white/85 px-3 py-2">
-                  <p className="text-[11px] font-semibold text-[var(--color-success)]">
+                <div className="rounded-lg border border-success/25 bg-card/85 px-3 py-2">
+                  <p className="text-[11px] font-semibold text-success">
                     变更后
                   </p>
-                  <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-[var(--ink)]">
+                  <div className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground">
                     {row.current || "—"}
                   </div>
                 </div>
@@ -206,13 +206,13 @@ function DiffPanel({
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+        <p className="mt-2 text-xs text-muted-foreground">
           当前内容与该历史版本一致。
         </p>
       )}
 
       {unchangedLabels.length > 0 ? (
-        <p className="mt-3 text-[11px] text-[var(--color-text-hint)]">
+        <p className="mt-3 text-[11px] text-muted-foreground/70">
           未变更：{unchangedLabels.join("、")}
         </p>
       ) : null}
@@ -239,7 +239,7 @@ function VersionHistory({
 }) {
   if (versions.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/50 px-3 py-4 text-center text-xs text-[var(--color-text-hint)]">
+      <p className="rounded-xl border border-dashed border-border bg-card/50 px-3 py-4 text-center text-xs text-muted-foreground/70">
         该题暂无历史版本记录。
       </p>
     );
@@ -255,23 +255,23 @@ function VersionHistory({
             key={version.version}
             className={
               selected
-                ? "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-primary)] bg-[var(--color-primary-light)]/40 px-3 py-2"
-                : "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--porcelain)] px-3 py-2"
+                ? "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary bg-accent/40 px-3 py-2"
+                : "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2"
             }
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-semibold text-[var(--ink)]">
+                <span className="font-mono text-xs font-semibold text-foreground">
                   v{version.version}
                 </span>
                 {current ? <StatusBadge tone="primary">当前</StatusBadge> : null}
                 {selected ? (
-                  <span className="text-[10px] font-semibold text-[var(--color-primary-dark)]">
+                  <span className="text-[10px] font-semibold text-accent-foreground">
                     对比基线
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1 truncate text-[11px] text-[var(--color-text-hint)]">
+              <p className="mt-1 truncate text-[11px] text-muted-foreground/70">
                 {formatChinaDateTime(version.created_at)} ·{" "}
                 {version.edited_by_name ||
                   (version.edited_by != null
@@ -347,7 +347,7 @@ export function ReviewDetailDrawer({
       ariaLabel={questionId ? `题目 #${questionId} 重审详情` : "题目重审详情"}
       title={
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-display text-xl font-bold text-[var(--ink)]">
+          <h2 className="font-display text-xl font-bold text-foreground">
             题目 #{questionId ?? "—"}
           </h2>
           {question ? (
@@ -355,22 +355,22 @@ export function ReviewDetailDrawer({
               {reviewStatusLabel(question.review_status)}
             </StatusBadge>
           ) : null}
-          <span className="text-xs text-[var(--color-text-hint)]">重审详情</span>
+          <span className="text-xs text-muted-foreground/70">重审详情</span>
         </div>
       }
     >
       {isLoading && !question ? (
         <div className="space-y-3" aria-busy="true">
-          <div className="h-11 animate-pulse rounded-xl bg-[var(--color-bg-input)]/75" />
-          <div className="h-28 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/60" />
-          <div className="h-44 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/50" />
+          <div className="h-11 animate-pulse rounded-xl bg-muted/75" />
+          <div className="h-28 animate-pulse rounded-2xl bg-muted/60" />
+          <div className="h-44 animate-pulse rounded-2xl bg-muted/50" />
         </div>
       ) : null}
 
       {isError && !question ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <AlertTriangle className="h-9 w-9 text-red-400" aria-hidden="true" />
-          <p className="text-sm font-semibold text-red-700">题目详情加载失败</p>
+          <AlertTriangle className="h-9 w-9 text-destructive" aria-hidden="true" />
+          <p className="text-sm font-semibold text-destructive">题目详情加载失败</p>
           <Button variant="secondary" size="sm" onClick={onRetry}>
             重新加载
           </Button>
@@ -379,7 +379,7 @@ export function ReviewDetailDrawer({
 
       {question ? (
         <div className="space-y-4">
-          <div className="sticky top-0 z-10 -mx-6 -mt-5 mb-4 flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] bg-white/94 px-6 py-3 backdrop-blur">
+          <div className="sticky top-0 z-10 -mx-6 -mt-5 mb-4 flex flex-wrap items-center gap-2 border-b border-border bg-card/94 px-6 py-3 backdrop-blur">
             {canReview ? (
               <>
                 <Button
@@ -410,7 +410,7 @@ export function ReviewDetailDrawer({
             ) : null}
             <Link
               href={`/questions?selected_id=${question.id}`}
-              className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)]"
+              className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               在题库中打开
@@ -418,7 +418,7 @@ export function ReviewDetailDrawer({
           </div>
 
           {tableBlocked ? (
-            <div className="rounded-2xl border border-[var(--color-warning)]/45 bg-[var(--color-warning-light)] p-4 text-sm text-[var(--ink)]">
+            <div className="rounded-2xl border border-warning/45 bg-warning-light p-4 text-sm text-foreground">
               当前题目仍有 {tableCount} 个结构化表格需要人工核验，暂不能审核通过。
             </div>
           ) : null}
@@ -428,7 +428,7 @@ export function ReviewDetailDrawer({
           ) : null}
 
           <ContentSection title="题干">
-            <div className="whitespace-pre-wrap text-base leading-8 text-[var(--ink)]">
+            <div className="whitespace-pre-wrap text-base leading-8 text-foreground">
               <QuestionContentRenderer
                 content={question.content}
                 fallbackText={textFromContent(question.content)}
@@ -447,7 +447,7 @@ export function ReviewDetailDrawer({
           </ContentSection>
 
           <ContentSection title="答案">
-            <div className="inline-flex min-h-9 items-center rounded-md bg-[var(--color-bg-input)] px-2.5 py-1.5 text-sm font-semibold leading-6 text-[var(--ink)]">
+            <div className="inline-flex min-h-9 items-center rounded-md bg-muted px-2.5 py-1.5 text-sm font-semibold leading-6 text-foreground">
               <AnswerValue questionType={question.question_type} answer={question.answer} />
             </div>
           </ContentSection>
@@ -468,17 +468,17 @@ export function ReviewDetailDrawer({
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-[var(--color-border)] bg-[var(--porcelain)] px-3 py-2"
+                  className="rounded-xl border border-border bg-card px-3 py-2"
                 >
-                  <p className="text-[11px] text-[var(--color-text-hint)]">{label}</p>
-                  <p className="mt-1 break-words font-medium text-[var(--color-text-secondary)]">
+                  <p className="text-[11px] text-muted-foreground/70">{label}</p>
+                  <p className="mt-1 break-words font-medium text-muted-foreground">
                     {value}
                   </p>
                 </div>
               ))}
             </div>
             {question.import_record ? (
-              <p className="mt-2 break-all text-[11px] text-[var(--color-text-hint)]">
+              <p className="mt-2 break-all text-[11px] text-muted-foreground/70">
                 重复检测：
                 {question.import_record.duplicate_status === "possible_duplicate"
                   ? "疑似重复"
@@ -490,25 +490,25 @@ export function ReviewDetailDrawer({
             ) : null}
           </ContentSection>
 
-          <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
+          <section className="rounded-2xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <History className="h-4 w-4 text-[var(--color-primary)]" aria-hidden="true" />
+                <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <History className="h-4 w-4 text-primary" aria-hidden="true" />
                   版本历史与对比
                 </h3>
-                <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">
+                <p className="mt-1 text-[11px] text-muted-foreground/70">
                   选择历史版本作为对比基线；回滚会生成新版本并恢复审核通过。
                 </p>
               </div>
               {versionsLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--color-text-hint)]" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/70" aria-hidden="true" />
               ) : null}
             </div>
 
             <div className="mt-3">
               {versionsError ? (
-                <p className="rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 text-xs text-red-700">
+                <p className="rounded-xl border border-destructive/30 bg-destructive-light/60 px-3 py-2 text-xs text-destructive">
                   版本历史加载失败，可稍后重试。
                 </p>
               ) : (
@@ -525,11 +525,11 @@ export function ReviewDetailDrawer({
             </div>
 
             {baselineLoading ? (
-              <div className="mt-4 h-24 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/60" />
+              <div className="mt-4 h-24 animate-pulse rounded-2xl bg-muted/60" />
             ) : null}
 
             {baselineError ? (
-              <p className="mt-4 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2 text-xs text-red-700">
+              <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive-light/60 px-3 py-2 text-xs text-destructive">
                 对比版本加载失败，无法展示差异。
               </p>
             ) : null}

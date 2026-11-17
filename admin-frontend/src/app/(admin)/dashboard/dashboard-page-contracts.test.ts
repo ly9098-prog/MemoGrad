@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement } from "react";
 import DashboardPage from "./page";
 import { DashboardTrendChart } from "./components/dashboard-trend-chart";
+import { renderDashboardWorkbench } from "./components/dashboard-workbench";
+import { BodyPortal } from "@/components/ui/body-portal";
+import { ManagementPanel } from "@/components/admin/management-ui";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -12,10 +15,12 @@ const h = vi.hoisted(() => ({
   states: [] as unknown[], index: 0, setters: [] as ReturnType<typeof vi.fn>[],
   queries: [] as Query[], refetches: [] as ReturnType<typeof vi.fn>[],
   authenticated: true, bootstrapping: false,
+  permissions: ["dashboard:read", "system:read"] as string[],
   request: vi.fn(), toQuery: vi.fn((query: Record<string, unknown>) => {
     void query;
     return "?fixture";
   }),
+  fetchQuery: vi.fn(),
 }));
 vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
@@ -24,10 +29,11 @@ vi.mock("react", async (original) => ({
     const index = h.index++;
     const setter = vi.fn();
     h.setters.push(setter);
-    return [index in h.states ? h.states[index] : initial, setter];
+    return [index in h.states ? h.states[index] : typeof initial === "function" ? initial() : initial, setter];
   },
 }));
 vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ fetchQuery: h.fetchQuery }),
   useQuery: (query: Query) => {
     h.queries.push(query);
     const refetch = vi.fn().mockResolvedValue(undefined);
@@ -38,6 +44,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: unknown) => unknown) => select({
     isAuthenticated: h.authenticated, isBootstrapping: h.bootstrapping,
+    permissions: h.permissions,
   }),
 }));
 vi.mock("@/lib/api/client", () => ({ apiRequest: h.request, toQuery: h.toQuery }));
@@ -56,7 +63,9 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-29T18:00:00Z"));
   h.states = []; h.index = 0; h.setters = []; h.queries = []; h.refetches = [];
   h.authenticated = true; h.bootstrapping = false;
+  h.permissions = ["dashboard:read", "system:read"];
   h.request.mockReset().mockResolvedValue({});
+  h.fetchQuery.mockReset().mockImplementation((query: Query) => query.queryFn());
 });
 afterEach(() => {
   vi.clearAllTimers();
@@ -68,11 +77,11 @@ describe("dashboard page request ownership", () => {
     { authenticated: false, bootstrapping: false },
     { authenticated: true, bootstrapping: true },
     { authenticated: false, bootstrapping: true },
-  ])("gates all six requests during authentication transition (%j)", (state) => {
+  ])("gates all seven requests during authentication transition (%j)", (state) => {
     h.authenticated = state.authenticated;
     h.bootstrapping = state.bootstrapping;
     DashboardPage();
-    expect(h.queries).toHaveLength(6);
+    expect(h.queries).toHaveLength(7);
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(h.request).not.toHaveBeenCalled();
   });
@@ -85,11 +94,40 @@ describe("dashboard page request ownership", () => {
       ["/dashboard/overview"], ["/dashboard/daily?fixture"],
       ["/dashboard/questions-stats"], ["/health/ready"],
       ["/dashboard/ai-stats?days=7"], ["/tasks/diagnostics"],
+      ["/dashboard/daily?fixture"],
     ]);
     expect(h.queries.map((query) => query.staleTime)).toEqual([
-      30_000, 30_000, 60_000, 30_000, 60_000, 30_000,
+      30_000, 30_000, 60_000, 30_000, 60_000, 30_000, 300_000,
     ]);
-    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false]);
+    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false, false]);
+  });
+
+  it("does not request shared task diagnostics without system:read", () => {
+    h.permissions = ["dashboard:read"];
+    DashboardPage();
+    const diagnostics = h.queries.find((query) => query.queryKey.join("|") === "dashboard|task-diagnostics");
+    expect(diagnostics?.enabled).toBe(false);
+  });
+
+  it("gates every dashboard request without dashboard:read", () => {
+    h.permissions = [];
+    DashboardPage();
+    expect(h.queries).toHaveLength(7);
+    expect(h.queries.every((query) => query.enabled === false)).toBe(true);
+    expect(h.request).not.toHaveBeenCalled();
+  });
+
+  it("renders a permission state instead of dashboard data without dashboard:read", () => {
+    h.permissions = [];
+    const root = DashboardPage();
+    const panel = find(
+      root,
+      (element) =>
+        element.type === ManagementPanel &&
+        element.props.title === "无权限查看仪表盘",
+    );
+    expect(panel).toBeDefined();
+    expect(find(panel, (element) => element.props.children === "无法加载运营数据")).toBeDefined();
   });
 
   it.each([
@@ -103,6 +141,19 @@ describe("dashboard page request ownership", () => {
     expect(h.queries[1].queryKey).toEqual(["dashboard", "daily", { from, to: "2026-10-30" }]);
   });
 
+  it("reads exactly 365 Shanghai calendar days for the activity chart with a five minute cache", async () => {
+    DashboardPage();
+    await h.queries[6].queryFn();
+    expect(h.toQuery).toHaveBeenCalledExactlyOnceWith({ from: "2025-10-31", to: "2026-10-30" });
+    expect(h.queries[6]).toMatchObject({
+      queryKey: ["dashboard", "activity", { from: "2025-10-31", to: "2026-10-30" }],
+      enabled: true,
+      staleTime: 300_000,
+      refetchOnWindowFocus: false,
+      retry: false,
+    });
+  });
+
   it("passes the current period and period setter to the existing chart component", () => {
     h.states[0] = "30d";
     const chart = find(DashboardPage(), (element) => element.type === DashboardTrendChart)!;
@@ -112,6 +163,46 @@ describe("dashboard page request ownership", () => {
     expect(h.setters[0]).toHaveBeenCalledWith("7d");
   });
 
+  it("routes pending imports to the review workspace", () => {
+    const tree = renderDashboardWorkbench({
+      dateLabel: "2026-10-30",
+      manualRefreshing: false,
+      refreshAll: async () => {},
+      period: "7d",
+      onPeriodChange: () => {},
+      overview: {
+        data: {
+          users_total: 700,
+          users_new_today: 0,
+          questions_total: 3403,
+          questions_pending_review: 0,
+          imports_total: 483,
+          imports_pending: 1,
+          audit_critical_today: 0,
+          cache: {},
+        },
+        isLoading: false,
+      },
+      daily: { data: [], isLoading: false },
+      stats: {
+        data: { by_subject: [], by_review_status: [], by_difficulty: [] },
+        isLoading: false,
+      },
+      readyHealth: { data: undefined, isLoading: false },
+      aiStats: { data: undefined, isLoading: false },
+      taskDiagnostics: { data: undefined, isLoading: false },
+      activity: { data: [], isLoading: false },
+      activityRange: { from: "2025-10-31", to: "2026-10-30" },
+      canReadSystem: false,
+      canReadImports: true,
+      canReadAudit: false,
+      reviewHint: "无权限查看",
+      importsHint: "进入导入审核",
+      auditHint: "无权限查看",
+    });
+    expect(find(tree, (element) => element.props.href === "/imports/review")).toBeDefined();
+  });
+
   it("waits for every refresh despite one rejection and clears the busy state last", async () => {
     const root = DashboardPage();
     let release!: () => void;
@@ -119,7 +210,7 @@ describe("dashboard page request ownership", () => {
     h.refetches[2].mockRejectedValue(new Error("synthetic offline"));
     const button = find(root, (element) => element.type === "button")!;
     (button.props.onClick as () => void)();
-    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1, 1]);
     await Promise.resolve();
     expect(h.setters[1].mock.calls).toEqual([[true]]);
     release();
@@ -129,11 +220,30 @@ describe("dashboard page request ownership", () => {
     expect(h.setters[1].mock.calls).toEqual([[true], [false]]);
   });
 
+  it("refreshes a still-mounted dashboard across Shanghai midnight with both new date windows", async () => {
+    vi.setSystemTime(new Date("2026-10-29T15:59:00Z"));
+    const root = DashboardPage();
+    vi.setSystemTime(new Date("2026-10-29T16:01:00Z"));
+    const button = find(root, (element) => element.type === "button")!;
+    (button.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(h.fetchQuery).toHaveBeenCalledTimes(2);
+    expect(h.fetchQuery.mock.calls.map(([query]) => query.queryKey)).toEqual([
+      ["dashboard", "daily", { from: "2026-10-24", to: "2026-10-30" }],
+      ["dashboard", "activity", { from: "2025-10-31", to: "2026-10-30" }],
+    ]);
+    expect(h.refetches[1]).not.toHaveBeenCalled();
+    expect(h.refetches[6]).not.toHaveBeenCalled();
+    expect(h.setters[2]).toHaveBeenCalledWith(Date.now());
+  });
+
   it("disables manual refresh while an earlier refresh is busy", () => {
     h.states[1] = true;
     const root = DashboardPage();
     const button = find(root, (element) => element.type === "button")!;
     expect(button.props.disabled).toBe(true);
-    expect(find(root, (element) => element.props["aria-label"] === "正在刷新仪表盘数据")).toBeDefined();
+    const portal = find(root, (element) => element.type === BodyPortal)!;
+    expect(portal).toBeDefined();
+    expect(find(portal, (element) => element.props["aria-label"] === "正在刷新仪表盘数据")).toBeDefined();
   });
 });

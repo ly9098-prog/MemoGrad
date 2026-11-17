@@ -44,23 +44,23 @@ describe("review batch complete result state", () => {
       {
         isFailed: true,
         label: "失败",
-        containerClass: "border-[var(--color-danger)]/40 bg-[var(--color-danger-light)]/30",
-        labelClass: "text-[var(--color-danger)]",
-        errorClass: "text-[var(--color-danger)]",
+      containerClass: "border-destructive/40 bg-destructive-light/30",
+      labelClass: "text-destructive",
+      errorClass: "text-destructive",
       },
       {
         isFailed: false,
         label: "跳过",
-        containerClass: "border-[var(--color-border)] bg-white/60",
-        labelClass: "text-[var(--color-text-hint)]",
-        errorClass: "text-[var(--color-text-secondary)]",
+      containerClass: "border-border bg-card/60",
+      labelClass: "text-muted-foreground/70",
+      errorClass: "text-muted-foreground",
       },
       {
         isFailed: false,
         label: "跳过",
-        containerClass: "border-[var(--color-border)] bg-white/60",
-        labelClass: "text-[var(--color-text-hint)]",
-        errorClass: "text-[var(--color-text-secondary)]",
+        containerClass: "border-border bg-card/60",
+        labelClass: "text-muted-foreground/70",
+        errorClass: "text-muted-foreground",
       },
     ]);
   });

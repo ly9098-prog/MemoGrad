@@ -139,12 +139,17 @@ test('cumulative customized branch retains lifetimeStart only and skips summary 
   assert.deepEqual(plain(f.page._buildCumulativePatch({ start_date: 'old' }, 'new')), { lifetimeStartDate: 'new', total: 7 })
 })
 
-test('duration display patch uses current segments hook and preserves original text identity', () => {
-  const f = fixture(), value = {}, segments = []
-  f.page._buildDurationSegments = input => { assert.equal(input, value); return segments }
+test('duration display patch uses current segments hook and reveal option', () => {
+  const f = fixture(), value = {}
+  const calls = []
+  f.page._buildDurationSegments = (input, reveal) => { calls.push([input, reveal]); return { input, reveal } }
   const patch = f.page._getTodayDurationDisplayPatch(value)
   assert.equal(patch._dispTodayDurationText, value)
-  assert.equal(patch._dispTodayDurationSegments, segments)
+  assert.deepEqual(patch._dispTodayDurationSegments, { input: value, reveal: false })
+  const revealPatch = f.page._getTodayDurationDisplayPatch(value, { reveal: true })
+  assert.equal(revealPatch._dispTodayDurationText, value)
+  assert.deepEqual(revealPatch._dispTodayDurationSegments, { input: value, reveal: true })
+  assert.deepEqual(calls, [[value, false], [value, true]])
 })
 
 test('initial duration segments match the formatter contract', () => {

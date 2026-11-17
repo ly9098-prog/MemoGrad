@@ -3,6 +3,7 @@
 import type { ReactNode, RefObject } from "react";
 import { AlertCircle, FileQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/status-badge";
 import { QuestionContentRenderer } from "@/components/question-content-renderer";
 import { MultiBlankQuestionOptions, QuestionOptions } from "@/components/question-options";
 import { QuestionAnalysis } from "@/components/questions/question-analysis";
@@ -35,13 +36,13 @@ type QuestionSideDetailPanelProps = {
 
 function EmptySelection() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center animate-fade-in">
-      <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-[var(--color-border)] bg-[var(--porcelain)] text-[var(--color-text-hint)] shadow-sm">
-        <FileQuestion className="h-8 w-8" />
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center animate-fade-in">
+      <div className="grid h-14 w-14 place-items-center rounded-[14px] bg-secondary text-muted-foreground">
+        <FileQuestion className="h-7 w-7" aria-hidden="true" />
       </div>
-      <p className="mt-5 text-2xl font-bold text-[var(--ink)]">选择一道题目</p>
-      <p className="mt-2 max-w-xs text-sm leading-6 text-[var(--color-text-secondary)]">
-        在左侧列表中选择题目，查看详情、编辑内容或进行版本对比。
+      <p className="mt-5 text-xl font-semibold tracking-[-0.03em] text-foreground">选择一道题目</p>
+      <p className="mt-2 max-w-xs text-[12px] leading-5 text-muted-foreground">
+        在左侧列表中选择题目，查看题干、选项、答案与解析。
       </p>
     </div>
   );
@@ -50,9 +51,9 @@ function EmptySelection() {
 function LoadingDetail() {
   return (
     <div className="min-h-0 flex-1 space-y-3 animate-fade-in">
-      <div className="h-16 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/75" />
-      <div className="h-28 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/60" />
-      <div className="h-44 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/50" />
+      <div className="h-14 animate-pulse rounded-[10px] bg-secondary/70 motion-reduce:animate-none" />
+      <div className="h-24 animate-pulse rounded-[10px] bg-secondary/60 motion-reduce:animate-none" />
+      <div className="h-40 animate-pulse rounded-[10px] bg-secondary/50 motion-reduce:animate-none" />
     </div>
   );
 }
@@ -75,8 +76,8 @@ export function QuestionSideDetailPanel({
   if (!question) {
     return isError ? (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center animate-fade-in">
-        <AlertCircle className="h-9 w-9 text-red-400" />
-        <p className="text-sm font-semibold text-red-700">详情加载失败</p>
+        <AlertCircle className="h-9 w-9 text-destructive" aria-hidden="true" />
+        <p className="text-sm font-semibold text-destructive">详情加载失败</p>
         <Button variant="secondary" size="sm" onClick={onRetry}>重新加载</Button>
       </div>
     ) : (
@@ -88,88 +89,87 @@ export function QuestionSideDetailPanel({
     <div
       ref={scrollRef}
       key={question.id}
-      className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 animate-fade-in [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="min-h-0 flex-1 overflow-y-auto pr-1 animate-fade-in [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      <div className="sticky top-0 z-10 -mx-1 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/96 px-1 pb-4 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-white/88">
-        <div className="min-w-0">
-          <p className="font-mono text-xs uppercase tracking-[0.28em] text-[var(--color-text-hint)]">
-            Question
-          </p>
-          <h3 className="mt-2 text-2xl font-bold text-[var(--ink)]">
-            题目 #{question.id}
-          </h3>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <TypeBadge type={question.question_type} />
-            <DifficultyBadge difficulty={question.difficulty} />
+      <div className="sticky top-0 z-10 -mx-1 border-b border-border bg-card/96 px-1 pb-4 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-card/88">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[20px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
+              题目 #{question.id}
+            </h3>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <TypeBadge type={question.question_type} />
+              <DifficultyBadge difficulty={question.difficulty} />
+              <StatusBadge variant="compact" tone={question.is_active ? "success" : "neutral"}>
+                {question.is_active ? "已启用" : "已停用"}
+              </StatusBadge>
+            </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {copyButton}
-          <Button
-            variant="secondary"
-            onClick={onOpenFullDetail}
-            className="shrink-0 rounded-lg border-slate-200 bg-white shadow-none transition hover:bg-slate-50"
-          >
-            完整详情
-          </Button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {copyButton}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenFullDetail}
+              className="h-8 rounded-[8px] border-border bg-card px-2.5 text-[11px] shadow-none hover:bg-secondary/50"
+            >
+              完整详情
+            </Button>
+          </div>
         </div>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
-        <p className="mb-3 flex items-center justify-between gap-3 font-semibold text-[var(--ink)]">
-          <span>题干</span>
-          <span className="font-mono text-[11px] font-normal text-[var(--color-text-hint)]">
-            #{question.id}
-          </span>
-        </p>
-        <div className="whitespace-pre-wrap text-base leading-8 text-[var(--ink)]">
-          <QuestionContentRenderer
-            content={question.content}
-            fallbackText={textFromContent(question.content)}
-            preserveCodeText
-          />
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="font-semibold text-[var(--ink)]">选项</p>
-        <div className="mt-3">
-          {isMultiBlankChoice(question.question_type) ? (
-            <MultiBlankQuestionOptions groups={resolveQuestionBlankOptionGroups(question)} />
-          ) : (
-            <QuestionOptions
-              options={normalizeQuestionOptions(resolveQuestionOptions(question))}
+      <div className="divide-y divide-border">
+        <section className="py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold text-muted-foreground">题干</p>
+            <span className="font-mono text-[10px] text-muted-foreground">#{question.id}</span>
+          </div>
+          <div className="mt-2 whitespace-pre-wrap text-[14px] leading-7 text-foreground">
+            <QuestionContentRenderer
+              content={question.content}
+              fallbackText={textFromContent(question.content)}
+              preserveCodeText
             />
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="font-semibold text-slate-950">答案</p>
-        <div className="mt-2 inline-flex min-h-9 items-center rounded-md bg-slate-50 px-2.5 py-1.5 text-sm font-semibold leading-6 text-slate-800">
-          <QuestionAnswerDisplay questionType={question.question_type} answer={question.answer} />
-        </div>
-      </section>
+        <section className="py-4">
+          <p className="text-[11px] font-semibold text-muted-foreground">选项</p>
+          <div className="mt-2">
+            {isMultiBlankChoice(question.question_type) ? (
+              <MultiBlankQuestionOptions groups={resolveQuestionBlankOptionGroups(question)} />
+            ) : (
+              <QuestionOptions
+                options={normalizeQuestionOptions(resolveQuestionOptions(question))}
+              />
+            )}
+          </div>
+        </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="font-semibold text-slate-950">解析</p>
-        <div className="mt-3">
-          <QuestionAnalysis value={question.analysis} compact />
-        </div>
-      </section>
+        <section className="py-4">
+          <p className="text-[11px] font-semibold text-muted-foreground">答案</p>
+          <div className="mt-2 inline-flex min-h-8 items-center rounded-[6px] bg-secondary/60 px-2.5 py-1.5 text-[13px] font-semibold leading-5 text-foreground">
+            <QuestionAnswerDisplay questionType={question.question_type} answer={question.answer} />
+          </div>
+        </section>
+
+        <section className="py-4">
+          <p className="text-[11px] font-semibold text-muted-foreground">解析</p>
+          <div className="mt-2">
+            <QuestionAnalysis value={question.analysis} compact />
+          </div>
+        </section>
+      </div>
 
       <QuestionSecondaryInfo question={question} />
 
-      <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-4">
+      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         {canWrite ? (
-          <Button variant="secondary" onClick={onEdit}>
-            编辑
-          </Button>
+          <Button variant="secondary" size="sm" onClick={onEdit}>编辑</Button>
         ) : null}
         {canDelete ? (
-          <Button variant="danger" onClick={onDelete}>
-            删除
-          </Button>
+          <Button variant="danger" size="sm" onClick={onDelete}>删除</Button>
         ) : null}
       </div>
     </div>

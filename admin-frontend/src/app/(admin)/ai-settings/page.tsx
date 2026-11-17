@@ -1,11 +1,24 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Ban, Power, Save, Sparkles, SlidersHorizontal, CheckCircle2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Ban,
+  Bot,
+  LayoutDashboard,
+  Power,
+  Save,
+  ScanText,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Toggle } from "@/components/ui/toggle";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -21,13 +34,13 @@ import { resolveAiModels, computeUsageRate } from "@/lib/ai-model-resolver";
 
 type Tab = "overview" | "models" | "ocr" | "completion" | "vector" | "system";
 
-const TABS: { key: Tab; label: string; icon: string; color: string }[] = [
-  { key: "overview", label: "总览", icon: "📊", color: "#5b7b9a" },
-  { key: "models", label: "模型", icon: "🤖", color: "#6b9b6b" },
-  { key: "ocr", label: "OCR", icon: "📝", color: "#c49a6b" },
-  { key: "completion", label: "补全", icon: "✨", color: "#9a7aba" },
-  { key: "vector", label: "向量", icon: "🔍", color: "#5b7b9a" },
-  { key: "system", label: "系统", icon: "⚙️", color: "#c47a7a" },
+const TABS: { key: Tab; label: string; icon: ReactNode; color: string }[] = [
+  { key: "overview", label: "总览", icon: <LayoutDashboard className="h-3.5 w-3.5" />, color: "#5b7b9a" },
+  { key: "models", label: "模型", icon: <Bot className="h-3.5 w-3.5" />, color: "#6b9b6b" },
+  { key: "ocr", label: "OCR", icon: <ScanText className="h-3.5 w-3.5" />, color: "#c49a6b" },
+  { key: "completion", label: "补全", icon: <Sparkles className="h-3.5 w-3.5" />, color: "#9a7aba" },
+  { key: "vector", label: "向量", icon: <Search className="h-3.5 w-3.5" />, color: "#5b7b9a" },
+  { key: "system", label: "系统", icon: <Settings2 className="h-3.5 w-3.5" />, color: "#c47a7a" },
 ];
 
 export default function AISettingsPage() {
@@ -41,7 +54,7 @@ export default function AISettingsPage() {
 
   function showToast(msg: string) {
     const el = document.createElement("div");
-    el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-[var(--color-success)]/30 bg-white px-5 py-3 text-sm font-semibold text-[var(--color-success)] shadow-[var(--shadow-card)] animate-rise-in";
+    el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
     el.innerHTML = `<svg class="-mt-0.5 mr-1.5 inline-block h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${msg}`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2500);
@@ -111,11 +124,11 @@ export default function AISettingsPage() {
   if (!isSuperAdmin) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-danger-light)]">
-          <Ban className="h-8 w-8 text-[var(--color-danger)]" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive-light">
+          <Ban className="h-8 w-8 text-destructive" />
         </div>
-        <h3 className="text-xl font-semibold text-[var(--ink)]">权限不足</h3>
-        <p className="max-w-sm text-sm text-[var(--color-text-secondary)]">仅超级管理员可访问 AI 解析设置页面</p>
+        <h1 className="text-xl font-semibold text-foreground">权限不足</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">仅超级管理员可访问 AI 解析设置页面</p>
       </div>
     );
   }
@@ -123,32 +136,27 @@ export default function AISettingsPage() {
   const activeTabMeta = TABS.find((t) => t.key === activeTab)!;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 shadow-[var(--shadow-card)] animate-rise-in">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border)]/60 px-5 py-4">
-        <div>
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-[var(--color-text-hint)]">
-            AI Operations Center
-          </p>
-          <h2 className="mt-1 font-display text-xl font-bold text-[var(--ink)]">AI 解析设置</h2>
-          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
-            管理 OCR 纠错、题目补全、AI 解析生成等能力
-          </p>
-        </div>
+    <ManagementPage className="space-y-5">
+    <ManagementPageHeader
+      icon={<Sparkles className="h-4 w-4" />}
+      title="AI 解析设置"
+      description="管理 OCR 纠错、题目补全、AI 解析生成等能力。"
+      actions={
         <span
           className={cn(
             "rounded-full px-3 py-1 text-[11px] font-semibold",
             current?.ai_parse_enabled
-              ? "bg-[var(--color-success-light)] text-[var(--color-success)]"
-              : "bg-[var(--color-danger-light)] text-[var(--color-danger)]",
+              ? "bg-success-light text-success"
+              : "bg-destructive-light text-destructive",
           )}
         >
           {current?.ai_parse_enabled ? "● 解析开启" : "● 全局关闭"}
         </span>
-      </div>
-
+      }
+    />
+    <div className="admin-panel overflow-hidden rounded-2xl animate-rise-in">
       {/* ── Tab bar ── */}
-      <div className="flex border-b border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/30">
+      <div className="flex border-b border-border/60 bg-muted/30">
         {TABS.map((t) => {
           const active = activeTab === t.key;
           return (
@@ -158,14 +166,14 @@ export default function AISettingsPage() {
               onClick={() => setActiveTab(t.key)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs transition-all",
-                active ? "font-semibold" : "font-medium text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]",
+                active ? "font-semibold" : "font-medium text-muted-foreground/70 hover:text-muted-foreground",
               )}
               style={{
                 color: active ? t.color : undefined,
                 borderBottom: active ? `2px solid ${t.color}` : "2px solid transparent",
               }}
             >
-              <span className="text-sm">{t.icon}</span>
+              {t.icon}
               {t.label}
             </button>
           );
@@ -178,7 +186,7 @@ export default function AISettingsPage() {
         {activeTab === "overview" && (
           <div className="space-y-5 animate-rise-in">
             {stats.isError ? (
-              <p className="rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-4 py-3 text-sm text-[var(--color-danger)]">
+              <p className="rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(stats.error)}
               </p>
             ) : (
@@ -199,7 +207,7 @@ export default function AISettingsPage() {
         {activeTab === "ocr" && (
           <div className="animate-rise-in">
             {configs.isError && (
-              <p className="mb-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-4 py-3 text-sm text-[var(--color-danger)]">
+              <p className="mb-4 rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(configs.error)}
               </p>
             )}
@@ -211,7 +219,7 @@ export default function AISettingsPage() {
         {activeTab === "completion" && (
           <div className="animate-rise-in">
             {configs.isError && (
-              <p className="mb-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-4 py-3 text-sm text-[var(--color-danger)]">
+              <p className="mb-4 rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(configs.error)}
               </p>
             )}
@@ -239,15 +247,15 @@ export default function AISettingsPage() {
 
             {/* Error */}
             {settings.isError && (
-              <p className="rounded-lg border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-3 py-2 text-sm text-[var(--color-danger)]">
+              <p className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-sm text-destructive">
                 {getErrorMessage(settings.error)}
               </p>
             )}
 
             {/* Warning */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning-light)] px-3 py-2.5">
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-warning)]" />
-              <p className="text-[11px] leading-5 text-[var(--color-text-secondary)]">
+            <div className="flex items-start gap-2.5 rounded-lg border border-warning/25 bg-warning-light px-3 py-2.5">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning-foreground" />
+              <p className="text-[11px] leading-5 text-muted-foreground">
                 全局关闭后所有管理员都不能新建 AI 解析任务，super_admin 也受影响；月度额度为全局 API
                 调用量，super_admin 不受额度限制。
               </p>
@@ -255,15 +263,15 @@ export default function AISettingsPage() {
 
             {/* Toggle + limit */}
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-bg-input)] p-4">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted p-4">
                 <div className="flex items-start gap-2.5">
                   <Power
                     className="mt-0.5 h-4 w-4"
-                    style={{ color: enabled ? "var(--color-success)" : "var(--color-text-hint)" }}
+                    style={{ color: enabled ? "var(--success)" : "var(--muted-foreground)" }}
                   />
                   <div>
-                    <span className="text-sm font-semibold text-[var(--ink)]">全局 AI 解析</span>
-                    <p className="mt-0.5 text-[11px] text-[var(--color-text-hint)]">关闭后拒绝创建新任务</p>
+                    <span className="text-sm font-semibold text-foreground">全局 AI 解析</span>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/70">关闭后拒绝创建新任务</p>
                   </div>
                 </div>
                 <Toggle
@@ -273,12 +281,12 @@ export default function AISettingsPage() {
                 />
               </div>
 
-              <div className="rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-bg-input)] p-4">
-                <span className="text-sm font-semibold text-[var(--ink)]">月度 API 调用额度</span>
-                <p className="mt-0.5 text-[11px] text-[var(--color-text-hint)]">0 = 不限制；仅限制非 super_admin</p>
+              <div className="rounded-xl border border-border/60 bg-muted p-4">
+                <span className="text-sm font-semibold text-foreground">月度 API 调用额度</span>
+                <p className="mt-0.5 text-[11px] text-muted-foreground/70">0 = 不限制；仅限制非 super_admin</p>
                 <div className="relative mt-2">
                   <input
-                    className="h-9 w-full rounded-lg border border-[var(--color-border)] bg-white pl-3 pr-10 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+                    className="h-9 w-full rounded-lg border border-border bg-card pl-3 pr-10 text-sm outline-none transition-colors focus:border-primary"
                     min={0}
                     step={1}
                     type="number"
@@ -286,20 +294,20 @@ export default function AISettingsPage() {
                     onChange={(e) => setMonthlyLimit(e.target.value)}
                     disabled={!current || updateMutation.isPending}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-text-hint)]">次</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70">次</span>
                 </div>
               </div>
             </div>
 
             {/* Usage progress */}
-            <div className="rounded-xl border border-[var(--color-border)]/60 bg-white/70 p-4">
+            <div className="rounded-xl border border-border/60 bg-card/70 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-[var(--color-primary)]" />
-                  <span className="text-sm font-semibold text-[var(--ink)]">本月使用进度</span>
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">本月使用进度</span>
                 </div>
-                <span className="text-sm tabular-nums text-[var(--color-text-secondary)]">
-                  <span className="font-semibold text-[var(--ink)]">
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  <span className="font-semibold text-foreground">
                     {current?.current_usage.call_count.toLocaleString("zh-CN") ?? 0}
                   </span>
                   {" / "}
@@ -309,9 +317,9 @@ export default function AISettingsPage() {
                   <span className="ml-2">{usageRate}%</span>
                 </span>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--color-primary-light)]">
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-accent">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] transition-all duration-700"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent-foreground transition-all duration-700"
                   style={{ width: `${usageRate}%` }}
                 />
               </div>
@@ -336,5 +344,6 @@ export default function AISettingsPage() {
         onConfirm={save}
       />
     </div>
+    </ManagementPage>
   );
 }

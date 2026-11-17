@@ -10,7 +10,6 @@ import {
   SEVERITY_LABELS,
   STATUS_LABELS,
   RESOURCE_TYPE_LABELS,
-  actionLabel,
 } from "./action-labels";
 import type { SelectOption } from "@/components/ui/custom-select";
 
@@ -110,7 +109,7 @@ export function AuditLogFilters({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
         {/* Search */}
         <div className="relative xl:col-span-2">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
           <Input
             className="pl-9 pr-8"
             placeholder="搜索操作、资源、操作人或资源 ID"
@@ -120,7 +119,7 @@ export function AuditLogFilters({
           />
           {localKeyword && (
             <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-hint)] transition-colors hover:text-[var(--ink)]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 transition-colors hover:text-foreground"
               onClick={clearKeyword}
               aria-label="清除搜索"
             >
@@ -168,7 +167,7 @@ export function AuditLogFilters({
 
       {/* Row 2: date range + actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-medium text-[var(--color-text-secondary)]">日期范围</span>
+        <span className="text-xs font-medium text-muted-foreground">日期范围</span>
         <Input
           className="h-11 w-auto min-w-[140px] flex-1 sm:flex-none sm:w-40"
           type="date"
@@ -176,7 +175,7 @@ export function AuditLogFilters({
           onChange={(e) => onFilterChange({ dateFrom: e.target.value })}
           aria-label="开始日期"
         />
-        <span className="text-[var(--color-text-hint)]">—</span>
+        <span className="text-muted-foreground/70">—</span>
         <Input
           className="h-11 w-auto min-w-[140px] flex-1 sm:flex-none sm:w-40"
           type="date"
@@ -185,7 +184,7 @@ export function AuditLogFilters({
           aria-label="结束日期"
         />
         {(dateFrom || dateTo) && (
-          <span className="text-xs text-[var(--color-text-hint)]">默认查询近 183 天</span>
+          <span className="text-xs text-muted-foreground/70">默认查询近 183 天</span>
         )}
 
         <div className="ml-auto flex gap-2">
@@ -203,12 +202,12 @@ export function AuditLogFilters({
       {/* Active filter indicator */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[var(--color-text-hint)]">
+          <span className="text-xs text-muted-foreground/70">
             已启用 {activeFilterCount} 个筛选条件
           </span>
           <button
             onClick={onReset}
-            className="text-xs text-[var(--color-primary)] underline-offset-2 hover:underline"
+            className="text-xs text-primary underline-offset-2 hover:underline"
           >
             清除全部
           </button>

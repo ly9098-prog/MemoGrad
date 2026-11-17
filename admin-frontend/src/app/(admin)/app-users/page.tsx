@@ -13,7 +13,13 @@ import {
   UsersRound,
   UserX,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+  MetricCard,
+  MetricStrip,
+} from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +27,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type { AppUser, PaginatedResponse } from "@/lib/api/types";
 import { chinaDateString, chinaDateToUtcIso, formatChinaDateTime } from "@/lib/time";
@@ -36,7 +43,6 @@ import {
   endOfChinaDateUtcIso,
   type UserAction,
   type UserStatusFilter,
-  type PaginationItem,
 } from "@/lib/app-user-utils";
 
 type ConfirmState = {
@@ -68,52 +74,14 @@ function UserAvatar({ user }: { user: AppUser }) {
       <img
         src={user.avatar_url}
         alt=""
-        className="h-9 w-9 shrink-0 rounded-full border border-[var(--color-border-light)] bg-[var(--color-primary-light)] object-cover"
+        className="h-9 w-9 shrink-0 rounded-full border border-border bg-accent object-cover"
       />
     );
   }
 
   return (
-    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--color-primary)]/15 bg-[var(--color-primary-light)] text-sm font-bold text-[var(--color-primary-dark)]">
+    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-primary/15 bg-accent text-sm font-bold text-primary">
       {initial}
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  helper,
-  icon,
-  tone = "primary",
-  loading,
-}: {
-  label: string;
-  value: number;
-  helper: string;
-  icon: ReactNode;
-  tone?: "primary" | "success" | "danger" | "neutral";
-  loading?: boolean;
-}) {
-  const toneClass = {
-    primary: "border-[var(--color-primary)]/15 bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
-    success: "border-[var(--color-success)]/15 bg-[var(--color-success-light)] text-[var(--color-success)]",
-    danger: "border-[var(--color-danger)]/15 bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-    neutral: "border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]",
-  }[tone];
-
-  return (
-    <div className="rounded-2xl border border-[var(--color-border-light)] bg-white/80 p-4 shadow-[0_1px_3px_rgba(27,39,51,0.04)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-[var(--color-text-secondary)]">{label}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--ink)] tabular-nums">
-            {loading ? <span className="inline-block h-7 w-16 animate-pulse rounded-lg bg-[var(--color-border-light)]" /> : value.toLocaleString("zh-CN")}
-          </p>
-        </div>
-        <span className={cn("grid h-9 w-9 place-items-center rounded-xl border", toneClass)}>{icon}</span>
-      </div>
-      <p className="mt-2 text-[11px] text-[var(--color-text-hint)]">{helper}</p>
     </div>
   );
 }
@@ -362,27 +330,81 @@ export default function AppUsersPage() {
   };
 
   return (
-    <div className="relative mx-auto w-full max-w-[1600px] space-y-5 pb-6">
+    <ManagementPage className="space-y-5 pb-6">
+      <ManagementPageHeader
+        icon={<UsersRound className="h-5 w-5" />}
+        title="小程序用户"
+        description="查询、筛选并管理小程序用户的账号状态与封禁记录。"
+        meta={<span>用户身份以微信 openid 为准；封禁只影响使用权限，不删除历史数据。</span>}
+      />
       {(manualRefreshing || (users.isLoading && !hasDisplayedUsers)) ? (
         <div
-          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-[rgba(245,244,239,0.58)] backdrop-blur-[2px]"
+          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
           role="status"
           aria-live="polite"
           aria-label="正在加载数据"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-border-light)] bg-white/95 px-5 py-3.5 text-sm font-medium text-[var(--color-text-secondary)] shadow-[0_18px_50px_rgba(35,49,42,0.14)]">
-            <RefreshCw className="h-5 w-5 animate-spin text-[var(--color-primary)]" />
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-popover/95 px-5 py-3.5 text-sm font-medium text-muted-foreground shadow-[0_18px_50px_rgba(35,49,42,0.14)]">
+            <RefreshCw className="h-5 w-5 animate-spin text-primary" />
             <span>加载中…</span>
           </div>
         </div>
       ) : null}
-      <Card className="overflow-visible rounded-2xl">
-        <CardContent className="p-4 lg:p-5">
+      <MetricStrip className="grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="用户总数"
+          value={totalUsers.data?.total ?? 0}
+          hint="全部小程序用户"
+          icon={<UsersRound className="h-4 w-4" />}
+          loading={totalUsers.isLoading}
+        />
+        <MetricCard
+          label="正常用户"
+          value={activeUsers.data?.total ?? 0}
+          hint="当前可正常使用"
+          icon={<UserCheck className="h-4 w-4" />}
+          tone="success"
+          loading={activeUsers.isLoading}
+        />
+        <MetricCard
+          label="封禁用户"
+          value={bannedUsers.data?.total ?? 0}
+          hint="当前限制使用"
+          icon={<UserX className="h-4 w-4" />}
+          tone="danger"
+          loading={bannedUsers.isLoading}
+        />
+        <MetricCard
+          label="今日新增"
+          value={todayUsers.data?.total ?? 0}
+          hint={`北京时间 ${today}`}
+          icon={<UserPlus className="h-4 w-4" />}
+          loading={todayUsers.isLoading}
+        />
+      </MetricStrip>
+
+      {notice ? (
+        <div
+          role="status"
+          className={cn(
+            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm",
+            notice.tone === "success"
+              ? "border-success/25 bg-success-light text-success"
+              : "border-destructive/25 bg-destructive-light text-destructive",
+          )}
+        >
+          {notice.tone === "success" ? <ShieldCheck className="h-4 w-4 shrink-0" /> : <UserX className="h-4 w-4 shrink-0" />}
+          <span>{notice.text}</span>
+        </div>
+      ) : null}
+
+      <Card className="overflow-hidden rounded-2xl">
+        <div className="border-b border-border/70 bg-secondary/20 p-4 lg:p-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <label className="relative min-w-0 flex-1 xl:max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
-                className="h-10 bg-white pl-9"
+                className="h-10 bg-card pl-9"
                 placeholder="搜索 OpenID / 昵称"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
@@ -401,11 +423,11 @@ export default function AppUsersPage() {
                 className="w-full sm:min-w-32 xl:w-36"
               />
 
-              <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-3">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3">
                 <input
                   type="date"
                   aria-label="开始日期"
-                  className="h-[38px] min-w-0 bg-transparent text-xs text-[var(--color-text-secondary)] outline-none"
+                  className="h-[38px] min-w-0 bg-transparent text-xs text-muted-foreground outline-none"
                   value={dateFrom}
                   max={dateTo || undefined}
                   onChange={(event) => {
@@ -413,11 +435,11 @@ export default function AppUsersPage() {
                     setPage(1);
                   }}
                 />
-                <span className="text-[var(--color-text-hint)]">—</span>
+                <span className="text-muted-foreground/70">—</span>
                 <input
                   type="date"
                   aria-label="结束日期"
-                  className="h-[38px] min-w-0 bg-transparent text-xs text-[var(--color-text-secondary)] outline-none"
+                  className="h-[38px] min-w-0 bg-transparent text-xs text-muted-foreground outline-none"
                   value={dateTo}
                   min={dateFrom || undefined}
                   onChange={(event) => {
@@ -438,61 +460,9 @@ export default function AppUsersPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <MetricCard
-          label="用户总数"
-          value={totalUsers.data?.total ?? 0}
-          helper="全部小程序用户"
-          icon={<UsersRound className="h-4 w-4" />}
-          loading={totalUsers.isLoading}
-        />
-        <MetricCard
-          label="正常用户"
-          value={activeUsers.data?.total ?? 0}
-          helper="当前可正常使用"
-          icon={<UserCheck className="h-4 w-4" />}
-          tone="success"
-          loading={activeUsers.isLoading}
-        />
-        <MetricCard
-          label="封禁用户"
-          value={bannedUsers.data?.total ?? 0}
-          helper="当前限制使用"
-          icon={<UserX className="h-4 w-4" />}
-          tone="danger"
-          loading={bannedUsers.isLoading}
-        />
-        <MetricCard
-          label="今日新增"
-          value={todayUsers.data?.total ?? 0}
-          helper={`北京时间 ${today}`}
-          icon={<UserPlus className="h-4 w-4" />}
-          tone="neutral"
-          loading={todayUsers.isLoading}
-        />
-      </section>
-
-      {notice ? (
-        <div
-          role="status"
-          className={cn(
-            "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm",
-            notice.tone === "success"
-              ? "border-[var(--color-success)]/25 bg-[var(--color-success-light)] text-[var(--color-success)]"
-              : "border-[var(--color-danger)]/25 bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-          )}
-        >
-          {notice.tone === "success" ? <ShieldCheck className="h-4 w-4 shrink-0" /> : <UserX className="h-4 w-4 shrink-0" />}
-          <span>{notice.text}</span>
         </div>
-      ) : null}
-
-      <Card className="overflow-visible rounded-2xl">
         <CardContent className="p-0">
-          <div className="flex flex-col gap-3 border-b border-[var(--color-border-light)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
+          <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
             <div className="flex items-center gap-3">
               <CustomSelect
                 value={batchAction}
@@ -509,7 +479,7 @@ export default function AppUsersPage() {
                 disabled={!selectedIds.size || actionMutation.isPending}
                 className="w-44"
               />
-              {selectedIds.size ? <span className="text-xs text-[var(--color-text-hint)]">仅操作当前页选中用户</span> : null}
+              {selectedIds.size ? <span className="text-xs text-muted-foreground/70">仅操作当前页选中用户</span> : null}
             </div>
             <Button variant="ghost" size="sm" onClick={refreshAll} disabled={manualRefreshing} className="self-start sm:self-auto">
               <RefreshCw className={cn("h-4 w-4", manualRefreshing && "animate-spin")} />
@@ -519,8 +489,8 @@ export default function AppUsersPage() {
 
           <div className="relative overflow-x-auto">
             <table className="w-full min-w-[940px] border-collapse text-sm">
-              <thead className="bg-[rgba(232,240,245,0.55)] text-left">
-                <tr className="border-b border-[var(--color-border-light)]">
+              <thead className="bg-secondary/50 text-left">
+                <tr className="border-b border-border">
                   <th className="w-12 px-4 py-3 lg:px-5">
                     <CustomCheckbox
                       checked={allPageSelected}
@@ -536,7 +506,7 @@ export default function AppUsersPage() {
                     ["状态", "w-28"],
                     ["操作", "w-36"],
                   ].map(([label, width]) => (
-                    <th key={label} className={cn("px-4 py-3 text-[11px] font-semibold tracking-[0.08em] text-[var(--color-text-secondary)]", width)}>
+                    <th key={label} className={cn("px-4 py-3 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground", width)}>
                       {label}
                     </th>
                   ))}
@@ -545,22 +515,22 @@ export default function AppUsersPage() {
               <tbody>
                 {users.isLoading && !hasDisplayedUsers ? (
                   Array.from({ length: Math.min(pageSize, 8) }, (_, index) => (
-                    <tr key={index} className="border-b border-[var(--color-border-light)] last:border-b-0">
-                      <td className="px-4 py-3 lg:px-5"><div className="h-[18px] w-[18px] animate-pulse rounded bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-3"><div className="h-10 w-56 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-3"><div className="h-6 w-14 animate-pulse rounded-full bg-[var(--color-border-light)]" /></td>
-                      <td className="px-4 py-3"><div className="h-8 w-20 animate-pulse rounded-lg bg-[var(--color-border-light)]" /></td>
+                    <tr key={index} className="border-b border-border last:border-b-0">
+                      <td className="px-4 py-3 lg:px-5"><div className="h-[18px] w-[18px] animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-10 w-56 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-6 w-14 animate-pulse rounded-full bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-8 w-20 animate-pulse rounded-lg bg-border" /></td>
                     </tr>
                   ))
                 ) : users.isError && !hasDisplayedUsers ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center text-sm text-[var(--color-danger)]">用户列表加载失败，请点击刷新后重试。</td>
+                    <td colSpan={6} className="px-5 py-16 text-center text-sm text-destructive">用户列表加载失败，请点击刷新后重试。</td>
                   </tr>
                 ) : currentItems.length ? (
                   currentItems.map((user) => (
-                    <tr key={user.id} className="border-b border-[var(--color-border-light)] transition-colors last:border-b-0 hover:bg-[rgba(74,111,138,0.035)]">
+                    <tr key={user.id} className="border-b border-border transition-colors last:border-b-0 hover:bg-accent/40">
                       <td className="px-4 py-3 lg:px-5">
                         <CustomCheckbox
                           checked={selectedIds.has(user.id)}
@@ -568,21 +538,21 @@ export default function AppUsersPage() {
                           aria-label={`选择用户 ${user.nickname || user.openid}`}
                         />
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-[var(--color-text-secondary)] tabular-nums">{user.id}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-muted-foreground tabular-nums">{user.id}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <UserAvatar user={user} />
                           <div className="min-w-0">
-                            <div className="truncate font-semibold text-[var(--ink)]">{user.nickname || "未设置昵称"}</div>
-                            <div className="mt-0.5 max-w-[320px] truncate font-mono text-[11px] text-[var(--color-text-hint)]">{user.openid}</div>
+                            <div className="truncate font-semibold text-foreground">{user.nickname || "未设置昵称"}</div>
+                            <div className="mt-0.5 max-w-[320px] truncate font-mono text-[11px] text-muted-foreground/70">{user.openid}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         {user.banned_reason ? (
-                          <span className="line-clamp-2 max-w-sm text-xs leading-5 text-[var(--color-text-secondary)]" title={user.banned_reason}>{user.banned_reason}</span>
+                          <span className="line-clamp-2 max-w-sm text-xs leading-5 text-muted-foreground" title={user.banned_reason}>{user.banned_reason}</span>
                         ) : (
-                          <span className="text-[var(--color-text-hint)]">—</span>
+                          <span className="text-muted-foreground/70">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -596,7 +566,7 @@ export default function AppUsersPage() {
                           onClick={() => openSingleAction(user)}
                           className={cn(
                             "h-8 min-w-20 rounded-lg px-2.5 text-xs shadow-none",
-                            !user.is_banned && "border border-[var(--color-danger)]/20 text-[var(--color-danger)] hover:border-[var(--color-danger)]/35 hover:bg-[var(--color-danger-light)] hover:text-[var(--color-danger)]",
+                            !user.is_banned && "border border-destructive/20 text-destructive hover:border-destructive/35 hover:bg-destructive-light hover:text-destructive",
                           )}
                         >
                           {user.is_banned ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
@@ -608,9 +578,9 @@ export default function AppUsersPage() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-5 py-16 text-center">
-                      <UsersRound className="mx-auto h-8 w-8 text-[var(--color-text-hint)]" />
-                      <p className="mt-3 text-sm font-medium text-[var(--color-text-secondary)]">暂无符合条件的用户</p>
-                      <p className="mt-1 text-xs text-[var(--color-text-hint)]">可调整搜索词、状态或日期范围后重新查询。</p>
+                      <UsersRound className="mx-auto h-8 w-8 text-muted-foreground/70" />
+                      <p className="mt-3 text-sm font-medium text-muted-foreground">暂无符合条件的用户</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">可调整搜索词、状态或日期范围后重新查询。</p>
                     </td>
                   </tr>
                 )}
@@ -618,9 +588,9 @@ export default function AppUsersPage() {
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-[var(--color-border-light)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between lg:px-5">
-            <div className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-              <span>共 <strong className="font-semibold text-[var(--ink)]">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 条</span>
+          <div className="flex flex-col gap-3 border-t border-border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between lg:px-5">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>共 <strong className="font-semibold text-foreground">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 条</span>
               <CustomSelect
                 value={String(pageSize)}
                 onChange={(value) => {
@@ -639,7 +609,7 @@ export default function AppUsersPage() {
                 aria-label="上一页"
                 disabled={page <= 1}
                 onClick={() => setPage((value) => Math.max(1, value - 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-sm text-[var(--color-text-secondary)] transition hover:border-[var(--color-border)] hover:bg-white disabled:pointer-events-none disabled:opacity-30"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-sm text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
               >
                 ‹
               </button>
@@ -653,14 +623,14 @@ export default function AppUsersPage() {
                     className={cn(
                       "grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold transition",
                       page === item
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
-                        : "border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-white",
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-transparent text-muted-foreground hover:border-border hover:bg-accent",
                     )}
                   >
                     {item}
                   </button>
                 ) : (
-                  <span key={item} className="grid h-8 w-7 place-items-center text-xs text-[var(--color-text-hint)]">…</span>
+                  <span key={item} className="grid h-8 w-7 place-items-center text-xs text-muted-foreground/70">…</span>
                 ),
               )}
               <button
@@ -668,7 +638,7 @@ export default function AppUsersPage() {
                 aria-label="下一页"
                 disabled={page >= totalPages}
                 onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-sm text-[var(--color-text-secondary)] transition hover:border-[var(--color-border)] hover:bg-white disabled:pointer-events-none disabled:opacity-30"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-sm text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
               >
                 ›
               </button>
@@ -699,18 +669,17 @@ export default function AppUsersPage() {
       >
         {confirmState?.action === "ban" ? (
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold text-[var(--color-text-secondary)]">封禁原因</span>
-            <textarea
-              className="min-h-24 w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.14)]"
+            <span className="mb-2 block text-xs font-semibold text-muted-foreground">封禁原因</span>
+            <Textarea
               placeholder="请输入封禁原因"
               value={banReason}
               maxLength={256}
               onChange={(event) => setBanReason(event.target.value)}
             />
-            <span className="mt-1.5 block text-right text-[10px] text-[var(--color-text-hint)]">{banReason.length}/256</span>
+            <span className="mt-1.5 block text-right text-[10px] text-muted-foreground/70">{banReason.length}/256</span>
           </label>
         ) : null}
       </ConfirmDialog>
-    </div>
+    </ManagementPage>
   );
 }

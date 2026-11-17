@@ -42,16 +42,16 @@ type QuestionDrawerBodyProps = {
 function DetailError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 px-7 text-center">
-      <AlertCircle className="h-8 w-8 text-red-400" />
+      <AlertCircle className="h-8 w-8 text-destructive/70" />
       <div>
-        <p className="text-sm font-semibold text-red-700">题目详情加载失败</p>
-        <p className="mt-1 text-xs text-slate-400">请检查网络连接后重试。</p>
+        <p className="text-sm font-semibold text-destructive">题目详情加载失败</p>
+        <p className="mt-1 text-xs text-muted-foreground/60">请检查网络连接后重试。</p>
       </div>
       <Button
         type="button"
         variant="secondary"
         size="sm"
-        className="border-slate-200 bg-white shadow-none"
+        className="border-border bg-card shadow-none"
         onClick={onRetry}
       >
         <RotateCcw className="h-3.5 w-3.5" />
@@ -64,9 +64,9 @@ function DetailError({ onRetry }: { onRetry: () => void }) {
 function DetailLoading() {
   return (
     <div className="space-y-3 px-7 py-6">
-      <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
-      <div className="h-32 animate-pulse rounded-xl bg-slate-100/80" />
-      <div className="h-24 animate-pulse rounded-xl bg-slate-100/60" />
+      <div className="h-16 animate-pulse rounded-xl bg-muted" />
+      <div className="h-32 animate-pulse rounded-xl bg-muted/80" />
+      <div className="h-24 animate-pulse rounded-xl bg-muted/60" />
     </div>
   );
 }
@@ -127,13 +127,14 @@ export function QuestionDrawerBody({
     <>
       <QuestionDetailView question={question} />
       <QuestionVersionHistorySection
+        className="px-7"
         question={question}
         versions={versions}
         history={history}
         details={details}
         labels={labels}
       />
-      <QuestionSecondaryInfo question={question} />
+      <QuestionSecondaryInfo className="px-7" question={question} />
     </>
   );
 }

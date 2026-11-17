@@ -88,15 +88,15 @@ export function ReviewDrawerEditForm({
                   {/* Subject / Type */}
                   <div className="grid gap-3 md:grid-cols-2 animate-fade-up drawer-section-delay-1">
                     <div className="space-y-1">
-                      <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]/60" />
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
                         科目
                       </label>
                       <div className="relative">
                         <button
                           ref={subjectEditButtonRef}
                           type="button"
-                          className="flex h-11 w-full items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/80 px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20"
+                          className="flex h-11 w-full items-center gap-2 rounded-xl border border-border bg-card/80 px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                           onClick={() => {
                             const next = !subjectEditDropdownOpen;
                             onSubjectDropdownOpenChange(next);
@@ -107,47 +107,61 @@ export function ReviewDrawerEditForm({
                               onSubjectDropdownStyleChange({ top: r.bottom + 4, left: Math.min(r.left, maxRight - w), width: w });
                             }
                           }}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Escape" || !subjectEditDropdownOpen) return;
+                            event.preventDefault();
+                            onSubjectDropdownOpenChange(false);
+                          }}
                           onBlur={() => setTimeout(() => onSubjectDropdownOpenChange(false), 150)}
                         >
-                          <span className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left ${editState.subject_id ? "" : "text-[var(--color-text-hint)]"}`} title={editState.subject_id ? (subjectOptions.find((s) => s.id === editState.subject_id)?.name || "") : ""}>
+                          <span className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left ${editState.subject_id ? "" : "text-muted-foreground/70"}`} title={editState.subject_id ? (subjectOptions.find((s) => s.id === editState.subject_id)?.name || "") : ""}>
                             {editState.subject_id
                               ? (subjectOptions.find((s) => s.id === editState.subject_id)?.name || `#${editState.subject_id}`)
                               : "选择科目"}
                           </span>
                           {subjectsLoading ? (
-                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
+                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-primary" />
                           ) : (
-                            <ChevronDown className={`h-4 w-4 text-[var(--color-text-hint)] transition-transform ${subjectEditDropdownOpen ? "rotate-180" : ""}`} />
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground/70 transition-transform ${subjectEditDropdownOpen ? "rotate-180" : ""}`} />
                           )}
                         </button>
                         {subjectEditDropdownOpen ? createPortal(
-                          <div className="fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-[var(--color-border)] bg-white py-1 shadow-lg" style={subjectEditDropdownStyle}>
+                          <div
+                            data-focus-passthrough
+                            className="admin-content-theme fixed z-[200] max-h-56 overflow-y-auto scrollbar-hide rounded-xl border border-border bg-card py-1 shadow-lg"
+                            style={subjectEditDropdownStyle}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Escape") return;
+                              event.preventDefault();
+                              onSubjectDropdownOpenChange(false);
+                            }}
+                          >
                             <button
                               type="button"
-                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-[var(--color-primary-light)]/40 ${
+                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent/40 ${
                                 !editState.subject_id
-                                  ? "bg-[var(--color-primary-light)]/20 text-[var(--color-primary-dark)] font-semibold"
-                                  : "text-[var(--color-text-hint)]"
+                                  ? "bg-accent/20 text-accent-foreground font-semibold"
+                                  : "text-muted-foreground/70"
                               }`}
                               onMouseDown={(e) => { e.preventDefault(); onEditStateChange({ ...editState, subject_id: null }); onSubjectDropdownOpenChange(false); }}
                             >
-                              {!editState.subject_id ? <Check className="h-4 w-4 shrink-0 text-[var(--color-primary)]" /> : <span className="inline-block w-4 shrink-0" />}
+                              {!editState.subject_id ? <Check className="h-4 w-4 shrink-0 text-primary" /> : <span className="inline-block w-4 shrink-0" />}
                               不设置
                             </button>
                             {leafSubjectOptions.map((s) => (
                               <button
                                 key={s.id}
                                 type="button"
-                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-[var(--color-primary-light)]/40 ${
+                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent/40 ${
                                   editState.subject_id === s.id
-                                    ? "bg-[var(--color-primary-light)]/20 text-[var(--color-primary-dark)] font-semibold"
-                                    : "text-[var(--color-text-primary)]"
+                                    ? "bg-accent/20 text-accent-foreground font-semibold"
+                                    : "text-foreground"
                                 }`}
                                 onMouseDown={(e) => { e.preventDefault(); onEditStateChange({ ...editState, subject_id: s.id }); onSubjectDropdownOpenChange(false); }}
                               >
-                                {editState.subject_id === s.id ? <Check className="h-4 w-4 shrink-0 text-[var(--color-primary)]" /> : <span className="inline-block w-4 shrink-0" />}
+                                {editState.subject_id === s.id ? <Check className="h-4 w-4 shrink-0 text-primary" /> : <span className="inline-block w-4 shrink-0" />}
                                 <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={s.name}>{s.name}</span>
-                                <span className="ml-auto shrink-0 text-[10px] text-[var(--color-text-hint)]">{s.code}</span>
+                                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70">{s.code}</span>
                               </button>
                             ))}
                           </div>,
@@ -156,8 +170,8 @@ export function ReviewDrawerEditForm({
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]/60" />
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
                         题型
                       </label>
                       <CustomSelect
@@ -220,13 +234,13 @@ export function ReviewDrawerEditForm({
 
                   {/* AI suggestion in edit mode */}
                   {completeSuggestion ? (
-                    <section className="animate-fade-up drawer-section-delay-5 section-scroll section-scroll-ink rounded-2xl border border-[var(--color-primary)]/20 bg-gradient-to-br from-[var(--color-primary-light)]/60 to-white/90 p-4 shadow-sm">
+                    <section className="animate-fade-up drawer-section-delay-5 section-scroll section-scroll-ink rounded-2xl border border-primary/20 bg-gradient-to-br from-accent/60 to-card/90 p-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-primary)] shadow-sm">
-                            <Sparkles className="h-3.5 w-3.5 text-white" />
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary shadow-sm">
+                            <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
                           </div>
-                          <p className="text-sm font-bold text-[var(--color-primary-dark)]">AI 补全建议</p>
+                          <p className="text-sm font-bold text-accent-foreground">AI 补全建议</p>
                         </div>
                         {answerSuggestion ? (
                           <button
@@ -239,8 +253,8 @@ export function ReviewDrawerEditForm({
                             className={cn(
                               "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold shadow-sm transition",
                               answerSuggestionApplied
-                                ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-700 opacity-80"
-                                : "border-[var(--color-primary)]/30 bg-white text-[var(--color-primary-dark)] hover:bg-[var(--color-primary)] hover:text-white",
+                                ? "cursor-not-allowed border-success/30 bg-success-light text-success opacity-80"
+                                : "border-primary/30 bg-card text-accent-foreground hover:bg-primary hover:text-primary-foreground",
                             )}
                           >
                             {answerSuggestionApplied ? <Check className="h-3 w-3" /> : null}
@@ -248,7 +262,7 @@ export function ReviewDrawerEditForm({
                           </button>
                         ) : null}
                       </div>
-                      <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-primary)]/10 bg-white/80 p-3 font-mono text-[11px] leading-relaxed text-[var(--color-text-secondary)]">{renderJson(completeSuggestion)}</pre>
+                      <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-primary/10 bg-card/80 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">{renderJson(completeSuggestion)}</pre>
                     </section>
                   ) : null}
     </div>

@@ -1,9 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, FileText, Braces, Filter, Rows3, Save, Brain, WandSparkles } from "lucide-react";
+import { FileText, Braces, Filter, Rows3, Save, Brain, WandSparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -12,7 +11,7 @@ import type { AdminAiConfigsPatchRequest, AdminAiConfigsResponse } from "@/lib/a
 
 function showToast(msg: string) {
   const el = document.createElement("div");
-  el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-[var(--color-success)]/30 bg-white px-5 py-3 text-sm font-semibold text-[var(--color-success)] shadow-[var(--shadow-card)] animate-rise-in";
+  el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
   el.innerHTML = `<svg class="-mt-0.5 mr-1.5 inline-block h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${msg}`;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 2500);
@@ -84,15 +83,15 @@ function PromptPanel({ configs }: { configs: Record<string, string | number | bo
   return (
     <div className="space-y-4 animate-rise-in">
       <div>
-        <label className="block text-sm font-semibold text-[var(--ink)]">OCR 纠错 Prompt</label>
-        <p className="mt-0.5 text-xs text-[var(--color-text-hint)]">自定义 OCR 纠错提示词，修改后需要点击保存</p>
+        <label className="block text-sm font-semibold text-foreground">OCR 纠错 Prompt</label>
+        <p className="mt-0.5 text-xs text-muted-foreground/70">自定义 OCR 纠错提示词，修改后需要点击保存</p>
         <div className="relative mt-2">
           <textarea
-            className="h-80 w-full resize-y rounded-xl border border-[var(--color-border)] bg-white p-3 text-sm outline-none transition-colors focus:border-[var(--color-primary)]"
+            className="h-80 w-full resize-y rounded-xl border border-border bg-card p-3 text-sm outline-none transition-colors focus:border-primary"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
-          <WandSparkles className="absolute right-4 top-3 h-5 w-5 text-[var(--color-text-hint)]" />
+          <WandSparkles className="absolute right-4 top-3 h-5 w-5 text-muted-foreground/70" />
         </div>
       </div>
       {hasChanges && (
@@ -100,21 +99,21 @@ function PromptPanel({ configs }: { configs: Record<string, string | number | bo
           <button
             onClick={() => mutation.mutate({ configs: { ocr_correction_prompt: prompt } })}
             disabled={mutation.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-primary-dark)] bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-foreground bg-primary px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-foreground disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" />
             {mutation.isPending ? "保存中..." : "保存 Prompt"}
           </button>
           <button
             onClick={() => setPrompt(savedPrompt)}
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)]"
+            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground"
           >
             取消
           </button>
         </div>
       )}
       {mutation.isError && (
-        <p className="text-xs text-[var(--color-danger)]">{getErrorMessage(mutation.error)}</p>
+        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
       )}
     </div>
   );
@@ -151,25 +150,25 @@ function StrategyPanel({ configs }: { configs: Record<string, string | number | 
           className={cn(
             "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
             Boolean(configs[item.key])
-              ? "border-[var(--color-success)]/25 bg-[var(--color-success-light)]"
-              : "border-[var(--color-border)]/60 bg-white/60",
+              ? "border-success/25 bg-success-light"
+              : "border-border/60 bg-card/60",
           )}
         >
           <div className="flex items-center gap-3">
             <span
               className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: Boolean(configs[item.key]) ? "var(--color-success)" : "var(--color-border)" }}
+              style={{ background: Boolean(configs[item.key]) ? "var(--success)" : "var(--border)" }}
             />
             <div>
-              <span className="text-sm font-medium text-[var(--ink)]">{item.label}</span>
-              <p className="text-xs text-[var(--color-text-hint)]">{item.desc}</p>
+              <span className="text-sm font-medium text-foreground">{item.label}</span>
+              <p className="text-xs text-muted-foreground/70">{item.desc}</p>
             </div>
           </div>
           <Toggle checked={Boolean(configs[item.key])} onChange={() => toggle(item.key)} disabled={mutation.isPending} />
         </label>
       ))}
       {mutation.isError && (
-        <p className="text-xs text-[var(--color-danger)]">{getErrorMessage(mutation.error)}</p>
+        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
       )}
     </div>
   );
@@ -211,15 +210,15 @@ function FilterPanel({ configs }: { configs: Record<string, string | number | bo
     <div className="space-y-4 animate-rise-in">
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((f) => (
-          <label key={f.key} className="block rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-bg-input)] p-4">
-            <span className="text-sm font-semibold text-[var(--ink)]">{f.label}</span>
-            <p className="mt-0.5 text-xs text-[var(--color-text-hint)]">{f.desc}</p>
+          <label key={f.key} className="block rounded-xl border border-border/60 bg-muted p-4">
+            <span className="text-sm font-semibold text-foreground">{f.label}</span>
+            <p className="mt-0.5 text-xs text-muted-foreground/70">{f.desc}</p>
             <input
               type={f.type}
               value={String(getValue(f.key))}
               onChange={(e) => updateField(f.key, e.target.value)}
               disabled={mutation.isPending}
-              className="mt-2 h-10 w-full rounded-lg border border-[var(--color-border)] bg-white px-3 text-sm outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
+              className="mt-2 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary disabled:opacity-50"
             />
           </label>
         ))}
@@ -227,12 +226,12 @@ function FilterPanel({ configs }: { configs: Record<string, string | number | bo
       <label className={cn(
         "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
         Boolean(configs["ocr_filter_sensitive"])
-          ? "border-[#9a7aba]/25 bg-[#9a7aba]08"
-          : "border-[var(--color-border)]/60 bg-white/60",
+          ? "border-[#9a7aba]/25 bg-[#9a7aba]/10"
+          : "border-border/60 bg-card/60",
       )}>
         <div>
-          <span className="text-sm font-medium text-[var(--ink)]">启用敏感内容过滤</span>
-          <p className="text-xs text-[var(--color-text-hint)]">自动过滤 OCR 结果中的敏感内容</p>
+          <span className="text-sm font-medium text-foreground">启用敏感内容过滤</span>
+          <p className="text-xs text-muted-foreground/70">自动过滤 OCR 结果中的敏感内容</p>
         </div>
         <Toggle
           checked={Boolean(configs["ocr_filter_sensitive"])}
@@ -246,21 +245,21 @@ function FilterPanel({ configs }: { configs: Record<string, string | number | bo
           <button
             onClick={saveFilter}
             disabled={mutation.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-primary-dark)] bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-foreground bg-primary px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-foreground disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" />
             保存过滤设置
           </button>
           <button
             onClick={() => { setLocal({}); setDirty(false); }}
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)]"
+            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground"
           >
             取消
           </button>
         </div>
       )}
       {mutation.isError && (
-        <p className="text-xs text-[var(--color-danger)]">{getErrorMessage(mutation.error)}</p>
+        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
       )}
     </div>
   );
@@ -286,7 +285,7 @@ function StructurePanel({ configs }: { configs: Record<string, string | number |
 
   return (
     <div className="space-y-4 animate-rise-in">
-      <p className="text-sm text-[var(--color-text-secondary)]">
+      <p className="text-sm text-muted-foreground">
         当 OCR 识别结果出现结构错乱时，以下规则将被应用来自动修复题目格式。
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -297,13 +296,13 @@ function StructurePanel({ configs }: { configs: Record<string, string | number |
               "flex cursor-pointer items-center justify-between gap-2 rounded-xl border p-3 transition-colors",
               Boolean(configs[item.key])
                 ? "border-current/20"
-                : "border-[var(--color-border)]/60 bg-white/60",
+                : "border-border/60 bg-card/60",
             )}
             style={Boolean(configs[item.key]) ? { borderColor: `${item.color}30`, backgroundColor: `${item.color}08` } : undefined}
           >
             <div>
               <p className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</p>
-              <p className="mt-0.5 text-sm text-[var(--ink)]">{item.value}</p>
+              <p className="mt-0.5 text-sm text-foreground">{item.value}</p>
             </div>
             <Toggle
               checked={Boolean(configs[item.key])}
@@ -316,7 +315,7 @@ function StructurePanel({ configs }: { configs: Record<string, string | number |
         ))}
       </div>
       {mutation.isError && (
-        <p className="text-xs text-[var(--color-danger)]">保存失败，请稍后重试。</p>
+        <p className="text-xs text-destructive">保存失败，请稍后重试。</p>
       )}
     </div>
   );
@@ -332,15 +331,15 @@ export function OcrAccordion({ configs, loading, modelName }: {
   const activeItem = items.find((i) => i.id === activeTab)!;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border)]/60 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
         <div>
-          <h3 className="font-display text-xl font-bold text-[var(--ink)]">OCR 纠错配置</h3>
-          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">管理 OCR 识别结果的纠错策略和处理规则</p>
+          <h3 className="font-display text-xl font-bold text-foreground">OCR 纠错配置</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground">管理 OCR 识别结果的纠错策略和处理规则</p>
         </div>
         {modelName && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)]/60 bg-white/60 px-3 py-1.5 text-xs text-[var(--color-text-secondary)]">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-muted-foreground">
             <Brain className="h-3.5 w-3.5" />
             {modelName}
           </span>
@@ -348,7 +347,7 @@ export function OcrAccordion({ configs, loading, modelName }: {
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/30">
+      <div className="flex border-b border-border/60 bg-muted/30">
         {items.map((item) => {
           const Icon = item.icon;
           const active = activeTab === item.id;
@@ -360,7 +359,7 @@ export function OcrAccordion({ configs, loading, modelName }: {
                 "flex flex-1 items-center justify-center gap-2 py-3 text-xs font-medium transition-all",
                 active
                   ? "font-semibold"
-                  : "text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]",
+                  : "text-muted-foreground/70 hover:text-muted-foreground",
               )}
               style={{
                 color: active ? item.color : undefined,
@@ -378,8 +377,8 @@ export function OcrAccordion({ configs, loading, modelName }: {
       <div className="p-5">
         {loading ? (
           <div className="space-y-3 animate-pulse">
-            <div className="h-20 w-full rounded bg-[var(--color-border)]" />
-            <div className="h-10 w-2/3 rounded bg-[var(--color-border)]" />
+            <div className="h-20 w-full rounded bg-border" />
+            <div className="h-10 w-2/3 rounded bg-border" />
           </div>
         ) : (
           activeItem.content(data)

@@ -34,10 +34,10 @@ export function QuestionEditBasics({
     : [...QUESTION_TYPE_OPTIONS, unknownTypeOption];
 
   return (
-    <section className="border-b border-slate-200 py-5">
+    <section className="border-b border-border py-5">
       <div className="grid gap-x-4 gap-y-3 md:grid-cols-3">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[var(--color-text-secondary)]">科目</p>
+          <p className="text-xs font-semibold text-muted-foreground">科目</p>
           <CustomSelect
             value={String(editForm.subject_id ?? "")}
             onChange={(value) =>
@@ -52,11 +52,11 @@ export function QuestionEditBasics({
             }))}
             placeholder="选择科目"
             clearable={false}
-            className="rounded-lg border-slate-200 bg-slate-50/60 shadow-none hover:border-slate-400"
+            className="rounded-lg border-border bg-muted/60 shadow-none hover:border-primary/40"
           />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[var(--color-text-secondary)]">题型</p>
+          <p className="text-xs font-semibold text-muted-foreground">题型</p>
           <CustomSelect
             value={questionType}
             onChange={(value) =>
@@ -64,11 +64,11 @@ export function QuestionEditBasics({
             }
             options={typeOptions}
             clearable={false}
-            className="rounded-lg border-slate-200 bg-slate-50/60 shadow-none hover:border-slate-400"
+            className="rounded-lg border-border bg-muted/60 shadow-none hover:border-primary/40"
           />
         </div>
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[var(--color-text-secondary)]">难度</p>
+          <p className="text-xs font-semibold text-muted-foreground">难度</p>
           <CustomSelect
             value={String(editForm.difficulty ?? 3)}
             onChange={(value) =>
@@ -76,7 +76,7 @@ export function QuestionEditBasics({
             }
             options={difficultyOptions}
             clearable={false}
-            className="rounded-lg border-slate-200 bg-slate-50/60 shadow-none hover:border-slate-400"
+            className="rounded-lg border-border bg-muted/60 shadow-none hover:border-primary/40"
           />
         </div>
       </div>

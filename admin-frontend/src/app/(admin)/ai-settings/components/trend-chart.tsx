@@ -210,11 +210,11 @@ export function TrendChart({
   ];
 
   return (
-    <div className="rounded-2xl border border-[var(--color-border)]/80 bg-white/80 p-5 shadow-sm">
+    <div className="rounded-2xl border border-border/80 bg-card/80 p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="font-display text-xl font-bold text-[var(--ink)]">AI 调用趋势</h3>
-          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+          <h3 className="font-display text-xl font-bold text-foreground">AI 调用趋势</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {loading ? "加载中..." : `最近 ${period === "7d" ? "7" : "30"} 天的 AI 服务运行状况`}
           </p>
         </div>
@@ -227,26 +227,26 @@ export function TrendChart({
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
                 style={{
                   backgroundColor: series[key] ? `${color}14` : "transparent",
-                  color: series[key] ? color : "var(--color-text-hint)",
+                  color: series[key] ? color : "var(--muted-foreground)",
                 }}
               >
                 <span
                   className="h-2 w-2 rounded-full transition-all"
-                  style={{ backgroundColor: series[key] ? color : "var(--color-border)" }}
+                  style={{ backgroundColor: series[key] ? color : "var(--border)" }}
                 />
                 {label}
               </button>
             ))}
           </div>
-          <div className="flex overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] p-0.5">
+          <div className="flex overflow-hidden rounded-lg border border-border bg-muted p-0.5">
             {(["7d", "30d"] as Period[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className="rounded-md px-3 py-1 text-xs font-semibold transition-all"
                 style={{
-                  backgroundColor: period === p ? "white" : "transparent",
-                  color: period === p ? "var(--ink)" : "var(--color-text-hint)",
+                  backgroundColor: period === p ? "var(--card)" : "transparent",
+                  color: period === p ? "var(--foreground)" : "var(--muted-foreground)",
                   boxShadow: period === p ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                 }}
               >

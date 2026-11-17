@@ -24,11 +24,11 @@ export function ReviewBatchSelectionBar({
 
   return (
     <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-3 animate-drop-in sm:bottom-8">
-      <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-[var(--color-border)] bg-white/94 px-2.5 py-2 shadow-[var(--shadow-floating)] backdrop-blur-xl sm:flex-nowrap sm:gap-3 sm:rounded-full sm:pl-4 sm:pr-2">
-        <span className="whitespace-nowrap text-sm text-[var(--color-text-secondary)]">
-          已选 <strong className="text-[var(--ink)]">{selectedCount}</strong> 项
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-border bg-card/94 px-2.5 py-2 shadow-[var(--shadow-floating)] backdrop-blur-xl sm:flex-nowrap sm:gap-3 sm:rounded-full sm:pl-4 sm:pr-2">
+        <span className="whitespace-nowrap text-sm text-muted-foreground">
+          已选 <strong className="text-foreground">{selectedCount}</strong> 项
         </span>
-        <span className="hidden h-5 w-px bg-[var(--color-border)] sm:block" />
+        <span className="hidden h-5 w-px bg-border sm:block" />
         <Button
           variant="success"
           size="sm"
@@ -54,7 +54,7 @@ export function ReviewBatchSelectionBar({
         <button
           type="button"
           onClick={onClear}
-          className="grid h-8 w-8 place-items-center rounded-full text-[var(--color-text-hint)] transition-colors hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary)]"
+          className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:bg-accent hover:text-primary"
           aria-label="清除选择"
         >
           <X className="h-3.5 w-3.5" />

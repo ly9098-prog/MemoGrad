@@ -34,7 +34,7 @@ describe("review answer editor", () => {
     const view = createElement(ReviewAnswerEditor, data);
     const html = renderToStaticMarkup(view);
     expect(html).toContain("答案与解析");
-    expect(html).toMatch(/bg-\[var\(--color-success\)\] text-white shadow-sm">A<\/button>/);
+    expect(html).toMatch(/border-success bg-success text-success-foreground shadow-sm">A<\/button>/);
     clickOption(view, "A");
     clickOption(view, "B");
     expect(data.onAnswerChange.mock.calls).toEqual([[""], ["B"]]);

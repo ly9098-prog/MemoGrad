@@ -16,12 +16,12 @@ function VersionOptions({ value }: { value: unknown }) {
   }
 
   const options = normalizeQuestionOptions(value as QuestionOptionsValue | undefined);
-  if (options.length === 0) return <span className="text-xs text-slate-400">—</span>;
+  if (options.length === 0) return <span className="text-xs text-muted-foreground/60">—</span>;
   return (
     <div className="space-y-1.5">
       {options.map((option) => (
-        <div key={option.key} className="flex items-start gap-2 text-xs leading-5 text-slate-600">
-          <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 font-semibold text-slate-500">
+        <div key={option.key} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+          <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-muted font-semibold text-muted-foreground">
             {option.key}
           </span>
           <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
@@ -39,7 +39,7 @@ export function QuestionVersionValue({ label, value, emphasized = false }: {
   if (label === "题干") {
     const content = value as Record<string, unknown> | string | null | undefined;
     return (
-      <div className={`min-w-0 text-slate-600 [overflow-wrap:anywhere] ${emphasized ? "text-sm leading-7" : "text-xs leading-6"}`}>
+      <div className={`min-w-0 text-muted-foreground [overflow-wrap:anywhere] ${emphasized ? "text-sm leading-7" : "text-xs leading-6"}`}>
         <QuestionContentRenderer
           content={content}
           fallbackText={textFromContent(content)}
@@ -53,7 +53,7 @@ export function QuestionVersionValue({ label, value, emphasized = false }: {
 
   if (label === "答案") {
     return (
-      <div className="min-w-0 text-xs leading-6 text-slate-600 [overflow-wrap:anywhere]">
+      <div className="min-w-0 text-xs leading-6 text-muted-foreground [overflow-wrap:anywhere]">
         <MathFormula text={value == null || value === "" ? "—" : String(value)} />
       </div>
     );
@@ -76,9 +76,9 @@ export function QuestionVersionValue({ label, value, emphasized = false }: {
 
   if (label === "难度") {
     const difficulty = Number(value);
-    return Number.isFinite(difficulty) ? <DifficultyBadge difficulty={difficulty} /> : <span className="text-xs text-slate-400">—</span>;
+    return Number.isFinite(difficulty) ? <DifficultyBadge difficulty={difficulty} /> : <span className="text-xs text-muted-foreground/60">—</span>;
   }
 
   const text = versionValueText(value);
-  return <div className="whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{text}</div>;
+  return <div className="whitespace-pre-wrap break-words text-xs leading-6 text-muted-foreground">{text}</div>;
 }

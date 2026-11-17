@@ -242,12 +242,12 @@ export default function ImportTasksPage() {
         description="支持 PDF、文档、表格、图片解析导入，也支持 questions CSV 直接导入题库。"
         meta={
           pipelineId ? (
-            <div className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/70 px-3 text-xs text-[var(--color-text-secondary)]">
-              <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-[var(--color-warning)]" : status && ["failed", "error"].includes(status.status) ? "bg-[var(--color-danger)]" : "bg-[var(--color-success)]")} aria-hidden="true" />
+            <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
+              <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-warning" : status && ["failed", "error"].includes(status.status) ? "bg-destructive" : "bg-success")} aria-hidden="true" />
               {isPipelineRunning ? "任务处理中" : status ? (["failed", "error"].includes(status.status) ? "任务失败" : "任务完成") : "任务已提交"}
             </div>
           ) : (
-            <div className="inline-flex h-9 items-center rounded-full border border-[var(--color-border)] bg-white/70 px-3 text-xs text-[var(--color-text-secondary)]">支持 CSV / PDF / 图片 / TXT / Excel</div>
+            <div className="inline-flex h-9 items-center rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">支持 CSV / PDF / 图片 / TXT / Excel</div>
           )
         }
       />
@@ -259,7 +259,7 @@ export default function ImportTasksPage() {
         onDismiss={() => setMessage(null)}
       />
 
-      <nav aria-label="导入任务步骤" className="grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(239,235,229,0.42)] p-1.5 import-enter" style={{ animationDelay: "45ms" }}>
+      <nav aria-label="导入任务步骤" className="grid grid-cols-3 overflow-hidden rounded-2xl border border-border/60 bg-muted/40 p-1.5 import-enter" style={{ animationDelay: "45ms" }}>
         {tabs.map((tab) => {
           const active = activeTab === tab.key;
           return (
@@ -269,33 +269,33 @@ export default function ImportTasksPage() {
               onClick={() => setActiveTab(tab.key)}
               aria-current={active ? "step" : undefined}
               className={cn(
-                "relative flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl px-3 text-left import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]",
-                active ? "bg-white text-[var(--ink)] shadow-[0_2px_10px_rgba(27,39,51,0.06)]" : "text-[var(--color-text-hint)] hover:bg-white/55 hover:text-[var(--color-text-secondary)]",
+                "relative flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl px-3 text-left import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active ? "bg-card text-foreground shadow-[0_2px_10px_rgba(27,39,51,0.06)]" : "text-muted-foreground/70 hover:bg-card/55 hover:text-muted-foreground",
               )}
             >
               <span className="min-w-0">
                 <span className="block text-xs font-semibold sm:text-sm">{tab.label}</span>
-                <span className="mt-0.5 hidden text-[10px] font-normal text-[var(--color-text-hint)] sm:block">{tab.desc}</span>
+                <span className="mt-0.5 hidden text-[10px] font-normal text-muted-foreground/70 sm:block">{tab.desc}</span>
               </span>
               {tab.badge ? (
                 <span className={cn(
                   "shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold",
                   tab.badge === "处理中"
-                    ? "border-[rgba(196,154,107,0.3)] bg-[var(--color-warning-light)] text-[var(--color-text-primary)]"
-                    : "border-[rgba(91,140,91,0.25)] bg-[var(--color-success-light)] text-[var(--color-success)]",
+                    ? "border-warning/30 bg-warning-light text-warning-foreground"
+                    : "border-success/25 bg-success-light text-success",
                 )}>{tab.badge}</span>
               ) : null}
-              <span aria-hidden="true" className={cn("absolute bottom-1.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[var(--color-primary)] transition-[transform,opacity] duration-200", active ? "scale-x-100 opacity-100" : "scale-x-50 opacity-0")} />
+              <span aria-hidden="true" className={cn("absolute bottom-1.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary transition-[transform,opacity] duration-200", active ? "scale-x-100 opacity-100" : "scale-x-50 opacity-0")} />
             </button>
           );
         })}
       </nav>
 
       {activeTab === "upload" ? (
-        <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.82)] shadow-[var(--shadow-card)] import-panel-swap">
+        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
           <ImportPanelHeader title="新建导入任务" description="上传来源与解析配置在同一工作台完成；任务运行期间配置将锁定。" />
           <div className="grid lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-            <div className="border-b border-[var(--color-border-light)] p-4 sm:p-5 lg:border-b-0 lg:border-r">
+            <div className="border-b border-border/60 p-4 sm:p-5 lg:border-b-0 lg:border-r">
               <label htmlFor={fileInputId} className="block">
                 <div
                   onDragOver={handleFileDragOver}
@@ -305,23 +305,23 @@ export default function ImportTasksPage() {
                   "relative flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-8 text-center transition-[border-color,background-color,box-shadow] import-interactive",
                   (dragActive || file) && "import-drop-active",
                   isPipelineRunning
-                    ? "cursor-not-allowed border-[var(--color-border)] bg-[var(--color-bg-input)] opacity-60"
+                    ? "cursor-not-allowed border-border bg-muted opacity-60"
                     : dragActive || file
-                      ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
-                      : "border-[var(--color-border)] bg-white/60 hover:border-[var(--color-primary)] hover:bg-white",
+                      ? "border-primary bg-accent shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
+                      : "border-border bg-card/60 hover:border-primary hover:bg-card",
                 )}>
-                  <div className="grid h-14 w-14 place-items-center rounded-2xl border border-[rgba(74,111,138,0.16)] bg-white/80 text-[var(--color-primary-dark)] import-drop-icon">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl border border-primary/15 bg-card/80 text-accent-foreground import-drop-icon">
                     <FileBox className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
                   </div>
                   {file ? (
                     <div className="mt-4 max-w-full import-feedback-in">
-                      <p className="max-w-md truncate text-sm font-semibold text-[var(--ink)]" title={file.name}>{file.name}</p>
-                      <p className="mt-1 text-xs text-[var(--color-text-hint)]">{(file.size / 1024 / 1024).toFixed(1)} MB · 已就绪</p>
+                      <p className="max-w-md truncate text-sm font-semibold text-foreground" title={file.name}>{file.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">{(file.size / 1024 / 1024).toFixed(1)} MB · 已就绪</p>
                     </div>
                   ) : (
                     <div className="mt-4">
-                      <p className="text-sm font-semibold text-[var(--ink)]">选择导入文件</p>
-                      <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-hint)]">CSV、PDF、JPG、PNG、WebP、TXT、XLSX、XLS</p>
+                      <p className="text-sm font-semibold text-foreground">选择导入文件</p>
+                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">CSV、PDF、JPG、PNG、WebP、TXT、XLSX、XLS</p>
                     </div>
                   )}
                   <input id={fileInputId} type="file" accept=".csv,.pdf,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.webp" disabled={isPipelineRunning} className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
@@ -330,33 +330,33 @@ export default function ImportTasksPage() {
 
               {!isCsvFile ? (
                 <div className="mt-4 space-y-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)]">科目</span>
+                  <span className="text-xs font-semibold text-muted-foreground">科目</span>
                   <CustomSelect
                     value={subjectId}
                     onChange={setSubjectId}
                     placeholder="选择科目（可选）"
                     disabled={isPipelineRunning}
                     options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
-                    className="h-11 w-full justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm"
+                    className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
                   />
                 </div>
               ) : (
-                <div className="mt-4 rounded-xl border border-[rgba(74,111,138,0.16)] bg-white/55 px-3.5 py-3 text-xs leading-5 text-[var(--color-text-secondary)]">
-                  CSV 将逐行读取 <span className="font-mono font-semibold text-[var(--ink)]">subject_id</span>，支持同一文件包含多个科目，无需额外选择或覆盖科目。
+                <div className="mt-4 rounded-xl border border-primary/15 bg-card/55 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
+                  CSV 将逐行读取 <span className="font-mono font-semibold text-foreground">subject_id</span>，支持同一文件包含多个科目，无需额外选择或覆盖科目。
                 </div>
               )}
             </div>
 
             <div className="flex flex-col p-4 sm:p-5">
               {isCsvFile ? (
-                <div className="rounded-xl border border-[rgba(74,111,138,0.22)] bg-[var(--color-primary-light)] p-4 import-panel-swap">
+                <div className="rounded-xl border border-primary/20 bg-accent p-4 import-panel-swap">
                   <div className="flex items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[rgba(74,111,138,0.18)] bg-white/80 text-[var(--color-primary-dark)]">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-card/80 text-accent-foreground">
                       <FileText className="h-5 w-5" aria-hidden="true" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[var(--ink)]">questions CSV 直接导入</p>
-                      <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-secondary)]">CSV 会逐行使用各自的 subject_id 直接写入正式题库，支持多科目混合导入，不经过 OCR / AI 审核管线。源文件中的 id 与 current_version_id 不复用，目标库会自动生成主键和题目版本；相同 sync_uuid 会自动跳过。</p>
+                      <p className="text-sm font-semibold text-foreground">questions CSV 直接导入</p>
+                      <p className="mt-1 text-[11px] leading-5 text-muted-foreground">CSV 会逐行使用各自的 subject_id 直接写入正式题库，支持多科目混合导入，不经过 OCR / AI 审核管线。源文件中的 id 与 current_version_id 不复用，目标库会自动生成主键和题目版本；相同 sync_uuid 会自动跳过。</p>
                     </div>
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export default function ImportTasksPage() {
                 <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)]">导入模式</span>
+                  <span className="text-xs font-semibold text-muted-foreground">导入模式</span>
                   <CustomSelect
                     value={importMode}
                     onChange={setImportMode}
@@ -376,47 +376,47 @@ export default function ImportTasksPage() {
                       { value: "book", label: "教辅模式" },
                       { value: "exam", label: "试卷模式" },
                     ]}
-                    className="h-11 w-full justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm"
+                    className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-xs font-semibold text-[var(--color-text-secondary)]">置信度阈值</span>
+                  <span className="text-xs font-semibold text-muted-foreground">置信度阈值</span>
                   <Input type="number" step="0.1" min="0" max="1" disabled={isPipelineRunning} value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(event.target.value)} className="h-11" aria-invalid={Boolean(confidenceError)} aria-describedby={confidenceError ? "confidence-error" : undefined} />
-                  {confidenceError ? <p id="confidence-error" className="text-[11px] text-[var(--color-danger)]">{confidenceError}</p> : <p className="text-[11px] text-[var(--color-text-hint)]">0–1，越高越保守</p>}
+                  {confidenceError ? <p id="confidence-error" className="text-[11px] text-destructive">{confidenceError}</p> : <p className="text-[11px] text-muted-foreground/70">0–1，越高越保守</p>}
                 </label>
               </div>
 
               {isPdfFile ? (
-                <div className="mt-4 grid gap-4 rounded-xl border border-[var(--color-border-light)] bg-white/55 p-4 sm:grid-cols-2 import-panel-swap">
+                <div className="mt-4 grid gap-4 rounded-xl border border-border/60 bg-card/55 p-4 sm:grid-cols-2 import-panel-swap">
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-[var(--color-text-secondary)]">起始页</span>
+                    <span className="text-xs font-semibold text-muted-foreground">起始页</span>
                     <Input type="number" min="1" placeholder="默认第 1 页" disabled={isPipelineRunning} value={pageStart} onChange={(event) => setPageStart(event.target.value)} className="h-11" aria-invalid={Boolean(pageStartError || pageRangeError)} />
-                    {pageStartError ? <p className="text-[11px] text-[var(--color-danger)]">{pageStartError}</p> : null}
+                    {pageStartError ? <p className="text-[11px] text-destructive">{pageStartError}</p> : null}
                   </label>
                   <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-[var(--color-text-secondary)]">结束页</span>
+                    <span className="text-xs font-semibold text-muted-foreground">结束页</span>
                     <Input type="number" min="1" placeholder="默认最后一页" disabled={isPipelineRunning} value={pageEnd} onChange={(event) => setPageEnd(event.target.value)} className="h-11" aria-invalid={Boolean(pageEndError || pageRangeError)} />
-                    {pageEndError ? <p className="text-[11px] text-[var(--color-danger)]">{pageEndError}</p> : null}
+                    {pageEndError ? <p className="text-[11px] text-destructive">{pageEndError}</p> : null}
                   </label>
-                  {pageRangeError ? <p className="sm:col-span-2 text-[11px] text-[var(--color-danger)]">{pageRangeError}</p> : null}
+                  {pageRangeError ? <p className="sm:col-span-2 text-[11px] text-destructive">{pageRangeError}</p> : null}
                 </div>
               ) : null}
 
               <label className={cn(
                 "mt-4 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 import-interactive",
-                enableAiRepair ? "border-[rgba(74,111,138,0.3)] bg-[var(--color-primary-light)]" : "border-[var(--color-border)] bg-white/55 hover:border-[var(--color-primary)]",
+                enableAiRepair ? "border-primary/25 bg-accent" : "border-border bg-card/55 hover:border-primary",
               )}>
-                <input type="checkbox" checked={enableAiRepair} onChange={(event) => setEnableAiRepair(event.target.checked)} disabled={isPipelineRunning} className="h-4 w-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]" />
+                <input type="checkbox" checked={enableAiRepair} onChange={(event) => setEnableAiRepair(event.target.checked)} disabled={isPipelineRunning} className="h-4 w-4 rounded border-border accent-primary" />
                 <span>
-                  <span className="block text-xs font-semibold text-[var(--ink)]">启用 AI 修复</span>
-                  <span className="mt-0.5 block text-[11px] leading-5 text-[var(--color-text-hint)]">自动校正 OCR 偏差与结构异常</span>
+                  <span className="block text-xs font-semibold text-foreground">启用 AI 修复</span>
+                  <span className="mt-0.5 block text-[11px] leading-5 text-muted-foreground/70">自动校正 OCR 偏差与结构异常</span>
                 </span>
               </label>
                 </>
               ) : null}
 
-              <div className={cn("mt-auto flex items-center justify-between gap-4 border-t border-[var(--color-border-light)] pt-5", isCsvFile && "mt-5")}>
-                <p className="text-[11px] leading-5 text-[var(--color-text-hint)]">{isCsvFile ? "CSV 导入成功后可直接在题库管理中查看；重复 sync_uuid 不会重复写入。" : "提交后自动切换至进度页，完成后可查看质量报告。"}</p>
+              <div className={cn("mt-auto flex items-center justify-between gap-4 border-t border-border/60 pt-5", isCsvFile && "mt-5")}>
+                <p className="text-[11px] leading-5 text-muted-foreground/70">{isCsvFile ? "CSV 导入成功后可直接在题库管理中查看；重复 sync_uuid 不会重复写入。" : "提交后自动切换至进度页，完成后可查看质量报告。"}</p>
                 <Button
                   disabled={!file || uploadMutation.isPending || isPipelineRunning || (!isCsvFile && Boolean(confidenceError || pageStartError || pageEndError || pageRangeError))}
                   onClick={() => uploadMutation.mutate()}
@@ -432,7 +432,7 @@ export default function ImportTasksPage() {
       ) : null}
 
       {activeTab === "progress" ? (
-        <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.82)] shadow-[var(--shadow-card)] import-panel-swap">
+        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
           <ImportPanelHeader
             title="管线状态"
             description="跟踪上传、OCR、AI 解析和质量检查；运行中每 2.5 秒自动刷新。"
@@ -446,48 +446,48 @@ export default function ImportTasksPage() {
           {!pipelineId ? (
             <div className="flex min-h-[430px] items-center justify-center px-6 py-14">
               <div className="max-w-sm text-center import-panel-swap">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] text-[var(--color-primary-dark)] import-soft-pop"><FileUp className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
-                <p className="mt-4 text-sm font-semibold text-[var(--ink)]">暂无导入任务</p>
-                <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-hint)]">先在上传页选择文件并提交，任务状态会在这里持续更新。</p>
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop"><FileUp className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
+                <p className="mt-4 text-sm font-semibold text-foreground">暂无导入任务</p>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">先在上传页选择文件并提交，任务状态会在这里持续更新。</p>
                 <Button variant="secondary" className="mt-5 h-11 import-interactive" onClick={() => setActiveTab("upload")}>前往上传</Button>
               </div>
             </div>
           ) : null}
 
           {pipelineId && !status && !statusQuery.isError ? (
-            <div className="flex min-h-[320px] items-center justify-center gap-3 px-6 py-14 text-sm text-[var(--color-text-secondary)]">
+            <div className="flex min-h-[320px] items-center justify-center gap-3 px-6 py-14 text-sm text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />正在获取导入进度
             </div>
           ) : null}
 
           {status ? (
             <div className="import-panel-swap">
-              <div className="border-b border-[var(--color-border-light)] px-4 py-6 sm:px-6">
+              <div className="border-b border-border/60 px-4 py-6 sm:px-6">
                 <div className="relative grid grid-cols-4 gap-2">
-                  <div className="absolute left-[12.5%] right-[12.5%] top-5 h-px overflow-hidden bg-[var(--color-border)]" aria-hidden="true">
-                    <span className="absolute inset-0 origin-left bg-[var(--color-primary)] import-progress-fill" style={{ transform: `scaleX(${stageRailProgress / 100})` }} />
+                  <div className="absolute left-[12.5%] right-[12.5%] top-5 h-px overflow-hidden bg-border" aria-hidden="true">
+                    <span className="absolute inset-0 origin-left bg-primary import-progress-fill" style={{ transform: `scaleX(${stageRailProgress / 100})` }} />
                   </div>
                   {stages.map((stg, i) => (
                     <div key={stg.name} className="relative z-10 flex min-w-0 flex-col items-center text-center">
                       <div className={cn(
-                        "grid h-10 w-10 place-items-center rounded-full border-2 bg-white text-xs font-semibold import-interactive",
-                        stg.s === "done" && "border-[var(--color-success)] bg-[var(--color-success)] text-white",
-                        stg.s === "active" && "border-[var(--color-warning)] bg-[var(--color-warning)] text-white import-status-active",
-                        stg.s === "failed" && "border-[var(--color-danger)] bg-[var(--color-danger)] text-white",
-                        stg.s === "pending" && "border-[var(--color-border)] text-[var(--color-text-hint)]",
+                        "grid h-10 w-10 place-items-center rounded-full border-2 bg-card text-xs font-semibold import-interactive",
+                        stg.s === "done" && "border-success bg-success text-primary-foreground",
+                        stg.s === "active" && "border-warning bg-warning text-primary-foreground import-status-active",
+                        stg.s === "failed" && "border-destructive bg-destructive text-primary-foreground",
+                        stg.s === "pending" && "border-border text-muted-foreground/70",
                       )}>
                         {stg.s === "done" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : stg.s === "failed" ? <AlertCircle className="h-4 w-4" aria-hidden="true" /> : i + 1}
                       </div>
                       <span className={cn(
                         "mt-2 text-[10px] font-semibold sm:text-[11px]",
-                        stg.s === "done" ? "text-[var(--color-success)]" : stg.s === "active" ? "text-[var(--color-text-primary)]" : stg.s === "failed" ? "text-[var(--color-danger)]" : "text-[var(--color-text-hint)]",
+                        stg.s === "done" ? "text-success" : stg.s === "active" ? "text-foreground" : stg.s === "failed" ? "text-destructive" : "text-muted-foreground/70",
                       )}>{stg.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 divide-x divide-y divide-[var(--color-border-light)] border-b border-[var(--color-border-light)] bg-white/55 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+              <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border-b border-border/60 bg-card/55 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
                 {progressItems.map(([label, value]) => (
                   <ImportMetric
                     key={String(label)}
@@ -499,17 +499,17 @@ export default function ImportTasksPage() {
               </div>
 
               <div className="space-y-5 p-4 sm:p-5">
-                <div className="rounded-xl border border-[var(--color-border-light)] bg-white/60 px-4 py-3.5">
+                <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-[var(--color-warning)]" : ["failed", "error"].includes(status.status) ? "bg-[var(--color-danger)]" : "bg-[var(--color-success)]")} aria-hidden="true" />
-                      <span className="font-semibold text-[var(--color-text-secondary)]">{status.current_stage || "等待阶段信息"}</span>
+                      <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-warning" : ["failed", "error"].includes(status.status) ? "bg-destructive" : "bg-success")} aria-hidden="true" />
+                      <span className="font-semibold text-muted-foreground">{status.current_stage || "等待阶段信息"}</span>
                     </div>
-                    <span className="font-mono text-[10px] text-[var(--color-text-hint)]">{pipelineId}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground/70">{pipelineId}</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="text-[var(--color-text-hint)]">解析进度</span>
-                    <span className="font-mono font-semibold tabular-nums text-[var(--ink)]">{status.ocr_progress || "0%"}</span>
+                    <span className="text-muted-foreground/70">解析进度</span>
+                    <span className="font-mono font-semibold tabular-nums text-foreground">{status.ocr_progress || "0%"}</span>
                   </div>
                   <ImportProgressBar
                     value={parseProgressPercent(status.ocr_progress)}
@@ -521,32 +521,32 @@ export default function ImportTasksPage() {
                 </div>
 
                 {status.page_range ? (
-                  <div className="grid gap-3 rounded-xl border border-[var(--color-border-light)] bg-white/60 p-4 sm:grid-cols-3 import-panel-swap">
-                    <div><p className="text-[10px] font-medium text-[var(--color-text-hint)]">有效范围</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{status.page_range.effective_start} – {status.page_range.effective_end}</p></div>
-                    <div><p className="text-[10px] font-medium text-[var(--color-text-hint)]">总页数</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{status.page_range.total_pages}</p></div>
-                    <div><p className="text-[10px] font-medium text-[var(--color-text-hint)]">选中页数</p><p className="mt-1 text-sm font-semibold text-[var(--ink)]">{status.page_range.selected_page_count}</p></div>
+                  <div className="grid gap-3 rounded-xl border border-border/60 bg-card/60 p-4 sm:grid-cols-3 import-panel-swap">
+                    <div><p className="text-[10px] font-medium text-muted-foreground/70">有效范围</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.effective_start} – {status.page_range.effective_end}</p></div>
+                    <div><p className="text-[10px] font-medium text-muted-foreground/70">总页数</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.total_pages}</p></div>
+                    <div><p className="text-[10px] font-medium text-muted-foreground/70">选中页数</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.selected_page_count}</p></div>
                   </div>
                 ) : null}
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <details className="group overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-[var(--ink)] import-interactive hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]">
-                      <span>统计数据</span><ChevronDown className="h-4 w-4 text-[var(--color-text-hint)] import-chevron group-open:rotate-180" aria-hidden="true" />
+                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
+                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                      <span>统计数据</span><ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <pre className="max-h-48 overflow-auto border-t import-details-body border-[var(--color-border-light)] px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-[var(--color-text-secondary)]">{renderJson(status.stats)}</pre>
+                    <pre className="max-h-48 overflow-auto border-t import-details-body border-border/60 px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-muted-foreground">{renderJson(status.stats)}</pre>
                   </details>
-                  <details className="group overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-[var(--ink)] import-interactive hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]">
-                      <span className="flex items-center gap-2">错误日志{Array.isArray(status.errors) && status.errors.length > 0 ? <span className="rounded-full bg-[var(--color-danger-light)] px-2 py-0.5 text-[9px] text-[var(--color-danger)]">{status.errors.length}</span> : null}</span>
-                      <ChevronDown className="h-4 w-4 text-[var(--color-text-hint)] import-chevron group-open:rotate-180" aria-hidden="true" />
+                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
+                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                      <span className="flex items-center gap-2">错误日志{Array.isArray(status.errors) && status.errors.length > 0 ? <span className="rounded-full bg-destructive-light px-2 py-0.5 text-[9px] text-destructive">{status.errors.length}</span> : null}</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    {Array.isArray(status.errors) && status.errors.length > 0 ? <pre className="max-h-48 overflow-auto border-t import-details-body border-[var(--color-border-light)] px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-[var(--color-danger)]">{status.errors.map((e) => `• ${e}`).join("\n")}</pre> : <p className="border-t border-[var(--color-border-light)] px-4 py-3 text-[11px] import-details-body text-[var(--color-text-hint)]">暂无错误</p>}
+                    {Array.isArray(status.errors) && status.errors.length > 0 ? <pre className="max-h-48 overflow-auto border-t import-details-body border-border/60 px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-destructive">{status.errors.map((e) => `• ${e}`).join("\n")}</pre> : <p className="border-t border-border/60 px-4 py-3 text-[11px] import-details-body text-muted-foreground/70">暂无错误</p>}
                   </details>
                 </div>
 
                 {status.batch_id ? (
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-border-light)] pt-4">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-4 text-xs font-semibold text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />待审核</a>
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
+                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />待审核</a>
                     <Button variant="secondary" className="h-11 import-interactive" onClick={() => setActiveTab("quality")}>质量报告</Button>
                   </div>
                 ) : null}
@@ -555,13 +555,13 @@ export default function ImportTasksPage() {
           ) : null}
 
           {statusQuery.isError ? (
-            <div role="alert" className="m-4 flex items-start gap-2.5 rounded-xl border border-[rgba(196,77,77,0.28)] import-feedback-in bg-[var(--color-danger-light)] px-4 py-3 text-xs leading-5 text-[var(--color-danger)] sm:m-5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />无法获取导入进度，请刷新重试。</div>
+            <div role="alert" className="m-4 flex items-start gap-2.5 rounded-xl border border-destructive/30 import-feedback-in bg-destructive-light px-4 py-3 text-xs leading-5 text-destructive sm:m-5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />无法获取导入进度，请刷新重试。</div>
           ) : null}
         </section>
       ) : null}
 
       {activeTab === "quality" ? (
-        <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.82)] shadow-[var(--shadow-card)] import-panel-swap">
+        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
           <ImportPanelHeader
             title="质量报告"
             description={status?.quality_report ? `批次 ${status.batch_id || "—"} · 共 ${status.quality_report.total_questions ?? "—"} 题` : "导入完成后自动汇总风险、结构与性能指标。"}
@@ -570,9 +570,9 @@ export default function ImportTasksPage() {
           {!status?.quality_report ? (
             <div className="flex min-h-[430px] items-center justify-center px-6 py-14">
               <div className="max-w-sm text-center import-panel-swap">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] text-[var(--color-primary-dark)] import-soft-pop"><FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
-                <p className="mt-4 text-sm font-semibold text-[var(--ink)]">暂无质量报告</p>
-                <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-hint)]">{pipelineId ? "任务完成后会在这里生成质量分析。" : "先提交导入任务，完成后即可查看风险与质量指标。"}</p>
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop"><FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
+                <p className="mt-4 text-sm font-semibold text-foreground">暂无质量报告</p>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">{pipelineId ? "任务完成后会在这里生成质量分析。" : "先提交导入任务，完成后即可查看风险与质量指标。"}</p>
                 {!pipelineId ? <Button variant="secondary" className="mt-5 h-11 import-interactive" onClick={() => setActiveTab("upload")}>前往上传</Button> : null}
               </div>
             </div>
@@ -580,7 +580,7 @@ export default function ImportTasksPage() {
 
           {status?.quality_report ? (
             <div className="import-panel-swap">
-              <div className="grid grid-cols-2 divide-x divide-y divide-[var(--color-border-light)] border-b border-[var(--color-border-light)] bg-white/55 sm:grid-cols-4 sm:divide-y-0">
+              <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border-b border-border/60 bg-card/55 sm:grid-cols-4 sm:divide-y-0">
                 <ImportMetric label="总题数" value={status.quality_report.total_questions} />
                 <ImportMetric label="低风险" value={status.quality_report.low_risk ?? "—"} tone="success" />
                 <ImportMetric label="需检查" value={status.quality_report.medium_risk ?? "—"} tone="warning" />
@@ -588,30 +588,30 @@ export default function ImportTasksPage() {
               </div>
 
               <div className="space-y-5 p-4 sm:p-5">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-[var(--color-border-light)] sm:grid-cols-4 import-panel-swap">
-                  {status.quality_report.ai_answer_count !== undefined ? <div className="bg-white/80 p-4"><p className="text-[10px] font-medium text-[var(--color-text-hint)]">AI 答案</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-[var(--ink)]">{status.quality_report.ai_answer_count}</p></div> : null}
-                  {status.quality_report.math_image_count !== undefined ? <div className="bg-white/80 p-4"><p className="text-[10px] font-medium text-[var(--color-text-hint)]">公式截图</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-[var(--ink)]">{status.quality_report.math_image_count}</p></div> : null}
-                  {status.quality_report.table_markdown_count !== undefined ? <div className="bg-white/80 p-4"><p className="text-[10px] font-medium text-[var(--color-text-hint)]">表格</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-[var(--ink)]">{status.quality_report.table_markdown_count}</p></div> : null}
-                  {status.quality_report.estimated_manual_check_rate !== undefined ? <div className="bg-white/80 p-4"><p className="text-[10px] font-medium text-[var(--color-text-hint)]">人工检查率</p><p className={cn("mt-1.5 text-lg font-semibold tabular-nums", status.quality_report.estimated_manual_check_rate > 0.4 ? "text-[var(--color-text-primary)]" : "text-[var(--ink)]")}>{(status.quality_report.estimated_manual_check_rate * 100).toFixed(0)}%</p></div> : null}
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/60 bg-border/60 sm:grid-cols-4 import-panel-swap">
+                  {status.quality_report.ai_answer_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">AI 答案</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.ai_answer_count}</p></div> : null}
+                  {status.quality_report.math_image_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">公式截图</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.math_image_count}</p></div> : null}
+                  {status.quality_report.table_markdown_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">表格</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.table_markdown_count}</p></div> : null}
+                  {status.quality_report.estimated_manual_check_rate !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">人工检查率</p><p className={cn("mt-1.5 text-lg font-semibold tabular-nums", status.quality_report.estimated_manual_check_rate > 0.4 ? "text-warning-foreground" : "text-foreground")}>{(status.quality_report.estimated_manual_check_rate * 100).toFixed(0)}%</p></div> : null}
                 </div>
 
                 {status.quality_report.performance_summary ? (
-                  <details className="group overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-white/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-[var(--ink)] import-interactive hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]"><span>性能概览</span><ChevronDown className="h-4 w-4 text-[var(--color-text-hint)] import-chevron group-open:rotate-180" aria-hidden="true" /></summary>
-                    <div className="grid gap-px border-t border-[var(--color-border-light)] bg-[var(--color-border-light)] sm:grid-cols-3 import-details-body">
-                      <div className="bg-white/80 p-4 text-xs"><span className="text-[var(--color-text-hint)]">总耗时</span><strong className="ml-2 text-[var(--ink)]">{(status.quality_report.performance_summary.total_duration_ms / 1000).toFixed(1)}s</strong></div>
-                      <div className="bg-white/80 p-4 text-xs"><span className="text-[var(--color-text-hint)]">AI 调用</span><strong className="ml-2 text-[var(--ink)]">{status.quality_report.performance_summary.total_ai_calls} 次</strong></div>
-                      <div className="bg-white/80 p-4 text-xs"><span className="text-[var(--color-text-hint)]">Token</span><strong className="ml-2 text-[var(--ink)]">{status.quality_report.performance_summary.total_tokens_used}</strong></div>
-                      <div className="bg-white/80 p-4 text-xs"><span className="text-[var(--color-text-hint)]">OCR 缓存命中</span><strong className="ml-2 text-[var(--ink)]">{(status.quality_report.performance_summary.cache_hit_rate * 100).toFixed(0)}%</strong></div>
-                      <div className="bg-white/80 p-4 text-xs sm:col-span-2"><span className="text-[var(--color-text-hint)]">最慢阶段</span><strong className="ml-2 text-[var(--ink)]">{status.quality_report.performance_summary.slowest_stage} · {(status.quality_report.performance_summary.slowest_duration_ms / 1000).toFixed(1)}s</strong></div>
+                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
+                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span>性能概览</span><ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" /></summary>
+                    <div className="grid gap-px border-t border-border/60 bg-border/60 sm:grid-cols-3 import-details-body">
+                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">总耗时</span><strong className="ml-2 text-foreground">{(status.quality_report.performance_summary.total_duration_ms / 1000).toFixed(1)}s</strong></div>
+                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">AI 调用</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.total_ai_calls} 次</strong></div>
+                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">Token</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.total_tokens_used}</strong></div>
+                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">OCR 缓存命中</span><strong className="ml-2 text-foreground">{(status.quality_report.performance_summary.cache_hit_rate * 100).toFixed(0)}%</strong></div>
+                      <div className="bg-card/80 p-4 text-xs sm:col-span-2"><span className="text-muted-foreground/70">最慢阶段</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.slowest_stage} · {(status.quality_report.performance_summary.slowest_duration_ms / 1000).toFixed(1)}s</strong></div>
                     </div>
                   </details>
                 ) : null}
 
                 {status.batch_id ? (
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--color-border-light)] pt-4">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-[rgba(196,77,77,0.28)] bg-[var(--color-danger-light)] px-4 text-xs font-semibold text-[var(--color-danger)] import-interactive hover:border-[var(--color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-danger)] focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}&risk_filter=high`}><AlertCircle className="h-4 w-4" aria-hidden="true" />查看高风险题</a>
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white px-4 text-xs font-semibold text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />进入审核区</a>
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
+                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-destructive/30 bg-destructive-light px-4 text-xs font-semibold text-destructive import-interactive hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}&risk_filter=high`}><AlertCircle className="h-4 w-4" aria-hidden="true" />查看高风险题</a>
+                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />进入审核区</a>
                   </div>
                 ) : null}
               </div>

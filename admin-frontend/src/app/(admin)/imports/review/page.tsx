@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, FileText, Sparkles, XCircle } from "lucide-react";
@@ -12,6 +13,7 @@ import { formatChinaClock } from "@/lib/time";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
+import { hasOpenTransientOverlay, isTopModalSurface } from "@/lib/modal-focus";
 import { useOutsideClick } from "@/lib/use-outside-click";
 import { reviewPageStyles } from "./review-page-styles";
 import {
@@ -30,7 +32,7 @@ import {
   type MultiBlankAction,
   type MultiBlankEditState,
 } from "./components/multi-blank-choice-utils";
-import { isMultiBlankChoice, type EditState } from "./review-edit-state";
+import type { EditState } from "./review-edit-state";
 import {
   buildReviewQueueParams,
   createDefaultReviewFilters,
@@ -109,7 +111,6 @@ export default function ImportReviewPage() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [subjectDropdownOpen, setSubjectDropdownOpen] = useState(false);
   const subjectBtnRef = useRef<HTMLButtonElement>(null);
-  const [subjectDropdownStyle, setSubjectDropdownStyle] = useState<React.CSSProperties>({});
   const [subjectEditDropdownOpen, setSubjectEditDropdownOpen] = useState(false);
   const subjectEditBtnRef = useRef<HTMLButtonElement>(null);
   const [subjectEditDropdownStyle, setSubjectEditDropdownStyle] = useState<React.CSSProperties>({});
@@ -651,7 +652,19 @@ export default function ImportReviewPage() {
   useEffect(() => {
     if (previewId === null) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDrawer();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (
+        target?.closest(
+          '[role="combobox"][aria-expanded="true"], [role="listbox"], [data-focus-passthrough]',
+        )
+      ) {
+        return;
+      }
+      const drawer = document.querySelector<HTMLElement>("[data-review-detail-drawer]");
+      if (!drawer || !isTopModalSurface(drawer)) return;
+      if (hasOpenTransientOverlay()) return;
+      closeDrawer();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -749,38 +762,40 @@ export default function ImportReviewPage() {
 
   const canBatchOperate = items.length > 0 && (selectedIds.size > 0 || Boolean(filters.batch_id || batchIdParam));
 
-  return (
-    <div className="space-y-6">
-      <style>{reviewPageStyles}</style>
-      {message ? (
-        <div role="status" aria-live="polite" className="animate-paper-slide fixed right-6 top-6 z-[60] max-w-sm overflow-hidden rounded-2xl border border-[var(--color-border)]/60 bg-white/98 shadow-[0_20px_60px_rgba(45,62,80,0.12),0_4px_16px_rgba(45,62,80,0.06)] backdrop-blur-xl">
-          <div className="h-1 bg-gradient-to-r from-[var(--color-primary)] via-[var(--color-warning)] to-[var(--color-success)]" />
+  const messageToast = message ? (
+        <div role="status" aria-live="polite" className="admin-content-theme animate-paper-slide fixed right-6 top-6 z-[60] max-w-sm overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-[0_20px_60px_rgba(45,62,80,0.12),0_4px_16px_rgba(45,62,80,0.06)] backdrop-blur-xl">
+          <div className="h-1 bg-gradient-to-r from-primary via-warning to-success" />
           <div className="px-5 py-4">
           <div className="flex items-start gap-3.5">
-            <div className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-success-light)] shadow-sm">
-              <div className="absolute inset-0 rounded-xl animate-seal-stamp border-2 border-[var(--color-success)]/15" />
-              <CheckCircle2 className="relative h-4 w-4 text-[var(--color-success)]" />
+            <div className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-success-light shadow-sm">
+              <div className="absolute inset-0 rounded-xl animate-seal-stamp border-2 border-success/15" />
+              <CheckCircle2 className="relative h-4 w-4 text-success" />
             </div>
-            <p className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-[var(--ink)]">{message}</p>
+            <p className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground">{message}</p>
           </div>
-          <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-border)]/30 pt-2.5">
-            <span className="text-[10px] text-[var(--color-text-hint)]">{formatChinaClock()}</span>
+          <div className="mt-3 flex items-center gap-2 border-t border-border/30 pt-2.5">
+            <span className="text-[10px] text-muted-foreground/70">{formatChinaClock()}</span>
             <div className="ml-auto">
-              <button aria-label="关闭提示" className="rounded-lg px-3 py-1 text-[10px] font-medium text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--ink)]" onClick={() => updateMessage(null)}>关闭</button>
+              <button aria-label="关闭提示" className="rounded-lg px-3 py-1 text-[10px] font-medium text-muted-foreground/70 transition hover:bg-muted hover:text-foreground" onClick={() => updateMessage(null)}>关闭</button>
             </div>
           </div>
           </div>
         </div>
-      ) : null}
-      <Card className="!border-[var(--color-border)]/80 !shadow-[0_24px_60px_rgba(45,62,80,0.06)]">
+  ) : null;
+
+  return (
+    <div className="space-y-6">
+      <style>{reviewPageStyles}</style>
+      {messageToast && (typeof document === "undefined" ? messageToast : createPortal(messageToast, document.body))}
+      <Card className="!border-border/80 !shadow-[0_24px_60px_rgba(45,62,80,0.06)]">
         <CardHeader className="space-y-2 pb-3">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-display text-lg font-bold text-[var(--ink)]">待审核题目</h3>
-              <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">审核导入题目，通过后发布到正式题库</p>
+              <h1 className="font-display text-lg font-bold text-foreground">待审核题目</h1>
+              <p className="mt-0.5 text-xs text-muted-foreground">审核导入题目，通过后发布到正式题库</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-1 rounded-xl border border-[var(--color-border)] bg-white/60 p-1">
+              <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card/60 p-1">
                 <Button variant="secondary" className="h-8 px-3 text-xs" disabled={!canWrite || !canBatchOperate} onClick={() => updateConfirmState({ action: "batch-approve" })}>
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   批量通过
@@ -811,10 +826,10 @@ export default function ImportReviewPage() {
                   <FileText className="h-3.5 w-3.5" />
                   快速补充答案
                 </Button>
-                <div className="h-6 w-px bg-[var(--color-border)]" />
-                <div className="flex overflow-hidden rounded-md border border-[var(--color-border)] bg-white/70">
-                  <button type="button" className={`px-2.5 py-1.5 text-[10px] font-semibold transition ${viewMode === "list" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-secondary)] hover:text-[var(--color-primary-dark)]"}`} onClick={() => setViewMode("list")}>列表</button>
-                  <button type="button" className={`px-2.5 py-1.5 text-[10px] font-semibold transition ${viewMode === "table" ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-secondary)] hover:text-[var(--color-primary-dark)]"}`} onClick={() => setViewMode("table")}>核答案</button>
+                <div className="hidden h-6 w-px bg-border sm:block" />
+                <div className="flex overflow-hidden rounded-md border border-border bg-card/70">
+                  <button type="button" className={`px-2.5 py-1.5 text-[10px] font-semibold transition ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-accent-foreground"}`} onClick={() => setViewMode("list")}>列表</button>
+                  <button type="button" className={`px-2.5 py-1.5 text-[10px] font-semibold transition ${viewMode === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-accent-foreground"}`} onClick={() => setViewMode("table")}>核答案</button>
                 </div>
               </div>
             </div>
@@ -849,8 +864,8 @@ export default function ImportReviewPage() {
         </CardHeader>
         <CardContent className="space-y-1.5 pt-0">
           <section className="space-y-1">
-              <div className={`flex items-center gap-2 rounded-lg border border-[var(--color-border)]/40 bg-[var(--color-primary-light)]/10 px-3 py-1.5 ${selectedIds.size > 0 ? "" : "invisible"}`}>
-                <span className="text-xs font-medium text-[var(--color-primary-dark)]">已选 {selectedIds.size} 题</span>
+              <div className={`flex items-center gap-2 rounded-lg border border-border/40 bg-accent/10 px-3 py-1.5 ${selectedIds.size > 0 ? "" : "invisible"}`}>
+                <span className="text-xs font-medium text-accent-foreground">已选 {selectedIds.size} 题</span>
               </div>
               <ReviewList
                 viewMode={viewMode}
@@ -877,11 +892,11 @@ export default function ImportReviewPage() {
               {!queue.isLoading && items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-14 text-center">
                   <div className="empty-ink-drop mb-4" />
-                  <p className="font-display text-lg font-semibold text-[var(--color-text-secondary)]">暂无待审核题目</p>
-                  <p className="mt-1.5 max-w-xs text-xs text-[var(--color-text-hint)] leading-relaxed">所有导入题目已完成审核，或当前筛选条件没有匹配的记录</p>
+                  <p className="font-display text-lg font-semibold text-muted-foreground">暂无待审核题目</p>
+                  <p className="mt-1.5 max-w-xs text-xs text-muted-foreground/70 leading-relaxed">所有导入题目已完成审核，或当前筛选条件没有匹配的记录</p>
                 </div>
               ) : null}
-              {queue.isError ? <p className="text-sm text-[var(--color-danger)]">待审核接口当前不可用。</p> : null}
+              {queue.isError ? <p className="text-sm text-destructive">待审核接口当前不可用。</p> : null}
             </section>
 
             <ReviewPagination

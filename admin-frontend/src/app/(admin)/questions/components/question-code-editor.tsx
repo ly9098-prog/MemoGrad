@@ -22,13 +22,13 @@ function CodeMetadataField({
   const caption = field === "caption";
   return (
     <label className="space-y-1">
-      <span className="text-[11px] font-medium text-slate-500">
+      <span className="text-[11px] font-medium text-muted-foreground">
         {caption ? "显示标题（可选）" : "语言（可选）"}
       </span>
       <input
         className={caption
-          ? "h-9 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100"
-          : "h-9 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 font-mono text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100"}
+          ? "h-9 w-full rounded-lg border border-border bg-muted/40 px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-primary focus:bg-card focus:ring-2 focus:ring-accent"
+          : "h-9 w-full rounded-lg border border-border bg-muted/40 px-3 font-mono text-sm text-foreground outline-none transition placeholder:text-muted-foreground/50 focus:border-primary focus:bg-card focus:ring-2 focus:ring-accent"}
         value={String(segment[field] ?? "")}
         placeholder={caption ? "留空则不在题干中显示标题" : "assembly / c / cpp"}
         onChange={(event) => onChange(updateCodeSegmentField(segment, field, event.target.value))}
@@ -39,14 +39,14 @@ function CodeMetadataField({
 
 function CodeMetadataEditor({ segment, onChange, onDelete }: CodeRowProps) {
   return (
-    <div className="grid gap-3 border-b border-slate-200 bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+    <div className="grid gap-3 border-b border-border bg-card px-4 py-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
       <CodeMetadataField segment={segment} field="caption" onChange={onChange} />
       <CodeMetadataField segment={segment} field="language" onChange={onChange} />
       <div className="flex items-end">
         <Button
           type="button"
           variant="secondary"
-          className="h-9 border-red-100 bg-white px-3 text-xs text-red-600 shadow-none hover:border-red-200 hover:bg-red-50"
+          className="h-9 border-destructive/20 bg-card px-3 text-xs text-destructive shadow-none hover:border-destructive/30 hover:bg-destructive-light"
           onClick={onDelete}
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -64,13 +64,13 @@ function CodeBodyEditor({ segment, onChange }: Pick<CodeRowProps, "segment" | "o
       <textarea
         wrap="off"
         spellCheck={false}
-        className="min-h-48 w-full resize-y overflow-auto whitespace-pre border-0 bg-slate-950 px-4 py-4 font-mono text-[13px] leading-6 text-slate-100 outline-none [tab-size:2]"
+        className="min-h-48 w-full resize-y overflow-auto whitespace-pre border-0 bg-foreground px-4 py-4 font-mono text-[13px] leading-6 text-background outline-none [tab-size:2]"
         value={code}
         placeholder="在这里输入代码内容……"
         onChange={(event) => onChange(updateCodeSegmentField(segment, "code", event.target.value))}
       />
       {!comparableText(code) ? (
-        <div className="border-t border-amber-200 bg-amber-50 px-4 py-2 text-[11px] text-amber-800">
+        <div className="border-t border-warning/40 bg-warning-light px-4 py-2 text-[11px] text-warning-foreground">
           代码正文不能为空。输入内容后即可保存，或删除该空代码块。
         </div>
       ) : null}
@@ -81,8 +81,8 @@ function CodeBodyEditor({ segment, onChange }: Pick<CodeRowProps, "segment" | "o
 function CodeRow(props: CodeRowProps) {
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-slate-50/50 ${
-        comparableText(codeSegmentText(props.segment)) ? "border-slate-200" : "border-amber-300"
+      className={`overflow-hidden rounded-xl border bg-muted/50 ${
+        comparableText(codeSegmentText(props.segment)) ? "border-border" : "border-warning/50"
       }`}
     >
       <CodeMetadataEditor {...props} />
@@ -95,19 +95,19 @@ function CodeSectionHeader({ count, onAdd }: { count: number; onAdd: () => void 
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-slate-950">代码块</p>
-        <p className="mt-1 text-[11px] text-slate-400">
+        <p className="text-sm font-semibold text-foreground">代码块</p>
+        <p className="mt-1 text-[11px] text-muted-foreground/60">
           可手动插入代码内容；只有显式 caption 才作为可见标题，segment.alt 仅保留为辅助描述。
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-[11px] tabular-nums text-slate-400">
+        <span className="text-[11px] tabular-nums text-muted-foreground/60">
           {count} 个代码块
         </span>
         <Button
           type="button"
           variant="secondary"
-          className="h-8 border-slate-200 bg-white px-3 text-xs shadow-none"
+          className="h-8 border-border bg-card px-3 text-xs shadow-none"
           onClick={onAdd}
         >
           <Plus className="h-3.5 w-3.5" />
@@ -120,7 +120,7 @@ function CodeSectionHeader({ count, onAdd }: { count: number; onAdd: () => void 
 
 export function QuestionCodeEditor({ segments, onReplace, onAdd }: SegmentListProps) {
   return (
-    <section className="border-b border-slate-200 py-5">
+    <section className="border-b border-border py-5">
       <CodeSectionHeader count={segments.filter(isCodeSegment).length} onAdd={onAdd} />
       {segments.some(isCodeSegment) ? (
         <div className="space-y-4">
@@ -141,7 +141,7 @@ export function QuestionCodeEditor({ segments, onReplace, onAdd }: SegmentListPr
         <button
           type="button"
           onClick={onAdd}
-          className="flex min-h-24 w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/40 px-4 text-sm text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+          className="flex min-h-24 w-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 px-4 text-sm text-muted-foreground transition hover:border-primary/30 hover:bg-muted hover:text-foreground"
         >
           <span className="flex items-center gap-2">
             <Plus className="h-4 w-4" />

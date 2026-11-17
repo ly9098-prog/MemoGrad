@@ -68,9 +68,9 @@ function getStatus(
 }
 
 const toneBg: Record<StatusTone, string> = {
-  success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60",
-  warning: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60",
-  error: "bg-red-50 text-red-700 ring-1 ring-red-200/60",
+  success: "bg-success-light text-success ring-1 ring-success/20",
+  warning: "bg-warning-light text-warning-foreground ring-1 ring-warning/20",
+  error: "bg-destructive-light text-destructive ring-1 ring-destructive/20",
 };
 
 export function MultiBlankAnswerSummary({
@@ -82,11 +82,11 @@ export function MultiBlankAnswerSummary({
   const canonical = serializeBlankAnswer(answerMap, groups.map((g) => g.id));
 
   return (
-    <div className="rounded-xl border border-[var(--color-border)]/40 bg-white/60 p-4">
+    <div className="rounded-xl border border-border/40 bg-card/60 p-4">
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between border-b border-[var(--color-border)]/20 pb-2">
+      <div className="mb-3 flex items-center justify-between border-b border-border/20 pb-2">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-hint)]">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             答案
           </span>
         </div>
@@ -102,7 +102,7 @@ export function MultiBlankAnswerSummary({
       </div>
 
       {/* Answer key table */}
-      <div className="divide-y divide-[var(--color-border)]/20">
+      <div className="divide-y divide-border/20">
         {groups.map((group) => {
           const answer = answerMap[group.id];
           const letters = (answer ?? "").split(",").filter(Boolean);
@@ -126,14 +126,14 @@ export function MultiBlankAnswerSummary({
               className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
             >
               {/* Group ID badge */}
-              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[var(--color-primary)]/8 text-[10px] font-semibold text-[var(--color-primary-dark)]">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/[0.08] text-[10px] font-semibold text-accent-foreground">
                 {group.id}
               </span>
 
               {/* Answer key cell */}
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 {!hasAnswer ? (
-                  <span className="inline-flex items-center rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-500">
+                  <span className="inline-flex items-center rounded bg-warning-light px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
                     -
                   </span>
                 ) : (
@@ -141,20 +141,20 @@ export function MultiBlankAnswerSummary({
                     className={cn(
                       "inline-flex h-5 min-w-[20px] items-center justify-center rounded px-1.5 text-[11px] font-bold",
                       rowTone === "success" &&
-                        "bg-emerald-50 text-emerald-600",
-                      rowTone === "error" && "bg-red-50 text-red-600",
+                        "bg-success-light text-success",
+                      rowTone === "error" && "bg-destructive-light text-destructive",
                     )}
                   >
                     {letters.join(",")}
                   </span>
                 )}
                 {optionTexts.length > 0 ? (
-                  <span className="truncate text-xs text-[var(--color-text-secondary)]">
+                  <span className="truncate text-xs text-muted-foreground">
                     {optionTexts.join("；")}
                   </span>
                 ) : null}
                 {!hasAnswer ? null : !validAnswer ? (
-                  <span className="text-[9px] text-red-400">非法</span>
+                  <span className="text-[9px] text-destructive/70">非法</span>
                 ) : null}
               </div>
             </div>
@@ -164,10 +164,10 @@ export function MultiBlankAnswerSummary({
 
       {/* Collapsible canonical value */}
       {canonical ? (
-        <div className="mt-2.5 border-t border-[var(--color-border)]/30 pt-2">
+        <div className="mt-2.5 border-t border-border/30 pt-2">
           <button
             type="button"
-            className="flex items-center gap-1 text-[9px] text-[var(--color-text-hint)] transition hover:text-[var(--color-text-primary)]"
+            className="flex items-center gap-1 text-[9px] text-muted-foreground/70 transition hover:text-foreground"
             onClick={() => setExpanded(!expanded)}
           >
             <ChevronDown
@@ -179,7 +179,7 @@ export function MultiBlankAnswerSummary({
             原始值
           </button>
           {expanded ? (
-            <p className="mt-1.5 rounded-lg bg-[var(--color-bg-input)]/50 px-2 py-1 font-mono text-[10px] leading-relaxed text-[var(--color-text-hint)]">
+            <p className="mt-1.5 rounded-lg bg-muted/50 px-2 py-1 font-mono text-[10px] leading-relaxed text-muted-foreground/70">
               {canonical}
             </p>
           ) : null}

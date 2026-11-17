@@ -24,29 +24,39 @@ function cancelImpl(options, resetState) {
   }
 }
 
-function animateImpl(options, fromSec, toSec, fromSessions, toSessions) {
+function createDurationAnimationContext(options, fromSec, toSec, fromSessions, toSessions) {
   const startValue = Math.max(0, Number(fromSec) || 0)
   const targetValue = Math.max(0, Number(toSec) || 0)
   const startSessionCount = Math.max(0, Number(fromSessions) || 0)
   const targetSessionCount = Math.max(0, Number(toSessions) || 0)
-
-  cancelImpl(options, false)
-  const token = options.getToken()
-  const startText = formatMin(startValue)
-  const targetText = formatMin(targetValue)
-  const displayPatch = options.getDurationDisplayPatch
-    ? options.getDurationDisplayPatch
+  const buildDisplayPatch = reveal => options.getDurationDisplayPatch
+    ? text => options.getDurationDisplayPatch(text, { reveal })
     : text => ({
       _dispTodayDurationText: text,
-      _dispTodayDurationSegments: buildDurationSegments(text),
+      _dispTodayDurationSegments: buildDurationSegments(text, reveal),
     })
 
+  return {
+    startValue, targetValue, startSessionCount, targetSessionCount,
+    startText: formatMin(startValue), targetText: formatMin(targetValue),
+    displayPatch: buildDisplayPatch(false),
+    revealDisplayPatch: buildDisplayPatch(true),
+  }
+}
+
+function animateImpl(options, fromSec, toSec, fromSessions, toSessions) {
+  const { startValue, targetValue, startSessionCount, targetSessionCount,
+    startText, targetText, displayPatch, revealDisplayPatch } = createDurationAnimationContext(
+    options, fromSec, toSec, fromSessions, toSessions
+  )
+  cancelImpl(options, false)
+  const token = options.getToken()
   options.setDisplayDurationSec(startValue)
   if (startText === targetText && startSessionCount === targetSessionCount) {
     options.setDisplayDurationSec(targetValue)
     options.setData({
       _dispTodaySessions: targetSessionCount,
-      ...displayPatch(targetText),
+      ...revealDisplayPatch(targetText),
       durationValueAnimating: false,
     })
     return
@@ -68,14 +78,14 @@ function animateImpl(options, fromSec, toSec, fromSessions, toSessions) {
   const tick = () => durationTick(options, {
     token, steps, interval, startValue, targetValue,
     startSessionCount, targetSessionCount, durationDelta, sessionDelta,
-    displayPatch, state,
+    displayPatch, revealDisplayPatch, state,
   })
   options.setTimer(options.setTimeout(tick, interval))
 }
 
 function durationTick(options, ctx) {
   if (!options.isAlive() || !options.isVisible() || ctx.token !== options.getToken()) return
-  const { steps, interval, startValue, targetValue, startSessionCount, targetSessionCount, durationDelta, sessionDelta, displayPatch, state } = ctx
+  const { steps, interval, startValue, targetValue, startSessionCount, targetSessionCount, durationDelta, sessionDelta, displayPatch, revealDisplayPatch, state } = ctx
 
   state.step += 1
   const progress = Math.min(1, state.step / steps)
@@ -101,7 +111,7 @@ function durationTick(options, ctx) {
     state.lastText = nextText
     options.setData({
       _dispTodaySessions: nextSessions,
-      ...displayPatch(nextText),
+      ...(isFinal ? revealDisplayPatch(nextText) : displayPatch(nextText)),
       durationValueAnimating: !isFinal,
     })
   }

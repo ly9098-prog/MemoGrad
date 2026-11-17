@@ -4,7 +4,6 @@ import {
   groupCatalogBySubject,
   extractIncludedIds,
   isMembershipDirty,
-  SUBJECT_PREFERRED_ORDER,
   STATUS_LABEL,
   RELATION_LABEL,
   statusTone,

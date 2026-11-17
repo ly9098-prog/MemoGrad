@@ -17,11 +17,11 @@ export function CustomCheckbox({
       onClick={onChange}
       className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border transition-colors ${
         checked
-          ? "border-[var(--color-primary)] bg-[var(--color-primary)]"
-          : "border-[var(--color-border)] bg-white hover:border-[var(--color-text-hint)]"
+          ? "border-primary bg-primary"
+          : "border-border bg-card hover:border-muted-foreground"
       } ${className}`}
     >
-      {checked && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+      {checked && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
     </button>
   );
 }

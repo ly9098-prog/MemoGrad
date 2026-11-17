@@ -782,6 +782,27 @@ async def list_imports(
     )
 
 
+@router.get("/pipelines")
+async def list_pipelines(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str | None = None,
+    source_type: str | None = None,
+    sort_by: str = "started_at",
+    _=Depends(require_permissions("import:read")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List import pipelines before the dynamic ``/{batch_id}`` route."""
+    return await _list_pipelines_impl(
+        page=page,
+        page_size=page_size,
+        status=status,
+        source_type=source_type,
+        sort_by=sort_by,
+        db=db,
+    )
+
+
 @router.get("/{batch_id}", response_model=AdminImportBatchDetail)
 async def get_import_detail(
     batch_id: str,
@@ -1837,15 +1858,13 @@ async def admin_cleanup_expired_artifacts(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/pipelines")
-async def list_pipelines(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+async def _list_pipelines_impl(
+    db: AsyncSession,
+    page: int,
+    page_size: int,
     status: str | None = None,
     source_type: str | None = None,
     sort_by: str = "started_at",
-    _=Depends(require_permissions("import:read")),
-    db: AsyncSession = Depends(get_db),
 ):
     """列出所有 ImportPipeline 记录，合并内存中的 quality_report。
 

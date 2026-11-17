@@ -1,18 +1,14 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Copy,
   Eye,
   FileText,
-  GripVertical,
-  ImageIcon,
   LayoutTemplate,
   Loader2,
   Plus,
@@ -29,13 +25,11 @@ import type {
   GraphSpecExpression,
   GraphSpecPanel,
   GraphSpecDomain,
-  GraphSpecAnnotation,
   GraphSpecRefLine,
   GraphPreviewResponse,
   GraphConfirmResponse,
   GraphStatus,
   QualityCheckResult,
-  FormulaGraphAsset,
 } from "@/lib/api/types";
 
 // ── Types ──
@@ -85,14 +79,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_BADGES: Record<string, string> = {
-  not_applicable: "bg-gray-50 text-gray-400 border-gray-200",
-  unconfigured: "bg-gray-50 text-gray-500 border-gray-200",
-  missing: "bg-amber-50 text-amber-700 border-amber-200",
-  generating: "bg-blue-50 text-blue-700 border-blue-200",
-  draft: "bg-amber-50 text-amber-700 border-amber-200",
-  ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  failed: "bg-red-50 text-red-700 border-red-200",
-  ignored: "bg-gray-50 text-gray-400 border-gray-200",
+  not_applicable: "bg-muted text-muted-foreground/60 border-border",
+  unconfigured: "bg-muted text-muted-foreground border-border",
+  missing: "bg-warning-light text-warning-foreground border-warning/40",
+  generating: "bg-accent text-accent-foreground border-primary/30",
+  draft: "bg-warning-light text-warning-foreground border-warning/40",
+  ready: "bg-success-light text-success border-success/30",
+  failed: "bg-destructive-light text-destructive border-destructive/30",
+  ignored: "bg-muted text-muted-foreground/60 border-border",
 };
 
 const LINE_STYLE_OPTIONS = [
@@ -247,7 +241,7 @@ function DataTableNumberInput({
   return (
     <input
       type="number"
-      className={`w-full rounded border bg-white px-2 py-1 text-xs font-mono ${className}`}
+      className={`w-full rounded border bg-card px-2 py-1 text-xs font-mono ${className}`}
       placeholder={placeholder ?? ""}
       value={local}
       min={min}
@@ -661,10 +655,10 @@ export function FormulaGraphSpecPanel({
 
   if (!canUpdate) {
     return (
-      <section className="rounded-xl border border-[var(--color-border)] bg-white/60 p-4">
+      <section className="rounded-xl border border-border bg-card/60 p-4">
         <div className="flex items-center gap-2">
-          <LayoutTemplate className="h-4 w-4 text-[var(--color-text-secondary)]" />
-          <span className="text-sm font-semibold text-[var(--ink)]">自动生成函数图像</span>
+          <LayoutTemplate className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">自动生成函数图像</span>
           {currentStatus && currentStatus !== "not_applicable" && (
             <span className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGES[currentStatus] || ""}`}>
               {STATUS_LABELS[currentStatus] || currentStatus}
@@ -672,28 +666,28 @@ export function FormulaGraphSpecPanel({
           )}
         </div>
         {graphLastError && (
-          <p className="mt-2 text-xs text-red-600">错误: {graphLastError}</p>
+          <p className="mt-2 text-xs text-destructive">错误: {graphLastError}</p>
         )}
         {graphGeneratedAt && (
-          <p className="mt-1 text-xs text-[var(--color-text-hint)]">生成时间: {formatDt(graphGeneratedAt)}</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">生成时间: {formatDt(graphGeneratedAt)}</p>
         )}
         {graphConfirmedAt && (
-          <p className="mt-0.5 text-xs text-[var(--color-text-hint)]">确认时间: {formatDt(graphConfirmedAt)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">确认时间: {formatDt(graphConfirmedAt)}</p>
         )}
         {(!currentStatus || currentStatus === "not_applicable") && (
-          <p className="mt-2 text-xs text-[var(--color-text-hint)]">此公式不适用函数图像功能</p>
+          <p className="mt-2 text-xs text-muted-foreground/70">此公式不适用函数图像功能</p>
         )}
       </section>
     );
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white/60">
+    <section className="overflow-hidden rounded-xl border border-border bg-card/60">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <LayoutTemplate className="h-4 w-4 text-[var(--color-text-secondary)]" />
-          <span className="text-sm font-semibold text-[var(--ink)]">自动生成函数图像</span>
+          <LayoutTemplate className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">自动生成函数图像</span>
           <span className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGES[currentStatus] || ""}`}>
             {STATUS_LABELS[currentStatus] || currentStatus}
           </span>
@@ -704,8 +698,8 @@ export function FormulaGraphSpecPanel({
       {message && (
         <div className={`flex items-center justify-between px-4 py-2 text-sm ${
           messageType === "success"
-            ? "bg-[var(--color-success-light)] text-[var(--color-success)]"
-            : "bg-red-50 text-red-600"
+            ? "bg-success-light text-success"
+            : "bg-destructive-light text-destructive"
         }`}>
           <span>{message}</span>
           <button type="button" className="ml-3 shrink-0" onClick={() => setMessage(null)}>✕</button>
@@ -714,14 +708,14 @@ export function FormulaGraphSpecPanel({
 
       {/* Error banner */}
       {graphLastError && currentStatus === "failed" && (
-        <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">
+        <div className="border-b border-destructive/20 bg-destructive-light px-4 py-2 text-xs text-destructive">
           错误: {graphLastError}
         </div>
       )}
 
       {/* Timestamp bar */}
       {(graphGeneratedAt || graphConfirmedAt) && currentStatus === "ready" && (
-        <div className="flex gap-4 border-b border-[var(--color-border)] bg-gray-50 px-4 py-1.5 text-[11px] text-[var(--color-text-hint)]">
+        <div className="flex gap-4 border-b border-border bg-muted px-4 py-1.5 text-[11px] text-muted-foreground/70">
           {graphGeneratedAt && <span>生成时间: {formatDt(graphGeneratedAt)}</span>}
           {graphConfirmedAt && <span>确认时间: {formatDt(graphConfirmedAt)}</span>}
         </div>
@@ -730,7 +724,7 @@ export function FormulaGraphSpecPanel({
       <div className="space-y-4 p-4">
         {/* ── Template selector ── */}
         <div>
-          <label className="text-xs font-semibold text-[var(--color-text-secondary)]">图像模板</label>
+          <label className="text-xs font-semibold text-muted-foreground">图像模板</label>
           <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {TEMPLATE_OPTIONS.map((opt) => (
               <button
@@ -739,13 +733,13 @@ export function FormulaGraphSpecPanel({
                 disabled={isLoading}
                 className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
                   template === opt.value
-                    ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                    : "border-[var(--color-border)] bg-white/80 hover:bg-white"
+                    ? "border-primary bg-accent text-accent-foreground"
+                    : "border-border bg-card/80 hover:bg-card"
                 }`}
                 onClick={() => handleTemplateChange(opt.value)}
               >
                 <span className="font-semibold">{opt.label}</span>
-                <p className="mt-0.5 text-[10px] text-[var(--color-text-hint)]">{opt.desc}</p>
+                <p className="mt-0.5 text-[10px] text-muted-foreground/70">{opt.desc}</p>
               </button>
             ))}
           </div>
@@ -753,11 +747,11 @@ export function FormulaGraphSpecPanel({
 
         {/* ── Layout info (auto-computed from panel count) ── */}
         <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-[var(--color-text-secondary)]">布局</label>
-          <span className="text-xs text-[var(--color-text-hint)]">
+          <label className="text-xs font-semibold text-muted-foreground">布局</label>
+          <span className="text-xs text-muted-foreground/70">
             {specForApi.layout?.rows ?? 1}行 × {specForApi.layout?.columns ?? 1}列 = {(specForApi.layout?.rows ?? 1) * (specForApi.layout?.columns ?? 1)} 格，当前 {panels.length} 面板
             {(specForApi.layout?.rows ?? 1) * (specForApi.layout?.columns ?? 1) < panels.length && (
-              <span className="ml-1 text-amber-600">（格子数不足）</span>
+              <span className="ml-1 text-warning-foreground">（格子数不足）</span>
             )}
           </span>
         </div>
@@ -765,15 +759,15 @@ export function FormulaGraphSpecPanel({
         {/* ── Panel tabs ── */}
         {panels.length > 0 && (
           <div>
-            <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-[var(--color-border)] pb-1">
+            <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-border pb-1">
               {panels.map((panel, pi) => (
                 <button
                   key={pi}
                   type="button"
                   className={`inline-flex items-center gap-1 rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                     activePanelIdx === pi
-                      ? "border border-b-white bg-white text-[var(--color-primary)]"
-                      : "text-[var(--color-text-secondary)] hover:bg-gray-50"
+                      ? "border border-b-card bg-card text-primary"
+                      : "text-muted-foreground hover:bg-muted"
                   }`}
                   onClick={() => setActivePanelIdx(pi)}
                 >
@@ -782,7 +776,7 @@ export function FormulaGraphSpecPanel({
               ))}
               <button
                 type="button"
-                className="ml-1 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-primary)] hover:bg-[var(--color-primary-light)]"
+                className="ml-1 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-primary hover:bg-accent"
                 disabled={isLoading || panels.length >= 9}
                 onClick={addPanel}
                 title="新增面板"
@@ -793,12 +787,12 @@ export function FormulaGraphSpecPanel({
 
             {/* Per-panel controls */}
             <div className="mb-2 flex items-center gap-2">
-              <span className="text-xs text-[var(--color-text-hint)]">
+              <span className="text-xs text-muted-foreground/70">
                 {panels[activePanelIdx]?.title || `面板 ${activePanelIdx + 1}`}
               </span>
               <button
                 type="button"
-                className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-100 disabled:opacity-30"
+                className="rounded p-1 text-muted-foreground/70 hover:bg-muted disabled:opacity-30"
                 disabled={activePanelIdx <= 0 || isLoading}
                 onClick={() => movePanel(activePanelIdx, -1)}
                 title="左移"
@@ -807,7 +801,7 @@ export function FormulaGraphSpecPanel({
               </button>
               <button
                 type="button"
-                className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-100 disabled:opacity-30"
+                className="rounded p-1 text-muted-foreground/70 hover:bg-muted disabled:opacity-30"
                 disabled={activePanelIdx >= panels.length - 1 || isLoading}
                 onClick={() => movePanel(activePanelIdx, 1)}
                 title="右移"
@@ -816,7 +810,7 @@ export function FormulaGraphSpecPanel({
               </button>
               <button
                 type="button"
-                className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-100 disabled:opacity-30"
+                className="rounded p-1 text-muted-foreground/70 hover:bg-muted disabled:opacity-30"
                 disabled={isLoading}
                 onClick={() => copyPanel(activePanelIdx)}
                 title="复制面板"
@@ -825,7 +819,7 @@ export function FormulaGraphSpecPanel({
               </button>
               <button
                 type="button"
-                className="rounded p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+                className="rounded p-1 text-destructive hover:bg-destructive-light disabled:opacity-30"
                 disabled={panels.length <= 1 || isLoading}
                 onClick={() => deletePanel(activePanelIdx)}
                 title="删除面板"
@@ -836,7 +830,7 @@ export function FormulaGraphSpecPanel({
 
             {/* Active panel content */}
             {panels[activePanelIdx] && (
-              <div className="space-y-3 rounded-lg border border-[var(--color-border)] p-3">
+              <div className="space-y-3 rounded-lg border border-border p-3">
                 <PanelSettings
                   panel={panels[activePanelIdx]}
                   panelIdx={activePanelIdx}
@@ -898,9 +892,9 @@ export function FormulaGraphSpecPanel({
 
         {/* ── Validation errors ── */}
         {validationErrors.length > 0 && (
-          <div className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2">
-            <p className="text-xs font-semibold text-red-700">表单校验错误（{validationErrors.length} 项）</p>
-            <ul className="mt-1 list-disc pl-4 text-xs text-red-600">
+          <div className="rounded-lg border border-destructive/30 bg-destructive-light/60 px-3 py-2">
+            <p className="text-xs font-semibold text-destructive">表单校验错误（{validationErrors.length} 项）</p>
+            <ul className="mt-1 list-disc pl-4 text-xs text-destructive">
               {validationErrors.map((ve, i) => (
                 <li key={i}>{ve.message}</li>
               ))}
@@ -912,7 +906,7 @@ export function FormulaGraphSpecPanel({
         <div>
           <button
             type="button"
-            className="inline-flex items-center gap-1 text-xs text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground"
             onClick={() => {
               if (!showJsonMode) syncFormToJson();
               setShowJsonMode(!showJsonMode);
@@ -925,7 +919,7 @@ export function FormulaGraphSpecPanel({
           {showJsonMode && (
             <div className="mt-2 space-y-2">
               <textarea
-                className="w-full rounded-lg border bg-gray-50 px-3 py-2 font-mono text-xs"
+                className="w-full rounded-lg border bg-muted px-3 py-2 font-mono text-xs"
                 rows={12}
                 value={jsonText}
                 onChange={(e) => {
@@ -935,7 +929,7 @@ export function FormulaGraphSpecPanel({
                 disabled={isLoading}
               />
               {jsonParseError && (
-                <p className="text-xs text-red-500">JSON 错误: {jsonParseError}</p>
+                <p className="text-xs text-destructive">JSON 错误: {jsonParseError}</p>
               )}
               <div className="flex gap-2">
                 <Button
@@ -956,7 +950,7 @@ export function FormulaGraphSpecPanel({
                   同步 JSON → 表单
                 </Button>
               </div>
-              <p className="text-[10px] text-[var(--color-text-hint)]">
+              <p className="text-[10px] text-muted-foreground/70">
                 JSON 校验失败时不会覆盖当前表单。请先修正 JSON 错误后再同步到表单。
               </p>
             </div>
@@ -982,7 +976,7 @@ export function FormulaGraphSpecPanel({
           )}
 
           {showWarnings && canConfirm && !acceptWarnings && (
-            <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <input type="checkbox" checked={acceptWarnings} onChange={(e) => setAcceptWarnings(e.target.checked)} className="rounded" />
               接受警告并确认
             </label>
@@ -1006,18 +1000,18 @@ export function FormulaGraphSpecPanel({
 
         {/* ── Quality checks ── */}
         {quality && quality.warnings.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
-            <p className="text-xs font-semibold text-amber-700">质量检查警告</p>
-            <ul className="mt-1 list-disc pl-4 text-xs text-amber-600">
+          <div className="rounded-lg border border-warning/40 bg-warning-light/60 px-3 py-2">
+            <p className="text-xs font-semibold text-warning-foreground">质量检查警告</p>
+            <ul className="mt-1 list-disc pl-4 text-xs text-warning-foreground">
               {quality.warnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
           </div>
         )}
 
         {quality && quality.errors.length > 0 && (
-          <div className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2">
-            <p className="text-xs font-semibold text-red-700">质量检查错误（请修正后重新生成）</p>
-            <ul className="mt-1 list-disc pl-4 text-xs text-red-600">
+          <div className="rounded-lg border border-destructive/30 bg-destructive-light/60 px-3 py-2">
+            <p className="text-xs font-semibold text-destructive">质量检查错误（请修正后重新生成）</p>
+            <ul className="mt-1 list-disc pl-4 text-xs text-destructive">
               {quality.errors.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           </div>
@@ -1025,7 +1019,7 @@ export function FormulaGraphSpecPanel({
 
         {/* ── Preview image ── */}
         {previewUrl && (
-          <div className="rounded-lg border bg-white p-2">
+          <div className="rounded-lg border bg-card p-2">
             <img src={`${previewUrl}?v=${imageVersion}`} alt="函数图像预览" className="max-h-[400px] w-full object-contain" />
           </div>
         )}
@@ -1057,12 +1051,12 @@ function PanelSettings({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">面板设置</p>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">面板设置</p>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
         <div className="col-span-2 sm:col-span-3 lg:col-span-2">
-          <label className="text-[10px] text-[var(--color-text-hint)]">标题</label>
+          <label className="text-[10px] text-muted-foreground/70">标题</label>
           <input
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
             placeholder="面板标题"
             value={panel.title || ""}
             disabled={isLoading}
@@ -1070,9 +1064,9 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">X 轴模式</label>
+          <label className="text-[10px] text-muted-foreground/70">X 轴模式</label>
           <select
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
             value={panel.axis_mode || "auto_robust"}
             disabled={isLoading}
             onChange={(e) => updatePanel(panelIdx, "axis_mode", e.target.value)}
@@ -1083,10 +1077,10 @@ function PanelSettings({
           </select>
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">X min</label>
+          <label className="text-[10px] text-muted-foreground/70">X min</label>
           <input
             type="number"
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs font-mono"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs font-mono"
             placeholder="-6"
             value={panel.x_range?.[0] ?? ""}
             disabled={isLoading || (panel.axis_mode || "auto_robust") !== "manual"}
@@ -1099,10 +1093,10 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">X max</label>
+          <label className="text-[10px] text-muted-foreground/70">X max</label>
           <input
             type="number"
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs font-mono"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs font-mono"
             placeholder="6"
             value={panel.x_range?.[1] ?? ""}
             disabled={isLoading || (panel.axis_mode || "auto_robust") !== "manual"}
@@ -1115,10 +1109,10 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">Y min</label>
+          <label className="text-[10px] text-muted-foreground/70">Y min</label>
           <input
             type="number"
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs font-mono"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs font-mono"
             placeholder="-6"
             value={panel.y_range?.[0] ?? ""}
             disabled={isLoading || (panel.axis_mode || "auto_robust") !== "manual"}
@@ -1131,10 +1125,10 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">Y max</label>
+          <label className="text-[10px] text-muted-foreground/70">Y max</label>
           <input
             type="number"
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs font-mono"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs font-mono"
             placeholder="6"
             value={panel.y_range?.[1] ?? ""}
             disabled={isLoading || (panel.axis_mode || "auto_robust") !== "manual"}
@@ -1147,9 +1141,9 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">X 轴标签</label>
+          <label className="text-[10px] text-muted-foreground/70">X 轴标签</label>
           <input
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
             placeholder="x"
             value={panel.x_label || ""}
             disabled={isLoading}
@@ -1157,9 +1151,9 @@ function PanelSettings({
           />
         </div>
         <div>
-          <label className="text-[10px] text-[var(--color-text-hint)]">Y 轴标签</label>
+          <label className="text-[10px] text-muted-foreground/70">Y 轴标签</label>
           <input
-            className="mt-0.5 w-full rounded-lg border bg-white px-2 py-1.5 text-xs"
+            className="mt-0.5 w-full rounded-lg border bg-card px-2 py-1.5 text-xs"
             placeholder="y"
             value={panel.y_label || ""}
             disabled={isLoading}
@@ -1168,7 +1162,7 @@ function PanelSettings({
         </div>
       </div>
       {panel.axis_mode === "manual" && (
-        <p className="mt-1 text-[10px] text-amber-600">手动模式下请确保 min &lt; max，否则提交时会被阻止</p>
+        <p className="mt-1 text-[10px] text-warning-foreground">手动模式下请确保 min &lt; max，否则提交时会被阻止</p>
       )}
     </div>
   );
@@ -1190,15 +1184,15 @@ function ExpressionsEditor({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">
         表达式（{panel.expressions.length}/8）
       </p>
       <div className="space-y-1.5">
         {panel.expressions.map((expr, ei) => (
-          <div key={ei} className="flex items-center gap-1.5 rounded-lg bg-gray-50/60 p-1.5">
+          <div key={ei} className="flex items-center gap-1.5 rounded-lg bg-muted/60 p-1.5">
             {/* Expression */}
             <input
-              className="flex-[2] rounded border bg-white px-2 py-1.5 text-xs font-mono"
+              className="flex-[2] rounded border bg-card px-2 py-1.5 text-xs font-mono"
               placeholder="表达式 (如 x**2, sin(x))"
               value={expr.expression}
               onChange={(e) => updateExpression(panelIdx, ei, "expression", e.target.value)}
@@ -1206,7 +1200,7 @@ function ExpressionsEditor({
             />
             {/* display_latex */}
             <input
-              className="flex-1 rounded border bg-white px-2 py-1.5 text-xs font-mono"
+              className="flex-1 rounded border bg-card px-2 py-1.5 text-xs font-mono"
               placeholder="LaTeX (可选)"
               value={(expr as Record<string, unknown>).display_latex as string || ""}
               onChange={(e) => updateExpression(panelIdx, ei, "display_latex" as keyof GraphSpecExpression, e.target.value)}
@@ -1214,7 +1208,7 @@ function ExpressionsEditor({
             />
             {/* Label */}
             <input
-              className="w-24 rounded border bg-white px-2 py-1.5 text-xs"
+              className="w-24 rounded border bg-card px-2 py-1.5 text-xs"
               placeholder="标签"
               value={expr.label || ""}
               onChange={(e) => updateExpression(panelIdx, ei, "label", e.target.value)}
@@ -1222,7 +1216,7 @@ function ExpressionsEditor({
             />
             {/* Line style */}
             <select
-              className="w-20 rounded border bg-white px-1 py-1.5 text-xs"
+              className="w-20 rounded border bg-card px-1 py-1.5 text-xs"
               value={expr.line_style || "solid"}
               onChange={(e) => updateExpression(panelIdx, ei, "line_style", e.target.value)}
               disabled={isLoading}
@@ -1233,19 +1227,19 @@ function ExpressionsEditor({
             </select>
             {/* Actions */}
             <div className="flex shrink-0 items-center gap-0.5">
-              <button type="button" className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-200 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-muted-foreground/70 hover:bg-border disabled:opacity-30"
                 disabled={ei <= 0 || isLoading} onClick={() => moveExpression(panelIdx, ei, -1)} title="上移">
                 <ChevronUp className="h-3 w-3" />
               </button>
-              <button type="button" className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-200 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-muted-foreground/70 hover:bg-border disabled:opacity-30"
                 disabled={ei >= panel.expressions.length - 1 || isLoading} onClick={() => moveExpression(panelIdx, ei, 1)} title="下移">
                 <ChevronDown className="h-3 w-3" />
               </button>
-              <button type="button" className="rounded p-1 text-[var(--color-text-hint)] hover:bg-gray-200 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-muted-foreground/70 hover:bg-border disabled:opacity-30"
                 disabled={isLoading} onClick={() => copyExpression(panelIdx, ei)} title="复制">
                 <Copy className="h-3 w-3" />
               </button>
-              <button type="button" className="rounded p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-destructive hover:bg-destructive-light disabled:opacity-30"
                 disabled={panel.expressions.length <= 1 || isLoading} onClick={() => removeExpression(panelIdx, ei)} title="删除">
                 <X className="h-3 w-3" />
               </button>
@@ -1253,7 +1247,7 @@ function ExpressionsEditor({
           </div>
         ))}
       </div>
-      <button type="button" className="mt-1 text-xs text-[var(--color-primary)] hover:underline disabled:opacity-50"
+      <button type="button" className="mt-1 text-xs text-primary hover:underline disabled:opacity-50"
         disabled={isLoading || panel.expressions.length >= 8} onClick={() => addExpression(panelIdx)}>
         + 添加表达式
       </button>
@@ -1294,14 +1288,14 @@ function DomainEditor({
 
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">定义域</p>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">定义域</p>
 
       {/* Intervals */}
       {intervals.length > 0 && (
         <div className="mb-2 space-y-1">
           {intervals.map((iv, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="text-xs text-[var(--color-text-hint)] w-5">{intervalDisplay(iv)}</span>
+              <span className="text-xs text-muted-foreground/70 w-5">{intervalDisplay(iv)}</span>
               <label className="flex items-center gap-1 text-[10px]">
                 <input type="checkbox" checked={!iv.leftOpen} onChange={(e) => updateIntervalField(i, "leftOpen", !e.target.checked)}
                   className="rounded" disabled={isLoading} />
@@ -1316,7 +1310,7 @@ function DomainEditor({
                   className="rounded" disabled={isLoading} />
                 包含右端
               </label>
-              <button type="button" className="rounded p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-destructive hover:bg-destructive-light disabled:opacity-30"
                 disabled={isLoading} onClick={() => removeInterval(i)}>
                 <X className="h-3 w-3" />
               </button>
@@ -1326,7 +1320,7 @@ function DomainEditor({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="text-xs text-[var(--color-primary)] hover:underline disabled:opacity-50"
+        <button type="button" className="text-xs text-primary hover:underline disabled:opacity-50"
           disabled={isLoading} onClick={addInterval}>
           + 添加区间
         </button>
@@ -1334,9 +1328,9 @@ function DomainEditor({
 
       {/* Exclude points */}
       <div className="mt-2">
-        <label className="text-[10px] text-[var(--color-text-hint)]">排除点（逗号分隔）</label>
+        <label className="text-[10px] text-muted-foreground/70">排除点（逗号分隔）</label>
         <input
-          className="mt-0.5 w-full max-w-xs rounded-lg border bg-white px-2 py-1.5 text-xs font-mono"
+          className="mt-0.5 w-full max-w-xs rounded-lg border bg-card px-2 py-1.5 text-xs font-mono"
           placeholder="例如: 0, 1, -2"
           value={excludeText}
           disabled={isLoading}
@@ -1363,29 +1357,29 @@ function AnnotationsEditor({
 
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">
         注释和关键点（{annotations.length}/20）
       </p>
       {annotations.length > 0 && (
         <div className="mb-1 space-y-1.5">
           {annotations.map((ann, ai) => (
-            <div key={ai} className="flex items-center gap-1.5 rounded-lg bg-gray-50/60 p-1.5">
+            <div key={ai} className="flex items-center gap-1.5 rounded-lg bg-muted/60 p-1.5">
               <DataTableNumberInput value={ann.x} onChange={(v) => updateAnnotation(panelIdx, ai, "x", v)}
                 placeholder="x" disabled={isLoading} className="w-16" />
               <DataTableNumberInput value={ann.y} onChange={(v) => updateAnnotation(panelIdx, ai, "y", v)}
                 placeholder="y" disabled={isLoading} className="w-16" />
-              <input className="flex-1 rounded border bg-white px-2 py-1 text-xs"
+              <input className="flex-1 rounded border bg-card px-2 py-1 text-xs"
                 placeholder="标签（可选）" value={ann.label || ""} disabled={isLoading}
                 onChange={(e) => updateAnnotation(panelIdx, ai, "label", e.target.value)} />
-              <select className="w-16 rounded border bg-white px-1 py-1 text-xs"
+              <select className="w-16 rounded border bg-card px-1 py-1 text-xs"
                 value={ann.point_style || "filled"} disabled={isLoading}
                 onChange={(e) => updateAnnotation(panelIdx, ai, "point_style", e.target.value)}>
                 {POINT_STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              <input className="w-16 rounded border bg-white px-1 py-1 text-xs"
+              <input className="w-16 rounded border bg-card px-1 py-1 text-xs"
                 type="color" value={ann.color || "#b91c1c"} disabled={isLoading}
                 onChange={(e) => updateAnnotation(panelIdx, ai, "color", e.target.value)} />
-              <button type="button" className="rounded p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-destructive hover:bg-destructive-light disabled:opacity-30"
                 disabled={isLoading} onClick={() => removeAnnotation(panelIdx, ai)}>
                 <X className="h-3 w-3" />
               </button>
@@ -1393,7 +1387,7 @@ function AnnotationsEditor({
           ))}
         </div>
       )}
-      <button type="button" className="text-xs text-[var(--color-primary)] hover:underline disabled:opacity-50"
+      <button type="button" className="text-xs text-primary hover:underline disabled:opacity-50"
         disabled={isLoading || annotations.length >= 20} onClick={() => addAnnotation(panelIdx)}>
         + 添加注释
       </button>
@@ -1420,22 +1414,22 @@ function RefLinesEditor({
 
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">{label}（{lines.length}）</p>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">{label}（{lines.length}）</p>
       {lines.length > 0 && (
         <div className="mb-1 space-y-1.5">
           {lines.map((line, li) => (
-            <div key={li} className="flex items-center gap-1.5 rounded-lg bg-gray-50/60 p-1.5">
+            <div key={li} className="flex items-center gap-1.5 rounded-lg bg-muted/60 p-1.5">
               <DataTableNumberInput value={line.value} onChange={(v) => updateRefLine(panelIdx, orientation, li, "value", v)}
                 placeholder="值" disabled={isLoading} className="w-20" />
-              <input className="flex-1 rounded border bg-white px-2 py-1 text-xs"
+              <input className="flex-1 rounded border bg-card px-2 py-1 text-xs"
                 placeholder="标签（可选）" value={line.label || ""} disabled={isLoading}
                 onChange={(e) => updateRefLine(panelIdx, orientation, li, "label", e.target.value)} />
-              <select className="w-16 rounded border bg-white px-1 py-1 text-xs"
+              <select className="w-16 rounded border bg-card px-1 py-1 text-xs"
                 value={line.style || "dashed"} disabled={isLoading}
                 onChange={(e) => updateRefLine(panelIdx, orientation, li, "style", e.target.value)}>
                 {LINE_STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-              <button type="button" className="rounded p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+              <button type="button" className="rounded p-1 text-destructive hover:bg-destructive-light disabled:opacity-30"
                 disabled={isLoading} onClick={() => removeRefLine(panelIdx, orientation, li)}>
                 <X className="h-3 w-3" />
               </button>
@@ -1443,7 +1437,7 @@ function RefLinesEditor({
           ))}
         </div>
       )}
-      <button type="button" className="text-xs text-[var(--color-primary)] hover:underline disabled:opacity-50"
+      <button type="button" className="text-xs text-primary hover:underline disabled:opacity-50"
         disabled={isLoading} onClick={() => addRefLine(panelIdx, orientation)}>
         + 添加{label}
       </button>

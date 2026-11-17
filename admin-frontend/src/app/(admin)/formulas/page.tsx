@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
@@ -71,7 +72,7 @@ function renderStructuredConditions(raw: string | null | undefined) {
             return (
               <li key={i}>
                 <MixedLatexRenderer text={expr} />
-                {note && <span className="text-[var(--color-text-secondary)] ml-2">— {note}</span>}
+                {note && <span className="text-muted-foreground ml-2">— {note}</span>}
               </li>
             )
           })}
@@ -156,11 +157,11 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: "bg-gray-50 text-gray-600 border-gray-200",
-  pending_review: "bg-amber-50 text-amber-700 border-amber-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
-  published: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  offline: "bg-slate-50 text-slate-600 border-slate-200",
+  draft: "bg-muted text-muted-foreground border-border",
+  pending_review: "bg-warning-light text-warning-foreground border-warning/40",
+  rejected: "bg-destructive-light text-destructive border-destructive/30",
+  published: "bg-success-light text-success border-success/30",
+  offline: "bg-muted text-muted-foreground border-border",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -206,14 +207,14 @@ const GRAPH_STATUS_OPTIONS = [
 ];
 
 const GRAPH_STATUS_BADGE: Record<string, string> = {
-  not_applicable: "bg-gray-50 text-gray-400 border-gray-200",
-  unconfigured: "bg-gray-50 text-gray-500 border-gray-200",
-  missing: "bg-amber-50 text-amber-700 border-amber-200",
-  generating: "bg-blue-50 text-blue-700 border-blue-200",
-  draft: "bg-amber-50 text-amber-700 border-amber-200",
-  ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  failed: "bg-red-50 text-red-700 border-red-200",
-  ignored: "bg-gray-50 text-gray-400 border-gray-200",
+  not_applicable: "bg-muted text-muted-foreground/60 border-border",
+  unconfigured: "bg-muted text-muted-foreground border-border",
+  missing: "bg-warning-light text-warning-foreground border-warning/40",
+  generating: "bg-accent text-accent-foreground border-primary/30",
+  draft: "bg-warning-light text-warning-foreground border-warning/40",
+  ready: "bg-success-light text-success border-success/30",
+  failed: "bg-destructive-light text-destructive border-destructive/30",
+  ignored: "bg-muted text-muted-foreground/60 border-border",
 };
 
 const GRAPH_STATUS_LABEL: Record<string, string> = {
@@ -563,14 +564,14 @@ export default function FormulasPage() {
         <div key={node.id}>
           <div
             className={`group flex items-center gap-1 rounded-lg pr-2 transition-colors ${
-              isSelected ? "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]" : "hover:bg-[var(--color-bg-input)]"
+              isSelected ? "bg-accent text-accent-foreground" : "hover:bg-muted"
             }`}
             style={{ paddingLeft: 4 + depth * 14 }}
           >
             <button
               type="button"
               onClick={() => hasChildren && toggleCategory(node.id)}
-              className="flex h-8 w-6 shrink-0 items-center justify-center text-[var(--color-text-hint)]"
+              className="flex h-8 w-6 shrink-0 items-center justify-center text-muted-foreground/70"
               aria-label={isExpanded ? "收起分类" : "展开分类"}
             >
               {hasChildren ? (
@@ -584,16 +585,16 @@ export default function FormulasPage() {
               title={`${node.name} (${node.code})`}
             >
               {node.node_type === "subject" ? (
-                <FolderTree className="h-3.5 w-3.5 shrink-0 text-[var(--color-primary)]" />
+                <FolderTree className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
-                <Folder className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-hint)]" />
+                <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
               )}
-              <span className={`truncate text-xs ${isSelected ? "font-semibold" : "font-medium text-[var(--color-text-secondary)]"}`}>
+              <span className={`truncate text-xs ${isSelected ? "font-semibold" : "font-medium text-muted-foreground"}`}>
                 {node.name}
               </span>
             </button>
             <span
-              className="min-w-5 text-right text-[10px] tabular-nums text-[var(--color-text-hint)]"
+              className="min-w-5 text-right text-[10px] tabular-nums text-muted-foreground/70"
               title={`${node.subtree_formula_count ?? node.formula_count ?? 0} 条公式（含子分类）`}
             >
               {node.subtree_formula_count ?? node.formula_count ?? 0}
@@ -612,39 +613,35 @@ export default function FormulasPage() {
   };
 
   return (
-    <div className="space-y-5 pb-24">
-      {/* ── Header ── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1
-            className="font-display text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)]"
-            style={{ fontVariationSettings: "'wght' 700" }}
-          >
-            408 速记卡管理
-          </h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            {canReview ? "统一管理公式、定义、易混点、陷阱与对比卡，审核通过后自动发布" : "分类、列表与详情同屏管理 408 速记卡"}
-          </p>
-        </div>
-        {canWrite && (
-          <Link href="/formulas/new">
-            <Button variant="primary" size="md">
-              <Plus className="h-4 w-4" />
-              新建速记卡
-            </Button>
-          </Link>
-        )}
-      </div>
+    <ManagementPage className="space-y-5 pb-24">
+      <ManagementPageHeader
+        title="408 速记卡管理"
+        description={
+          canReview
+            ? "统一管理公式、定义、易混点、陷阱与对比卡，审核通过后自动发布"
+            : "分类、列表与详情同屏管理 408 速记卡"
+        }
+        actions={
+          canWrite ? (
+            <Link href="/formulas/new">
+              <Button variant="primary" size="md">
+                <Plus className="h-4 w-4" />
+                新建速记卡
+              </Button>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {/* ── Floating toast notification ── */}
       {message && (
         <div className="fixed right-6 top-24 z-50 animate-fade-in">
-          <div className="flex items-center gap-3 rounded-full border border-[var(--color-success)]/30 bg-white/90 py-2 pl-5 pr-2 shadow-lg shadow-black/8 backdrop-blur-xl">
-            <span className="text-sm font-medium text-[var(--color-text-primary)]">{message}</span>
+          <div className="flex items-center gap-3 rounded-full border border-success/30 bg-card/90 py-2 pl-5 pr-2 shadow-lg shadow-black/8 backdrop-blur-xl">
+            <span className="text-sm font-medium text-foreground">{message}</span>
             <button
               type="button"
               onClick={() => setMessage(null)}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-text-hint)] transition-colors hover:bg-[var(--color-success-light)] hover:text-[var(--color-success)]"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-success-light hover:text-success"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -654,10 +651,10 @@ export default function FormulasPage() {
 
       <Card className="overflow-visible">
         {/* ── Workspace filters ── */}
-        <div className="border-b border-[var(--color-border)] bg-white/72 p-4">
+        <div className="border-b border-border bg-card/72 p-4">
           <div className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_140px_150px_170px_155px_auto]">
             <label className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 className="pl-9 pr-16"
                 placeholder="搜索标题 / 别名 / 速记内容"
@@ -666,13 +663,13 @@ export default function FormulasPage() {
               />
               <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
                 {(searchDebouncing || (formulas.isFetching && Boolean(filters.q))) ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-text-hint)]" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/70" />
                 ) : null}
                 {searchDraft ? (
                   <button
                     type="button"
                     onClick={() => setSearchDraft("")}
-                    className="grid h-7 w-7 place-items-center rounded-lg text-[var(--color-text-hint)] transition hover:bg-[var(--color-primary-light)] hover:text-[var(--ink)]"
+                    className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-accent hover:text-foreground"
                     aria-label="清空搜索"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -718,54 +715,54 @@ export default function FormulasPage() {
         {/* ── Three-column management workspace ── */}
         <div className="grid min-h-[680px] xl:grid-cols-[230px_minmax(430px,1fr)_minmax(330px,0.78fr)] xl:items-stretch">
           {/* Category navigation */}
-          <aside className="border-b border-[var(--color-border)] bg-[var(--porcelain)]/55 p-4 xl:self-stretch xl:border-b-0 xl:border-r">
+          <aside className="border-b border-border bg-[var(--porcelain)]/55 p-4 xl:self-stretch xl:border-b-0 xl:border-r">
             <div className="xl:sticky xl:top-0 xl:flex xl:h-dvh xl:min-h-0 xl:flex-col xl:overflow-hidden">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">分类目录</p>
-                <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">按学科层级快速定位</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground/70">分类目录</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/70">按学科层级快速定位</p>
               </div>
               {filters.category_id ? (
                 <button
                   type="button"
                   onClick={() => updateFilter("category_id", "")}
-                  className="text-[11px] font-medium text-[var(--color-primary)] hover:underline"
+                  className="text-[11px] font-medium text-primary hover:underline"
                 >
                   全部
                 </button>
               ) : null}
             </div>
             <label className="relative mb-3 block">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
               <input
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
                 placeholder="搜索分类名称 / 编码"
-                className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white/80 pl-8 pr-3 text-xs outline-none transition focus:border-[var(--color-primary)]"
+                className="h-9 w-full rounded-xl border border-border bg-card/80 pl-8 pr-3 text-xs outline-none transition focus:border-primary"
               />
             </label>
             <button
               type="button"
               onClick={() => updateFilter("category_id", "")}
               className={`mb-1 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
-                !filters.category_id ? "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)] hover:bg-white"
+                !filters.category_id ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-card"
               }`}
             >
               <span className="flex items-center gap-2"><Layers className="h-3.5 w-3.5" />全部分类</span>
-              <span className="tabular-nums text-[10px] text-[var(--color-text-hint)]">{totalCategoryFormulaCount}</span>
+              <span className="tabular-nums text-[10px] text-muted-foreground/70">{totalCategoryFormulaCount}</span>
             </button>
             <div className="max-h-[560px] space-y-0.5 overflow-y-auto pr-1 xl:min-h-0 xl:max-h-none xl:flex-1 xl:overscroll-contain">
               {categories.isLoading ? (
                 <div className="space-y-2 py-2">
-                  {Array.from({ length: 7 }, (_, i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-white/70" />)}
+                  {Array.from({ length: 7 }, (_, i) => <div key={i} className="h-8 animate-pulse rounded-lg bg-card/70" />)}
                 </div>
               ) : filteredCategoryTree.length ? (
                 renderCategoryTree(filteredCategoryTree)
               ) : (
-                <p className="py-8 text-center text-xs text-[var(--color-text-hint)]">无匹配分类</p>
+                <p className="py-8 text-center text-xs text-muted-foreground/70">无匹配分类</p>
               )}
             </div>
-            <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+            <div className="mt-4 border-t border-border pt-3">
               <Link href="/formulas/categories">
                 <Button variant="secondary" size="sm" className="w-full">
                   <FolderTree className="h-3.5 w-3.5" />
@@ -777,29 +774,29 @@ export default function FormulasPage() {
           </aside>
 
           {/* Formula list */}
-          <main className="min-w-0 border-b border-[var(--color-border)] p-4 xl:border-b-0 xl:border-r">
+          <main className="min-w-0 border-b border-border p-4 xl:border-b-0 xl:border-r">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-bold text-[var(--ink)]">速记卡列表</p>
+                  <p className="text-sm font-bold text-foreground">速记卡列表</p>
                   {selectedCategory ? (
-                    <span className="rounded-md bg-[var(--color-primary-light)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-primary-dark)]">
+                    <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
                       {selectedCategory.name} · 含子分类
                     </span>
                   ) : null}
                   {formulas.isFetching && !formulas.isLoading ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-hint)]">
+                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70">
                       <Loader2 className="h-3 w-3 animate-spin" /> 更新中
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-[11px] text-[var(--color-text-hint)]">
+                <p className="mt-0.5 text-[11px] text-muted-foreground/70">
                   {formulas.isLoading ? "正在加载…" : `共 ${formulas.data?.total ?? 0} 项 · 第 ${formulas.data?.page ?? page} 页`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {isBatchable ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-2.5 py-1.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
                     <CustomCheckbox
                       checked={allSelected}
                       indeterminate={indeterminate}
@@ -807,11 +804,11 @@ export default function FormulasPage() {
                       onCheckedChange={toggleSelectAll}
                       aria-label="选择当前页"
                     />
-                    <span className="text-[11px] text-[var(--color-text-secondary)]">全选当前页</span>
+                    <span className="text-[11px] text-muted-foreground">全选当前页</span>
                   </div>
                 ) : null}
                 {hasActiveFilters ? (
-                  <span className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-primary)]/20 bg-[var(--color-primary-light)]/55 px-2.5 py-1.5 text-[11px] font-medium text-[var(--color-primary-dark)]">
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-accent/55 px-2.5 py-1.5 text-[11px] font-medium text-accent-foreground">
                     <SlidersHorizontal className="h-3 w-3" /> 筛选已生效
                   </span>
                 ) : null}
@@ -819,35 +816,36 @@ export default function FormulasPage() {
             </div>
 
             {formulas.isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 6 }, (_, i) => <div key={i} className="h-24 animate-pulse rounded-2xl border bg-white/60" />)}
+              <div className="divide-y divide-border border-y border-border">
+                {Array.from({ length: 6 }, (_, i) => <div key={i} className="h-[92px] animate-pulse bg-secondary/25" />)}
               </div>
             ) : formulas.isError ? (
-              <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-red-200 bg-red-50/35 py-14 text-center animate-fade-in">
-                <AlertCircle className="h-9 w-9 text-red-400" />
+              <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-destructive/30 bg-destructive-light/30 py-14 text-center animate-fade-in">
+                <AlertCircle className="h-9 w-9 text-destructive/70" />
                 <div>
-                  <p className="text-sm font-semibold text-red-700">公式加载失败</p>
-                  <p className="mt-1 text-xs text-red-500">请检查查询参数或后端服务后重试</p>
+                  <p className="text-sm font-semibold text-destructive">公式加载失败</p>
+                  <p className="mt-1 text-xs text-destructive">请检查查询参数或后端服务后重试</p>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => formulas.refetch()}>重新加载</Button>
               </div>
             ) : (
-              <div className={`space-y-2 transition-opacity duration-200 ${formulas.isFetching ? "opacity-70" : "opacity-100"}`}>
-                <div className="stagger-enter space-y-2" key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}>
-                {items.map((card) => {
+              <div className={`transition-opacity duration-200 ${formulas.isFetching ? "opacity-70" : "opacity-100"}`}>
+                {items.length > 0 ? (
+                  <div className="stagger-enter divide-y divide-border border-y border-border" key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}>
+                  {items.map((card) => {
                   const isSelected = selectedId === card.id;
                   const tagNames = card.tags?.map((tag) => tag.name).join(" · ") || "";
                   return (
                     <article
                       key={card.id}
                       onMouseEnter={() => prefetchDetail(card.id)}
-                      className={`group rounded-2xl border transition-all duration-200 ${
+                      className={`group border-l-2 transition-colors duration-150 motion-reduce:transition-none ${
                         isSelected
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]/35 shadow-sm ring-2 ring-[var(--color-primary-light)]"
-                          : "border-[var(--color-border)] bg-white/82 hover:border-[var(--color-primary)]/45 hover:bg-white"
+                          ? "border-primary bg-accent/35"
+                          : "border-transparent hover:bg-secondary/30"
                       }`}
                     >
-                      <div className="flex items-start gap-3 p-3">
+                      <div className="flex items-start gap-3 px-3 py-3.5">
                         {isBatchable ? (
                           <CustomCheckbox
                             checked={safeSelectedIds.has(card.id)}
@@ -863,26 +861,26 @@ export default function FormulasPage() {
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[card.status] || "bg-gray-50"}`}>
+                            <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[card.status] || "bg-muted"}`}>
                               {STATUS_LABEL[card.status] || card.status}
                             </span>
-                            <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                            <span className="inline-flex rounded-md border border-success/30 bg-success-light px-1.5 py-0.5 text-[10px] font-medium text-success">
                               {STUDY_CARD_TYPE_LABEL[card.study_card_type] || card.study_card_type || "公式"}
                             </span>
                             {card.is_function_graph ? (
-                              <span className="inline-flex rounded-md border border-[var(--color-primary-light)] bg-[var(--color-primary-light)]/60 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-primary-dark)]">函数图像</span>
+                              <span className="inline-flex rounded-md border border-accent bg-accent/60 px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">函数图像</span>
                             ) : null}
                             {card.graph_status && card.graph_status !== "not_applicable" ? (
-                              <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${GRAPH_STATUS_BADGE[card.graph_status] || "bg-gray-50"}`}>
+                              <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${GRAPH_STATUS_BADGE[card.graph_status] || "bg-muted"}`}>
                                 {GRAPH_STATUS_LABEL[card.graph_status] || card.graph_status}
                               </span>
                             ) : null}
                           </div>
-                          <h3 className="mt-1.5 line-clamp-1 text-sm font-bold text-[var(--ink)]"><MixedLatexRenderer text={card.title} /></h3>
+                          <h3 className="mt-1.5 line-clamp-1 text-sm font-bold text-foreground"><MixedLatexRenderer text={card.title} /></h3>
                           {card.summary ? (
-                            <p className="mt-1 line-clamp-1 text-xs leading-5 text-[var(--color-text-secondary)]"><MixedLatexRenderer text={card.summary} /></p>
+                            <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground"><MixedLatexRenderer text={card.summary} /></p>
                           ) : null}
-                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--color-text-hint)]">
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground/70">
                             {tagNames ? <span className="inline-flex items-center gap-1"><Tag className="h-3 w-3" />{tagNames}</span> : null}
                             <span>#{card.id}</span>
                             <span>{card.formula_blocks?.length || 0} 个内容块</span>
@@ -896,14 +894,15 @@ export default function FormulasPage() {
                       </div>
                     </article>
                   );
-                })}
-                </div>
+                  })}
+                  </div>
+                ) : null}
 
                 {!items.length ? (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border)] bg-white/60 py-14 text-center animate-fade-in">
-                    <Sigma className="h-10 w-10 text-[var(--color-text-hint)]" />
-                    <p className="text-sm font-semibold text-[var(--color-text-secondary)]">{selectedCategory ? `「${selectedCategory.name}」下暂无匹配速记卡` : "暂无匹配速记卡"}</p>
-                    <p className="max-w-sm text-xs leading-5 text-[var(--color-text-hint)]">
+                  <div className="flex flex-col items-center gap-2 rounded-[12px] border border-dashed border-border bg-secondary/20 py-14 text-center animate-fade-in">
+                    <Sigma className="h-10 w-10 text-muted-foreground/70" />
+                    <p className="text-sm font-semibold text-muted-foreground">{selectedCategory ? `「${selectedCategory.name}」下暂无匹配速记卡` : "暂无匹配速记卡"}</p>
+                    <p className="max-w-sm text-xs leading-5 text-muted-foreground/70">
                       {selectedCategory ? "已同时查询当前分类及其全部子分类。可调整状态、速记类型、图像状态或搜索关键词。" : "尝试调整搜索关键词或筛选条件。"}
                     </p>
                     {hasActiveFilters ? <Button variant="secondary" size="sm" onClick={clearFilters}>清除筛选</Button> : null}
@@ -913,13 +912,13 @@ export default function FormulasPage() {
             )}
 
             {formulas.data && formulas.data.total_pages > 1 ? (
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
-                <span className="text-[11px] text-[var(--color-text-hint)]">第 {formulas.data.page} / {formulas.data.total_pages} 页</span>
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                <span className="text-[11px] text-muted-foreground/70">第 {formulas.data.page} / {formulas.data.total_pages} 页</span>
                 <div className="flex items-center gap-1">
                   <button
                     disabled={page <= 1 || formulas.isFetching}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-30"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </button>
@@ -930,7 +929,7 @@ export default function FormulasPage() {
                         onClick={() => setPage(pageNumber)}
                         disabled={formulas.isFetching}
                         className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg border px-2 text-xs font-semibold ${
-                          pageNumber === page ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white" : "border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]"
+                          pageNumber === page ? "border-primary bg-primary text-white" : "border-border bg-card text-muted-foreground"
                         }`}
                       >
                         {pageNumber}
@@ -940,7 +939,7 @@ export default function FormulasPage() {
                   <button
                     disabled={page >= formulas.data.total_pages || formulas.isFetching}
                     onClick={() => setPage((p) => p + 1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white transition hover:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-30"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card transition hover:border-primary disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
@@ -950,13 +949,13 @@ export default function FormulasPage() {
           </main>
 
           {/* Detail / preview */}
-          <aside className="min-w-0 bg-white/62 p-4 xl:self-stretch">
+          <aside className="min-w-0 bg-card/62 p-4 xl:self-stretch">
             <div className="xl:sticky xl:top-0 xl:h-dvh xl:min-h-0 xl:overflow-hidden">
             {detail.isLoading && selectedId !== null ? (
               <div className="space-y-3 animate-fade-in">
-                <div className="h-16 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/75" />
-                <div className="h-24 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/60" />
-                <div className="h-48 animate-pulse rounded-2xl bg-[var(--color-bg-input)]/50" />
+                <div className="h-16 animate-pulse rounded-2xl bg-muted/75" />
+                <div className="h-24 animate-pulse rounded-2xl bg-muted/60" />
+                <div className="h-48 animate-pulse rounded-2xl bg-muted/50" />
               </div>
             ) : selectedCard ? (
               <div
@@ -964,15 +963,15 @@ export default function FormulasPage() {
                 key={selectedCard.id}
                 className="space-y-4 animate-fade-in xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1"
               >
-                <div className="sticky top-0 z-10 -mx-1 flex items-start justify-between gap-3 rounded-xl bg-white/94 px-1 pb-2 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-white/82">
+                <div className="sticky top-0 z-10 -mx-1 flex items-start justify-between gap-3 rounded-xl bg-card/94 px-1 pb-2 pt-0.5 backdrop-blur supports-[backdrop-filter]:bg-card/82">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[selectedCard.status] || ""}`}>
                         {STATUS_LABEL[selectedCard.status] || selectedCard.status}
                       </span>
-                      <span className="text-[10px] text-[var(--color-text-hint)]">#{selectedCard.id} · v{selectedCard.version}</span>
+                      <span className="text-[10px] text-muted-foreground/70">#{selectedCard.id} · v{selectedCard.version}</span>
                     </div>
-                    <h2 className="mt-2 text-base font-bold leading-6 text-[var(--ink)]"><MixedLatexRenderer text={selectedCard.title} /></h2>
+                    <h2 className="mt-2 text-base font-bold leading-6 text-foreground"><MixedLatexRenderer text={selectedCard.title} /></h2>
                   </div>
                   {canUpdate ? (
                     <Link href={`/formulas/${selectedCard.id}?returnTo=${encodeURIComponent(listReturnHref)}`}>
@@ -985,72 +984,72 @@ export default function FormulasPage() {
 
                 <div className="flex flex-wrap gap-1.5">
                   {selectedCard.tags?.map((tag) => (
-                    <span key={tag.id} className="inline-flex items-center rounded-md border border-[var(--color-border)] bg-white px-2 py-1 text-[10px] text-[var(--color-text-secondary)]">
+                    <span key={tag.id} className="inline-flex items-center rounded-md bg-secondary/50 px-2 py-1 text-[10px] text-muted-foreground">
                       {tag.name}
                     </span>
                   ))}
                 </div>
 
                 {selectedCard.summary ? (
-                  <section className="rounded-2xl border border-[var(--color-border)] bg-white p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">内容摘要</p>
-                    <p className="text-xs leading-5 text-[var(--color-text-secondary)]"><MixedLatexRenderer text={selectedCard.summary} /></p>
+                  <section className="border-b border-border pb-3">
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70">内容摘要</p>
+                    <p className="text-xs leading-5 text-muted-foreground"><MixedLatexRenderer text={selectedCard.summary} /></p>
                   </section>
                 ) : null}
 
-                <section className="rounded-2xl border border-[var(--color-border)] bg-white p-3">
+                <section className="border-b border-border pb-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-xs font-bold text-[var(--ink)]">公式预览</p>
-                    <span className="text-[10px] text-[var(--color-text-hint)]">{selectedCard.formula_blocks?.length || 0} 个公式块</span>
+                    <p className="text-xs font-bold text-foreground">公式预览</p>
+                    <span className="text-[10px] text-muted-foreground/70">{selectedCard.formula_blocks?.length || 0} 个公式块</span>
                   </div>
                   <div className="space-y-2">
                     {selectedCard.formula_blocks?.length ? selectedCard.formula_blocks.map((block, index) => (
-                      <div key={index} className="rounded-xl border border-[var(--color-border)] bg-[var(--porcelain)]/45 p-3">
-                        {block.label ? <p className="mb-1 text-[10px] font-semibold text-[var(--color-text-hint)]">{block.label}</p> : null}
+                      <div key={index} className="rounded-[10px] bg-secondary/35 p-3">
+                        {block.label ? <p className="mb-1 text-[10px] font-semibold text-muted-foreground/70">{block.label}</p> : null}
                         <LatexRenderer latex={normalizeLatexExpression(block.latex)} displayMode={true} />
-                        {block.note ? <p className="mt-1 text-[10px] leading-5 text-[var(--color-text-secondary)]"><MixedLatexRenderer text={block.note} /></p> : null}
+                        {block.note ? <p className="mt-1 text-[10px] leading-5 text-muted-foreground"><MixedLatexRenderer text={block.note} /></p> : null}
                       </div>
                     )) : (
-                      <p className="py-6 text-center text-xs text-[var(--color-text-hint)]">暂无公式块</p>
+                      <p className="py-6 text-center text-xs text-muted-foreground/70">暂无公式块</p>
                     )}
                   </div>
                 </section>
 
                 {selectedCard.card_type === "function_graph" && selectedCard.graph_asset?.thumbnail_url ? (
-                  <section className="rounded-2xl border border-[var(--color-border)] bg-white p-3">
+                  <section className="border-b border-border pb-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-bold text-[var(--ink)]">函数图像</p>
-                      <span className={`rounded-md border px-1.5 py-0.5 text-[10px] ${GRAPH_STATUS_BADGE[selectedCard.graph_status || ""] || "bg-gray-50"}`}>
+                      <p className="text-xs font-bold text-foreground">函数图像</p>
+                      <span className={`rounded-md border px-1.5 py-0.5 text-[10px] ${GRAPH_STATUS_BADGE[selectedCard.graph_status || ""] || "bg-muted"}`}>
                         {GRAPH_STATUS_LABEL[selectedCard.graph_status || ""] || selectedCard.graph_status}
                       </span>
                     </div>
-                    <img src={selectedCard.graph_asset.thumbnail_url} alt="函数图像" className="max-h-44 w-full rounded-xl border bg-white object-contain" />
+                    <img src={selectedCard.graph_asset.thumbnail_url} alt="函数图像" className="max-h-44 w-full rounded-[10px] bg-secondary/30 object-contain" />
                   </section>
                 ) : null}
 
                 {selectedCard.conditions ? (
-                  <section className="rounded-2xl border border-amber-200 bg-amber-50/55 p-3">
-                    <p className="text-xs font-bold text-amber-800">适用条件</p>
-                    <div className="mt-1.5 text-xs leading-5 text-amber-900">{renderStructuredConditions(selectedCard.conditions)}</div>
+                  <section className="rounded-[10px] border border-warning/35 bg-warning-light/45 p-3">
+                    <p className="text-xs font-bold text-warning-foreground">适用条件</p>
+                    <div className="mt-1.5 text-xs leading-5 text-warning-foreground">{renderStructuredConditions(selectedCard.conditions)}</div>
                   </section>
                 ) : null}
 
                 {selectedCard.error_tips ? (
-                  <section className="rounded-2xl border border-red-200 bg-red-50/45 p-3">
-                    <p className="text-xs font-bold text-red-700">易错提醒</p>
-                    <div className="mt-1.5 text-xs leading-5 text-red-800">{renderStructuredErrorTips(selectedCard.error_tips)}</div>
+                  <section className="rounded-[10px] border border-destructive/25 bg-destructive-light/40 p-3">
+                    <p className="text-xs font-bold text-destructive">易错提醒</p>
+                    <div className="mt-1.5 text-xs leading-5 text-destructive">{renderStructuredErrorTips(selectedCard.error_tips)}</div>
                   </section>
                 ) : null}
 
                 {selectedCard.status === "rejected" && selectedCard.rejection_reason ? (
-                  <section className="rounded-2xl border border-red-200 bg-red-50/45 p-3">
-                    <p className="text-xs font-bold text-red-700">驳回原因</p>
-                    <p className="mt-1.5 text-xs leading-5 text-red-800">{selectedCard.rejection_reason}</p>
+                  <section className="rounded-[10px] border border-destructive/25 bg-destructive-light/40 p-3">
+                    <p className="text-xs font-bold text-destructive">驳回原因</p>
+                    <p className="mt-1.5 text-xs leading-5 text-destructive">{selectedCard.rejection_reason}</p>
                   </section>
                 ) : null}
 
                 {canReview ? (
-                  <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-3">
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
                     {selectedCard.status === "draft" ? (
                       <Button size="sm" onClick={() => setConfirmAction({ action: "approve", cardId: selectedCard.id, title: selectedCard.title })}>
                         <Send className="h-3.5 w-3.5" /> 提交审核
@@ -1098,15 +1097,15 @@ export default function FormulasPage() {
               </div>
             ) : detail.isError && selectedId !== null ? (
               <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center animate-fade-in">
-                <AlertCircle className="h-9 w-9 text-red-400" />
-                <p className="text-sm font-semibold text-red-700">详情加载失败</p>
+                <AlertCircle className="h-9 w-9 text-destructive/70" />
+                <p className="text-sm font-semibold text-destructive">详情加载失败</p>
                 <Button variant="secondary" size="sm" onClick={() => detail.refetch()}>重新加载</Button>
               </div>
             ) : (
               <div className="flex h-full min-h-64 flex-col items-center justify-center gap-2 text-center animate-fade-in">
-                <Eye className="h-9 w-9 text-[var(--color-text-hint)]" />
-                <p className="text-sm font-semibold text-[var(--color-text-secondary)]">选择一条公式查看详情</p>
-                <p className="text-xs text-[var(--color-text-hint)]">详情、预览与审核操作将在此处展示</p>
+                <Eye className="h-9 w-9 text-muted-foreground/70" />
+                <p className="text-sm font-semibold text-muted-foreground">选择一条公式查看详情</p>
+                <p className="text-xs text-muted-foreground/70">详情、预览与审核操作将在此处展示</p>
               </div>
             )}
             </div>
@@ -1120,7 +1119,7 @@ export default function FormulasPage() {
           className="fixed bottom-10 z-50 animate-drop-in"
           style={{ left: "calc(50vw + 144px)", transform: "translateX(-50%)" }}
         >
-          <div className="flex items-center gap-3 rounded-full border border-[var(--color-border-light)] bg-white/90 pl-5 pr-2 py-2 shadow-xl shadow-black/10 backdrop-blur-xl">
+          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-card/90 pl-5 pr-2 py-2 shadow-xl shadow-black/10 backdrop-blur-xl">
             <CustomCheckbox
               checked={allSelected}
               indeterminate={indeterminate}
@@ -1128,10 +1127,10 @@ export default function FormulasPage() {
               onCheckedChange={toggleSelectAll}
               aria-label="选择当前页"
             />
-            <span className="whitespace-nowrap text-sm text-[var(--color-text-secondary)]">
-              已选 <strong className="text-[var(--ink)]">{selectedCount}</strong> 项
+            <span className="whitespace-nowrap text-sm text-muted-foreground">
+              已选 <strong className="text-foreground">{selectedCount}</strong> 项
             </span>
-            <div className="flex items-center gap-2 pl-2 border-l border-[var(--color-border-light)]">
+            <div className="flex items-center gap-2 pl-2 border-l border-border/60">
               {currentFilterStatus === "pending_review" && (
                 <>
                   <Button size="sm" disabled={selectedCount === 0 || batchBusy}
@@ -1160,7 +1159,7 @@ export default function FormulasPage() {
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-text-hint)] transition-colors hover:bg-[var(--color-primary-light)] hover:text-[var(--color-primary)]"
+              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-accent hover:text-primary"
               aria-label="关闭"
             >
               <X className="h-3.5 w-3.5" />
@@ -1191,10 +1190,10 @@ export default function FormulasPage() {
       >
         {confirmAction?.action === "reject" && (
           <div className="mt-4">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">驳回原因</label>
+            <label className="text-xs font-semibold text-muted-foreground">驳回原因</label>
             <textarea
-              className="mt-1.5 min-h-20 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm
-                         placeholder:text-[var(--color-text-hint)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+              className="mt-1.5 min-h-20 w-full rounded-xl border border-border bg-muted p-3 text-sm
+                         placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               placeholder="请填写驳回原因..."
               value={reviewReason}
               onChange={(e) => setReviewReason(e.target.value)}
@@ -1226,16 +1225,16 @@ export default function FormulasPage() {
         onConfirm={() => { const t = reviewReason.trim(); if (!t) return; handleBatchReject(); }}
       >
         <div className="mt-4">
-          <label className="text-xs font-semibold text-[var(--color-text-secondary)]">驳回原因 *</label>
+          <label className="text-xs font-semibold text-muted-foreground">驳回原因 *</label>
           <textarea
-            className="mt-1.5 min-h-20 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-3 text-sm
-                       placeholder:text-[var(--color-text-hint)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+            className="mt-1.5 min-h-20 w-full rounded-xl border border-border bg-muted p-3 text-sm
+                       placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             placeholder="请填写统一驳回原因..."
             value={reviewReason}
             onChange={(e) => setReviewReason(e.target.value)}
           />
           {reviewReason.trim() === "" && confirmAction?.action === "batch_reject" && (
-            <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+            <p className="mt-1.5 text-xs text-destructive flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />驳回原因不能为空
             </p>
           )}
@@ -1253,6 +1252,6 @@ export default function FormulasPage() {
         onCancel={() => setConfirmAction(null)}
         onConfirm={handleBatchDelete}
       />
-    </div>
+    </ManagementPage>
   );
 }

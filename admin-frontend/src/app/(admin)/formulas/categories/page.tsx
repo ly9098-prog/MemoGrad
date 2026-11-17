@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -22,6 +22,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { FormulaCategoryDialog } from "@/components/formulas/formula-category-dialog";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
@@ -69,6 +70,7 @@ export default function FormulaCategoriesPage() {
   const [search, setSearch] = useState("");
   const [dialogParent, setDialogParent] = useState<AdminFormulaCategoryNode | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const dialogTriggerRef = useRef<HTMLElement | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-formula-categories"],
@@ -158,13 +160,17 @@ export default function FormulaCategoriesPage() {
   };
 
   const openCreateDialog = (parent: AdminFormulaCategoryNode | null) => {
+    dialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setDialogParent(parent);
     setShowCreateDialog(true);
   };
 
   const closeCreateDialog = () => {
+    const trigger = dialogTriggerRef.current;
     setShowCreateDialog(false);
     setDialogParent(null);
+    window.requestAnimationFrame(() => trigger?.focus());
   };
 
   const saveChanges = () => {
@@ -202,15 +208,15 @@ export default function FormulaCategoriesPage() {
           <div
             className={`group flex items-center gap-1 rounded-xl pr-2 transition-all duration-200 ${
               isSelected
-                ? "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]"
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:bg-muted"
             }`}
             style={{ paddingLeft: 4 + depth * 14 }}
           >
             <button
               type="button"
               onClick={() => hasChildren && toggleExpand(node.id)}
-              className="flex h-9 w-6 shrink-0 items-center justify-center text-[var(--color-text-hint)]"
+              className="flex h-9 w-6 shrink-0 items-center justify-center text-muted-foreground/70"
               aria-label={isExpanded ? "收起" : "展开"}
             >
               {hasChildren ? (
@@ -225,13 +231,13 @@ export default function FormulaCategoriesPage() {
               className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left"
             >
               {node.node_type === "subject" ? (
-                <FolderTree className="h-3.5 w-3.5 shrink-0 text-[var(--color-primary)]" />
+                <FolderTree className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
-                <Folder className="h-3.5 w-3.5 shrink-0 text-[var(--color-text-hint)]" />
+                <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
               )}
               <span className={`truncate text-xs ${isSelected ? "font-bold" : "font-medium"}`}>{node.name}</span>
             </button>
-            <span className="rounded-md border border-[var(--color-border)] bg-white/70 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--color-text-hint)]">
+            <span className="rounded-md border border-border bg-card/70 px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground/70">
               {TYPE_LABEL[node.node_type] || node.node_type}
             </span>
           </div>
@@ -243,23 +249,23 @@ export default function FormulaCategoriesPage() {
   const childTypeLabel = selectedNode?.node_type === "subject" ? "章节" : selectedNode?.node_type === "chapter" ? "分组" : null;
 
   return (
-    <div className="space-y-5 pb-24">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)]">公式分类管理</h1>
-          <p className="mt-1.5 text-sm text-[var(--color-text-secondary)]">科目 → 章节 → 分组，使用结构化配置台维护分类体系</p>
-        </div>
-        {canWrite ? (
-          <Button variant="primary" onClick={() => openCreateDialog(null)}>
-            <Plus className="h-4 w-4" /> 新建分类
-          </Button>
-        ) : null}
-      </div>
+    <ManagementPage className="space-y-5 pb-24">
+      <ManagementPageHeader
+        title="公式分类管理"
+        description="科目 → 章节 → 分组，使用结构化配置台维护分类体系"
+        actions={
+          canWrite ? (
+            <Button variant="primary" onClick={() => openCreateDialog(null)}>
+              <Plus className="h-4 w-4" /> 新建分类
+            </Button>
+          ) : undefined
+        }
+      />
 
       {message ? (
-        <div className="fixed right-6 top-24 z-50 flex animate-drop-in items-center gap-3 rounded-full border border-[var(--color-border)] bg-white/92 py-2 pl-5 pr-2 text-sm font-medium shadow-lg backdrop-blur-xl">
+        <div className="fixed right-6 top-24 z-50 flex animate-drop-in items-center gap-3 rounded-full border border-border bg-card/92 py-2 pl-5 pr-2 text-sm font-medium shadow-lg backdrop-blur-xl">
           {message}
-          <button type="button" onClick={() => setMessage(null)} className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-[var(--color-bg-input)]">
+          <button type="button" onClick={() => setMessage(null)} className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -268,28 +274,28 @@ export default function FormulaCategoriesPage() {
       <Card className="overflow-hidden">
         <div className="grid min-h-[690px] xl:grid-cols-[260px_minmax(440px,1fr)_250px]">
           {/* 分类树 */}
-          <aside className="border-b border-[var(--color-border)] bg-[var(--porcelain)]/55 p-4 xl:border-b-0 xl:border-r">
+          <aside className="border-b border-border bg-[var(--porcelain)]/55 p-4 xl:border-b-0 xl:border-r">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">分类树</p>
-                <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">选择节点后在右侧配置</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground/70">分类树</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/70">选择节点后在右侧配置</p>
               </div>
-              <span className="rounded-lg border border-[var(--color-border)] bg-white px-2 py-1 text-[10px] text-[var(--color-text-hint)]">{roots.length} 科目</span>
+              <span className="rounded-lg border border-border bg-card px-2 py-1 text-[10px] text-muted-foreground/70">{roots.length} 科目</span>
             </div>
 
             <label className="relative mb-3 block">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-hint)]" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="搜索名称 / 编码"
-                className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white/80 pl-8 pr-9 text-xs outline-none transition focus:border-[var(--color-primary)]"
+                className="h-9 w-full rounded-xl border border-border bg-card/80 pl-8 pr-9 text-xs outline-none transition focus:border-primary"
               />
               {search ? (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[var(--color-text-hint)] transition hover:bg-[var(--color-primary-light)] hover:text-[var(--ink)]"
+                  className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/70 transition hover:bg-accent hover:text-foreground"
                   aria-label="清空分类搜索"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -300,17 +306,17 @@ export default function FormulaCategoriesPage() {
             <div className="max-h-[570px] space-y-0.5 overflow-y-auto pr-1">
               {isLoading ? (
                 <div className="space-y-2">
-                  {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-9 animate-pulse rounded-xl bg-white/75" />)}
+                  {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-9 animate-pulse rounded-xl bg-card/75" />)}
                 </div>
               ) : visibleTree.length ? (
                 renderTree(visibleTree)
               ) : (
-                <div className="py-12 text-center text-xs text-[var(--color-text-hint)]">无匹配分类</div>
+                <div className="py-12 text-center text-xs text-muted-foreground/70">无匹配分类</div>
               )}
             </div>
 
             {canWrite ? (
-              <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+              <div className="mt-4 border-t border-border pt-3">
                 <Button variant="secondary" size="sm" className="w-full" onClick={() => openCreateDialog(null)}>
                   <Plus className="h-3.5 w-3.5" /> 新建根分类
                 </Button>
@@ -319,31 +325,31 @@ export default function FormulaCategoriesPage() {
           </aside>
 
           {/* 中央配置区 */}
-          <main className="min-w-0 border-b border-[var(--color-border)] p-5 xl:border-b-0 xl:border-r">
+          <main className="min-w-0 border-b border-border p-5 xl:border-b-0 xl:border-r">
             {selectedNode ? (
               <div key={selectedNode.id} className="space-y-5 animate-fade-in">
                 <div>
-                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-[var(--color-text-hint)]">
+                  <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground/70">
                     {selectedPath.map((node, index) => (
                       <span key={node.id} className="inline-flex items-center gap-1">
                         {index > 0 ? <ChevronRight className="h-3 w-3" /> : null}
-                        <span className={index === selectedPath.length - 1 ? "font-semibold text-[var(--ink)]" : ""}>{node.name}</span>
+                        <span className={index === selectedPath.length - 1 ? "font-semibold text-foreground" : ""}>{node.name}</span>
                       </span>
                     ))}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-xl font-bold text-[var(--ink)]">{selectedNode.name}</h2>
-                      <p className="mt-1 font-mono text-xs text-[var(--color-text-hint)]">{selectedNode.code}</p>
+                      <h2 className="text-xl font-bold text-foreground">{selectedNode.name}</h2>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground/70">{selectedNode.code}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isDirty ? <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">有未保存修改</span> : null}
+                      {isDirty ? <span className="rounded-lg border border-warning/40 bg-warning-light px-2 py-1 text-[10px] font-semibold text-warning-foreground">有未保存修改</span> : null}
                       <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${
                         selectedNode.node_type === "subject"
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          ? "border-primary/30 bg-accent text-accent-foreground"
                           : selectedNode.node_type === "chapter"
-                            ? "border-violet-200 bg-violet-50 text-violet-700"
-                            : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            ? "border-border bg-secondary text-secondary-foreground"
+                            : "border-success/30 bg-success-light text-success"
                       }`}>
                         {TYPE_LABEL[selectedNode.node_type] || selectedNode.node_type}
                       </span>
@@ -351,67 +357,67 @@ export default function FormulaCategoriesPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-1 border-b border-[var(--color-border)]">
+                <div className="flex gap-1 border-b border-border">
                   <button
                     type="button"
                     onClick={() => setActiveTab("basic")}
-                    className={`border-b-2 px-3 py-2 text-xs transition-colors ${activeTab === "basic" ? "border-[var(--color-primary)] font-bold text-[var(--color-primary-dark)]" : "border-transparent font-medium text-[var(--color-text-hint)] hover:text-[var(--ink)]"}`}
+                    className={`border-b-2 px-3 py-2 text-xs transition-colors ${activeTab === "basic" ? "border-primary font-bold text-accent-foreground" : "border-transparent font-medium text-muted-foreground/70 hover:text-foreground"}`}
                   >
                     基础信息
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab("children")}
-                    className={`border-b-2 px-3 py-2 text-xs transition-colors ${activeTab === "children" ? "border-[var(--color-primary)] font-bold text-[var(--color-primary-dark)]" : "border-transparent font-medium text-[var(--color-text-hint)] hover:text-[var(--ink)]"}`}
+                    className={`border-b-2 px-3 py-2 text-xs transition-colors ${activeTab === "children" ? "border-primary font-bold text-accent-foreground" : "border-transparent font-medium text-muted-foreground/70 hover:text-foreground"}`}
                   >
                     子项管理 {selectedNode.children?.length ? `(${selectedNode.children.length})` : ""}
                   </button>
-                  <button type="button" className="px-3 py-2 text-xs font-medium text-[var(--color-text-hint)] opacity-55" disabled>关联设置</button>
-                  <button type="button" className="px-3 py-2 text-xs font-medium text-[var(--color-text-hint)] opacity-55" disabled>操作日志</button>
+                  <button type="button" className="px-3 py-2 text-xs font-medium text-muted-foreground/70 opacity-55" disabled>关联设置</button>
+                  <button type="button" className="px-3 py-2 text-xs font-medium text-muted-foreground/70 opacity-55" disabled>操作日志</button>
                 </div>
 
                 {activeTab === "basic" ? (
-                  <section key={`basic-${selectedNode.id}`} className="animate-fade-in rounded-2xl border border-[var(--color-border)] bg-white/82 p-5">
+                  <section key={`basic-${selectedNode.id}`} className="animate-fade-in rounded-2xl border border-border bg-card/82 p-5">
                     <div className="mb-5 flex items-center justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-[var(--ink)]">基础信息</p>
-                          {isDirty ? <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">未保存</span> : null}
+                          <p className="text-sm font-bold text-foreground">基础信息</p>
+                          {isDirty ? <span className="rounded-md bg-warning-light px-1.5 py-0.5 text-[10px] font-semibold text-warning-foreground">未保存</span> : null}
                         </div>
-                        <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">名称、说明、排序和状态可直接维护；编码与层级关系保持只读。</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground/70">名称、说明、排序和状态可直接维护；编码与层级关系保持只读。</p>
                       </div>
-                      <ListTree className="h-5 w-5 text-[var(--color-primary)]" />
+                      <ListTree className="h-5 w-5 text-primary" />
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <label className="space-y-1.5 md:col-span-2">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">名称 *</span>
+                        <span className="text-xs font-semibold text-muted-foreground">名称 *</span>
                         <Input value={editName} onChange={(event) => setEditName(event.target.value)} disabled={!canWrite} />
                       </label>
 
                       <div className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">编码</span>
-                        <div className="flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 font-mono text-xs text-[var(--color-text-secondary)]">
-                          <Hash className="h-3.5 w-3.5 text-[var(--color-text-hint)]" /> {selectedNode.code}
+                        <span className="text-xs font-semibold text-muted-foreground">编码</span>
+                        <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted px-3 font-mono text-xs text-muted-foreground">
+                          <Hash className="h-3.5 w-3.5 text-muted-foreground/70" /> {selectedNode.code}
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">层级</span>
-                        <div className="flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-xs text-[var(--color-text-secondary)]">
-                          <Layers className="h-3.5 w-3.5 text-[var(--color-text-hint)]" /> {TYPE_LABEL[selectedNode.node_type] || selectedNode.node_type}
+                        <span className="text-xs font-semibold text-muted-foreground">层级</span>
+                        <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted px-3 text-xs text-muted-foreground">
+                          <Layers className="h-3.5 w-3.5 text-muted-foreground/70" /> {TYPE_LABEL[selectedNode.node_type] || selectedNode.node_type}
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">父级</span>
-                        <div className="flex h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-xs text-[var(--color-text-secondary)]">
-                          <GitBranch className="h-3.5 w-3.5 text-[var(--color-text-hint)]" /> {parentNode?.name || "根节点"}
+                        <span className="text-xs font-semibold text-muted-foreground">父级</span>
+                        <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted px-3 text-xs text-muted-foreground">
+                          <GitBranch className="h-3.5 w-3.5 text-muted-foreground/70" /> {parentNode?.name || "根节点"}
                         </div>
                       </div>
 
                       <label className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">排序</span>
+                        <span className="text-xs font-semibold text-muted-foreground">排序</span>
                         <Input
                           type="number"
                           value={editSortOrder}
@@ -421,44 +427,44 @@ export default function FormulaCategoriesPage() {
                       </label>
 
                       <div className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">考试范围</span>
-                        <div className="flex h-11 items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 font-mono text-xs text-[var(--color-text-secondary)]">
+                        <span className="text-xs font-semibold text-muted-foreground">考试范围</span>
+                        <div className="flex h-11 items-center rounded-xl border border-border bg-muted px-3 font-mono text-xs text-muted-foreground">
                           {selectedNode.exam_scope || "—"}
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">状态</span>
+                        <span className="text-xs font-semibold text-muted-foreground">状态</span>
                         <button
                           type="button"
                           aria-pressed={editActive}
                           disabled={!canWrite}
                           onClick={() => setEditActive((value) => !value)}
-                          className="flex h-11 w-full items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-xs transition hover:border-[var(--color-primary)] disabled:cursor-default"
+                          className="flex h-11 w-full items-center justify-between rounded-xl border border-border bg-muted px-3 text-xs transition hover:border-primary disabled:cursor-default"
                         >
-                          <span className="flex items-center gap-2 text-[var(--color-text-secondary)]"><Activity className="h-3.5 w-3.5 text-[var(--color-text-hint)]" />当前节点状态</span>
-                          <span className={`relative h-5 w-9 rounded-full transition-colors ${editActive ? "bg-[var(--color-primary)]" : "bg-gray-300"}`}>
-                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${editActive ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                          <span className="flex items-center gap-2 text-muted-foreground"><Activity className="h-3.5 w-3.5 text-muted-foreground/70" />当前节点状态</span>
+                          <span className={`relative h-5 w-9 rounded-full transition-colors ${editActive ? "bg-primary" : "bg-border"}`}>
+                            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card shadow-sm transition-transform duration-200 ${editActive ? "translate-x-[18px]" : "translate-x-0.5"}`} />
                           </span>
                         </button>
                       </div>
 
                       <label className="space-y-1.5 md:col-span-2">
-                        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">说明</span>
+                        <span className="text-xs font-semibold text-muted-foreground">说明</span>
                         <textarea
                           value={editDescription}
                           onChange={(event) => setEditDescription(event.target.value)}
                           disabled={!canWrite}
                           rows={4}
                           placeholder="补充该分类的范围、使用约定或维护说明"
-                          className="w-full resize-y rounded-xl border border-[var(--color-border)] bg-white px-3 py-2.5 text-sm leading-6 outline-none transition placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/10 disabled:bg-[var(--color-bg-input)]"
+                          className="w-full resize-y rounded-xl border border-border bg-card px-3 py-2.5 text-sm leading-6 outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:bg-muted"
                         />
                       </label>
                     </div>
 
                     {canWrite ? (
-                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-4">
-                        <span className="text-[10px] text-[var(--color-text-hint)]">快捷键 Ctrl / ⌘ + S 保存</span>
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                        <span className="text-[10px] text-muted-foreground/70">快捷键 Ctrl / ⌘ + S 保存</span>
                         <div className="flex items-center gap-2">
                           <Button variant="secondary" onClick={resetEdits} disabled={!isDirty || updateMutation.isPending}>取消</Button>
                           <Button onClick={saveChanges} disabled={!editName.trim() || !isDirty || updateMutation.isPending}>
@@ -470,11 +476,11 @@ export default function FormulaCategoriesPage() {
                     ) : null}
                   </section>
                 ) : (
-                  <section key={`children-${selectedNode.id}`} className="animate-fade-in rounded-2xl border border-[var(--color-border)] bg-white/82 p-5">
+                  <section key={`children-${selectedNode.id}`} className="animate-fade-in rounded-2xl border border-border bg-card/82 p-5">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold text-[var(--ink)]">直属子项</p>
-                        <p className="mt-1 text-[11px] text-[var(--color-text-hint)]">快速浏览并进入下一级分类，减少反复展开树节点。</p>
+                        <p className="text-sm font-bold text-foreground">直属子项</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground/70">快速浏览并进入下一级分类，减少反复展开树节点。</p>
                       </div>
                       {canWrite && childTypeLabel ? (
                         <Button size="sm" variant="secondary" onClick={() => openCreateDialog(selectedNode)}>
@@ -490,70 +496,70 @@ export default function FormulaCategoriesPage() {
                             key={child.id}
                             type="button"
                             onClick={() => selectNode(child)}
-                            className="group flex w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--porcelain)]/35 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-primary)]/45 hover:bg-white hover:shadow-sm"
+                            className="group flex w-full items-center gap-3 rounded-xl border border-border bg-[var(--porcelain)]/35 p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card hover:shadow-sm"
                           >
-                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                               <Folder className="h-4 w-4" />
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-2">
-                                <span className="truncate text-sm font-semibold text-[var(--ink)]">{child.name}</span>
-                                <span className="rounded-md border border-[var(--color-border)] bg-white px-1.5 py-0.5 text-[9px] text-[var(--color-text-hint)]">{TYPE_LABEL[child.node_type] || child.node_type}</span>
+                                <span className="truncate text-sm font-semibold text-foreground">{child.name}</span>
+                                <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[9px] text-muted-foreground/70">{TYPE_LABEL[child.node_type] || child.node_type}</span>
                               </span>
-                              <span className="mt-1 block truncate font-mono text-[10px] text-[var(--color-text-hint)]">{child.code}</span>
+                              <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground/70">{child.code}</span>
                             </span>
                             <span className="text-right">
-                              <span className="block text-sm font-bold tabular-nums text-[var(--ink)]">{child.subtree_formula_count ?? child.formula_count ?? 0}</span>
-                              <span className="text-[9px] text-[var(--color-text-hint)]">公式</span>
+                              <span className="block text-sm font-bold tabular-nums text-foreground">{child.subtree_formula_count ?? child.formula_count ?? 0}</span>
+                              <span className="text-[9px] text-muted-foreground/70">公式</span>
                             </span>
-                            <ArrowRight className="h-4 w-4 shrink-0 text-[var(--color-text-hint)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)]" />
+                            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                           </button>
                         ))}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--porcelain)]/35 py-12 text-center">
-                        <Folder className="h-8 w-8 text-[var(--color-text-hint)]" />
-                        <p className="text-sm font-semibold text-[var(--color-text-secondary)]">当前节点没有子项</p>
+                      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-[var(--porcelain)]/35 py-12 text-center">
+                        <Folder className="h-8 w-8 text-muted-foreground/70" />
+                        <p className="text-sm font-semibold text-muted-foreground">当前节点没有子项</p>
                         {canWrite && childTypeLabel ? <Button size="sm" variant="secondary" onClick={() => openCreateDialog(selectedNode)}>新建{childTypeLabel}</Button> : null}
                       </div>
                     )}
                   </section>
                 )}
 
-                <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--porcelain)]/45 p-4">
+                <section className="rounded-2xl border border-border bg-[var(--porcelain)]/45 p-4">
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-xl border border-[var(--color-border)] bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-hint)]">直属公式</p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">{selectedNode.formula_count ?? 0}</p>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">直属公式</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{selectedNode.formula_count ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--color-border)] bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-hint)]">含子分类公式</p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">{selectedNode.subtree_formula_count ?? selectedNode.formula_count ?? 0}</p>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">含子分类公式</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{selectedNode.subtree_formula_count ?? selectedNode.formula_count ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--color-border)] bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-hint)]">全部后代</p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">{descendantCount}</p>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">全部后代</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{descendantCount}</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--color-border)] bg-white p-3">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-hint)]">当前深度</p>
-                      <p className="mt-1 text-xl font-bold tabular-nums text-[var(--ink)]">{selectedPath.length}</p>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">当前深度</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{selectedPath.length}</p>
                     </div>
                   </div>
                 </section>
               </div>
             ) : (
               <div className="flex h-full min-h-64 flex-col items-center justify-center gap-2 text-center">
-                <FolderTree className="h-10 w-10 text-[var(--color-text-hint)]" />
-                <p className="text-sm font-semibold text-[var(--color-text-secondary)]">选择分类节点开始配置</p>
+                <FolderTree className="h-10 w-10 text-muted-foreground/70" />
+                <p className="text-sm font-semibold text-muted-foreground">选择分类节点开始配置</p>
               </div>
             )}
           </main>
 
           {/* 快捷操作 */}
-          <aside className="bg-white/65 p-4">
+          <aside className="bg-card/65 p-4">
             <div className="sticky top-20 space-y-4">
-              <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">快捷操作</p>
+              <section className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground/70">快捷操作</p>
                 <div className="mt-3 space-y-2">
                   {canWrite && childTypeLabel && selectedNode ? (
                     <Button variant="secondary" size="sm" className="w-full justify-start" onClick={() => openCreateDialog(selectedNode)}>
@@ -574,28 +580,28 @@ export default function FormulaCategoriesPage() {
               </section>
 
               {selectedNode ? (
-                <section className="rounded-2xl border border-[var(--color-border)] bg-white p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-hint)]">节点概览</p>
+                <section className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground/70">节点概览</p>
                   <dl className="mt-3 space-y-3 text-xs">
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-[var(--color-text-hint)]">节点类型</dt>
-                      <dd className="font-semibold text-[var(--ink)]">{TYPE_LABEL[selectedNode.node_type] || selectedNode.node_type}</dd>
+                      <dt className="text-muted-foreground/70">节点类型</dt>
+                      <dd className="font-semibold text-foreground">{TYPE_LABEL[selectedNode.node_type] || selectedNode.node_type}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="flex items-center gap-1.5 text-[var(--color-text-hint)]"><FileText className="h-3.5 w-3.5" />直属公式</dt>
-                      <dd className="font-semibold tabular-nums text-[var(--ink)]">{selectedNode.formula_count ?? 0}</dd>
+                      <dt className="flex items-center gap-1.5 text-muted-foreground/70"><FileText className="h-3.5 w-3.5" />直属公式</dt>
+                      <dd className="font-semibold tabular-nums text-foreground">{selectedNode.formula_count ?? 0}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-[var(--color-text-hint)]">含子分类公式</dt>
-                      <dd className="font-semibold tabular-nums text-[var(--ink)]">{selectedNode.subtree_formula_count ?? selectedNode.formula_count ?? 0}</dd>
+                      <dt className="text-muted-foreground/70">含子分类公式</dt>
+                      <dd className="font-semibold tabular-nums text-foreground">{selectedNode.subtree_formula_count ?? selectedNode.formula_count ?? 0}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-[var(--color-text-hint)]">直属子项</dt>
-                      <dd className="font-semibold tabular-nums text-[var(--ink)]">{selectedNode.children?.length || 0}</dd>
+                      <dt className="text-muted-foreground/70">直属子项</dt>
+                      <dd className="font-semibold tabular-nums text-foreground">{selectedNode.children?.length || 0}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-[var(--color-text-hint)]">状态</dt>
-                      <dd className={selectedNode.is_active === false ? "font-semibold text-gray-500" : "font-semibold text-emerald-700"}>
+                      <dt className="text-muted-foreground/70">状态</dt>
+                      <dd className={selectedNode.is_active === false ? "font-semibold text-muted-foreground" : "font-semibold text-success"}>
                         {selectedNode.is_active === false ? "已停用" : "已启用"}
                       </dd>
                     </div>
@@ -603,10 +609,10 @@ export default function FormulaCategoriesPage() {
                 </section>
               ) : null}
 
-              <section className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--porcelain)]/45 p-4">
+              <section className="rounded-2xl border border-dashed border-border bg-[var(--porcelain)]/45 p-4">
                 <div className="flex items-start gap-3">
-                  <ListTree className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary)]" />
-                  <p className="text-[11px] leading-5 text-[var(--color-text-secondary)]">
+                  <ListTree className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <p className="text-[11px] leading-5 text-muted-foreground">
                     配置台将树结构、节点属性和子项管理拆分为独立区域；父级节点的公式统计按整个子树聚合，与公式库页面的分类筛选口径保持一致。
                   </p>
                 </div>
@@ -617,6 +623,6 @@ export default function FormulaCategoriesPage() {
       </Card>
 
       {showCreateDialog ? <FormulaCategoryDialog parentNode={dialogParent} onClose={closeCreateDialog} /> : null}
-    </div>
+    </ManagementPage>
   );
 }

@@ -16,7 +16,6 @@ import { FunctionPropertiesPanel } from "@/components/formulas/function-properti
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { apiRequest } from "@/lib/api/client";
-import type { FormulaGraphAsset } from "@/lib/api/types";
 import { decodeApiText, normalizeLatexExpression } from "@/lib/math-text";
 import { formatChinaDate } from "@/lib/time";
 import { safeInternalRedirect } from "@/lib/safe-redirect";
@@ -73,7 +72,7 @@ function renderSymbolNotes(raw: string | null | undefined) {
           <li key={index}>
             <MathAwareText text={symbol} />
             {Boolean(note) && (
-              <span className="ml-2 text-[var(--color-text-secondary)]">
+              <span className="ml-2 text-muted-foreground">
                 — <MathAwareText text={note} />
               </span>
             )}
@@ -101,7 +100,7 @@ function renderStructuredConditions(raw: string | null | undefined) {
           <li key={index}>
             <MathAwareText text={expression} />
             {Boolean(note) && (
-              <span className="ml-2 text-[var(--color-text-secondary)]">
+              <span className="ml-2 text-muted-foreground">
                 — <MathAwareText text={note} />
               </span>
             )}
@@ -155,11 +154,11 @@ type FormulaCard = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: "bg-gray-50 text-gray-600 border-gray-200",
-  pending_review: "bg-amber-50 text-amber-700 border-amber-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
-  published: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  offline: "bg-slate-50 text-slate-600 border-slate-200",
+  draft: "bg-muted text-muted-foreground border-border",
+  pending_review: "bg-warning-light text-warning-foreground border-warning/40",
+  rejected: "bg-destructive-light text-destructive border-destructive/30",
+  published: "bg-success-light text-success border-success/30",
+  offline: "bg-muted text-muted-foreground border-border",
 };
 const STATUS_LABEL: Record<string, string> = {
   draft: "草稿", pending_review: "待审核",
@@ -226,7 +225,7 @@ export default function EditFormulaPage() {
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-12 text-sm text-[var(--color-text-secondary)]">加载中...</div>;
+    return <div className="flex items-center justify-center p-12 text-sm text-muted-foreground">加载中...</div>;
   }
 
   if (!card) {
@@ -288,27 +287,27 @@ export default function EditFormulaPage() {
               </Link>
               <div>
                 <div className="flex items-center gap-3">
-                  <h3 className="font-display text-2xl font-bold text-[var(--ink)]"><MathAwareText text={card.title} /></h3>
+                  <h3 className="font-display text-2xl font-bold text-foreground"><MathAwareText text={card.title} /></h3>
                   <span className={`inline-flex items-center gap-1 rounded-xl border px-3 py-1 text-xs font-semibold ${STATUS_BADGE[card.status] || ""}`}>
                     {STATUS_LABEL[card.status] || card.status}
                   </span>
                   {card.card_type === "function_graph" && (
-                    <span className="inline-flex items-center gap-1 rounded-xl border border-[var(--color-primary-light)] bg-[var(--color-primary-light)]/50 px-3 py-1 text-xs font-semibold text-[var(--color-primary-dark)]">
+                    <span className="inline-flex items-center gap-1 rounded-xl border border-accent bg-accent/50 px-3 py-1 text-xs font-semibold text-accent-foreground">
                       函数图像
                     </span>
                   )}
                   {card.card_type === "auto" && card.is_function_graph && (
-                    <span className="inline-flex items-center gap-1 rounded-xl border border-[var(--color-primary-light)] bg-[var(--color-primary-light)]/25 px-3 py-1 text-xs font-semibold text-[var(--color-primary-dark)]">
+                    <span className="inline-flex items-center gap-1 rounded-xl border border-accent bg-accent/25 px-3 py-1 text-xs font-semibold text-accent-foreground">
                       公式 + 函数图像
                     </span>
                   )}
                   {card.card_type === "function_graph" && !card.graph_asset && (
-                    <span className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <span className="inline-flex items-center gap-1 rounded-xl border border-warning/40 bg-warning-light px-3 py-1 text-xs font-semibold text-warning-foreground">
                       缺少图像
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-muted-foreground">
                   #{card.id} · v{card.version}
                   {card.published_at ? ` · 发布于 ${formatChinaDate(card.published_at)}` : ""}
                 </p>
@@ -325,7 +324,7 @@ export default function EditFormulaPage() {
         <CardContent className="space-y-6">
           {message ? (
             <div className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-              message.includes("成功") ? "border-[var(--color-success)] bg-[var(--color-success-light)]" : "border-red-200 bg-red-50"
+              message.includes("成功") ? "border-success bg-success-light" : "border-destructive/30 bg-destructive-light"
             }`}>
               {message}
               <button className="ml-3" onClick={() => setMessage(null)}>✕</button>
@@ -337,47 +336,47 @@ export default function EditFormulaPage() {
             {card.tags?.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 {card.tags.map((t) => (
-                  <span key={t.id} className="rounded-lg border bg-white/60 px-2 py-1 text-xs text-[var(--color-text-secondary)]">{t.name}</span>
+                  <span key={t.id} className="rounded-lg border bg-card/60 px-2 py-1 text-xs text-muted-foreground">{t.name}</span>
                 ))}
               </div>
             )}
 
             {/* Summary */}
             {card.summary && (
-              <section className="rounded-[1.6rem] border border-[var(--color-primary-light)] bg-[var(--porcelain)] p-5">
-                <div className="text-sm leading-6 text-[var(--color-text-secondary)]">
+              <section className="rounded-[1.6rem] border border-accent bg-[var(--porcelain)] p-5">
+                <div className="text-sm leading-6 text-muted-foreground">
                   <MathAwareText text={card.summary} />
                 </div>
               </section>
             )}
 
             {/* Formula blocks */}
-            <section className="rounded-[1.6rem] border bg-white/80 p-5">
-              <p className="font-semibold text-[var(--ink)]">公式块</p>
+            <section className="rounded-[1.6rem] border bg-card/80 p-5">
+              <p className="font-semibold text-foreground">公式块</p>
               <div className="mt-3 space-y-4">
                 {card.formula_blocks?.map((block, i) => (
-                  <div key={i} className="rounded-xl border bg-white p-4">
-                    {block.label && <p className="mb-1 text-xs font-semibold text-[var(--color-text-hint)]">{block.label}</p>}
+                  <div key={i} className="rounded-xl border bg-card p-4">
+                    {block.label && <p className="mb-1 text-xs font-semibold text-muted-foreground/70">{block.label}</p>}
                     <LatexRenderer latex={normalizeLatexExpression(block.latex)} displayMode={true} />
-                    {block.note && <div className="mt-1 text-xs text-[var(--color-text-secondary)]"><MathAwareText text={block.note} /></div>}
+                    {block.note && <div className="mt-1 text-xs text-muted-foreground"><MathAwareText text={block.note} /></div>}
                   </div>
                 ))}
               </div>
             </section>
 
             {card.conditions && (
-              <section className="rounded-[1.6rem] border border-amber-200 bg-amber-50/60 p-4">
-                <p className="font-semibold text-amber-800">适用条件</p>
-                <div className="mt-2 text-sm text-amber-900 whitespace-pre-wrap break-words max-w-full overflow-x-auto">
+              <section className="rounded-[1.6rem] border border-warning/40 bg-warning-light/60 p-4">
+                <p className="font-semibold text-warning-foreground">适用条件</p>
+                <div className="mt-2 text-sm text-warning-foreground whitespace-pre-wrap break-words max-w-full overflow-x-auto">
                   {renderStructuredConditions(card.conditions)}
                 </div>
               </section>
             )}
 
             {card.secondary_conclusions && (
-              <section className="rounded-[1.6rem] border bg-white/80 p-4">
-                <p className="font-semibold text-[var(--ink)]">二级结论</p>
-                <div className="mt-2 space-y-2 text-sm text-[var(--color-text-secondary)] break-words max-w-full overflow-x-auto">
+              <section className="rounded-[1.6rem] border bg-card/80 p-4">
+                <p className="font-semibold text-foreground">二级结论</p>
+                <div className="mt-2 space-y-2 text-sm text-muted-foreground break-words max-w-full overflow-x-auto">
                   {renderJsonStringArray(card.secondary_conclusions)}
                 </div>
               </section>
@@ -420,33 +419,33 @@ export default function EditFormulaPage() {
             )}
 
             {card.symbol_notes && (
-              <section className="rounded-[1.6rem] border bg-white/80 p-4">
-                <p className="font-semibold text-[var(--ink)]">符号说明</p>
-                <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              <section className="rounded-[1.6rem] border bg-card/80 p-4">
+                <p className="font-semibold text-foreground">符号说明</p>
+                <div className="mt-2 text-sm text-muted-foreground">
                   {renderSymbolNotes(card.symbol_notes)}
                 </div>
               </section>
             )}
 
             {card.error_tips && (
-              <section className="rounded-[1.6rem] border border-red-200 bg-red-50/60 p-4">
-                <p className="font-semibold text-red-700">易错提醒</p>
-                <div className="mt-2 text-sm leading-6 text-red-800 whitespace-pre-wrap break-words max-w-full overflow-x-auto">
+              <section className="rounded-[1.6rem] border border-destructive/30 bg-destructive-light/60 p-4">
+                <p className="font-semibold text-destructive">易错提醒</p>
+                <div className="mt-2 text-sm leading-6 text-destructive whitespace-pre-wrap break-words max-w-full overflow-x-auto">
                   {renderStructuredErrorTips(card.error_tips)}
                 </div>
               </section>
             )}
 
             {card.examples && card.examples.length > 0 && (
-              <section className="rounded-[1.6rem] border bg-white/70 p-5">
-                <p className="font-semibold text-[var(--ink)]">例题</p>
+              <section className="rounded-[1.6rem] border bg-card/70 p-5">
+                <p className="font-semibold text-foreground">例题</p>
                 <div className="mt-3 space-y-4">
                   {card.examples.map((ex, i) => (
-                    <div key={i} className="rounded-xl border bg-white p-4">
-                      <p className="font-semibold text-[var(--ink)]">题目：<MathAwareText text={ex.question} /></p>
-                      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">解法：<MathAwareText text={ex.short_solution} /></p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--color-success)]">答案：<MathAwareText text={ex.answer} /></p>
-                      {ex.error_tip && <p className="mt-1 text-sm text-red-600">注意：<MathAwareText text={ex.error_tip} /></p>}
+                    <div key={i} className="rounded-xl border bg-card p-4">
+                      <p className="font-semibold text-foreground">题目：<MathAwareText text={ex.question} /></p>
+                      <p className="mt-1 text-sm text-muted-foreground">解法：<MathAwareText text={ex.short_solution} /></p>
+                      <p className="mt-1 text-sm font-semibold text-success">答案：<MathAwareText text={ex.answer} /></p>
+                      {ex.error_tip && <p className="mt-1 text-sm text-destructive">注意：<MathAwareText text={ex.error_tip} /></p>}
                     </div>
                   ))}
                 </div>
@@ -455,9 +454,9 @@ export default function EditFormulaPage() {
 
             {/* Rejection reason */}
             {card.status === "rejected" && card.rejection_reason && (
-              <section className="rounded-[1.6rem] border border-red-200 bg-red-50/50 p-4">
-                <p className="font-semibold text-red-700">驳回原因</p>
-                <p className="mt-2 text-sm text-red-800">{card.rejection_reason}</p>
+              <section className="rounded-[1.6rem] border border-destructive/30 bg-destructive-light/50 p-4">
+                <p className="font-semibold text-destructive">驳回原因</p>
+                <p className="mt-2 text-sm text-destructive">{card.rejection_reason}</p>
               </section>
             )}
 
@@ -539,9 +538,9 @@ export default function EditFormulaPage() {
       >
         {confirmAction === "rejected" && (
           <div className="mt-4">
-            <label className="text-xs font-semibold text-[var(--color-text-secondary)]">驳回原因 *</label>
+            <label className="text-xs font-semibold text-muted-foreground">驳回原因 *</label>
             <textarea
-              className="mt-1 min-h-20 w-full rounded-xl border bg-[var(--color-bg-input)] p-3 text-sm"
+              className="mt-1 min-h-20 w-full rounded-xl border bg-muted p-3 text-sm"
               placeholder="请填写驳回原因..."
               value={reviewReason}
               onChange={(e) => setReviewReason(e.target.value)}

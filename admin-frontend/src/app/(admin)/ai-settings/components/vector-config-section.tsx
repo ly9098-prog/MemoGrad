@@ -31,8 +31,8 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 const inputCls =
-  "mt-1 h-9 w-full rounded-lg border border-[var(--color-border)] bg-white px-3 text-sm outline-none transition-colors focus:border-[var(--color-primary)]";
-const labelCls = "text-[11px] font-medium text-[var(--color-text-hint)]";
+  "mt-1 h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-primary";
+const labelCls = "text-[11px] font-medium text-muted-foreground/70";
 
 function hasEmbeddingCapability(model: AdminAiModelConfig) {
   return (model.features ?? []).includes("embedding") || model.feature === "embedding";
@@ -47,10 +47,10 @@ export function VectorConfigSection() {
   function showToast(msg: string, isError = false) {
     const el = document.createElement("div");
     el.className =
-      "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-white px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in" +
+      "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-card px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in" +
       (isError
-        ? " border-[var(--color-danger)]/30 text-[var(--color-danger)]"
-        : " border-[var(--color-success)]/30 text-[var(--color-success)]");
+        ? " border-destructive/30 text-destructive"
+        : " border-success/30 text-success");
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2500);
@@ -131,16 +131,16 @@ export function VectorConfigSection() {
 
   if (config.isLoading || models.isLoading) {
     return (
-      <div className="rounded-2xl border border-[var(--color-border)]/80 bg-white/80 p-8 text-center shadow-sm">
-        <Loader2 className="mx-auto h-5 w-5 animate-spin text-[var(--color-primary)]" />
-        <p className="mt-2 text-sm text-[var(--color-text-hint)]">加载向量配置…</p>
+      <div className="rounded-2xl border border-border/80 bg-card/80 p-8 text-center shadow-sm">
+        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
+        <p className="mt-2 text-sm text-muted-foreground/70">加载向量配置…</p>
       </div>
     );
   }
 
   if (config.isError || !c) {
     return (
-      <p className="rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-4 py-3 text-sm text-[var(--color-danger)]">
+      <p className="rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
         {getErrorMessage(config.error)}
       </p>
     );
@@ -151,11 +151,11 @@ export function VectorConfigSection() {
   const selectedInvalid = Boolean(selectedModel && (!selectedModel.is_enabled || !hasEmbeddingCapability(selectedModel)));
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 shadow-[var(--shadow-card)] animate-rise-in">
-      <div className="flex items-center justify-between border-b border-[var(--color-border)]/60 px-5 py-4">
+    <section className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)] animate-rise-in">
+      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
         <div>
-          <h3 className="font-display text-xl font-bold text-[var(--ink)]">向量检索 & Embedding</h3>
-          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+          <h3 className="font-display text-xl font-bold text-foreground">向量检索 & Embedding</h3>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             选择模型配置中已注册的 Embedding 模型，并管理 pgvector 检索参数
           </p>
         </div>
@@ -166,16 +166,16 @@ export function VectorConfigSection() {
       </div>
 
       <div className="flex min-h-[360px]">
-        <nav className="flex w-[160px] shrink-0 flex-col gap-1 border-r border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/50 p-2.5">
+        <nav className="flex w-[160px] shrink-0 flex-col gap-1 border-r border-border/60 bg-muted/50 p-2.5">
           <div
             className={cn(
               "mb-2 flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors",
               isEnabled
-                ? "border-[var(--color-success)]/30 bg-[var(--color-success-light)]"
-                : "border-[var(--color-border)] bg-white/60",
+                ? "border-success/30 bg-success-light"
+                : "border-border bg-card/60",
             )}
           >
-            <span className={cn("text-xs font-semibold", isEnabled ? "text-[var(--color-success)]" : "text-[var(--color-text-hint)]")}>
+            <span className={cn("text-xs font-semibold", isEnabled ? "text-success" : "text-muted-foreground/70")}>
               {isEnabled ? "已启用" : "已禁用"}
             </span>
             <Toggle checked={isEnabled} size="sm" onChange={() => set("vector_enabled", !isEnabled)} />
@@ -192,11 +192,11 @@ export function VectorConfigSection() {
                 className={cn(
                   "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-all",
                   active
-                    ? "bg-white font-semibold text-[var(--ink)] shadow-[0_2px_8px_rgba(0,0,0,.06)]"
-                    : "text-[var(--color-text-secondary)] hover:bg-white/60",
+                    ? "bg-card font-semibold text-foreground shadow-[0_2px_8px_rgba(0,0,0,.06)]"
+                    : "text-muted-foreground hover:bg-card/60",
                 )}
               >
-                <Icon className={cn("h-3.5 w-3.5", active ? "text-[var(--color-primary)]" : "text-[var(--color-text-hint)]")} />
+                <Icon className={cn("h-3.5 w-3.5", active ? "text-primary" : "text-muted-foreground/70")} />
                 {item.label}
               </button>
             );
@@ -243,7 +243,7 @@ export function VectorConfigSection() {
                 </label>
               </div>
 
-              <div className="rounded-lg border border-[var(--color-border)]/50 bg-[var(--color-bg-input)]/35 px-4 py-3 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              <div className="rounded-lg border border-border/50 bg-muted/35 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
                 Provider、API Key、Base URL 与 Model ID 统一在「模型配置」维护；本页不再保存第二套 Embedding 凭据。
               </div>
             </div>
@@ -252,18 +252,18 @@ export function VectorConfigSection() {
           {tab === "embedding" && (
             <div className="space-y-4 animate-rise-in">
               {models.isError && (
-                <div className="rounded-lg border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-3 py-2 text-xs text-[var(--color-danger)]">
+                <div className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-xs text-destructive">
                   {getErrorMessage(models.error)}
                 </div>
               )}
 
               {embeddingModels.length === 0 ? (
-                <div className="rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-warning-light)] px-4 py-4">
+                <div className="rounded-xl border border-warning/40 bg-warning-light px-4 py-4">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" />
                     <div>
-                      <p className="text-sm font-semibold text-[var(--ink)]">尚未注册 Embedding 模型</p>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                      <p className="text-sm font-semibold text-foreground">尚未注册 Embedding 模型</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                         请先到「模型」标签添加模型，并将模型类型设置为 Embedding。API Key、Base URL 和模型标识只需配置一次。
                       </p>
                     </div>
@@ -291,30 +291,30 @@ export function VectorConfigSection() {
               )}
 
               {selectedModel && (
-                <div className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-bg-input)]/30 p-4">
+                <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/60 bg-muted/30 p-4">
                   <div>
                     <p className={labelCls}>Provider</p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{selectedModel.provider}</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{selectedModel.provider}</p>
                   </div>
                   <div>
                     <p className={labelCls}>模型标识</p>
-                    <p className="mt-1 break-all font-mono text-xs font-semibold text-[var(--ink)]">{selectedModel.name}</p>
+                    <p className="mt-1 break-all font-mono text-xs font-semibold text-foreground">{selectedModel.name}</p>
                   </div>
                   <div className="col-span-2">
                     <p className={labelCls}>API Base URL</p>
-                    <p className="mt-1 break-all font-mono text-xs text-[var(--color-text-secondary)]">
+                    <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
                       {selectedModel.api_base_url || "未配置"}
                     </p>
                   </div>
                   <div>
                     <p className={labelCls}>API Key</p>
-                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.api_configured ? "text-[var(--color-success)]" : "text-[var(--color-warning)]")}>
+                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.api_configured ? "text-success" : "text-warning-foreground")}>
                       {selectedModel.api_configured ? "● 已配置" : "● 未配置"}
                     </p>
                   </div>
                   <div>
                     <p className={labelCls}>状态</p>
-                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.is_enabled ? "text-[var(--color-success)]" : "text-[var(--color-danger)]")}>
+                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.is_enabled ? "text-success" : "text-destructive")}>
                       {selectedModel.is_enabled ? "● 可用" : "● 已禁用"}
                     </p>
                   </div>
@@ -322,7 +322,7 @@ export function VectorConfigSection() {
               )}
 
               {selectedInvalid && (
-                <div className="rounded-lg border border-[var(--color-danger)] bg-[var(--color-danger-light)] px-3 py-2 text-xs text-[var(--color-danger)]">
+                <div className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-xs text-destructive">
                   当前选择的模型已禁用或不再具备 Embedding 能力，请重新选择。
                 </div>
               )}
@@ -363,7 +363,7 @@ export function VectorConfigSection() {
                 </label>
               </div>
 
-              <div className="border-t border-[var(--color-border)]/40 pt-4">
+              <div className="border-t border-border/40 pt-4">
                 <Button
                   variant="secondary"
                   disabled={testMutation.isPending || !selectedModelId || !selectedModel?.api_configured || selectedInvalid}
@@ -381,8 +381,8 @@ export function VectorConfigSection() {
                     className={cn(
                       "mt-3 rounded-lg px-3 py-2.5 text-xs",
                       testResult.success
-                        ? "border border-[var(--color-success)] bg-[var(--color-success-light)] text-[var(--color-success)]"
-                        : "border border-[var(--color-danger)] bg-[var(--color-danger-light)] text-[var(--color-danger)]",
+                        ? "border border-success bg-success-light text-success"
+                        : "border border-destructive bg-destructive-light text-destructive",
                     )}
                   >
                     <div className="flex items-start gap-2">

@@ -16,7 +16,7 @@ type ComparisonProps = {
 function PendingVersion({ label }: { label: string | null }) {
   return (
     <div className="mb-2 flex justify-end">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-500">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" />
         正在切换到 {label ?? "所选版本"}
       </span>
@@ -27,9 +27,9 @@ function PendingVersion({ label }: { label: string | null }) {
 function ComparisonSkeleton() {
   return (
     <div className="mt-4 space-y-3 animate-pulse">
-      <div className="h-24 rounded-xl border border-slate-200 bg-slate-50/60" />
-      <div className="h-20 rounded-xl border border-slate-200 bg-slate-50/60" />
-      <div className="h-20 rounded-xl border border-slate-200 bg-slate-50/60" />
+      <div className="h-24 rounded-xl border border-border bg-muted/60" />
+      <div className="h-20 rounded-xl border border-border bg-muted/60" />
+      <div className="h-20 rounded-xl border border-border bg-muted/60" />
     </div>
   );
 }
@@ -38,11 +38,11 @@ function RawVersionData({
   left, right, leftTitle, rightTitle,
 }: Pick<ComparisonProps, "left" | "right" | "leftTitle" | "rightTitle">) {
   return (
-    <details className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 transition-colors hover:border-slate-300">
-      <summary className="cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-slate-700">
+    <details className="rounded-xl border border-dashed border-border bg-muted/50 px-4 py-3 transition-colors hover:border-primary/30">
+      <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground hover:text-foreground">
         查看原始版本数据
       </summary>
-      <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-white p-3 text-[11px] leading-5 text-slate-500">
+      <pre className="mt-3 max-h-72 overflow-auto rounded-lg bg-card p-3 text-[11px] leading-5 text-muted-foreground/80">
         {JSON.stringify({ [leftTitle]: left, [rightTitle]: right }, null, 2)}
       </pre>
     </details>

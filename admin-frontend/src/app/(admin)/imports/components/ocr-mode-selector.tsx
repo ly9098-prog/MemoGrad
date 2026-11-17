@@ -22,10 +22,10 @@ const OPTIONS: {
 export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorProps) {
   return (
     <div className="space-y-1.5">
-      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+      <span className="text-xs font-semibold text-muted-foreground">
         OCR 识别方式
       </span>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3" role="group" aria-label="OCR 识别方式">
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           const Icon = opt.icon;
@@ -35,21 +35,22 @@ export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorPr
               type="button"
               disabled={disabled}
               onClick={() => onChange(opt.value)}
+              aria-pressed={selected}
               className={[
                 "group relative flex flex-col gap-1.5 rounded-xl border px-3.5 py-3 text-left text-sm transition-all duration-200",
                 "cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
                 "hover:shadow-sm active:scale-[0.98]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 selected
-                  ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
-                  : "border-[var(--color-border)] bg-white/60 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]",
+                  ? "border-primary bg-accent"
+                  : "border-border bg-card/60 hover:border-primary hover:bg-accent",
               ].join(" ")}
             >
               {/* Selected indicator */}
               <span
                 className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full transition-all duration-200 ${
                   selected
-                    ? "scale-100 bg-[var(--color-primary)] text-white"
+                    ? "scale-100 bg-primary text-primary-foreground"
                     : "scale-0 bg-transparent"
                 }`}
               >
@@ -62,8 +63,8 @@ export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorPr
               <span
                 className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200 ${
                   selected
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "bg-[var(--color-bg-input)] text-[var(--color-text-hint)] group-hover:bg-white/80"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground/70 group-hover:bg-card/80"
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -73,12 +74,12 @@ export function OcrModeSelector({ value, onChange, disabled }: OcrModeSelectorPr
               <div className="space-y-0.5">
                 <span
                   className={`block text-sm font-semibold leading-tight ${
-                    selected ? "text-[var(--color-primary-dark)]" : "text-[var(--ink)]"
+                    selected ? "text-accent-foreground" : "text-foreground"
                   }`}
                 >
                   {opt.label}
                 </span>
-                <span className="block text-[10px] leading-tight text-[var(--color-text-hint)]">
+                <span className="block text-[10px] leading-tight text-muted-foreground/70">
                   {opt.desc}
                 </span>
               </div>

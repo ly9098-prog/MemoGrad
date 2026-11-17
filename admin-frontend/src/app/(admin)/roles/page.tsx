@@ -26,6 +26,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ManagementPage,
+  ManagementPageHeader,
+} from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -287,21 +291,27 @@ export default function RolesPage() {
   if (isBootstrapping || !isSuperAdmin) return null;
 
   return (
-    <div>
+    <ManagementPage className="space-y-5">
+      <ManagementPageHeader
+        icon={<KeyRound className="h-5 w-5" />}
+        title="角色与权限"
+        description="按资源与操作集中配置后台角色权限；保存后立即影响菜单与接口访问。"
+        meta={<span>权限矩阵只对超级管理员开放；系统角色和超级管理员受保护。</span>}
+      />
       <Card className="overflow-hidden">
-        <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6">
+        <div className="border-b border-border px-5 py-4 sm:px-6">
           <div className="flex min-h-10 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                 <KeyRound className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="font-display text-xl font-bold text-[var(--ink)]">权限矩阵</h3>
-                <p className="text-sm text-[var(--color-text-secondary)]">选择左侧角色，在右侧矩阵中按资源和操作集中授权。</p>
+                <h3 className="font-display text-xl font-bold text-foreground">权限矩阵</h3>
+                <p className="text-sm text-muted-foreground">选择左侧角色，在右侧矩阵中按资源和操作集中授权。</p>
               </div>
             </div>
             {message ? (
-              <div className="animate-drop-in rounded-lg border border-[var(--color-border)] bg-white/80 px-3 py-2 text-xs font-medium text-[var(--color-text-secondary)] shadow-sm" role="status">
+              <div className="animate-drop-in rounded-lg border border-border bg-card/80 px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm" role="status">
                 {message}
               </div>
             ) : null}
@@ -309,23 +319,23 @@ export default function RolesPage() {
         </div>
 
         <div className="grid min-h-[680px] xl:grid-cols-[236px_minmax(0,1fr)]">
-          <aside className="border-b border-[var(--color-border)] bg-white/30 xl:border-b-0 xl:border-r">
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border-light)] px-5 py-3.5">
-              <span className="text-sm font-semibold text-[var(--ink)]">角色</span>
-              <span className="text-xs text-[var(--color-text-hint)]">{roleItems.length} 个</span>
+          <aside className="border-b border-border bg-card/30 xl:border-b-0 xl:border-r">
+            <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-3.5">
+              <span className="text-sm font-semibold text-foreground">角色</span>
+              <span className="text-xs text-muted-foreground/70">{roleItems.length} 个</span>
             </div>
 
             <div className="py-2">
               {roles.isLoading ? (
                 <div className="space-y-2 px-3 py-3">
                   {[0, 1, 2].map((index) => (
-                    <div key={index} className="h-[78px] animate-pulse rounded-lg bg-[var(--color-bg-input)]/65" />
+                    <div key={index} className="h-[78px] animate-pulse rounded-lg bg-muted/65" />
                   ))}
                 </div>
               ) : roles.isError ? (
-                <div className="px-5 py-6 text-sm text-[var(--color-danger)]">角色加载失败，请刷新后重试。</div>
+                <div className="px-5 py-6 text-sm text-destructive">角色加载失败，请刷新后重试。</div>
               ) : (
-                <div className="divide-y divide-[var(--color-border-light)]/70">
+                <div className="divide-y divide-border/60">
                   {roleItems.map((role) => {
                     const active = role.id === activeRoleId;
                     const pendingOverride = permissionOverrides[role.id];
@@ -338,31 +348,31 @@ export default function RolesPage() {
                         aria-pressed={active}
                         onClick={() => selectRole(role.id)}
                         className={cn(
-                          "group relative w-full px-5 py-3.5 text-left transition-all duration-200 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] active:bg-[var(--color-primary-light)]",
-                          active ? "bg-[var(--color-primary-light)]/85" : "hover:bg-white/70",
+                          "group relative w-full px-5 py-3.5 text-left transition-all duration-200 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent",
+                          active ? "bg-accent/85" : "hover:bg-card/70",
                         )}
                       >
                         <span
                           className={cn(
-                            "absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-[var(--color-primary)] transition-all duration-200",
+                            "absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-primary transition-all duration-200",
                             active ? "scale-y-100 opacity-100" : "scale-y-50 opacity-0",
                           )}
                         />
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={cn("font-semibold transition-colors", active ? "text-[var(--color-primary-dark)]" : "text-[var(--ink)]")}>{role.display_name}</span>
+                              <span className={cn("font-semibold transition-colors", active ? "text-accent-foreground" : "text-foreground")}>{role.display_name}</span>
                               {role.is_system ? <StatusBadge tone="neutral">系统</StatusBadge> : null}
                             </div>
-                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-text-secondary)]">{role.description || role.name}</p>
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{role.description || role.name}</p>
                             <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-                              <span className={cn("font-semibold tabular-nums", active ? "text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)]")}>
+                              <span className={cn("font-semibold tabular-nums", active ? "text-accent-foreground" : "text-muted-foreground")}>
                                 {permissionCount}{totalPermissionCount > 0 ? ` / ${totalPermissionCount}` : ""} 项权限
                               </span>
-                              {roleDirty ? <span className="font-medium text-[var(--color-warning)]">未保存</span> : null}
+                              {roleDirty ? <span className="font-medium text-warning-foreground">未保存</span> : null}
                             </div>
                           </div>
-                          {role.name === "super_admin" ? <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-hint)]" /> : null}
+                          {role.name === "super_admin" ? <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" /> : null}
                         </div>
                       </button>
                     );
@@ -372,13 +382,13 @@ export default function RolesPage() {
             </div>
           </aside>
 
-          <main className="min-w-0 bg-white/15">
+          <main className="min-w-0 bg-card/15">
             <div key={selectedRole?.id ?? "empty"} className="animate-fade-in">
-              <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6">
+              <div className="border-b border-border px-5 py-4 sm:px-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-display text-2xl font-bold text-[var(--ink)]">{selectedRole?.display_name ?? "未选择角色"}</h3>
+                      <h3 className="font-display text-2xl font-bold text-foreground">{selectedRole?.display_name ?? "未选择角色"}</h3>
                       {selectedRole?.is_system ? <StatusBadge tone="neutral">系统</StatusBadge> : null}
                       {isLocked ? <StatusBadge tone="warning">只读</StatusBadge> : null}
                       {isDirty ? (
@@ -389,11 +399,11 @@ export default function RolesPage() {
                         </StatusBadge>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {selectedRole?.description || "请选择一个角色以查看权限"}
                       {selectedRole ? ` · ${activePermissionIds.size} / ${totalPermissionCount} 项权限已开启` : ""}
                     </p>
-                    {isLocked ? <p className="mt-1.5 text-xs text-[var(--color-text-hint)]">超级管理员始终拥有全部权限，矩阵仅用于查看。</p> : null}
+                    {isLocked ? <p className="mt-1.5 text-xs text-muted-foreground/70">超级管理员始终拥有全部权限，矩阵仅用于查看。</p> : null}
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
@@ -419,20 +429,20 @@ export default function RolesPage() {
                 </div>
               </div>
 
-              <div className="border-b border-[var(--color-border)] px-5 py-3 sm:px-6">
+              <div className="border-b border-border px-5 py-3 sm:px-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <label className="relative block w-full lg:max-w-md">
                     <span className="sr-only">搜索权限</span>
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                     <input
                       ref={searchInputRef}
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="搜索权限名称、资源代码或操作"
-                      className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-white/80 pl-9 pr-16 text-sm text-[var(--ink)] outline-none transition-all duration-200 placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
+                      className="h-10 w-full rounded-lg border border-border bg-card/80 pl-9 pr-16 text-sm text-foreground outline-none transition-all duration-200 placeholder:text-muted-foreground/70 focus:border-primary focus:ring-2 focus:ring-accent"
                     />
                     {!searchQuery ? (
-                      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/70 px-1.5 py-0.5 font-mono text-[10px] text-[var(--color-text-hint)]">
+                      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border/60 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/70">
                         /
                       </span>
                     ) : null}
@@ -441,7 +451,7 @@ export default function RolesPage() {
                         type="button"
                         aria-label="清空搜索"
                         onClick={() => setSearchQuery("")}
-                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--ink)]"
+                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -449,34 +459,34 @@ export default function RolesPage() {
                   </label>
 
                   <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
-                    <span className="mr-1 hidden whitespace-nowrap text-xs tabular-nums text-[var(--color-text-hint)] sm:inline">
+                    <span className="mr-1 hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground/70 sm:inline">
                       {categoryMatrices.length} 个模块 · {visibleResourceCount} 个资源
                     </span>
                     <div
                       className={cn(
                         "flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-all duration-150",
                         onlyGranted
-                          ? "border-[var(--color-primary)]/25 bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                          : "border-[var(--color-border)] bg-white/65 text-[var(--color-text-secondary)]",
+                          ? "border-primary/25 bg-accent text-accent-foreground"
+                          : "border-border bg-card/65 text-muted-foreground",
                       )}
                     >
-                      <Toggle checked={onlyGranted} onChange={() => setOnlyGranted((current) => !current)} size="sm" color="var(--color-primary)" />
-                      <button type="button" onClick={() => setOnlyGranted((current) => !current)} className="whitespace-nowrap transition hover:text-[var(--ink)]">
+                      <Toggle checked={onlyGranted} onChange={() => setOnlyGranted((current) => !current)} size="sm" color="var(--primary)" />
+                      <button type="button" onClick={() => setOnlyGranted((current) => !current)} className="whitespace-nowrap transition hover:text-foreground">
                         仅显示已授权
                       </button>
                     </div>
-                    <div className="flex h-9 overflow-hidden rounded-lg border border-[var(--color-border)] bg-white/65">
+                    <div className="flex h-9 overflow-hidden rounded-lg border border-border bg-card/65">
                       <button
                         type="button"
-                        className="px-3 text-xs font-semibold text-[var(--color-primary-dark)] transition hover:bg-[var(--color-primary-light)]/65"
+                        className="px-3 text-xs font-semibold text-accent-foreground transition hover:bg-accent/65"
                         onClick={expandAll}
                       >
                         展开全部
                       </button>
-                      <span className="w-px bg-[var(--color-border-light)]" aria-hidden="true" />
+                      <span className="w-px bg-border/60" aria-hidden="true" />
                       <button
                         type="button"
-                        className="px-3 text-xs font-semibold text-[var(--color-primary-dark)] transition hover:bg-[var(--color-primary-light)]/65"
+                        className="px-3 text-xs font-semibold text-accent-foreground transition hover:bg-accent/65"
                         onClick={collapseAll}
                       >
                         收起全部
@@ -490,25 +500,25 @@ export default function RolesPage() {
                 {permissions.isLoading ? (
                   <div className="space-y-3">
                     {[0, 1, 2].map((index) => (
-                      <div key={index} className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white/65">
-                        <div className="h-14 animate-pulse bg-[var(--color-bg-input)]/60" />
-                        <div className="space-y-px border-t border-[var(--color-border)] p-3">
-                          <div className="h-9 animate-pulse rounded bg-[var(--color-bg-input)]/45" />
-                          <div className="h-9 animate-pulse rounded bg-[var(--color-bg-input)]/45" />
+                      <div key={index} className="overflow-hidden rounded-xl border border-border bg-card/65">
+                        <div className="h-14 animate-pulse bg-muted/60" />
+                        <div className="space-y-px border-t border-border p-3">
+                          <div className="h-9 animate-pulse rounded bg-muted/45" />
+                          <div className="h-9 animate-pulse rounded bg-muted/45" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : permissions.isError ? (
-                  <div className="rounded-xl border border-[var(--color-danger)]/40 bg-[var(--color-danger-light)] px-4 py-10 text-center text-sm text-[var(--color-danger)]">
+                  <div className="rounded-xl border border-destructive/40 bg-destructive-light px-4 py-10 text-center text-sm text-destructive">
                     权限加载失败，请确认后端 RBAC 接口可用。
                   </div>
                 ) : categoryMatrices.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/45 px-4 py-12 text-center">
-                    <p className="font-semibold text-[var(--ink)]">没有匹配的权限</p>
-                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">尝试修改搜索条件或关闭“仅显示已授权”。</p>
+                  <div className="rounded-xl border border-dashed border-border bg-card/45 px-4 py-12 text-center">
+                    <p className="font-semibold text-foreground">没有匹配的权限</p>
+                    <p className="mt-1 text-sm text-muted-foreground">尝试修改搜索条件或关闭“仅显示已授权”。</p>
                     {searchQuery ? (
-                      <button type="button" className="mt-4 text-sm font-semibold text-[var(--color-primary-dark)] hover:underline" onClick={() => setSearchQuery("")}>
+                      <button type="button" className="mt-4 text-sm font-semibold text-accent-foreground hover:underline" onClick={() => setSearchQuery("")}>
                         清空搜索
                       </button>
                     ) : null}
@@ -525,7 +535,7 @@ export default function RolesPage() {
                     const matrixMinWidth = 420 + actions.length * 92;
 
                     return (
-                      <section key={category} className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-white/80 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow] duration-200 hover:border-[var(--color-primary)]/25 hover:shadow-sm">
+                      <section key={category} className="overflow-hidden rounded-lg border border-border bg-card/80 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow] duration-200 hover:border-primary/25 hover:shadow-sm">
                         <div className="flex min-h-[52px] items-center gap-3 px-4 py-2">
                           <button
                             type="button"
@@ -535,26 +545,26 @@ export default function RolesPage() {
                           >
                             <ChevronDown
                               className={cn(
-                                "h-4 w-4 shrink-0 text-[var(--color-text-hint)] transition-transform duration-200 group-hover:text-[var(--color-primary-dark)]",
+                                "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:text-accent-foreground",
                                 collapsed && "-rotate-90",
                               )}
                             />
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] transition-transform duration-200 group-hover:scale-105">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-transform duration-200 group-hover:scale-105">
                               <CategoryIcon category={category} />
                             </div>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h4 className="font-semibold text-[var(--ink)]">{categoryLabel(category)}</h4>
-                                <span className="inline-flex h-5 items-center rounded-full border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/55 px-2 font-mono text-[10px] tabular-nums text-[var(--color-text-secondary)]">
+                                <h4 className="font-semibold text-foreground">{categoryLabel(category)}</h4>
+                                <span className="inline-flex h-5 items-center rounded-full border border-border/60 bg-muted/55 px-2 font-mono text-[10px] tabular-nums text-muted-foreground">
                                   {grantedCount}/{items.length}
                                 </span>
                                 {categoryDirty ? (
-                                  <span className="animate-drop-in text-[10px] font-semibold tabular-nums text-[var(--color-warning)]">
+                                  <span className="animate-drop-in text-[10px] font-semibold tabular-nums text-warning-foreground">
                                     变更 {categoryAdded > 0 ? `+${categoryAdded}` : ""}{categoryAdded > 0 && categoryRemoved > 0 ? "/" : ""}{categoryRemoved > 0 ? `-${categoryRemoved}` : ""}
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="mt-0.5 truncate text-xs text-[var(--color-text-secondary)]">{categoryDescription(category)}</p>
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{categoryDescription(category)}</p>
                             </div>
                           </button>
 
@@ -570,7 +580,7 @@ export default function RolesPage() {
                               type="button"
                               disabled={!selectedRole || isLocked}
                               onClick={() => toggleCategory(items)}
-                              className="text-xs font-semibold text-[var(--color-primary-dark)] transition hover:opacity-70 disabled:cursor-not-allowed"
+                              className="text-xs font-semibold text-accent-foreground transition hover:opacity-70 disabled:cursor-not-allowed"
                             >
                               {allGranted ? "取消全选" : "全选"}
                             </button>
@@ -582,9 +592,11 @@ export default function RolesPage() {
                             "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
                             collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100",
                           )}
+                          aria-hidden={collapsed}
+                          inert={collapsed}
                         >
                           <div className="min-h-0 overflow-hidden">
-                            <div className="overflow-x-auto border-t border-[var(--color-border)] bg-white/60">
+                            <div className="overflow-x-auto border-t border-border bg-card/60">
                               <table className="w-full border-separate border-spacing-0 text-sm" style={{ minWidth: `${matrixMinWidth}px` }}>
                                 <colgroup>
                                   <col style={{ width: "230px" }} />
@@ -594,19 +606,19 @@ export default function RolesPage() {
                                   ))}
                                 </colgroup>
                                 <thead>
-                                  <tr className="text-left text-[11px] font-semibold text-[var(--color-text-hint)]">
-                                    <th className="sticky left-0 z-20 border-b border-r border-[var(--color-border)] bg-[var(--color-bg-input)] px-4 py-2.5 shadow-[1px_0_0_var(--color-border)]">
+                                  <tr className="text-left text-[11px] font-semibold text-muted-foreground/70">
+                                    <th className="sticky left-0 z-20 border-b border-r border-border bg-muted px-4 py-2.5 shadow-[1px_0_0_var(--border)]">
                                       权限资源
                                     </th>
-                                    <th className="sticky left-[230px] z-20 border-b border-r-2 border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5 shadow-[2px_0_3px_rgba(15,23,42,0.03)]">
+                                    <th className="sticky left-[230px] z-20 border-b border-r-2 border-border bg-muted px-3 py-2.5 shadow-[2px_0_3px_rgba(15,23,42,0.03)]">
                                       资源代码
                                     </th>
                                     {actions.map((action) => (
                                       <th
                                         key={action}
-                                        className="border-b border-r border-[var(--color-border-light)] bg-[var(--color-bg-input)]/80 px-2 py-2.5 text-center whitespace-nowrap last:border-r-0"
+                                        className="border-b border-r border-border/60 bg-muted/80 px-2 py-2.5 text-center whitespace-nowrap last:border-r-0"
                                       >
-                                        <span className="inline-flex min-w-9 items-center justify-center rounded-md px-1.5 py-0.5 text-[var(--color-text-secondary)]">
+                                        <span className="inline-flex min-w-9 items-center justify-center rounded-md px-1.5 py-0.5 text-muted-foreground">
                                           {actionLabel(action)}
                                         </span>
                                       </th>
@@ -622,21 +634,21 @@ export default function RolesPage() {
                                         key={row.resource}
                                         className={cn(
                                           "group/row transition-colors duration-150",
-                                          rowIndex > 0 && "[&>td]:border-t [&>td]:border-[var(--color-border-light)]",
+                                          rowIndex > 0 && "[&>td]:border-t [&>td]:border-border/60",
                                         )}
                                       >
                                         <td className={cn(
-                                          "sticky left-0 z-10 border-r border-[var(--color-border)] px-4 py-2.5 shadow-[1px_0_0_var(--color-border)] transition-colors duration-150 group-hover/row:bg-[var(--color-primary-light)]/45",
-                                          rowIndex % 2 === 0 ? "bg-white" : "bg-[var(--color-bg-card)]",
+                                          "sticky left-0 z-10 border-r border-border px-4 py-2.5 shadow-[1px_0_0_var(--border)] transition-colors duration-150 group-hover/row:bg-accent/45",
+                                          "bg-card",
                                         )}>
                                           <div className="flex min-w-0 items-center justify-between gap-3">
-                                            <span className="min-w-0 truncate font-semibold text-[var(--ink)]">{row.label}</span>
+                                            <span className="min-w-0 truncate font-semibold text-foreground">{row.label}</span>
                                             <span
                                               className={cn(
                                                 "inline-flex h-6 min-w-9 shrink-0 items-center justify-center rounded-full border px-2 font-mono text-[10px] tabular-nums transition-colors",
                                                 rowAllGranted
-                                                  ? "border-[var(--color-primary)]/20 bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]"
-                                                  : "border-[var(--color-border)] bg-[var(--color-bg-input)]/55 text-[var(--color-text-secondary)]",
+                                                  ? "border-primary/20 bg-accent text-accent-foreground"
+                                                  : "border-border bg-muted/55 text-muted-foreground",
                                               )}
                                             >
                                               {rowGrantedCount}/{row.permissions.length}
@@ -644,10 +656,10 @@ export default function RolesPage() {
                                           </div>
                                         </td>
                                         <td className={cn(
-                                          "sticky left-[230px] z-10 border-r-2 border-[var(--color-border)] px-3 py-2.5 shadow-[2px_0_3px_rgba(15,23,42,0.03)] transition-colors duration-150 group-hover/row:bg-[var(--color-primary-light)]/45",
-                                          rowIndex % 2 === 0 ? "bg-white" : "bg-[var(--color-bg-card)]",
+                                          "sticky left-[230px] z-10 border-r-2 border-border px-3 py-2.5 shadow-[2px_0_3px_rgba(15,23,42,0.03)] transition-colors duration-150 group-hover/row:bg-accent/45",
+                                          "bg-card",
                                         )}>
-                                          <code className="inline-flex max-w-full truncate rounded-md border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/60 px-2 py-1 font-mono text-[11px] font-medium tracking-[0.01em] text-[var(--color-text-secondary)]">
+                                          <code className="inline-flex max-w-full truncate rounded-md border border-border/60 bg-muted/60 px-2 py-1 font-mono text-[11px] font-medium tracking-[0.01em] text-muted-foreground">
                                             {row.resource}
                                           </code>
                                         </td>
@@ -658,8 +670,8 @@ export default function RolesPage() {
                                               <td
                                                 key={action}
                                                 className={cn(
-                                                  "border-r border-[var(--color-border-light)] px-2 py-3 text-center text-[var(--color-border)] last:border-r-0",
-                                                  rowIndex % 2 === 0 ? "bg-[var(--color-bg-input)]/18" : "bg-[var(--color-bg-input)]/28",
+                                                  "border-r border-border/60 px-2 py-3 text-center text-border last:border-r-0",
+                                                  rowIndex % 2 === 0 ? "bg-muted/18" : "bg-muted/28",
                                                 )}
                                                 aria-hidden="true"
                                               >
@@ -681,13 +693,13 @@ export default function RolesPage() {
                                                 togglePermission(permission.id);
                                               }}
                                               className={cn(
-                                                "relative border-r border-[var(--color-border-light)] px-2 py-2 text-center transition-[background-color,box-shadow] duration-150 last:border-r-0",
-                                                rowIndex % 2 === 0 ? "bg-white/65" : "bg-[var(--color-bg-card)]/80",
-                                                granted && !highRisk && "bg-[var(--color-primary-light)]/24",
-                                                highRisk && "bg-[var(--color-warning-light)]/35",
+                                                "relative border-r border-border/60 px-2 py-2 text-center transition-[background-color,box-shadow] duration-150 last:border-r-0",
+                                                rowIndex % 2 === 0 ? "bg-card/65" : "bg-card/80",
+                                                granted && !highRisk && "bg-accent/24",
+                                                highRisk && "bg-warning-light/35",
                                                 changeState === "added" && "shadow-[inset_0_0_0_1px_rgba(74,111,138,0.28)]",
-                                                changeState === "removed" && "bg-[var(--color-warning-light)]/50 shadow-[inset_0_0_0_1px_rgba(196,154,107,0.35)]",
-                                                !isLocked && "cursor-pointer hover:bg-[var(--color-primary-light)]/55 hover:shadow-[inset_0_0_0_1px_var(--color-border)]",
+                                                changeState === "removed" && "bg-warning-light/50 shadow-[inset_0_0_0_1px_rgba(196,154,107,0.35)]",
+                                                !isLocked && "cursor-pointer hover:bg-accent/55 hover:shadow-[inset_0_0_0_1px_var(--border)]",
                                               )}
                                               title={title}
                                             >
@@ -695,7 +707,7 @@ export default function RolesPage() {
                                                 <span
                                                   className={cn(
                                                     "pointer-events-none absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full animate-drop-in",
-                                                    changeState === "added" ? "bg-[var(--color-primary)]" : "bg-[var(--color-warning)]",
+                                                    changeState === "added" ? "bg-primary" : "bg-warning",
                                                   )}
                                                   aria-hidden="true"
                                                 />
@@ -703,10 +715,10 @@ export default function RolesPage() {
                                               <div
                                                 className={cn(
                                                   "mx-auto flex h-8 min-w-11 items-center justify-center gap-1 rounded-lg border border-transparent px-2 transition-all duration-150",
-                                                  granted && "border-[var(--color-primary)]/10 bg-white/55",
-                                                  highRisk && "border-[var(--color-warning)]/15 bg-[var(--color-warning-light)]/55",
-                                                  changeState === "removed" && "border-[var(--color-warning)]/20 bg-white/65",
-                                                  !isLocked && "group-hover/row:border-[var(--color-border-light)] group-hover/row:bg-white/75",
+                                                  granted && "border-primary/10 bg-card/55",
+                                                  highRisk && "border-warning/15 bg-warning-light/55",
+                                                  changeState === "removed" && "border-warning/20 bg-card/65",
+                                                  !isLocked && "group-hover/row:border-border/60 group-hover/row:bg-card/75",
                                                 )}
                                               >
                                                 <CustomCheckbox
@@ -716,7 +728,7 @@ export default function RolesPage() {
                                                   onCheckedChange={() => togglePermission(permission.id)}
                                                   aria-label={`${selectedRole?.display_name ?? "角色"}：${permission.description || permission.name}`}
                                                 />
-                                                {highRisk ? <AlertTriangle className="h-3 w-3 shrink-0 text-[var(--color-warning)]" aria-hidden="true" /> : null}
+                                                {highRisk ? <AlertTriangle className="h-3 w-3 shrink-0 text-warning-foreground" aria-hidden="true" /> : null}
                                               </div>
                                             </td>
                                           );
@@ -751,6 +763,6 @@ export default function RolesPage() {
           saveMutation.mutate({ roleId: selectedRole.id, permissionIds: Array.from(activePermissionIds).sort((a, b) => a - b) });
         }}
       />
-    </div>
+    </ManagementPage>
   );
 }

@@ -8,11 +8,11 @@ export function DifficultyBadge({
 }) {
   const d = Number(difficulty) || 0;
   const colors = [
-    "bg-emerald-50 text-emerald-700 border-emerald-200",
-    "bg-green-50 text-green-700 border-green-200",
-    "bg-amber-50 text-amber-700 border-amber-200",
-    "bg-orange-50 text-orange-700 border-orange-200",
-    "bg-red-50 text-red-700 border-red-200",
+    "bg-success-light text-success border-success/30",
+    "bg-success-light text-success border-success/30",
+    "bg-warning-light text-warning-foreground border-warning/40",
+    "bg-warning-light text-warning-foreground border-warning/40",
+    "bg-destructive-light text-destructive border-destructive/30",
   ];
   const idx = Math.min(Math.max(Math.round(d) - 1, 0), colors.length - 1);
   const label = ["简单", "较易", "中等", "较难", "困难"];

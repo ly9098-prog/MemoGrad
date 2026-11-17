@@ -73,28 +73,22 @@ function StatCard({
   })();
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-[var(--color-border)]/80 bg-white/80 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-      <div
-        className="absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
-        style={{ background: `radial-gradient(circle, ${gradient.replace("from-", "").replace("to-", "")}, transparent)` }}
-      />
-      <div className="relative z-10">
-        <div className="flex items-start justify-between">
-          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">{label}</p>
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-[var(--color-border)]/60 bg-white/60 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-0.5">
-            <Icon className="h-5 w-5" style={{ color: gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || "var(--color-primary)" }} />
-          </div>
+    <div className="relative min-w-0 bg-card px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-medium leading-5 text-muted-foreground">{label}</p>
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] bg-secondary/55">
+          <Icon className="h-4 w-4" style={{ color: gradient.match(/#[a-fA-F0-9]{6}/)?.[0] || "var(--primary)" }} />
         </div>
-        <div className="mt-3 flex items-baseline gap-1.5">
-          <span className={cn(
-            "font-display text-3xl font-bold tracking-tight tabular-nums",
-            loading ? "text-[var(--color-border)]" : "text-[var(--ink)]",
-          )}>
-            {formatted}
-          </span>
-          {!loading && <span className="text-sm font-medium text-[var(--color-text-hint)]">{suffix}</span>}
-          {loading && <span className="text-sm text-[var(--color-border)]">{suffix}</span>}
-        </div>
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className={cn(
+          "text-[26px] font-semibold leading-none tracking-[-0.04em] tabular-nums",
+          loading ? "text-border" : "text-foreground",
+        )}>
+          {formatted}
+        </span>
+        {!loading && <span className="text-[11px] font-medium text-muted-foreground/70">{suffix}</span>}
+        {loading && <span className="text-[11px] text-border">{suffix}</span>}
       </div>
     </div>
   );
@@ -112,7 +106,7 @@ export function StatCards({ stats, loading }: { stats?: AIStatsResponse | null; 
   };
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-px overflow-hidden rounded-[16px] border border-border bg-border sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {CARD_META.map((meta) => (
         <StatCard
           key={meta.key}

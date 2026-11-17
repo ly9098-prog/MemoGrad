@@ -161,11 +161,11 @@ function RenderedAnswer({ answer }: { answer: string | string[] | boolean | null
 function ImportTextPreview({ text }: { text: string }) {
   if (!text.trim()) {
     return (
-      <div className="grid min-h-[430px] place-items-center rounded-xl border border-dashed border-[var(--color-border)] bg-white/40 px-6 text-center">
+      <div className="grid min-h-[430px] place-items-center rounded-xl border border-dashed border-border bg-card/40 px-6 text-center">
         <div>
-          <Eye className="mx-auto h-5 w-5 text-[var(--color-text-hint)]" aria-hidden="true" />
-          <p className="mt-2 text-sm font-semibold text-[var(--ink)]">暂无可预览内容</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--color-text-hint)]">输入题目后，这里会按 KaTeX 与代码保护规则预览最终阅读效果。</p>
+          <Eye className="mx-auto h-5 w-5 text-muted-foreground/70" aria-hidden="true" />
+          <p className="mt-2 text-sm font-semibold text-foreground">暂无可预览内容</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground/70">输入题目后，这里会按 KaTeX 与代码保护规则预览最终阅读效果。</p>
         </div>
       </div>
     );
@@ -173,7 +173,7 @@ function ImportTextPreview({ text }: { text: string }) {
 
   const parts = text.replace(/\r\n?/g, "\n").split("```");
   return (
-    <div className="min-h-[430px] overflow-auto rounded-xl border border-[var(--color-border)] bg-white/80 p-4 text-sm leading-7 text-[var(--color-text-secondary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+    <div className="min-h-[430px] overflow-auto rounded-xl border border-border bg-card/80 p-4 text-sm leading-7 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
       {parts.map((part, index) => {
         if (index % 2 === 1) {
           const newline = part.indexOf("\n");
@@ -183,11 +183,11 @@ function ImportTextPreview({ text }: { text: string }) {
             : part;
           const language = code === part ? "" : maybeLanguage;
           return (
-            <figure key={`code-${index}`} className="my-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 first:mt-0 last:mb-0">
+            <figure key={`code-${index}`} className="my-3 overflow-hidden rounded-xl border border-border bg-muted/60 first:mt-0 last:mb-0">
               {language ? (
-                <figcaption className="border-b border-slate-200 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-slate-400">{language}</figcaption>
+                <figcaption className="border-b border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">{language}</figcaption>
               ) : null}
-              <pre className="max-w-full overflow-x-auto px-3 py-3 font-mono text-[12px] leading-6 text-slate-800 [tab-size:2]"><code>{code}</code></pre>
+              <pre className="max-w-full overflow-x-auto px-3 py-3 font-mono text-[12px] leading-6 text-foreground [tab-size:2]"><code>{code}</code></pre>
             </figure>
           );
         }
@@ -231,30 +231,30 @@ function LatexRulesPanel({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <section id="latex-import-rules" className="mb-3 overflow-hidden rounded-xl border border-[rgba(74,111,138,0.22)] bg-[rgba(237,243,246,0.54)] import-details-body">
-      <div className="flex items-start justify-between gap-4 border-b border-[rgba(74,111,138,0.14)] px-4 py-3">
+    <section id="latex-import-rules" className="mb-3 overflow-hidden rounded-xl border border-primary/20 bg-accent/50 import-details-body">
+      <div className="flex items-start justify-between gap-4 border-b border-primary/15 px-4 py-3">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
-            <Braces className="h-4 w-4 text-[var(--color-primary-dark)]" aria-hidden="true" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <Braces className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
             LaTeX 导入规则
           </div>
-          <p className="mt-1 max-w-[62ch] text-[11px] leading-5 text-[var(--color-text-hint)]">
-            导入标准为行内 <code className="font-mono text-[var(--color-text-secondary)]">$...$</code>、块级 <code className="font-mono text-[var(--color-text-secondary)]">$$...$$</code>；兼容 <code className="font-mono">\(...\)</code> / <code className="font-mono">\[...\]</code>，解析时会机械标准化，不改写公式内容。
+          <p className="mt-1 max-w-[62ch] text-[11px] leading-5 text-muted-foreground/70">
+            导入标准为行内 <code className="font-mono text-muted-foreground">$...$</code>、块级 <code className="font-mono text-muted-foreground">$$...$$</code>；兼容 <code className="font-mono">\(...\)</code> / <code className="font-mono">\[...\]</code>，解析时会机械标准化，不改写公式内容。
           </p>
         </div>
-        <button type="button" onClick={onClose} className="h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-[var(--color-text-secondary)] import-interactive hover:bg-white/75" aria-label="收起 LaTeX 规则">
+        <button type="button" onClick={onClose} className="h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-muted-foreground import-interactive hover:bg-card/75" aria-label="收起 LaTeX 规则">
           收起
         </button>
       </div>
-      <div className="grid gap-px bg-[rgba(74,111,138,0.12)] sm:grid-cols-2">
+      <div className="grid gap-px bg-primary/10 sm:grid-cols-2">
         {rules.map((rule) => (
-          <div key={rule.title} className="bg-[rgba(254,252,249,0.94)] p-3.5">
+          <div key={rule.title} className="bg-card/90 p-3.5">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold text-[var(--ink)]">{rule.title}</p>
-              {rule.preview ? <span className="max-w-[55%] truncate text-[11px] text-[var(--color-primary-dark)]"><MathFormula text={rule.preview} /></span> : <Code2 className="h-3.5 w-3.5 text-[var(--color-text-hint)]" aria-hidden="true" />}
+              <p className="text-[11px] font-semibold text-foreground">{rule.title}</p>
+              {rule.preview ? <span className="max-w-[55%] truncate text-[11px] text-accent-foreground"><MathFormula text={rule.preview} /></span> : <Code2 className="h-3.5 w-3.5 text-muted-foreground/70" aria-hidden="true" />}
             </div>
-            <code className="mt-2 block overflow-x-auto whitespace-pre rounded-lg bg-[rgba(239,235,229,0.64)] px-2.5 py-2 font-mono text-[10px] leading-5 text-[var(--color-text-secondary)]">{rule.source}</code>
-            <p className="mt-2 text-[11px] leading-5 text-[var(--color-text-hint)]">{rule.detail}</p>
+            <code className="mt-2 block overflow-x-auto whitespace-pre rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-[10px] leading-5 text-muted-foreground">{rule.source}</code>
+            <p className="mt-2 text-[11px] leading-5 text-muted-foreground/70">{rule.detail}</p>
           </div>
         ))}
       </div>
@@ -277,10 +277,10 @@ function LatexInspectionPanel({
   const hasWarnings = inspection.warningCount > 0;
   const stateLabel = hasErrors ? `${inspection.errorCount} 个错误` : hasWarnings ? `${inspection.warningCount} 个建议` : "检查通过";
   const stateClass = hasErrors
-    ? "border-[rgba(196,77,77,0.28)] bg-[var(--color-danger-light)] text-[var(--color-danger)]"
+    ? "border-destructive/30 bg-destructive-light text-destructive"
     : hasWarnings
-      ? "border-[rgba(196,154,107,0.32)] bg-[var(--color-warning-light)] text-[var(--color-text-primary)]"
-      : "border-[rgba(91,140,91,0.26)] bg-[var(--color-success-light)] text-[var(--color-success)]";
+      ? "border-warning/30 bg-warning-light text-warning-foreground"
+      : "border-success/25 bg-success-light text-success";
   const StateIcon = hasErrors ? AlertTriangle : hasWarnings ? Info : Check;
 
   return (
@@ -288,7 +288,7 @@ function LatexInspectionPanel({
       <button
         type="button"
         onClick={onToggle}
-        className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left import-interactive hover:bg-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)]"
+        className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left import-interactive hover:bg-card/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         aria-expanded={expanded}
         aria-controls="latex-import-inspection"
       >
@@ -296,7 +296,7 @@ function LatexInspectionPanel({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
             <span className="font-semibold">LaTeX 预检 · {stateLabel}</span>
-            <span className="text-[var(--color-text-hint)]">
+            <span className="text-muted-foreground/70">
               行内 {inspection.inlineCount} · 块级 {inspection.blockCount} · 代码块 {inspection.codeFenceCount}
             </span>
           </div>
@@ -305,7 +305,7 @@ function LatexInspectionPanel({
       </button>
 
       {expanded ? (
-        <div id="latex-import-inspection" className="border-t border-[rgba(74,111,138,0.12)] bg-white/40 px-3.5 py-3 import-details-body">
+        <div id="latex-import-inspection" className="border-t border-primary/10 bg-card/40 px-3.5 py-3 import-details-body">
           {inspection.issues.length === 0 ? (
             <div className="flex items-start gap-2 text-[11px] leading-5">
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -331,7 +331,7 @@ function LatexInspectionPanel({
                     key={issue.id}
                     type="button"
                     onClick={() => onIssueClick(issue.line)}
-                    className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-[11px] import-interactive hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                    className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-[11px] import-interactive hover:bg-card/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     title={`跳转到第 ${issue.line} 行`}
                   >
                     {content}
@@ -576,8 +576,8 @@ export default function TextImportPage() {
         title="文本导入"
         description="粘贴结构化或自然语言题目，先解析结构与 LaTeX，再送入审核队列。科目可留空，选项支持常见网页复制格式。"
         meta={
-          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/70 px-3 text-xs text-[var(--color-text-secondary)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" aria-hidden="true" />
+          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
             科目可后补
           </div>
         }
@@ -589,14 +589,14 @@ export default function TextImportPage() {
         onDismiss={() => setGlobalError(null)}
       />
 
-      <section className="overflow-hidden rounded-2xl border border-[var(--color-border-light)] bg-[rgba(254,252,249,0.82)] shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
+      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
         <div className="grid min-h-[620px] xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
-          <div className="min-w-0 border-b border-[var(--color-border-light)] xl:border-b-0 xl:border-r">
+          <div className="min-w-0 border-b border-border/60 xl:border-b-0 xl:border-r">
             <ImportPanelHeader
               title="原始文本"
               description="先预检 LaTeX / 代码，再识别题干、选项与答案；支持 A. 内容，也支持 A 与内容分两行。"
               trailing={
-                <div className="text-right font-mono text-[10px] tabular-nums text-[var(--color-text-hint)]">
+                <div className="text-right font-mono text-[10px] tabular-nums text-muted-foreground/70">
                   <div>{charCount.toLocaleString()} 字</div>
                   <div className="mt-0.5">公式 {latexInspection.formulaCount}</div>
                 </div>
@@ -605,13 +605,13 @@ export default function TextImportPage() {
             <div className="flex h-[calc(100%-4rem)] min-h-[555px] flex-col p-4 sm:p-5">
               <div className="mb-3 flex flex-col gap-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="inline-flex items-center rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-1" role="tablist" aria-label="文本输入模式">
+                  <div className="inline-flex items-center rounded-xl border border-border bg-muted p-1" role="tablist" aria-label="文本输入模式">
                     <button
                       type="button"
                       role="tab"
                       aria-selected={inputMode === "source"}
                       onClick={() => setInputMode("source")}
-                      className={`h-11 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${inputMode === "source" ? "bg-white text-[var(--ink)] shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]"}`}
+                      className={`h-11 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${inputMode === "source" ? "bg-card text-foreground shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-muted-foreground/70 hover:text-muted-foreground"}`}
                     >
                       输入
                     </button>
@@ -620,7 +620,7 @@ export default function TextImportPage() {
                       role="tab"
                       aria-selected={inputMode === "preview"}
                       onClick={() => setInputMode("preview")}
-                      className={`flex h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${inputMode === "preview" ? "bg-white text-[var(--ink)] shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-[var(--color-text-hint)] hover:text-[var(--color-text-secondary)]"}`}
+                      className={`flex h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${inputMode === "preview" ? "bg-card text-foreground shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-muted-foreground/70 hover:text-muted-foreground"}`}
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                       预览
@@ -630,7 +630,7 @@ export default function TextImportPage() {
                   <button
                     type="button"
                     onClick={() => setRulesOpen((open) => !open)}
-                    className={`flex h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${rulesOpen ? "border-[rgba(74,111,138,0.32)] bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]" : "border-[var(--color-border)] bg-white/60 text-[var(--color-text-secondary)] hover:bg-white"}`}
+                    className={`flex h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rulesOpen ? "border-primary/30 bg-accent text-accent-foreground" : "border-border bg-card/60 text-muted-foreground hover:bg-card"}`}
                     aria-expanded={rulesOpen}
                     aria-controls="latex-import-rules"
                   >
@@ -641,18 +641,18 @@ export default function TextImportPage() {
 
                 {inputMode === "source" ? (
                   <div className="flex flex-wrap items-center gap-1.5" aria-label="文本快速格式化工具">
-                    <button type="button" onClick={() => wrapSelection("inline")} className="h-11 rounded-lg border border-[var(--color-border-light)] bg-white/60 px-3 font-mono text-[11px] font-semibold text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-border)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" title="将选中文本包裹为行内公式">
-                      $ · $ <span className="ml-1 font-sans font-normal text-[var(--color-text-hint)]">行内</span>
+                    <button type="button" onClick={() => wrapSelection("inline")} className="h-11 rounded-lg border border-border/60 bg-card/60 px-3 font-mono text-[11px] font-semibold text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本包裹为行内公式">
+                      $ · $ <span className="ml-1 font-sans font-normal text-muted-foreground/70">行内</span>
                     </button>
-                    <button type="button" onClick={() => wrapSelection("block")} className="h-11 rounded-lg border border-[var(--color-border-light)] bg-white/60 px-3 font-mono text-[11px] font-semibold text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-border)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" title="将选中文本包裹为块级公式">
-                      $$ · $$ <span className="ml-1 font-sans font-normal text-[var(--color-text-hint)]">块级</span>
+                    <button type="button" onClick={() => wrapSelection("block")} className="h-11 rounded-lg border border-border/60 bg-card/60 px-3 font-mono text-[11px] font-semibold text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本包裹为块级公式">
+                      $$ · $$ <span className="ml-1 font-sans font-normal text-muted-foreground/70">块级</span>
                     </button>
-                    <button type="button" onClick={() => wrapSelection("code")} className="flex h-11 items-center gap-1.5 rounded-lg border border-[var(--color-border-light)] bg-white/60 px-3 text-[11px] font-medium text-[var(--color-text-secondary)] import-interactive hover:border-[var(--color-border)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" title="将选中文本放入代码围栏">
+                    <button type="button" onClick={() => wrapSelection("code")} className="flex h-11 items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 text-[11px] font-medium text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本放入代码围栏">
                       <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
                       代码块
                     </button>
                     {latexInspection.alternateDelimiterCount > 0 ? (
-                      <button type="button" onClick={handleNormalizeDelimiters} className="ml-auto flex h-11 items-center gap-1.5 rounded-lg border border-[rgba(74,111,138,0.24)] bg-[var(--color-primary-light)] px-3 text-[11px] font-medium text-[var(--color-primary-dark)] import-interactive hover:border-[rgba(74,111,138,0.38)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
+                      <button type="button" onClick={handleNormalizeDelimiters} className="ml-auto flex h-11 items-center gap-1.5 rounded-lg border border-primary/25 bg-accent px-3 text-[11px] font-medium text-accent-foreground import-interactive hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                         标准化 {latexInspection.alternateDelimiterCount} 处定界符
                       </button>
@@ -669,7 +669,7 @@ export default function TextImportPage() {
                   <textarea
                     ref={textAreaRef}
                     id="question-import-text"
-                    className="min-h-[430px] flex-1 resize-y rounded-xl border border-[var(--color-border)] bg-[rgba(239,235,229,0.62)] px-4 py-3.5 font-mono text-[13px] leading-6 text-[var(--ink)] outline-none transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-[var(--color-text-hint)] focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]"
+                    className="min-h-[430px] flex-1 resize-y rounded-xl border border-border bg-muted/60 px-4 py-3.5 font-mono text-[13px] leading-6 text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15"
                     placeholder={TEXT_IMPORT_SAMPLE}
                     value={text}
                     spellCheck={false}
@@ -696,7 +696,7 @@ export default function TextImportPage() {
               />
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs leading-5 text-[var(--color-text-hint)]">
+                <div className="text-xs leading-5 text-muted-foreground/70">
                   <p>支持带/不带括号的结构标签；选项可写 “A. 内容”，也可写成 “A” 后换行输入内容。</p>
                   <p className="mt-0.5 font-mono text-[10px]">⌘ / Ctrl + Enter · 解析文本</p>
                 </div>
@@ -712,7 +712,7 @@ export default function TextImportPage() {
             </div>
           </div>
 
-          <div className="min-w-0 bg-white/30">
+          <div className="min-w-0 bg-card/30">
             {parseResult ? (
               <div className="flex min-h-[620px] flex-col import-panel-swap">
                 <ImportPanelHeader
@@ -730,14 +730,14 @@ export default function TextImportPage() {
                   }
                 />
 
-                <div className="grid grid-cols-3 divide-x divide-[var(--color-border-light)] border-b border-[var(--color-border-light)] bg-white/55" aria-live="polite">
+                <div className="grid grid-cols-3 divide-x divide-border/60 border-b border-border/60 bg-card/55" aria-live="polite">
                   <ImportMetric label="识别题目" value={parseResult.raw_count} />
                   <ImportMetric label="有效" value={parseResult.valid_count} tone="success" />
                   <ImportMetric label="需处理" value={Math.max(0, parseResult.raw_count - parseResult.valid_count)} tone={parseResult.raw_count - parseResult.valid_count > 0 ? "danger" : "neutral"} />
                 </div>
 
                 {parseResult.warnings.length > 0 ? (
-                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(196,154,107,0.35)] bg-[var(--color-warning-light)] px-3.5 py-3 text-xs leading-5 text-[var(--color-text-primary)] sm:mx-5 import-feedback-in">
+                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-warning/35 bg-warning-light px-3.5 py-3 text-xs leading-5 text-foreground sm:mx-5 import-feedback-in">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <div className="space-y-1">
                       {parseResult.warnings.map((w, i) => <p key={i}>{w}</p>)}
@@ -746,7 +746,7 @@ export default function TextImportPage() {
                 ) : null}
 
                 {importStatus ? (
-                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(91,140,91,0.3)] bg-[var(--color-success-light)] px-3.5 py-3 text-xs leading-5 text-[var(--color-success)] sm:mx-5 import-feedback-in">
+                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-success/30 bg-success-light px-3.5 py-3 text-xs leading-5 text-success sm:mx-5 import-feedback-in">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <div>
                       <p className="font-semibold">导入完成 · 批次 {importStatus.batch_id}</p>
@@ -760,61 +760,61 @@ export default function TextImportPage() {
                 ) : null}
 
                 <div className="min-h-0 flex-1 p-4 sm:p-5">
-                  <div className="max-h-[440px] overflow-y-auto rounded-xl border border-[var(--color-border-light)] bg-white/65">
+                  <div className="max-h-[440px] overflow-y-auto rounded-xl border border-border/60 bg-card/65">
                     {parseResult.questions.map((q, index) => (
-                      <article key={index} className="group border-b border-[var(--color-border-light)] px-4 py-3.5 last:border-b-0 hover:bg-[rgba(74,111,138,0.035)] import-list-item import-interactive" style={{ animationDelay: `${Math.min(index, 8) * 28}ms` }}>
+                      <article key={index} className="group border-b border-border/60 px-4 py-3.5 last:border-b-0 hover:bg-primary/[0.04] import-list-item import-interactive" style={{ animationDelay: `${Math.min(index, 8) * 28}ms` }}>
                         <div className="flex items-start gap-3">
-                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${q.is_valid ? "bg-[var(--color-success)]" : "bg-[var(--color-danger)]"}`} aria-hidden="true" />
+                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${q.is_valid ? "bg-success" : "bg-destructive"}`} aria-hidden="true" />
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="text-xs font-semibold text-[var(--ink)]">题目 {index + 1}</span>
+                              <span className="text-xs font-semibold text-foreground">题目 {index + 1}</span>
                               <StatusBadge tone={q.is_valid ? "success" : "danger"}>{q.is_valid ? "有效" : "无效"}</StatusBadge>
-                              <span className="text-[11px] text-[var(--color-text-hint)]">{typeLabel(q.question_type)}</span>
+                              <span className="text-[11px] text-muted-foreground/70">{typeLabel(q.question_type)}</span>
                               {q.subject_id || q.subject ? (
-                                <span className="rounded-full border border-[rgba(74,111,138,0.18)] bg-[var(--color-primary-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary-dark)]" title={q.subject_id ? "已指定科目" : "自动识别的科目，可在审核时调整"}>
+                                <span className="rounded-full border border-primary/20 bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground" title={q.subject_id ? "已指定科目" : "自动识别的科目，可在审核时调整"}>
                                   {q.subject_id
                                     ? (subjectOptions.find((s) => s.id === q.subject_id)?.name || `#${q.subject_id}`)
                                     : (subjectOptions.find((s) => s.code === q.subject)?.name || q.subject)}
                                 </span>
                               ) : (
-                                <span className="rounded-full border border-dashed border-[var(--color-border)] bg-white/55 px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-hint)]" title="科目可在审核阶段补充">科目待补</span>
+                                <span className="rounded-full border border-dashed border-border bg-card/55 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/70" title="科目可在审核阶段补充">科目待补</span>
                               )}
                             </div>
-                            <div className="mt-2 max-h-28 overflow-hidden text-sm leading-6 text-[var(--color-text-secondary)]">
+                            <div className="mt-2 max-h-28 overflow-hidden text-sm leading-6 text-muted-foreground">
                               <QuestionContentRenderer content={q.stem} fallbackText={q.stem} preserveCodeText />
                             </div>
 
                             {q.options.length > 0 ? (
                               <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
                                 {q.options.slice(0, 4).map((opt) => (
-                                  <div key={opt.key} className="flex min-w-0 items-baseline gap-1 text-[11px] text-[var(--color-text-hint)]">
-                                    <span className="shrink-0 font-semibold text-[var(--color-text-secondary)]">{opt.key}.</span>
+                                  <div key={opt.key} className="flex min-w-0 items-baseline gap-1 text-[11px] text-muted-foreground/70">
+                                    <span className="shrink-0 font-semibold text-muted-foreground">{opt.key}.</span>
                                     <span className="min-w-0 truncate"><MathFormula text={opt.text} /></span>
                                   </div>
                                 ))}
                               </div>
                             ) : q.question_type === "single_choice" || q.question_type === "multiple_choice" ? (
-                              <button type="button" onClick={() => startEdit(index)} className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg border border-dashed border-[rgba(196,154,107,0.42)] bg-[var(--color-warning-light)] px-3 py-2 text-left text-[11px] text-[var(--color-text-primary)] import-interactive hover:border-[rgba(196,154,107,0.62)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
+                              <button type="button" onClick={() => startEdit(index)} className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg border border-dashed border-warning/40 bg-warning-light px-3 py-2 text-left text-[11px] text-foreground import-interactive hover:border-warning/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 <span><strong className="font-semibold">未识别到选项</strong> · 点击编辑补充或检查选项分隔格式</span>
                               </button>
                             ) : null}
 
-                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--color-text-hint)]">
-                              <span className="inline-flex items-baseline gap-1">答案 <strong className="font-semibold text-[var(--color-text-secondary)]"><RenderedAnswer answer={q.answer} /></strong></span>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
+                              <span className="inline-flex items-baseline gap-1">答案 <strong className="font-semibold text-muted-foreground"><RenderedAnswer answer={q.answer} /></strong></span>
                               {q.analysis ? <span>含解析</span> : null}
-                              {q.warnings.length > 0 ? <span className="text-[var(--color-text-primary)]">{q.warnings.length} 条警告</span> : null}
-                              {q.errors.length > 0 ? <span className="text-[var(--color-danger)]">{q.errors.length} 个错误</span> : null}
+                              {q.warnings.length > 0 ? <span className="text-foreground">{q.warnings.length} 条警告</span> : null}
+                              {q.errors.length > 0 ? <span className="text-destructive">{q.errors.length} 个错误</span> : null}
                             </div>
 
                             {q.errors.length > 0 || q.warnings.length > 0 ? (
-                              <details className="mt-2 rounded-lg border border-[var(--color-border-light)] bg-white/40 px-2.5 py-1.5 text-[11px] text-[var(--color-text-secondary)] open:pb-2.5">
-                                <summary className="flex min-h-11 cursor-pointer select-none items-center py-1.5 font-medium text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
+                              <details className="mt-2 rounded-lg border border-border/60 bg-card/40 px-2.5 py-1.5 text-[11px] text-muted-foreground open:pb-2.5">
+                                <summary className="flex min-h-11 cursor-pointer select-none items-center py-1.5 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                   查看解析异常
                                 </summary>
-                                <div className="space-y-1.5 border-t border-[var(--color-border-light)] pt-2 import-details-body">
+                                <div className="space-y-1.5 border-t border-border/60 pt-2 import-details-body">
                                   {q.errors.map((message, issueIndex) => (
-                                    <p key={`e-${issueIndex}`} className="flex gap-1.5 leading-5 text-[var(--color-danger)]"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{formatParseIssue(message)}</p>
+                                    <p key={`e-${issueIndex}`} className="flex gap-1.5 leading-5 text-destructive"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{formatParseIssue(message)}</p>
                                   ))}
                                   {q.warnings.map((message, issueIndex) => (
                                     <p key={`w-${issueIndex}`} className="flex gap-1.5 leading-5"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{formatParseIssue(message)}</p>
@@ -829,7 +829,7 @@ export default function TextImportPage() {
                               <Edit3 className="h-4 w-4" aria-hidden="true" />
                             </Button>
                             <Button variant="ghost" className="h-11 w-11 p-0 import-interactive" aria-label={`删除题目 ${index + 1}`} title="删除题目" onClick={() => handleDelete(index)}>
-                              <Trash2 className="h-4 w-4 text-[var(--color-danger)]" aria-hidden="true" />
+                              <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
                             </Button>
                           </div>
                         </div>
@@ -838,13 +838,13 @@ export default function TextImportPage() {
                   </div>
 
                   {editingIndex !== null && editForm ? (
-                    <section ref={editSectionRef} className="mt-4 scroll-mt-5 overflow-hidden rounded-xl border border-[rgba(74,111,138,0.32)] bg-white import-panel-swap">
+                    <section ref={editSectionRef} className="mt-4 scroll-mt-5 overflow-hidden rounded-xl border border-primary/30 bg-card import-panel-swap">
                       <ImportPanelHeader
                         title={`编辑题目 ${editingIndex + 1}`}
                         description="按最终渲染效果检查题干、选项、公式与代码；科目为可选项，不参与结构有效性判断。"
                         trailing={
                           <div className="flex flex-wrap items-center justify-end gap-2">
-                            <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-medium sm:inline-flex ${editLatexInspection.errorCount > 0 ? "border-[rgba(196,77,77,0.26)] bg-[var(--color-danger-light)] text-[var(--color-danger)]" : editLatexInspection.warningCount > 0 ? "border-[rgba(196,154,107,0.3)] bg-[var(--color-warning-light)] text-[var(--color-text-primary)]" : "border-[rgba(91,140,91,0.24)] bg-[var(--color-success-light)] text-[var(--color-success)]"}`}>
+                            <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-medium sm:inline-flex ${editLatexInspection.errorCount > 0 ? "border-destructive/25 bg-destructive-light text-destructive" : editLatexInspection.warningCount > 0 ? "border-warning/30 bg-warning-light text-warning-foreground" : "border-success/25 bg-success-light text-success"}`}>
                               公式 {editLatexInspection.formulaCount} · {editLatexInspection.errorCount + editLatexInspection.warningCount > 0 ? `风险 ${editLatexInspection.errorCount + editLatexInspection.warningCount}` : "通过"}
                             </span>
                             <Button variant="ghost" className="h-11 import-interactive" onClick={() => { setEditingIndex(null); setEditForm(null); setOptionDraft(""); }}>取消</Button>
@@ -854,17 +854,17 @@ export default function TextImportPage() {
                       />
                       <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
                         <label className="space-y-1.5">
-                          <span className="flex items-center justify-between gap-2 text-xs font-semibold text-[var(--color-text-secondary)]">
-                            <span>科目 <span className="font-normal text-[var(--color-text-hint)]">（可选）</span></span>
-                            {!editForm.subject_id ? <span className="text-[10px] font-normal text-[var(--color-text-hint)]">审核时可补</span> : null}
+                          <span className="flex items-center justify-between gap-2 text-xs font-semibold text-muted-foreground">
+                            <span>科目 <span className="font-normal text-muted-foreground/70">（可选）</span></span>
+                            {!editForm.subject_id ? <span className="text-[10px] font-normal text-muted-foreground/70">审核时可补</span> : null}
                           </span>
-                          <select className="h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]" value={editForm.subject_id ?? ""} onChange={(e) => setEditForm({ ...editForm, subject_id: e.target.value ? Number(e.target.value) : null })}>
+                          <select className="h-11 w-full rounded-xl border border-border bg-muted px-3 text-sm text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.subject_id ?? ""} onChange={(e) => setEditForm({ ...editForm, subject_id: e.target.value ? Number(e.target.value) : null })}>
                             <option value="">未指定 · 不阻塞导入</option>
                             {subjectOptions.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                           </select>
                         </label>
                         <div className="space-y-1.5">
-                          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">题型</span>
+                          <span className="text-xs font-semibold text-muted-foreground">题型</span>
                           <CustomSelect
                             value={editForm.question_type ?? ""}
                             onChange={(v) => setEditForm({ ...editForm, question_type: v || null })}
@@ -876,73 +876,73 @@ export default function TextImportPage() {
                           />
                         </div>
                         <label className="space-y-1.5 sm:col-span-2">
-                          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">题干</span>
-                          <textarea className="min-h-24 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]" value={editForm.stem} onChange={(e) => setEditForm({ ...editForm, stem: e.target.value })} />
+                          <span className="text-xs font-semibold text-muted-foreground">题干</span>
+                          <textarea className="min-h-24 w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.stem} onChange={(e) => setEditForm({ ...editForm, stem: e.target.value })} />
                         </label>
                         <label className="space-y-1.5 sm:col-span-2">
-                          <span className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold text-[var(--color-text-secondary)]">
-                            <span>选项 <span className="font-normal text-[var(--color-text-hint)]">支持 “A. 内容” 或 “A ↵ 内容”</span></span>
-                            <span className={`text-[10px] font-normal ${editForm.options.length >= 4 ? "text-[var(--color-success)]" : "text-[var(--color-text-hint)]"}`}>已识别 {editForm.options.length} 项</span>
+                          <span className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold text-muted-foreground">
+                            <span>选项 <span className="font-normal text-muted-foreground/70">支持 “A. 内容” 或 “A ↵ 内容”</span></span>
+                            <span className={`text-[10px] font-normal ${editForm.options.length >= 4 ? "text-success" : "text-muted-foreground/70"}`}>已识别 {editForm.options.length} 项</span>
                           </span>
-                          <textarea className="min-h-28 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5 font-mono text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]" value={optionDraft} onChange={(e) => { const nextDraft = e.target.value; setOptionDraft(nextDraft); setEditForm({ ...editForm, options: parseEditableOptions(nextDraft) }); }} />
+                          <textarea className="min-h-28 w-full rounded-xl border border-border bg-muted px-3 py-2.5 font-mono text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={optionDraft} onChange={(e) => { const nextDraft = e.target.value; setOptionDraft(nextDraft); setEditForm({ ...editForm, options: parseEditableOptions(nextDraft) }); }} />
                         </label>
                         <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">答案</span>
-                          <input className="h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]" value={typeof editForm.answer === "boolean" ? (editForm.answer ? "正确" : "错误") : Array.isArray(editForm.answer) ? editForm.answer.join(",") : String(editForm.answer ?? "")} onChange={(e) => setEditForm({ ...editForm, answer: e.target.value })} />
+                          <span className="text-xs font-semibold text-muted-foreground">答案</span>
+                          <input className="h-11 w-full rounded-xl border border-border bg-muted px-3 text-sm text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={typeof editForm.answer === "boolean" ? (editForm.answer ? "正确" : "错误") : Array.isArray(editForm.answer) ? editForm.answer.join(",") : String(editForm.answer ?? "")} onChange={(e) => setEditForm({ ...editForm, answer: e.target.value })} />
                         </label>
                         <label className="space-y-1.5 sm:col-span-2">
-                          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">解析</span>
-                          <textarea className="min-h-24 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 py-2.5 text-sm leading-6 outline-none transition focus:border-[var(--color-primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(91,123,154,0.12)]" value={editForm.analysis ?? ""} onChange={(e) => setEditForm({ ...editForm, analysis: e.target.value })} />
+                          <span className="text-xs font-semibold text-muted-foreground">解析</span>
+                          <textarea className="min-h-24 w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.analysis ?? ""} onChange={(e) => setEditForm({ ...editForm, analysis: e.target.value })} />
                         </label>
 
                         {editStructureIssues.length > 0 ? (
-                          <div role="status" className="sm:col-span-2 flex items-start gap-2.5 rounded-xl border border-[rgba(196,154,107,0.34)] bg-[var(--color-warning-light)] px-3.5 py-3 text-[11px] leading-5 text-[var(--color-text-primary)] import-feedback-in">
+                          <div role="status" className="sm:col-span-2 flex items-start gap-2.5 rounded-xl border border-warning/35 bg-warning-light px-3.5 py-3 text-[11px] leading-5 text-foreground import-feedback-in">
                             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             <div>
                               <p className="font-semibold">保存前还需处理 {editStructureIssues.length} 项结构问题</p>
-                              <p className="mt-0.5 text-[var(--color-text-hint)]">{editStructureIssues.join(" · ")}</p>
+                              <p className="mt-0.5 text-muted-foreground/70">{editStructureIssues.join(" · ")}</p>
                             </div>
                           </div>
                         ) : null}
 
-                        <section className="sm:col-span-2 overflow-hidden rounded-xl border border-[var(--color-border-light)] bg-[rgba(239,235,229,0.34)]">
-                          <div className="flex min-h-11 items-center justify-between gap-3 border-b border-[var(--color-border-light)] px-3.5 py-2">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
-                              <Eye className="h-3.5 w-3.5 text-[var(--color-primary-dark)]" aria-hidden="true" />
+                        <section className="sm:col-span-2 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                          <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 px-3.5 py-2">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                              <Eye className="h-3.5 w-3.5 text-accent-foreground" aria-hidden="true" />
                               最终渲染预览
                             </div>
-                            <span className="text-[10px] text-[var(--color-text-hint)]">与题库阅读侧使用同一渲染规则</span>
+                            <span className="text-[10px] text-muted-foreground/70">与题库阅读侧使用同一渲染规则</span>
                           </div>
-                          <div className="space-y-4 p-3.5 text-sm leading-7 text-[var(--color-text-secondary)] import-panel-swap">
+                          <div className="space-y-4 p-3.5 text-sm leading-7 text-muted-foreground import-panel-swap">
                             <div>
-                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-hint)]">题干</p>
+                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">题干</p>
                               <QuestionContentRenderer content={editForm.stem} fallbackText={editForm.stem} preserveCodeText />
                             </div>
                             {editForm.options.length > 0 ? (
                               <div className="grid gap-2 sm:grid-cols-2">
                                 {editForm.options.map((option) => (
-                                  <div key={option.key} className="flex min-w-0 gap-2 rounded-lg border border-[var(--color-border-light)] bg-white/60 px-2.5 py-2 text-xs leading-6">
-                                    <span className="font-semibold text-[var(--color-primary-dark)]">{option.key}.</span>
+                                  <div key={option.key} className="flex min-w-0 gap-2 rounded-lg border border-border/60 bg-card/60 px-2.5 py-2 text-xs leading-6">
+                                    <span className="font-semibold text-accent-foreground">{option.key}.</span>
                                     <span className="min-w-0"><MathFormula text={option.text} /></span>
                                   </div>
                                 ))}
                               </div>
                             ) : null}
-                            <div className="grid gap-3 border-t border-[var(--color-border-light)] pt-3 sm:grid-cols-[0.34fr_0.66fr]">
+                            <div className="grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-[0.34fr_0.66fr]">
                               <div>
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-hint)]">答案</p>
-                                <div className="text-xs font-semibold text-[var(--color-text-secondary)]"><RenderedAnswer answer={editForm.answer} /></div>
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">答案</p>
+                                <div className="text-xs font-semibold text-muted-foreground"><RenderedAnswer answer={editForm.answer} /></div>
                               </div>
                               <div>
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-hint)]">解析</p>
-                                <div className="whitespace-pre-wrap text-xs leading-6">{editForm.analysis ? <MathFormula text={editForm.analysis} /> : <span className="italic text-[var(--color-text-hint)]">无解析</span>}</div>
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">解析</p>
+                                <div className="whitespace-pre-wrap text-xs leading-6">{editForm.analysis ? <MathFormula text={editForm.analysis} /> : <span className="italic text-muted-foreground/70">无解析</span>}</div>
                               </div>
                             </div>
                             {editLatexInspection.issues.length > 0 ? (
-                              <div className="rounded-lg border border-[rgba(196,154,107,0.28)] bg-[var(--color-warning-light)] px-3 py-2 text-[11px] leading-5 text-[var(--color-text-primary)]">
+                              <div className="rounded-lg border border-warning/30 bg-warning-light px-3 py-2 text-[11px] leading-5 text-foreground">
                                 <span className="font-semibold">LaTeX 预检：</span>
                                 {editLatexInspection.errorCount > 0 ? `${editLatexInspection.errorCount} 个结构错误` : `${editLatexInspection.warningCount} 个格式建议`}
-                                <span className="ml-1 text-[var(--color-text-hint)]">· 保存前建议核对公式定界符与括号。</span>
+                                <span className="ml-1 text-muted-foreground/70">· 保存前建议核对公式定界符与括号。</span>
                               </div>
                             ) : null}
                           </div>
@@ -957,12 +957,12 @@ export default function TextImportPage() {
                 <ImportPanelHeader title="解析结果" description="结果将在这里按有效性、题型与异常信息分组呈现。" />
                 <div className="flex flex-1 items-center justify-center px-6 py-14">
                   <div className="max-w-sm text-center import-panel-swap">
-                    <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] text-[var(--color-primary-dark)] import-soft-pop">
+                    <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop">
                       <FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
                     </div>
-                    <p className="mt-4 text-sm font-semibold text-[var(--ink)]">等待解析内容</p>
-                    <p className="mt-1.5 text-xs leading-5 text-[var(--color-text-hint)]">粘贴题目后先用左侧预览与 LaTeX 预检确认格式，再执行解析。完成后可逐题编辑、删除；科目可留空，结构通过即可进入审核。</p>
-                    <div className="mt-5 grid grid-cols-3 divide-x divide-[var(--color-border-light)] border-y border-[var(--color-border-light)] py-2.5 text-[11px] text-[var(--color-text-secondary)]">
+                    <p className="mt-4 text-sm font-semibold text-foreground">等待解析内容</p>
+                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">粘贴题目后先用左侧预览与 LaTeX 预检确认格式，再执行解析。完成后可逐题编辑、删除；科目可留空，结构通过即可进入审核。</p>
+                    <div className="mt-5 grid grid-cols-3 divide-x divide-border/60 border-y border-border/60 py-2.5 text-[11px] text-muted-foreground">
                       <span>预检</span><span>解析</span><span>入库</span>
                     </div>
                   </div>

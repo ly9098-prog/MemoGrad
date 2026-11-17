@@ -15,12 +15,12 @@ type PreviewProps = {
 
 function StemPreview({ content, draft, visualModel }: Omit<PreviewProps, "onRuntimeIssue">) {
   return (
-    <section className="animate-fade-up drawer-section-delay-1 section-scroll section-scroll-ink rounded-2xl border border-[var(--color-border)]/80 bg-white/90 p-5 shadow-sm transition-all hover:shadow-md">
+    <section className="animate-fade-up drawer-section-delay-1 section-scroll section-scroll-ink rounded-2xl border border-border/80 bg-card/90 p-5 shadow-sm transition-all hover:shadow-md">
       <div className="flex items-center gap-2.5 mb-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-primary)]/10">
-          <span className="text-xs font-bold text-[var(--color-primary)]" style={{ fontFamily: "'Georgia', serif" }}>题</span>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+          <span className="text-xs font-bold text-primary font-display">题</span>
         </span>
-        <span className="text-sm font-semibold text-[var(--ink)]">题干</span>
+        <span className="text-sm font-semibold text-foreground">题干</span>
       </div>
       <div className="ml-9 stem-text">
         <QuestionContentRenderer content={content} fallbackText={draft.stem} showTableMetadata ignoredSegmentIds={visualModel.consumedSegmentIds} preserveCodeText />
@@ -34,14 +34,14 @@ function RegularOptions({ draft, visualModel, onRuntimeIssue }: Omit<PreviewProp
     return <OptionVisualPreview model={visualModel} options={draft.options} onRuntimeIssue={onRuntimeIssue} />;
   }
   if (draft.options.length === 0) {
-    return <p className="text-sm text-[var(--color-text-hint)]">（无选项）</p>;
+    return <p className="text-sm text-muted-foreground/70">（无选项）</p>;
   }
   return (
     <div className="space-y-2">
       {draft.options.map((option) => (
         <div key={option.key} className="flex items-center gap-3">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center option-chip">{option.key}</span>
-          <span className="text-sm text-[var(--color-text-secondary)]"><MathFormula text={normalizeOptionTextForDisplay(option.text)} /></span>
+          <span className="text-sm text-muted-foreground"><MathFormula text={normalizeOptionTextForDisplay(option.text)} /></span>
         </div>
       ))}
     </div>
@@ -52,7 +52,7 @@ function OptionsPreview({ draft, visualModel, onRuntimeIssue }: Omit<PreviewProp
   const multiBlank = isMultiBlankChoice(draft.question_type) ? draft.multiBlank : null;
   if (multiBlank && multiBlank.groups.length >= 2) {
     return (
-      <section className="animate-fade-up drawer-section-delay-2 section-scroll section-scroll-warm rounded-2xl border border-[var(--color-border)]/80 bg-white/90 p-5 shadow-sm transition-all hover:shadow-md">
+      <section className="animate-fade-up drawer-section-delay-2 section-scroll section-scroll-warm rounded-2xl border border-border/80 bg-card/90 p-5 shadow-sm transition-all hover:shadow-md">
         <MultiBlankChoicePreview
           groups={multiBlank.groups}
           answerMap={multiBlank.answerMap}
@@ -64,12 +64,12 @@ function OptionsPreview({ draft, visualModel, onRuntimeIssue }: Omit<PreviewProp
     );
   }
   return (
-    <section className="animate-fade-up drawer-section-delay-2 section-scroll section-scroll-warm rounded-2xl border border-[var(--color-border)]/80 bg-white/90 p-5 shadow-sm transition-all hover:shadow-md">
+    <section className="animate-fade-up drawer-section-delay-2 section-scroll section-scroll-warm rounded-2xl border border-border/80 bg-card/90 p-5 shadow-sm transition-all hover:shadow-md">
       <div className="flex items-center gap-2.5 mb-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: "rgba(196,154,107,0.12)" }}>
-          <span className="text-xs font-bold" style={{ color: "#c49a6b", fontFamily: "'Georgia', serif" }}>选</span>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning-light">
+          <span className="text-xs font-bold text-warning-foreground font-display">选</span>
         </span>
-        <span className="text-sm font-semibold text-[var(--ink)]">选项</span>
+        <span className="text-sm font-semibold text-foreground">选项</span>
       </div>
       <div className="ml-9">
         <RegularOptions draft={draft} visualModel={visualModel} onRuntimeIssue={onRuntimeIssue} />

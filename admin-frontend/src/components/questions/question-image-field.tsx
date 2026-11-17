@@ -188,7 +188,7 @@ export function QuestionImageField({
         title="替换图片"
         aria-label="替换图片"
         className={cn(
-          "flex items-center justify-center rounded-full bg-white/90 text-[var(--color-primary-dark)] shadow-sm transition hover:bg-white",
+          "flex items-center justify-center rounded-full bg-card/90 text-accent-foreground shadow-sm transition hover:bg-card",
           isRow ? "h-5 w-5" : "h-8 w-8",
         )}
       >
@@ -201,7 +201,7 @@ export function QuestionImageField({
           title="删除图片"
           aria-label="删除图片"
           className={cn(
-            "flex items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm transition hover:bg-white",
+            "flex items-center justify-center rounded-full bg-card/90 text-destructive shadow-sm transition hover:bg-card",
             isRow ? "h-5 w-5" : "h-8 w-8",
           )}
         >
@@ -224,7 +224,7 @@ export function QuestionImageField({
       {showImage ? (
         isRow ? (
           /* ── Row: compact square thumbnail with hover replace/delete ── */
-          <div className="group/img relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="group/img relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-border bg-card">
             <img src={showImage} alt={alt} className="h-full w-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/img:opacity-100">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white" /> : overlayButtons}
@@ -232,7 +232,7 @@ export function QuestionImageField({
           </div>
         ) : (
           /* ── Hero: large stem image fills the insert area ── */
-          <div className="group/img relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="group/img relative overflow-hidden rounded-lg border border-border bg-card">
             <img
               src={showImage}
               alt={alt}
@@ -251,7 +251,7 @@ export function QuestionImageField({
           disabled={busy}
           title={addLabel}
           aria-label={addLabel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-slate-400 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-card text-muted-foreground/70 transition hover:border-primary/40 hover:bg-accent hover:text-accent-foreground disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
         </button>
@@ -261,7 +261,7 @@ export function QuestionImageField({
           type="button"
           onClick={triggerPicker}
           disabled={busy}
-          className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/40 text-slate-400 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700 disabled:cursor-wait disabled:opacity-60"
+          className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/40 text-muted-foreground/60 transition hover:border-primary/40 hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? (
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -273,7 +273,7 @@ export function QuestionImageField({
       )}
 
       {error ? (
-        <p className="mt-1.5 text-xs text-red-600" role="alert">
+        <p className="mt-1.5 text-xs text-destructive" role="alert">
           {error}
         </p>
       ) : null}

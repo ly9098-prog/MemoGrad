@@ -31,7 +31,7 @@ export function OptionVisualEditor({
       <div className="space-y-3">
         {/* Group image */}
         {resolvedUrl ? (
-          <div className="overflow-hidden rounded-xl border border-[var(--color-border)]/60 bg-white">
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
             <img
               src={resolvedUrl}
               alt={model.groupImage.alt || "选项组"}
@@ -40,12 +40,12 @@ export function OptionVisualEditor({
             />
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-amber-300/60 bg-amber-50/40 px-3 py-4 text-center text-xs text-amber-600">
+          <div className="rounded-lg border border-dashed border-warning/30 bg-warning-light/40 px-3 py-4 text-center text-xs text-warning-foreground">
             选项组图片不可用
           </div>
         )}
 
-        <p className="text-[10px] text-[var(--color-text-hint)]">此题为图片选项组，文字可留空。</p>
+        <p className="text-[10px] text-muted-foreground/70">此题为图片选项组，文字可留空。</p>
 
         {/* Text inputs — allow empty */}
         {options.map((opt, index) => (
@@ -53,7 +53,7 @@ export function OptionVisualEditor({
             <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center option-chip">{opt.key}</span>
             <div className="flex-1 space-y-1">
               <input
-                className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+                className="h-9 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                 value={opt.text}
                 placeholder="（图片选项，文字可留空）"
                 onChange={(e) => {
@@ -66,13 +66,13 @@ export function OptionVisualEditor({
               {opt.segments && opt.segments.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {opt.segments.map((seg, si) => (
-                    <div key={si} className="flex items-center gap-1 rounded-md border border-[var(--color-border)]/50 bg-white/70 px-2 py-1">
-                      <span className="text-[10px] text-[var(--color-text-hint)]">{String(seg.type ?? "")}</span>
-                      <span className="max-w-24 truncate font-mono text-[9px] text-[var(--color-text-hint)]">
+                    <div key={si} className="flex items-center gap-1 rounded-md border border-border/50 bg-card/70 px-2 py-1">
+                      <span className="text-[10px] text-muted-foreground/70">{String(seg.type ?? "")}</span>
+                      <span className="max-w-24 truncate font-mono text-[9px] text-muted-foreground/70">
                         {String(seg.url ?? "")}
                       </span>
                       {seg.option_key ? (
-                        <span className="rounded bg-[var(--color-primary-light)] px-1 font-mono text-[9px]">
+                        <span className="rounded bg-accent px-1 font-mono text-[9px] text-accent-foreground">
                           {String(seg.option_key)}
                         </span>
                       ) : null}
@@ -86,8 +86,8 @@ export function OptionVisualEditor({
 
         {/* Legacy warning */}
         {model.legacy ? (
-          <div className="rounded-lg border border-amber-200/60 bg-amber-50/70 p-2">
-            <p className="flex items-center gap-1 text-[10px] font-medium text-amber-700">
+          <div className="rounded-lg border border-warning/30 bg-warning-light/70 p-2">
+            <p className="flex items-center gap-1 text-[10px] font-medium text-warning-foreground">
               <AlertTriangle className="h-3 w-3 shrink-0" />
               兼容模式 — 保存时不会丢失图片数据
             </p>
@@ -109,7 +109,7 @@ export function OptionVisualEditor({
               <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center option-chip">{key}</span>
               <div className="flex-1 space-y-1">
                 <input
-                  className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+                  className="h-9 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                   value={opt?.text ?? ""}
                   onChange={(e) => {
                     const next = [...options];
@@ -127,7 +127,7 @@ export function OptionVisualEditor({
                       return (
                         <div
                           key={ii}
-                          className="group/img relative overflow-hidden rounded-lg border border-[var(--color-border)]/50 bg-white"
+                          className="group/img relative overflow-hidden rounded-lg border border-border/50 bg-card"
                         >
                           {imgUrl ? (
                             <img
@@ -136,14 +136,14 @@ export function OptionVisualEditor({
                               className="max-h-16 max-w-24 object-contain"
                             />
                           ) : (
-                            <div className="flex h-12 w-20 items-center justify-center text-[9px] text-amber-600">
+                            <div className="flex h-12 w-20 items-center justify-center text-[9px] text-warning-foreground">
                               无图片
                             </div>
                           )}
                           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover/img:opacity-100">
                             <button
                               type="button"
-                              className="flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm hover:bg-white"
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-card/90 text-destructive shadow-sm hover:bg-card"
                               title="移除图片"
                               onClick={() => {
                                 // Only remove from UI — actual delete is on save
@@ -189,7 +189,7 @@ export function OptionVisualEditor({
             <div key={key} className="flex items-start gap-2 opacity-60">
               <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center option-chip">{key}</span>
               <input
-                className="h-9 w-full rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-bg-input)]/50 px-3 text-sm text-[var(--color-text-hint)] outline-none"
+                className="h-9 w-full rounded-xl border border-dashed border-border bg-muted/50 px-3 text-sm text-muted-foreground/70 outline-none"
                 value=""
                 disabled
                 placeholder="（图片选项占位，无法编辑）"
@@ -200,11 +200,11 @@ export function OptionVisualEditor({
 
         {/* Override to text mode */}
         {onRequestTextModeOverride ? (
-          <div className="rounded-lg border border-amber-200/60 bg-amber-50/70 p-3">
-            <p className="mb-2 text-[10px] font-medium text-amber-700">如果已知文字答案，可切换为文字编辑模式</p>
+          <div className="rounded-lg border border-warning/30 bg-warning-light/70 p-3">
+            <p className="mb-2 text-[10px] font-medium text-warning-foreground">如果已知文字答案，可切换为文字编辑模式</p>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-lg border border-amber-300/60 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100 hover:text-amber-800"
+              className="inline-flex items-center gap-1 rounded-lg border border-warning/30 bg-card px-2.5 py-1.5 text-[10px] font-semibold text-warning-foreground shadow-sm transition hover:bg-warning-light"
               onClick={() => {
                 if (window.confirm("切换为文字选项模式后，图片关系和历史占位数据将被保留但不再展示。确定继续吗？")) {
                   onRequestTextModeOverride();
@@ -223,13 +223,13 @@ export function OptionVisualEditor({
   // ── none mode: standard text inputs ──
   return (
     <div className="space-y-2">
-      {options.length === 0 ? <p className="text-sm text-[var(--color-text-hint)]">暂无可编辑选项</p> : null}
+      {options.length === 0 ? <p className="text-sm text-muted-foreground/70">暂无可编辑选项</p> : null}
       {options.map((opt, index) => (
         <div key={opt.key} className="flex items-start gap-2">
           <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center option-chip">{opt.key}</span>
           <div className="flex-1 space-y-1.5">
             <input
-              className="h-9 w-full rounded-xl border border-[var(--color-border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+              className="h-9 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               value={opt.text}
               onChange={(e) => {
                 const next = [...options];
@@ -253,19 +253,19 @@ export function OptionVisualEditor({
                             ? "换行"
                             : "图片";
                   return (
-                    <div key={si} className="flex items-center gap-1 rounded-md border border-[var(--color-border)]/50 bg-white/70 px-2 py-1">
+                    <div key={si} className="flex items-center gap-1 rounded-md border border-border/50 bg-card/70 px-2 py-1">
                       {isImg && seg.url ? (
                         <img src={String(seg.url)} alt="" className="h-8 w-8 rounded object-cover" />
                       ) : null}
-                      <span className="text-[10px] text-[var(--color-text-hint)]">{label}</span>
+                      <span className="text-[10px] text-muted-foreground/70">{label}</span>
                       {seg.option_key ? (
-                        <span className="rounded bg-[var(--color-primary-light)] px-1 font-mono text-[9px]">
+                        <span className="rounded bg-accent px-1 font-mono text-[9px] text-accent-foreground">
                           {String(seg.option_key)}
                         </span>
                       ) : null}
                       <button
                         type="button"
-                        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-[9px] text-red-400 hover:bg-red-50 hover:text-red-600"
+                        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-[9px] text-destructive/70 hover:bg-destructive-light hover:text-destructive"
                         onClick={() => {
                           const next = [...options];
                           const segs = next[index].segments?.filter((_, i) => i !== si) ?? [];

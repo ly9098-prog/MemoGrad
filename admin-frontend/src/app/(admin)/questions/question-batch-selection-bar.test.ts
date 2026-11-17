@@ -21,7 +21,7 @@ describe("QuestionBatchSelectionBar", () => {
   it("renders the selected count, delete action, and clear action", () => {
     const bar = renderBar();
 
-    expect(bar.html).toContain('已选 <strong class="text-[var(--ink)]">2</strong> 项');
+    expect(bar.html).toContain('已选 <strong class="text-foreground">2</strong> 项');
     expect(bar.html).toContain("批量删除");
     expect(bar.html).toContain("清除选择");
   });

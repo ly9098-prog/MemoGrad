@@ -1,6 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useModalSurface } from "@/lib/use-modal-surface";
 import { QuestionDrawerHeader } from "./question-drawer-header";
 
 type QuestionDetailDrawerProps = {
@@ -32,18 +34,26 @@ export function QuestionDetailDrawer({
   onClose,
   children,
 }: QuestionDetailDrawerProps) {
+  const drawerRef = useRef<HTMLElement>(null);
+  useModalSurface({
+    open: open && questionId !== null,
+    surfaceRef: drawerRef,
+  });
+
   if (!open || questionId === null) return null;
 
-  return (
+  const drawer = (
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-slate-950/25 backdrop-blur-[1px] animate-fade-in"
+      className="fixed inset-0 z-40 flex justify-end bg-overlay backdrop-blur-[1px] animate-fade-in"
       onClick={onClose}
     >
       <aside
+        ref={drawerRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={editing ? "编辑题目" : "题目详情"}
-        className="question-detail-drawer h-full w-full max-w-[880px] overflow-y-auto overscroll-contain border-l border-slate-200/80 bg-white shadow-[-18px_0_52px_rgba(15,23,42,0.12)] animate-drop-in"
+        className="question-detail-drawer admin-content-theme h-full w-full max-w-[880px] overflow-y-auto overscroll-contain border-l border-border/80 bg-card shadow-[-18px_0_52px_rgba(15,23,42,0.12)] animate-drop-in"
         onClick={(event) => event.stopPropagation()}
       >
         <QuestionDrawerHeader
@@ -62,4 +72,11 @@ export function QuestionDetailDrawer({
       </aside>
     </div>
   );
+
+  // ManagementPage establishes an isolated stacking context. Portal the
+  // full-screen drawer so it can sit above the global topbar on every viewport.
+  // Keep the inline markup during server rendering so static markup tests and
+  // non-DOM renderers still receive the complete semantic tree.
+  if (typeof document === "undefined") return drawer;
+  return createPortal(drawer, document.body);
 }

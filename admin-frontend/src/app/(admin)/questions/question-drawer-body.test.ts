@@ -99,6 +99,8 @@ describe("QuestionDrawerBody", () => {
     expect(types).toContain(QuestionDetailView);
     expect(types).toContain(QuestionVersionHistorySection);
     expect(types).toContain(QuestionSecondaryInfo);
+    expect(body.nodes.find((node) => node.type === QuestionVersionHistorySection)?.props.className).toBe("px-7");
+    expect(body.nodes.find((node) => node.type === QuestionSecondaryInfo)?.props.className).toBe("px-7");
   });
 
   it("renders the edit form in edit mode", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -15,12 +15,28 @@ import {
   XCircle,
   Globe,
   AlertTriangle,
+  ArrowUpRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { StatusBadge } from "@/components/status-badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  EmptyState,
+  ManagementNotice,
+  ManagementSkeletonRows,
+  PremiumSection,
+  PremiumSectionHeader,
+  PremiumStat,
+} from "@/components/admin/management-ui";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { getQuestionTypeLabel, canonicalizeQuestionType } from "@/lib/question-types";
 import type { ImportQuestionItem, PaginatedResponse } from "@/lib/api/types";
@@ -99,10 +115,10 @@ function statusIcon(status: string) {
 }
 
 function statusColor(status: string) {
-  if (status === "approved") return "text-green-600";
-  if (status === "rejected") return "text-red-500";
-  if (status === "published") return "text-blue-600";
-  return "text-amber-500";
+  if (status === "approved") return "text-success";
+  if (status === "rejected") return "text-destructive";
+  if (status === "published") return "text-primary";
+  return "text-warning-foreground";
 }
 
 function statusTone(status: string) {
@@ -126,101 +142,130 @@ function duplicateStatusTone(status: string | null | undefined) {
   return "neutral" as const;
 }
 
+function duplicateStatusLabel(status: string) {
+  if (status === "possible_duplicate") return "疑似重复";
+  if (status === "normal") return "无重复";
+  return status;
+}
+
 function typeLabel(t: string | null | undefined) {
   return getQuestionTypeLabel(t);
 }
 
 /** Compact detail modal */
-function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () => void }) {
+function DetailModal({
+  item,
+  onClose,
+  returnFocusRef,
+}: {
+  item: ImportQuestionItem;
+  onClose: () => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
+}) {
   const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(16,24,40,0.42)] px-4 py-10">
-      <div className="relative mt-6 w-full max-w-2xl rounded-2xl border border-[var(--color-border)] bg-white shadow-[var(--shadow-floating)]">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className="admin-content-theme top-6 max-h-[calc(100dvh-3rem)] max-w-2xl translate-y-0 overflow-hidden rounded-2xl p-0"
+        showCloseButton={false}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef.current;
+          if (!target?.isConnected) return;
+          event.preventDefault();
+          target.focus();
+        }}
+      >
+        <DialogDescription className="sr-only">
+          查看导入题目的题干、答案、解析及 OCR/AI 原始数据。
+        </DialogDescription>
         {/* ===== Header with large close hit area ===== */}
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 py-3 pr-14">
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-[var(--admin-line)] px-5 py-3 pr-14">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 font-mono text-xs text-[var(--color-text-hint)]">#{item.id}</span>
-            <h3 className="truncate font-display text-base font-bold text-[var(--ink)]">导入题目详情</h3>
+            <span className="shrink-0 font-mono text-xs text-muted-foreground/70">#{item.id}</span>
+            <DialogTitle className="truncate font-display text-base font-bold text-foreground">导入题目详情</DialogTitle>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex overflow-hidden rounded-lg border border-[var(--color-border)]">
+            <div className="flex overflow-hidden rounded-lg border border-border">
               <button
                 type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "formatted" ? "bg-[var(--color-primary)] text-white" : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]"}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "formatted" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
                 onClick={() => setDetailView("formatted")}
               >
                 <FileText className="h-3 w-3" />文本
               </button>
               <button
                 type="button"
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "json" ? "bg-[var(--color-primary)] text-white" : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-input)]"}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition ${detailView === "json" ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground hover:bg-muted"}`}
                 onClick={() => setDetailView("json")}
               >
                 <Code2 className="h-3 w-3" />JSON
               </button>
             </div>
             <Link
-              className="hidden sm:inline text-xs font-semibold text-[var(--color-primary-dark)] underline"
+              className="hidden sm:inline text-xs font-semibold text-accent-foreground underline"
               href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}
             >
               审核批次
             </Link>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Large close button — positioned absolutely to avoid crowded header */}
-        <button
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--color-text-hint)] shadow-sm ring-1 ring-[var(--color-border)] transition hover:bg-[var(--color-bg-secondary)] hover:text-[var(--ink)] hover:ring-[var(--color-text-hint)] active:scale-95"
-          onClick={onClose}
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <DialogClose asChild>
+          <button
+            type="button"
+            aria-label="关闭导入题目详情"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-card text-muted-foreground/70 shadow-sm ring-1 ring-border transition hover:bg-secondary hover:text-foreground hover:ring-muted-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </DialogClose>
 
         {/* ===== Scrollable body ===== */}
-        <div className="overflow-y-auto max-h-[70vh] px-5 py-4">
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
           {detailView === "formatted" ? (
             <div className="space-y-3">
               <section>
-                <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">题干</p>
-                <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{textFromImport(item) || "—"}</pre>
+                <p className="mb-1 text-xs font-semibold text-muted-foreground">题干</p>
+                <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{textFromImport(item) || "—"}</pre>
               </section>
 
               {isMultiBlankChoice(item) ? (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">选项组</p>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项组</p>
                   <div className="space-y-2">
                     {(() => {
                       const groups = item?.parsed_content?.blank_option_groups;
                       const list: BlankOptionGroup[] = Array.isArray(groups) ? (groups as BlankOptionGroup[]) : [];
                       return list.length > 0 ? list.map((group, gi) => (
-                        <div key={gi} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5">
-                          <p className="mb-1.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">空 {group.id ?? gi + 1}</p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--color-text-secondary)]">
+                        <div key={gi} className="rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3">
+                          <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">空 {group.id ?? gi + 1}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                             {group.options?.map((opt, oi) => (
-                              <span key={oi}><span className="font-bold text-[var(--ink)]">{opt.key}.</span> {opt.text}</span>
+                              <span key={oi}><span className="font-bold text-foreground">{opt.key}.</span> {opt.text}</span>
                             ))}
                           </div>
                         </div>
-                      )) : <p className="text-xs text-[var(--color-text-hint)]">暂无选项组数据</p>;
+                      )) : <p className="text-xs text-muted-foreground/70">暂无选项组数据</p>;
                     })()}
                   </div>
                 </section>
               ) : (
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">选项</p>
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{renderOptions(optionDataFromImport(item))}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">选项</p>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{renderOptions(optionDataFromImport(item))}</pre>
                 </section>
               )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">答案</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{item.parsed_answer || "—"}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">答案</p>
+                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_answer || "—"}</pre>
                 </section>
                 <section>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">解析</p>
-                  <pre className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">{item.parsed_analysis || "—"}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
+                  <pre className="whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 text-xs leading-relaxed text-[#2d4758]">{item.parsed_analysis || "—"}</pre>
                 </section>
               </div>
             </div>
@@ -233,15 +278,15 @@ function DetailModal({ item, onClose }: { item: ImportQuestionItem; onClose: () 
                 { title: "OCR / AI 原始数据", data: { raw_data: item.raw_data, ai_metadata: item.ai_metadata } },
               ].map(({ title, data }) => (
                 <section key={title}>
-                  <p className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">{title}</p>
-                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-2.5 font-mono text-[11px] leading-relaxed text-[var(--color-text-secondary)]">{renderJson(data)}</pre>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">{title}</p>
+                  <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-[12px] border border-[var(--admin-line)] bg-[rgba(234,242,248,0.58)] p-3 font-mono text-[11px] leading-relaxed text-[#2d4758]">{renderJson(data)}</pre>
                 </section>
               ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -250,6 +295,7 @@ export default function ImportQuestionsPage() {
   const batchIdParam = searchParams.get("batch_id") || "";
   const [filters, setFilters] = useState({ batch_id: "", status: "", subject_id: "", source_type: "", keyword: "" });
   const [previewId, setPreviewId] = useState<number | null>(null);
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
 
   const queryParams = useMemo(
     () => ({ page: 1, page_size: 50, batch_id: filters.batch_id || batchIdParam, status: filters.status, subject_id: filters.subject_id ? Number(filters.subject_id) : undefined, source_type: filters.source_type, keyword: filters.keyword }),
@@ -279,126 +325,138 @@ export default function ImportQuestionsPage() {
     setPreviewId(null);
   };
 
+  const pendingCount = items.filter((item) => item.status === "pending").length;
+  const duplicateCount = items.filter((item) => item.duplicate_status === "possible_duplicate").length;
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="font-display text-2xl font-bold text-[var(--ink)]">导入题目列表</h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">查看 question_imports 暂存题目、重复检测与 OCR/AI 元数据。</p>
-            </div>
-            <Link href="/imports/review" className="inline-flex h-11 items-center justify-center rounded-2xl border border-[var(--color-primary)] bg-[var(--color-primary-light)] px-4 text-sm font-semibold text-[var(--color-primary-dark)] transition hover:bg-white">
+    <div className="space-y-5">
+      <PremiumSection>
+        <PremiumSectionHeader
+          title="导入题目列表"
+          description="查看导入暂存题目、重复检测与 OCR/AI 元数据。"
+          icon={<Search className="h-3.5 w-3.5" />}
+          titleAs="h1"
+          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
+          meta={
+            <>
+              <StatusBadge tone="accent">导入暂存</StatusBadge>
+              <span>查看详情不会改变审核状态</span>
+            </>
+          }
+          aside={
+            <Link href="/imports/review" className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-white/72 bg-white/82 px-4 text-[13px] font-semibold text-[#1b4f70] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:bg-[#e1f0fa]">
               进入审核
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
+          }
+        />
+        <div className="grid gap-px border-b border-[var(--admin-line)] md:grid-cols-2 xl:grid-cols-4">
+          <PremiumStat label="匹配总数" value={questions.data?.total ?? items.length} hint={questions.isError ? "导入题目接口不可用" : "当前筛选的全部匹配结果"} icon={<FileText className="h-3.5 w-3.5" />} loading={questions.isLoading} />
+          <PremiumStat label="本页记录" value={items.length} hint="单页最多展示 50 条" icon={<Search className="h-3.5 w-3.5" />} loading={questions.isLoading} />
+          <PremiumStat label="本页待审核" value={pendingCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页待审核记录"} icon={<Clock className="h-3.5 w-3.5" />} accent="amber" tone={pendingCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
+          <PremiumStat label="本页疑似重复" value={duplicateCount} hint={questions.isError ? "导入题目接口不可用" : "仅统计当前页重复检测命中"} icon={<AlertTriangle className="h-3.5 w-3.5" />} accent="violet" tone={duplicateCount > 0 ? "alert" : "default"} loading={questions.isLoading} />
+        </div>
+        <div className="grid gap-3 border-b border-[var(--admin-line)] bg-secondary/20 px-4 py-4 md:grid-cols-2 xl:grid-cols-5 sm:px-5">
+          <label className="relative xl:col-span-2">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+            <Input className="pl-9" placeholder="搜索题干 / OCR 原文" aria-label="搜索导入题目" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
+          </label>
+          <Input placeholder="批次 ID" aria-label="按批次 ID 筛选" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
+          <Input placeholder="科目 ID" aria-label="按科目 ID 筛选" value={filters.subject_id} onChange={(event) => updateFilter("subject_id", event.target.value)} />
+          <CustomSelect
+            value={filters.status}
+            onChange={(value) => updateFilter("status", value)}
+            placeholder="全部状态"
+            options={[
+              { value: "", label: "全部状态" },
+              { value: "pending", label: "待审核" },
+              { value: "approved", label: "已通过" },
+              { value: "rejected", label: "已拒绝" },
+              { value: "published", label: "已发布" },
+            ]}
+            className="h-11 w-full justify-between rounded-[10px] border border-border bg-card px-3 text-sm"
+          />
+        </div>
+        {questions.isError ? (
+          <div className="border-b border-[var(--admin-line)] p-4 sm:p-5">
+            <ManagementNotice tone="danger" title="导入题目接口不可用">
+              当前无法读取导入暂存列表。请检查接口状态或稍后重试，现有筛选条件不会被清空。
+            </ManagementNotice>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <label className="relative xl:col-span-2">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-hint)]" />
-              <Input className="pl-9" placeholder="搜索题干 / OCR 原文" value={filters.keyword} onChange={(event) => updateFilter("keyword", event.target.value)} />
-            </label>
-            <Input placeholder="批次 ID" value={filters.batch_id || batchIdParam} onChange={(event) => updateFilter("batch_id", event.target.value)} />
-            <Input placeholder="科目 ID" value={filters.subject_id} onChange={(event) => updateFilter("subject_id", event.target.value)} />
-            <CustomSelect
-              value={filters.status}
-              onChange={(value) => updateFilter("status", value)}
-              placeholder="全部状态"
-              options={[
-                { value: "", label: "全部状态" },
-                { value: "pending", label: "pending" },
-                { value: "approved", label: "approved" },
-                { value: "rejected", label: "rejected" },
-                { value: "published", label: "published" },
-              ]}
-              className="h-11 w-full justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* ===== Card-style question list ===== */}
-          <section className="space-y-2">
-            {items.map((item) => {
-              const StatusIcon = statusIcon(item.status);
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3.5 transition hover:border-[var(--color-primary-light)] hover:shadow-sm"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    {/* Left: main content */}
-                    <div className="min-w-0 flex-1 space-y-2">
-                      {/* Top row: status + metadata */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {/* Status */}
-                        <div className="flex items-center gap-1.5">
-                          <StatusIcon className={`h-4 w-4 ${statusColor(item.status)}`} />
-                          <StatusBadge tone={statusTone(item.status)}>
-                            {statusLabel(item.status)}
-                          </StatusBadge>
-                        </div>
-
-                        {/* Duplicate badge */}
-                        {item.duplicate_status ? (
-                          <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
-                            <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
-                            {item.duplicate_status === "possible_duplicate" ? "疑似重复" : item.duplicate_status}
-                          </StatusBadge>
-                        ) : null}
-
-                        {/* Separator */}
-                        <span className="hidden h-3 w-px bg-[var(--color-border)] sm:block" />
-
-                        {/* Subject + type pills */}
-                        {item.subject_name || item.subject_code ? (
-                          <span className="rounded-md bg-[var(--color-primary-light)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-primary-dark)]">
-                            {item.subject_name || item.subject_code}
-                          </span>
-                        ) : null}
-                        <span className="text-[11px] text-[var(--color-text-hint)]">
-                          {typeLabel(item.question_type)}
-                        </span>
-
-                        {/* Batch ID */}
-                        <span className="ml-auto truncate font-mono text-[10px] text-[var(--color-text-hint)] sm:ml-0" title={item.batch_id}>
-                          {item.batch_id}
-                        </span>
+        ) : null}
+        <section aria-busy={questions.isLoading} className="divide-y divide-[var(--admin-line)]">
+          {questions.isLoading ? <ManagementSkeletonRows rows={5} /> : null}
+          {!questions.isLoading ? items.map((item) => {
+            const StatusIcon = statusIcon(item.status);
+            return (
+              <div key={item.id} className="group px-4 py-4 transition-colors hover:bg-[rgba(239,247,252,0.54)] sm:px-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <StatusIcon className={`h-4 w-4 ${statusColor(item.status)}`} />
+                        <StatusBadge tone={statusTone(item.status)}>
+                          {statusLabel(item.status)}
+                        </StatusBadge>
                       </div>
 
-                      {/* Stem preview */}
-                      <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink)]">
-                        {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
-                      </p>
+                      {item.duplicate_status ? (
+                        <StatusBadge tone={duplicateStatusTone(item.duplicate_status)}>
+                          <AlertTriangle className="mr-0.5 inline h-2.5 w-2.5" />
+                          {duplicateStatusLabel(item.duplicate_status)}
+                        </StatusBadge>
+                      ) : null}
+
+                      <span className="hidden h-3 w-px bg-border sm:block" />
+
+                      {item.subject_name || item.subject_code ? (
+                        <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-medium text-accent-foreground">
+                          {item.subject_name || item.subject_code}
+                        </span>
+                      ) : null}
+                      <span className="text-[11px] text-muted-foreground/70">
+                        {typeLabel(item.question_type)}
+                      </span>
+
+                      <span className="ml-auto truncate font-mono text-[10px] text-muted-foreground/70 sm:ml-0" title={item.batch_id}>
+                        {item.batch_id}
+                      </span>
                     </div>
 
-                    {/* Right: action */}
-                    <div className="flex shrink-0 items-start sm:pl-3">
-                      <Button
-                        variant="ghost"
-className="h-9 gap-1.5 px-3 text-xs font-medium"
-                        onClick={() => setPreviewId(item.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                        查看
-                      </Button>
-                    </div>
+                    <p className="line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                      {item.content_preview || textFromImport(item) || `导入题目 #${item.id}`}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-start sm:pl-3">
+                    <Button
+                      variant="ghost"
+                      className="h-9 gap-1.5 px-3 text-xs font-medium"
+                      onClick={(event) => {
+                        previewTriggerRef.current = event.currentTarget;
+                        setPreviewId(item.id);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                      查看
+                    </Button>
                   </div>
                 </div>
-              );
-            })}
-            {!questions.isLoading && items.length === 0 ? (
-              <p className="py-16 text-center text-sm text-[var(--color-text-hint)]">暂无导入题目</p>
-            ) : null}
-          </section>
-
-          {questions.isError ? (
-            <p className="mt-4 text-sm text-[var(--color-danger)]">导入题目接口当前不可用。</p>
+              </div>
+            );
+          }) : null}
+          {!questions.isLoading && !questions.isError && items.length === 0 ? (
+            <EmptyState>当前筛选没有导入题目。调整状态、批次或关键词后再试。</EmptyState>
           ) : null}
-        </CardContent>
-      </Card>
+        </section>
+      </PremiumSection>
 
-      {/* ===== Detail modal ===== */}
       {previewItem ? (
-        <DetailModal item={previewItem} onClose={() => setPreviewId(null)} />
+        <DetailModal
+          item={previewItem}
+          onClose={() => setPreviewId(null)}
+          returnFocusRef={previewTriggerRef}
+        />
       ) : null}
     </div>
   );

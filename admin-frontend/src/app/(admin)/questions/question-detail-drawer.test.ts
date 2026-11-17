@@ -1,19 +1,7 @@
-import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { QuestionDetailDrawer } from "./question-detail-drawer";
-
-type Element = ReactElement<Record<string, unknown>>;
-type PureComponent = (props: Record<string, unknown>) => ReactNode;
-
-function elements(node: ReactNode): Element[] {
-  if (Array.isArray(node)) return node.flatMap(elements);
-  if (!isValidElement<Record<string, unknown>>(node)) return [];
-  if (typeof node.type === "function") {
-    return elements((node.type as PureComponent)(node.props));
-  }
-  return [node, ...elements(node.props.children as ReactNode)];
-}
 
 function renderDrawer(overrides: Partial<Omit<Parameters<typeof QuestionDetailDrawer>[0], "children">> = {}) {
   const onClose = vi.fn();
@@ -36,7 +24,7 @@ function renderDrawer(overrides: Partial<Omit<Parameters<typeof QuestionDetailDr
     props as Parameters<typeof QuestionDetailDrawer>[0],
     createElement("div", null, "drawer body"),
   );
-  return { html: renderToStaticMarkup(element), nodes: elements(element), onClose };
+  return { html: renderToStaticMarkup(element), onClose };
 }
 
 describe("QuestionDetailDrawer", () => {
@@ -45,6 +33,7 @@ describe("QuestionDetailDrawer", () => {
 
     expect(drawer.html).toContain("drawer body");
     expect(drawer.html).toContain('aria-modal="true"');
+    expect(drawer.html).toContain('tabindex="-1"');
     expect(drawer.html).toContain("题目详情");
     expect(drawer.html).toContain("复制题干和选项");
   });

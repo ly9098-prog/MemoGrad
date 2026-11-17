@@ -18,7 +18,7 @@ function OptionImage({ imageUrl, optionKey }: { imageUrl: string; optionKey: str
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <span className="text-xs text-[var(--color-text-hint)]">
+      <span className="text-xs text-muted-foreground/70">
         （图片选项 {optionKey} 加载失败）
       </span>
     );
@@ -27,7 +27,7 @@ function OptionImage({ imageUrl, optionKey }: { imageUrl: string; optionKey: str
     <img
       src={imageUrl}
       alt={`选项 ${optionKey}`}
-      className="max-h-32 max-w-full rounded-lg border border-[var(--color-border)]/50 object-contain"
+      className="max-h-32 max-w-full rounded-lg border border-border/50 object-contain"
       onError={() => setFailed(true)}
     />
   );
@@ -45,7 +45,7 @@ function OptionImage({ imageUrl, optionKey }: { imageUrl: string; optionKey: str
 export function QuestionOptions({ options, className = "" }: QuestionOptionsProps) {
   if (options.length === 0) {
     return (
-      <p className="text-sm text-[var(--color-text-hint)]">—</p>
+      <p className="text-sm text-muted-foreground/70">—</p>
     );
   }
 
@@ -53,12 +53,12 @@ export function QuestionOptions({ options, className = "" }: QuestionOptionsProp
     <div className={`space-y-3 ${className}`}>
       {options.map((opt, i) => (
         <div key={opt.key || i} className="flex items-start gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary-light)] text-[10px] font-bold text-[var(--color-primary-dark)]">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-[10px] font-bold text-accent-foreground">
             {opt.key}
           </span>
           <div className="min-w-0 flex-1 leading-7">
             {opt.text ? (
-              <span className="whitespace-pre-wrap text-sm text-[var(--color-text-secondary)]">
+              <span className="whitespace-pre-wrap text-sm text-muted-foreground">
                 <MathFormula text={opt.text} />
               </span>
             ) : opt.imageUrl ? (
@@ -87,14 +87,14 @@ export function MultiBlankQuestionOptions({
   className = "",
 }: MultiBlankQuestionOptionsProps) {
   if (groups.length === 0) {
-    return <p className="text-sm text-[var(--color-text-hint)]">—</p>;
+    return <p className="text-sm text-muted-foreground/70">—</p>;
   }
 
   if (haveIdenticalBlankOptionSets(groups)) {
     return (
       <div className={className}>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-[var(--color-text-hint)]">
+          <span className="text-xs font-medium text-muted-foreground/70">
             {groups.map((group) => group.id).join("、")} 共用选项
           </span>
         </div>
@@ -108,13 +108,13 @@ export function MultiBlankQuestionOptions({
       {groups.map((group) => (
         <div
           key={group.id}
-          className="rounded-lg border border-[var(--color-border)]/70 bg-[var(--color-bg-input)]/20 p-3"
+          className="rounded-lg border border-border/70 bg-muted/20 p-3"
         >
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-md bg-[var(--color-primary-light)] px-1.5 text-[11px] font-bold text-[var(--color-primary-dark)]">
+            <span className="flex h-6 min-w-6 items-center justify-center rounded-md bg-accent px-1.5 text-[11px] font-bold text-accent-foreground">
               {group.id}
             </span>
-            <span className="text-xs font-medium text-[var(--color-text-hint)]">
+            <span className="text-xs font-medium text-muted-foreground/70">
               该空选项
             </span>
           </div>

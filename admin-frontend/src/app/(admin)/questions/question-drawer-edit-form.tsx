@@ -113,12 +113,12 @@ export function QuestionDrawerEditForm({
       />
 
       {unresolvedTableCount > 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="rounded-xl border border-warning/40 bg-warning-light px-3 py-2 text-xs text-warning-foreground">
           仍有 {unresolvedTableCount} 个结构化表格需要人工核验。请检查单元格和合并关系，并点击“标记人工已核验”后再保存。
         </div>
       ) : null}
       {emptyCodeCount > 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="rounded-xl border border-warning/40 bg-warning-light px-3 py-2 text-xs text-warning-foreground">
           仍有 {emptyCodeCount} 个代码块正文为空。请输入代码内容，或删除空代码块后再保存。
         </div>
       ) : null}

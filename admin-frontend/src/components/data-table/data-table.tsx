@@ -2,8 +2,17 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-type TableColumn<TData> = {
+export type TableColumn<TData> = {
   id?: string;
   header?: ReactNode | (() => ReactNode);
   accessorKey?: keyof TData | string;
@@ -14,53 +23,55 @@ export function DataTable<TData>({
   data,
   columns,
   emptyText = "暂无数据",
+  className,
 }: {
   data: TData[];
   columns: Array<TableColumn<TData>>;
   emptyText?: string;
+  className?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white/70">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="bg-[var(--color-primary-light)] text-left text-xs uppercase tracking-[0.16em] text-[var(--color-primary-dark)]">
-            <tr>
+    <div className={cn("admin-table-surface overflow-hidden rounded-[16px]", className)}>
+      <TableContainer>
+        <Table className="min-w-[760px]">
+          <TableHeader className="bg-secondary/55">
+            <TableRow className="hover:bg-transparent">
               {columns.map((column, index) => (
-                <th key={column.id ?? index} className="px-4 py-3 font-bold">
+                <TableHead key={column.id ?? index} className="h-10 whitespace-nowrap py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
                   {typeof column.header === "function" ? column.id : column.header}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.length ? (
               data.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-t border-[var(--color-border)] transition hover:bg-[rgba(237,241,245,0.55)]">
+                <TableRow key={rowIndex} className="hover:bg-accent/35">
                   {columns.map((column, cellIndex) => {
                     const accessorKey = column.accessorKey ? String(column.accessorKey) : undefined;
                     const value = accessorKey ? (row as Record<string, unknown>)[accessorKey] : undefined;
                     return (
-                      <td key={`${rowIndex}-${cellIndex}`} className={cn("px-4 py-3 align-middle text-[var(--color-text-primary)]")}>
+                      <TableCell key={`${rowIndex}-${cellIndex}`} className={cn("py-3 text-[12px] text-foreground")}>
                         {column.cell
                           ? column.cell({ row: { original: row } })
                           : value === undefined || value === null
                             ? "—"
                             : String(value)}
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))
             ) : (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-14 text-center text-[var(--color-text-hint)]">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={columns.length} className="py-14 text-center text-xs text-muted-foreground">
                   {emptyText}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
     </div>
   );
 }

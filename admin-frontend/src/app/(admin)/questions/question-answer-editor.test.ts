@@ -44,7 +44,7 @@ describe("QuestionAnswerEditor", () => {
     expect(html).toContain("快速选择");
     expect(html).toContain("答案内容");
     expect(html).toContain("多选：单击切换各选项，以逗号分隔");
-    expect(html).toContain("border-slate-900 bg-slate-900 text-white");
+    expect(html).toContain("border-foreground bg-foreground text-background");
   });
 
   it("renders a plain answer input when no options exist", () => {

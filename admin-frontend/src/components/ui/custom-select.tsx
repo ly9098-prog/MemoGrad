@@ -105,6 +105,8 @@ export function CustomSelect({
     if (!open) return;
     const escHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         close();
         ref.current?.querySelector("button")?.focus();
       }
@@ -153,6 +155,9 @@ export function CustomSelect({
       return;
     }
     if (e.key === "Escape") {
+      if (!open) return;
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
       setActiveIndex(-1);
       ref.current?.querySelector("button")?.focus();
@@ -201,7 +206,7 @@ export function CustomSelect({
   };
 
   return (
-    <div ref={ref} className="relative" onKeyDown={handleKeyDown}>
+    <div ref={ref} className="relative min-w-0" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => !disabled && setOpen((v) => !v)}
@@ -211,25 +216,25 @@ export function CustomSelect({
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
         className={cn(
-          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-xl border bg-[var(--color-bg-input)] pl-3 pr-2 text-sm outline-none transition-all duration-150",
+          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-[9px] border bg-muted pl-3 pr-2 text-sm outline-none transition-all duration-150",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
           open
-            ? "border-[var(--color-primary)] bg-white ring-4 ring-[rgba(91,123,154,0.14)]"
-            : "border-[var(--color-border)] hover:border-[var(--color-primary)]",
+            ? "border-primary bg-card ring-4 ring-primary/15"
+            : "border-border hover:border-primary",
           className,
         )}
       >
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-left",
-            selected ? "text-[var(--ink)]" : "text-[var(--color-text-hint)]",
+            selected ? "text-foreground" : "text-muted-foreground/70",
           )}
         >
           {selected ? selected.label : placeholder}
         </span>
         {selected?.suffix && (
           <span
-            className="max-w-[90px] shrink-0 truncate whitespace-nowrap text-[10px] text-[var(--color-text-hint)]"
+            className="max-w-[90px] shrink-0 truncate whitespace-nowrap text-[10px] text-muted-foreground/70"
             title={selected.suffix}
           >
             {selected.suffix}
@@ -239,7 +244,7 @@ export function CustomSelect({
           <span
             role="button"
             tabIndex={-1}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--color-text-hint)] hover:bg-[var(--color-border)] hover:text-[var(--ink)]"
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 hover:bg-border hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
               onChange("");
@@ -251,7 +256,7 @@ export function CustomSelect({
         )}
         <svg
           className={cn(
-            "h-4 w-4 shrink-0 text-[var(--color-text-hint)] transition-transform duration-200",
+            "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
             open && "rotate-180",
           )}
           viewBox="0 0 24 24"
@@ -378,8 +383,9 @@ function PortalDropdown({
       ref={(el) => setDropdownEl(el)}
       role="listbox"
       id={id}
+      data-focus-passthrough
       className={cn(
-        "rounded-xl border border-[var(--color-border)]/80 bg-white shadow-lg transition-all duration-150",
+        "admin-content-theme rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
         mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
       )}
       style={style}
@@ -400,11 +406,11 @@ function PortalDropdown({
       }}
     >
       {searchable && (
-        <div className="relative shrink-0 border-b border-[var(--color-border)]/60 p-2">
-          <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-hint)]" />
+        <div className="relative shrink-0 border-b border-border/60 p-2">
+          <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
           <input
             ref={searchRef}
-            className="h-8 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-input)] pl-7 pr-2 text-xs outline-none focus:border-[var(--color-primary)]"
+            className="h-8 w-full rounded-lg border border-border bg-muted pl-7 pr-2 text-xs text-foreground outline-none focus:border-primary"
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => {
@@ -427,7 +433,7 @@ function PortalDropdown({
         onTouchMove={(event) => event.stopPropagation()}
       >
         {filtered.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-[var(--color-text-hint)]">无匹配选项</div>
+          <div className="px-4 py-6 text-center text-xs text-muted-foreground/70">无匹配选项</div>
         ) : (
           filtered.map((opt, idx) => {
             const isSelected = opt.value === value;
@@ -443,17 +449,17 @@ function PortalDropdown({
                 className={cn(
                   "flex w-full min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap px-4 py-2.5 text-left text-sm transition-colors duration-100",
                   isSelected
-                    ? "bg-[var(--color-primary-light)] font-medium text-[var(--ink)]"
-                    : "text-[var(--color-text-secondary)]",
-                  isActive && !isSelected && "bg-[var(--color-primary-light)]/60",
-                  !isSelected && !isActive && "hover:bg-[var(--color-primary-light)]/40",
+                    ? "bg-accent font-medium text-foreground"
+                    : "text-muted-foreground",
+                  isActive && !isSelected && "bg-accent/60",
+                  !isSelected && !isActive && "hover:bg-accent/40",
                   opt.disabled && "cursor-not-allowed opacity-40",
                 )}
                 onMouseEnter={() => { onActiveIndexChange(idx); }}
               >
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {isSelected && (
-                    <svg className="h-4 w-4 text-[var(--color-primary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   )}
@@ -461,7 +467,7 @@ function PortalDropdown({
                 <span className="min-w-0 flex-1 truncate whitespace-nowrap">{opt.label}</span>
                 {opt.suffix && (
                   <span
-                    className="max-w-[120px] shrink-0 truncate whitespace-nowrap text-[10px] text-[var(--color-text-hint)]"
+                    className="max-w-[120px] shrink-0 truncate whitespace-nowrap text-[10px] text-muted-foreground/70"
                     title={opt.suffix}
                   >
                     {opt.suffix}

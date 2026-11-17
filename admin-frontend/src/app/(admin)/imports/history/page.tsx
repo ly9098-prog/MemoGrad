@@ -84,8 +84,8 @@ export default function ImportHistoryPage() {
       <Card>
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="font-display text-2xl font-bold text-[var(--ink)]">导入记录</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">查看批次统计，发布已通过题目，删除未发布批次。</p>
+            <h1 className="font-display text-2xl font-bold text-foreground">导入记录</h1>
+            <p className="mt-1 text-sm text-muted-foreground">查看批次统计，发布已通过题目，删除未发布批次。</p>
           </div>
           <Button variant="secondary" disabled={batches.isFetching} onClick={() => batches.refetch()}>
             <RefreshCw className="h-4 w-4" />
@@ -93,10 +93,10 @@ export default function ImportHistoryPage() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {message ? <p className="rounded-2xl border border-[var(--color-border)] bg-white/70 px-4 py-3 text-sm text-[var(--color-text-secondary)]">{message}</p> : null}
+          {message ? <p className="rounded-2xl border border-border bg-card/70 px-4 py-3 text-sm text-muted-foreground">{message}</p> : null}
           <div className="grid gap-3 md:grid-cols-3">
             <Input placeholder="批次 ID" value={batchIdParam} readOnly />
-            <select className="h-11 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-input)] px-3 text-sm" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
+            <select className="h-11 rounded-xl border border-border bg-muted px-3 text-sm" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
               <option value="">全部状态</option>
               <option value="pending">pending</option>
               <option value="approved">approved</option>
@@ -105,8 +105,8 @@ export default function ImportHistoryPage() {
             </select>
             <Input placeholder="来源类型" value={filters.source_type} onChange={(event) => updateFilter("source_type", event.target.value)} />
           </div>
-          <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white/70">
-            <div className="grid grid-cols-[1.4fr_0.7fr_1.2fr_1.3fr_1.2fr] gap-3 border-b border-[var(--color-border)] px-4 py-3 text-xs font-semibold text-[var(--color-text-secondary)]">
+          <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
+            <div className="grid grid-cols-[1.4fr_0.7fr_1.2fr_1.3fr_1.2fr] gap-3 border-b border-border px-4 py-3 text-xs font-semibold text-muted-foreground">
               <span>批次</span>
               <span>来源</span>
               <span>统计</span>
@@ -114,12 +114,12 @@ export default function ImportHistoryPage() {
               <span>操作</span>
             </div>
             {items.map((batch) => (
-              <div key={batch.batch_id} className="grid grid-cols-[1.4fr_0.7fr_1.2fr_1.3fr_1.2fr] gap-3 border-b border-[var(--color-border)] px-4 py-4 text-sm last:border-b-0">
+              <div key={batch.batch_id} className="grid grid-cols-[1.4fr_0.7fr_1.2fr_1.3fr_1.2fr] gap-3 border-b border-border px-4 py-4 text-sm last:border-b-0">
                 <div className="min-w-0">
-                  <p className="break-all font-mono text-xs font-semibold text-[var(--ink)]">{batch.batch_id}</p>
-                  <p className="mt-1 truncate text-xs text-[var(--color-text-hint)]">{batch.source_file || "—"}</p>
+                  <p className="break-all font-mono text-xs font-semibold text-foreground">{batch.batch_id}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground/70">{batch.source_file || "—"}</p>
                 </div>
-                <span className="text-[var(--color-text-secondary)]">{batch.source_type || "—"}</span>
+                <span className="text-muted-foreground">{batch.source_type || "—"}</span>
                 <div className="flex flex-wrap gap-1">
                   <StatusBadge tone="neutral">总 {batch.total_count}</StatusBadge>
                   <StatusBadge tone={statusTone(batch.pending_count)}>待审 {batch.pending_count}</StatusBadge>
@@ -127,7 +127,7 @@ export default function ImportHistoryPage() {
                   <StatusBadge tone="danger">拒绝 {batch.rejected_count}</StatusBadge>
                   <StatusBadge tone="primary">发布 {batch.published_count}</StatusBadge>
                 </div>
-                <div className="text-xs text-[var(--color-text-secondary)]">
+                <div className="text-xs text-muted-foreground">
                   <p>{batch.created_at || "—"}</p>
                   <p>{batch.updated_at || "—"}</p>
                 </div>
@@ -148,32 +148,32 @@ export default function ImportHistoryPage() {
               </div>
             ))}
           </div>
-          {!batches.isLoading && items.length === 0 ? <p className="py-10 text-center text-sm text-[var(--color-text-hint)]">暂无导入记录</p> : null}
-          {batches.isError ? <p className="text-sm text-[var(--color-danger)]">导入记录接口当前不可用。</p> : null}
+          {!batches.isLoading && items.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground/70">暂无导入记录</p> : null}
+          {batches.isError ? <p className="text-sm text-destructive">导入记录接口当前不可用。</p> : null}
         </CardContent>
       </Card>
 
       {selectedBatch ? (
         <Card>
           <CardHeader>
-            <h3 className="font-display text-2xl font-bold text-[var(--ink)]">批次详情</h3>
-            <p className="mt-1 break-all text-sm text-[var(--color-text-secondary)]">{selectedBatch.batch_id}</p>
+            <h3 className="font-display text-2xl font-bold text-foreground">批次详情</h3>
+            <p className="mt-1 break-all text-sm text-muted-foreground">{selectedBatch.batch_id}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {selectedBatch.items.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-input)] p-4">
+              <article key={item.id} className="rounded-2xl border border-border bg-muted p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <StatusBadge tone={item.status === "published" ? "primary" : item.status === "approved" ? "success" : item.status === "rejected" ? "danger" : "warning"}>{item.status}</StatusBadge>
-                  <Link className="text-sm font-semibold text-[var(--color-primary-dark)] underline" href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}>进入审核</Link>
+                  <Link className="text-sm font-semibold text-accent-foreground underline" href={`/imports/review?batch_id=${encodeURIComponent(item.batch_id)}`}>进入审核</Link>
                 </div>
-                <div className="mt-3 text-sm font-semibold text-[var(--ink)]">
+                <div className="mt-3 text-sm font-semibold text-foreground">
                   <QuestionContentRenderer
                     content={item.parsed_content}
                     fallbackText={String(item.parsed_content?.text ?? item.parsed_content?.stem ?? item.raw_data?.text ?? `导入题目 #${item.id}`)}
                     showTableMetadata
                   />
                 </div>
-                <p className="mt-2 text-xs text-[var(--color-text-secondary)]">{item.subject_name || item.subject_code || "未分类"} · {item.question_type || "未识别"}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{item.subject_name || item.subject_code || "未分类"} · {item.question_type || "未识别"}</p>
               </article>
             ))}
           </CardContent>

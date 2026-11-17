@@ -38,7 +38,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
+import { BodyPortal } from "@/components/ui/body-portal";
 import { apiRequest } from "@/lib/api/client";
 import { formatChinaDateTime } from "@/lib/time";
 import type {
@@ -102,20 +104,20 @@ type MetricTone = "primary" | "success" | "warning" | "danger";
 
 const metricToneStyles: Record<MetricTone, { icon: string; accent: string }> = {
   primary: {
-    icon: "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
-    accent: "bg-[var(--color-primary)]",
+    icon: "bg-accent text-accent-foreground",
+    accent: "bg-primary",
   },
   success: {
-    icon: "bg-[var(--color-success-light)] text-[var(--color-success)]",
-    accent: "bg-[var(--color-success)]",
+    icon: "bg-success-light text-success",
+    accent: "bg-success",
   },
   warning: {
-    icon: "bg-[var(--color-warning-light)] text-[#9b6f3b]",
-    accent: "bg-[var(--color-warning)]",
+    icon: "bg-warning-light text-warning-foreground",
+    accent: "bg-warning",
   },
   danger: {
-    icon: "bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-    accent: "bg-[var(--color-danger)]",
+    icon: "bg-destructive-light text-destructive",
+    accent: "bg-destructive",
   },
 };
 
@@ -134,19 +136,17 @@ function MetricCard({
 }) {
   const styles = metricToneStyles[tone];
   return (
-    <Card className="relative overflow-hidden rounded-2xl">
+    <div className="relative min-w-0 overflow-hidden bg-card px-4 py-4">
       <div className={`absolute inset-x-0 top-0 h-0.5 ${styles.accent}`} />
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-[var(--color-text-hint)]">{label}</p>
-            <p className="mt-1 text-[26px] font-bold leading-none tabular-nums text-[var(--ink)]">{value}</p>
-          </div>
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>{icon}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground/70">{label}</p>
+          <p className="mt-1 text-[26px] font-bold leading-none tabular-nums text-foreground">{value}</p>
         </div>
-        <p className="mt-2 truncate text-[11px] text-[var(--color-text-secondary)]">{hint}</p>
-      </CardContent>
-    </Card>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>{icon}</div>
+      </div>
+      <p className="mt-2 truncate text-[11px] text-muted-foreground">{hint}</p>
+    </div>
   );
 }
 
@@ -162,21 +162,21 @@ function RuntimeNode({
   tone: "success" | "warning" | "danger" | "neutral";
 }) {
   const dotClass = {
-    success: "bg-[var(--color-success)] shadow-[0_0_0_4px_var(--color-success-light)]",
-    warning: "bg-[var(--color-warning)] shadow-[0_0_0_4px_var(--color-warning-light)]",
-    danger: "bg-[var(--color-danger)] shadow-[0_0_0_4px_var(--color-danger-light)]",
-    neutral: "bg-[var(--color-text-hint)] shadow-[0_0_0_4px_var(--color-bg-input)]",
+    success: "bg-success shadow-[0_0_0_4px_var(--success-light)]",
+    warning: "bg-warning shadow-[0_0_0_4px_var(--warning-light)]",
+    danger: "bg-destructive shadow-[0_0_0_4px_var(--destructive-light)]",
+    neutral: "bg-muted-foreground shadow-[0_0_0_4px_var(--muted)]",
   }[tone];
 
   return (
-    <div className="min-w-0 flex-1 rounded-xl border border-[var(--color-border-light)] bg-white/70 px-3 py-2.5">
+    <div className="min-w-0 flex-1 rounded-xl border border-border/60 bg-card/70 px-3 py-2.5">
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-        <span className="truncate text-[11px] font-semibold text-[var(--color-text-secondary)]">{title}</span>
+        <span className="truncate text-[11px] font-semibold text-muted-foreground">{title}</span>
       </div>
       <div className="mt-1.5 flex items-end justify-between gap-2">
-        <span className="truncate text-xs font-semibold text-[var(--ink)]">{subtitle}</span>
-        <span className="shrink-0 font-mono text-[10px] text-[var(--color-text-hint)]">{value}</span>
+        <span className="truncate text-xs font-semibold text-foreground">{subtitle}</span>
+        <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70">{value}</span>
       </div>
     </div>
   );
@@ -192,10 +192,10 @@ function TraceStage({
   tone?: "success" | "warning" | "danger" | "neutral";
 }) {
   const styles = {
-    success: "border-[var(--color-success)]/30 bg-[var(--color-success-light)] text-[var(--color-success)]",
-    warning: "border-[var(--color-warning)]/40 bg-[var(--color-warning-light)] text-[#8d6639]",
-    danger: "border-[var(--color-danger)]/30 bg-[var(--color-danger-light)] text-[var(--color-danger)]",
-    neutral: "border-[var(--color-border)] bg-white/70 text-[var(--color-text-secondary)]",
+    success: "border-success/30 bg-success-light text-success",
+    warning: "border-warning/40 bg-warning-light text-warning-foreground",
+    danger: "border-destructive/30 bg-destructive-light text-destructive",
+    neutral: "border-border bg-card/70 text-muted-foreground",
   }[tone];
 
   return (
@@ -326,7 +326,7 @@ function TaskTrendChart({ data }: { data: Array<{
           <Area type="monotone" dataKey="projection_receipts" name="答题投影回执" stroke="#c49a6b" fill="transparent" strokeWidth={1.8} dot={false} />
         </AreaChart>
       ) : (
-        <div className="flex h-full items-center justify-center text-[10px] text-[var(--color-text-hint)]">图表加载中…</div>
+        <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground/70">图表加载中…</div>
       )}
     </div>
   );
@@ -343,15 +343,15 @@ function TrendTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-white/95 px-3 py-2 shadow-lg">
-      <p className="mb-1.5 text-xs font-semibold text-[var(--ink)]">{label}</p>
+    <div className="rounded-xl border border-border bg-card/95 px-3 py-2 shadow-lg">
+      <p className="mb-1.5 text-xs font-semibold text-foreground">{label}</p>
       {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center justify-between gap-4 text-[11px] leading-5 text-[var(--color-text-secondary)]">
+        <div key={entry.name} className="flex items-center justify-between gap-4 text-[11px] leading-5 text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <i className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
             {entry.name}
           </span>
-          <b className="font-mono text-[var(--ink)]">{entry.value ?? 0}</b>
+          <b className="font-mono text-foreground">{entry.value ?? 0}</b>
         </div>
       ))}
     </div>
@@ -559,7 +559,7 @@ export default function SystemTasksPage() {
   if (diagnostics.isError) {
     return (
       <Card>
-        <CardContent className="flex items-center gap-3 p-5 text-sm text-[var(--color-danger)]">
+        <CardContent className="flex items-center gap-3 p-5 text-sm text-destructive">
           <ServerCrash className="h-5 w-5" />
           无法获取任务诊断状态，请检查后端服务与管理员权限。
         </CardContent>
@@ -568,89 +568,89 @@ export default function SystemTasksPage() {
   }
 
   return (
-    <div className="relative space-y-3 pb-2">
+    <ManagementPage className="relative space-y-3 pb-2">
       {actionFeedback ? (
-        <div
-          className="fixed right-4 top-4 z-[140] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-[var(--color-border)] bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(36,52,64,0.16)] backdrop-blur-md"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-                actionFeedback.tone === "success"
-                  ? "bg-[var(--color-success-light)] text-[var(--color-success)]"
-                  : actionFeedback.tone === "danger"
-                    ? "bg-[var(--color-danger-light)] text-[var(--color-danger)]"
-                    : "bg-[var(--color-warning-light)] text-[#9b6f3b]"
-              }`}
-            >
-              {actionFeedback.tone === "success" ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : actionFeedback.tone === "danger" ? (
-                <XCircle className="h-4 w-4" />
-              ) : (
-                <AlertTriangle className="h-4 w-4" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold text-[var(--ink)]">
-                    {actionFeedback.tone === "success" ? "操作成功" : actionFeedback.tone === "danger" ? "操作失败" : "操作提醒"}
-                  </p>
-                  <p className="mt-1 break-words text-[10px] leading-5 text-[var(--color-text-secondary)]">
-                    {actionFeedback.message}
-                  </p>
+        <BodyPortal>
+          <div
+            className="fixed right-4 top-4 z-[140] w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-border bg-card/95 p-3.5 shadow-[0_18px_50px_rgba(36,52,64,0.16)] backdrop-blur-md"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                  actionFeedback.tone === "success"
+                    ? "bg-success-light text-success"
+                    : actionFeedback.tone === "danger"
+                      ? "bg-destructive-light text-destructive"
+                      : "bg-warning-light text-warning-foreground"
+                }`}
+              >
+                {actionFeedback.tone === "success" ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : actionFeedback.tone === "danger" ? (
+                  <XCircle className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-foreground">
+                      {actionFeedback.tone === "success" ? "操作成功" : actionFeedback.tone === "danger" ? "操作失败" : "操作提醒"}
+                    </p>
+                    <p className="mt-1 break-words text-[10px] leading-5 text-muted-foreground">
+                      {actionFeedback.message}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="关闭消息"
+                    onClick={() => setActionFeedback(null)}
+                    className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-base leading-none text-muted-foreground/70 transition hover:bg-muted hover:text-foreground"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  aria-label="关闭消息"
-                  onClick={() => setActionFeedback(null)}
-                  className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-base leading-none text-[var(--color-text-hint)] transition hover:bg-[var(--color-bg-input)] hover:text-[var(--ink)]"
-                >
-                  ×
-                </button>
               </div>
             </div>
           </div>
-        </div>
+        </BodyPortal>
       ) : null}
 
       {manualRefreshing ? (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--color-bg)]/72 backdrop-blur-[2px]"
-          role="status"
-          aria-live="polite"
-          aria-label="正在刷新任务数据"
-        >
-          <div className="flex min-w-[180px] flex-col items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-white/95 px-7 py-6 shadow-[0_18px_50px_rgba(36,52,64,0.14)]">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)]">
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-[var(--ink)]">正在刷新任务数据</p>
-              <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">同步诊断、队列与任务运行状态…</p>
+        <BodyPortal>
+          <div
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-overlay backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+            aria-label="正在刷新任务数据"
+          >
+            <div className="flex min-w-[180px] flex-col items-center gap-3 rounded-2xl border border-border bg-card/95 px-7 py-6 shadow-[0_18px_50px_rgba(36,52,64,0.14)]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-primary">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-foreground">正在刷新任务数据</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">同步诊断、队列与任务运行状态…</p>
+              </div>
             </div>
           </div>
-        </div>
+        </BodyPortal>
       ) : null}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-[var(--color-primary)]" />
-            <h1 className="text-xl font-bold text-[var(--ink)]">异步任务诊断</h1>
-          </div>
-          <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-            聚合 Outbox、Redis 队列、Worker 与答题投影，快速定位积压、重试和永久失败。
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/65 px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)] sm:flex">
+      <ManagementPageHeader
+        icon={<Activity className="h-4 w-4" />}
+        title="异步任务诊断"
+        description="聚合 Outbox、Redis 队列、Worker 与答题投影，快速定位积压、重试和永久失败。"
+        meta={
+          <span className="inline-flex items-center gap-2 rounded-[7px] border border-white/70 bg-white/55 px-2.5 py-1 text-[11px] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md">
             <Clock3 className="h-3.5 w-3.5" />
-            <span>15s 自动刷新</span>
-            {data ? <span className="text-[var(--color-text-hint)]">· {formatTime(data.generated_at)}</span> : null}
-          </div>
+            15s 自动刷新
+            {data ? <span className="text-muted-foreground/70">· {formatTime(data.generated_at)}</span> : null}
+          </span>
+        }
+        actions={
           <Button
             size="sm"
             variant="secondary"
@@ -661,13 +661,13 @@ export default function SystemTasksPage() {
             <RefreshCw className={`h-3.5 w-3.5 ${manualRefreshing ? "animate-spin" : ""}`} />
             {manualRefreshing ? "刷新中…" : "刷新"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {!data || !health ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-[94px] animate-pulse rounded-2xl bg-[var(--color-bg-input)]" />
+            <div key={index} className="h-[94px] animate-pulse rounded-2xl bg-muted" />
           ))}
         </div>
       ) : (
@@ -677,16 +677,16 @@ export default function SystemTasksPage() {
               <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {health.ok ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--color-success)]" />
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
                   ) : (
-                    <AlertTriangle className={`h-4 w-4 shrink-0 ${health.severity === "error" ? "text-[var(--color-danger)]" : "text-[#9b6f3b]"}`} />
+                    <AlertTriangle className={`h-4 w-4 shrink-0 ${health.severity === "error" ? "text-destructive" : "text-warning-foreground"}`} />
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="truncate text-sm font-semibold text-[var(--ink)]">异步任务运行链路</h2>
+                      <h2 className="truncate text-sm font-semibold text-foreground">异步任务运行链路</h2>
                       <StatusBadge tone={healthTone(health.severity)}>{health.ok ? "健康" : "存在异常"}</StatusBadge>
                     </div>
-                    <p className="mt-0.5 truncate text-[10px] text-[var(--color-text-secondary)]">
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
                       {data.async_runtime_expected ? "异步运行时应处于工作状态" : "当前为本地仅 Web 模式，不要求异步 Worker 常驻"}
                     </p>
                   </div>
@@ -703,21 +703,21 @@ export default function SystemTasksPage() {
                   value={data.outbox.unpublished ? formatDuration(data.outbox.oldest_unpublished_seconds) : "实时"}
                   tone={data.outbox.unpublished > 0 ? "warning" : "success"}
                 />
-                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
+                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-muted-foreground/70" />
                 <RuntimeNode
                   title="Redis 队列"
                   subtitle={data.redis.available ? `${data.redis.totals.ready} 条待处理` : "连接不可用"}
                   value={data.redis.available ? `总计 ${queueTotal}` : "—"}
                   tone={data.redis.available ? (data.redis.totals.ready > 0 ? "warning" : "success") : "danger"}
                 />
-                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
+                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-muted-foreground/70" />
                 <RuntimeNode
                   title="Worker 执行器"
                   subtitle={data.redis.available ? `${data.redis.totals.processing} 条处理中` : "状态未知"}
                   value={data.redis.available ? `${data.redis.totals.retry} 条待重试` : "—"}
                   tone={!data.redis.available ? "neutral" : failedQueueTotal > 0 ? "danger" : data.redis.totals.retry > 0 ? "warning" : "success"}
                 />
-                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-[var(--color-text-hint)]" />
+                <ArrowRight className="my-auto h-4 w-4 shrink-0 text-muted-foreground/70" />
                 <RuntimeNode
                   title="答题投影"
                   subtitle={`${data.projection.unprojected} 条待回执`}
@@ -728,7 +728,7 @@ export default function SystemTasksPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-px overflow-hidden rounded-[16px] border border-border bg-border md:grid-cols-2 xl:grid-cols-5">
             <MetricCard
               label="Outbox 未发布"
               value={data.outbox.unpublished}
@@ -772,36 +772,36 @@ export default function SystemTasksPage() {
             <Card className="overflow-hidden rounded-2xl">
               <CardHeader className="flex flex-col gap-2 px-5 py-3.5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-[var(--ink)]">任务运行中心</h2>
-                  <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                  <h2 className="text-sm font-semibold text-foreground">任务运行中心</h2>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
                     汇总应用定时任务、systemd 系统任务、异步任务实例与近 7 天执行趋势，可直接查看详情、手动执行、重试或取消。
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                  <span className="rounded-lg border border-[var(--color-border)] bg-white/65 px-2 py-1 text-[var(--color-text-secondary)]">
-                    定时任务 <b className="ml-1 font-mono text-[var(--ink)]">{appScheduledRows.length}</b>
+                  <span className="rounded-lg border border-border bg-card/65 px-2 py-1 text-muted-foreground">
+                    定时任务 <b className="ml-1 font-mono text-foreground">{appScheduledRows.length}</b>
                   </span>
-                  <span className="rounded-lg border border-[var(--color-border)] bg-white/65 px-2 py-1 text-[var(--color-text-secondary)]">
-                    系统任务 <b className="ml-1 font-mono text-[var(--ink)]">{systemRows.length}</b>
+                  <span className="rounded-lg border border-border bg-card/65 px-2 py-1 text-muted-foreground">
+                    系统任务 <b className="ml-1 font-mono text-foreground">{systemRows.length}</b>
                   </span>
-                  <span className="rounded-lg border border-[var(--color-border)] bg-white/65 px-2 py-1 text-[var(--color-text-secondary)]">
-                    异步实例 <b className="ml-1 font-mono text-[var(--ink)]">{data.redis.available ? asyncRows.length : "—"}</b>
+                  <span className="rounded-lg border border-border bg-card/65 px-2 py-1 text-muted-foreground">
+                    异步实例 <b className="ml-1 font-mono text-foreground">{data.redis.available ? asyncRows.length : "—"}</b>
                   </span>
-                  <span className="rounded-lg border border-[var(--color-border)] bg-white/65 px-2 py-1 text-[var(--color-text-secondary)]">
-                    Redis <b className="ml-1 font-mono text-[var(--ink)]">{queueTotal}</b>
+                  <span className="rounded-lg border border-border bg-card/65 px-2 py-1 text-muted-foreground">
+                    Redis <b className="ml-1 font-mono text-foreground">{queueTotal}</b>
                   </span>
                 </div>
               </CardHeader>
 
               <CardContent className="p-0">
-                <div className="grid border-b border-[var(--color-border)] lg:grid-cols-[minmax(0,1.65fr)_minmax(260px,0.85fr)]">
-                  <div className="border-b border-[var(--color-border)] px-4 py-3 lg:border-b-0 lg:border-r">
+                <div className="grid border-b border-border lg:grid-cols-[minmax(0,1.65fr)_minmax(260px,0.85fr)]">
+                  <div className="border-b border-border px-4 py-3 lg:border-b-0 lg:border-r">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold text-[var(--ink)]">任务执行趋势（近 7 天）</p>
-                        <p className="text-[10px] text-[var(--color-text-hint)]">创建、发布、失败与答题投影回执</p>
+                        <p className="text-xs font-semibold text-foreground">任务执行趋势（近 7 天）</p>
+                        <p className="text-[10px] text-muted-foreground/70">创建、发布、失败与答题投影回执</p>
                       </div>
-                      <div className="hidden flex-wrap gap-x-3 text-[9px] text-[var(--color-text-secondary)] sm:flex">
+                      <div className="hidden flex-wrap gap-x-3 text-[9px] text-muted-foreground sm:flex">
                         <span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#5b7b9a]" />创建</span>
                         <span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#6b9b6b]" />发布</span>
                         <span><i className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#c96565]" />失败</span>
@@ -811,7 +811,7 @@ export default function SystemTasksPage() {
                     {trendData.length ? (
                       <TaskTrendChart data={trendData} />
                     ) : (
-                      <div className="flex h-[150px] min-h-[150px] w-full min-w-0 items-center justify-center text-xs text-[var(--color-text-hint)]">
+                      <div className="flex h-[150px] min-h-[150px] w-full min-w-0 items-center justify-center text-xs text-muted-foreground/70">
                         暂无趋势数据
                       </div>
                     )}
@@ -820,10 +820,10 @@ export default function SystemTasksPage() {
                   <div className="px-4 py-3">
                     <div className="mb-1 flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-semibold text-[var(--ink)]">Outbox 状态分布</p>
-                        <p className="text-[10px] text-[var(--color-text-hint)]">持久化任务当前状态</p>
+                        <p className="text-xs font-semibold text-foreground">Outbox 状态分布</p>
+                        <p className="text-[10px] text-muted-foreground/70">持久化任务当前状态</p>
                       </div>
-                      <span className="font-mono text-[10px] text-[var(--color-text-hint)]">总计 {outboxTotal}</span>
+                      <span className="font-mono text-[10px] text-muted-foreground/70">总计 {outboxTotal}</span>
                     </div>
                     <div className="grid h-[150px] grid-cols-[150px_minmax(0,1fr)] items-center">
                       <div className="relative h-[144px] w-[144px]">
@@ -843,13 +843,13 @@ export default function SystemTasksPage() {
                             <Tooltip formatter={(value) => [Number(value || 0), "数量"]} />
                           </PieChart>
                         ) : (
-                          <div className="flex h-full items-center justify-center text-[10px] text-[var(--color-text-hint)]">暂无 Outbox</div>
+                          <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground/70">暂无 Outbox</div>
                         )}
                         {statusPieData.length ? (
                           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                             <div className="text-center">
-                              <p className="font-mono text-lg font-bold leading-none text-[var(--ink)]">{outboxTotal}</p>
-                              <p className="mt-1 text-[9px] text-[var(--color-text-hint)]">任务</p>
+                              <p className="font-mono text-lg font-bold leading-none text-foreground">{outboxTotal}</p>
+                              <p className="mt-1 text-[9px] text-muted-foreground/70">任务</p>
                             </div>
                           </div>
                         ) : null}
@@ -859,11 +859,11 @@ export default function SystemTasksPage() {
                           const count = Number(data.outbox.counts[entry.key] || 0);
                           return (
                             <div key={entry.key} className="flex items-center justify-between gap-2 text-[10px]">
-                              <span className="flex min-w-0 items-center gap-1.5 text-[var(--color-text-secondary)]">
+                              <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                                 <i className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
                                 <span className="truncate">{entry.label}</span>
                               </span>
-                              <span className="font-mono text-[var(--ink)]">{count}</span>
+                              <span className="font-mono text-foreground">{count}</span>
                             </div>
                           );
                         })}
@@ -873,7 +873,7 @@ export default function SystemTasksPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex flex-wrap items-center gap-1 rounded-xl bg-[var(--color-bg-input)] p-1">
+                  <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted p-1">
                     {([
                       ["all", `全部 ${scheduledRows.length + (data.redis.available ? asyncRows.length : 0)}`],
                       ["scheduled", `定时任务 ${appScheduledRows.length}`],
@@ -886,8 +886,8 @@ export default function SystemTasksPage() {
                         onClick={() => setTaskScope(scope)}
                         className={`h-7 rounded-lg px-3 text-[10px] font-semibold transition ${
                           taskScope === scope
-                            ? "bg-white text-[var(--color-primary-dark)] shadow-sm"
-                            : "text-[var(--color-text-secondary)] hover:text-[var(--ink)]"
+                            ? "bg-card text-accent-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {label}
@@ -897,7 +897,7 @@ export default function SystemTasksPage() {
 
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div className="relative w-[210px] max-w-[52vw]">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-text-hint)]" />
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
                       <Input
                         value={taskSearch}
                         onChange={(event) => setTaskSearch(event.target.value)}
@@ -908,7 +908,7 @@ export default function SystemTasksPage() {
                     <Select
                       value={taskStatus}
                       onChange={(v) => setTaskStatus(v as TaskStatusFilter)}
-                      className="w-[112px] border-[var(--color-border)]"
+                      className="w-[112px] border-border"
                       options={[
                         { value: "all", label: "全部状态" },
                         { value: "running", label: "运行中" },
@@ -919,11 +919,11 @@ export default function SystemTasksPage() {
                       ]}
                     />
                     {data.redis.available ? (
-                      <div className="hidden items-center gap-2 text-[9px] text-[var(--color-text-hint)] 2xl:flex">
-                        <span>待处理 <b className="font-mono text-[var(--ink)]">{data.redis.totals.ready}</b></span>
-                        <span>处理中 <b className="font-mono text-[var(--ink)]">{data.redis.totals.processing}</b></span>
-                        <span>待重试 <b className="font-mono text-[#9b6f3b]">{data.redis.totals.retry}</b></span>
-                        <span>死信/损坏 <b className="font-mono text-[var(--color-danger)]">{failedQueueTotal}</b></span>
+                      <div className="hidden items-center gap-2 text-[9px] text-muted-foreground/70 2xl:flex">
+                        <span>待处理 <b className="font-mono text-foreground">{data.redis.totals.ready}</b></span>
+                        <span>处理中 <b className="font-mono text-foreground">{data.redis.totals.processing}</b></span>
+                        <span>待重试 <b className="font-mono text-warning-foreground">{data.redis.totals.retry}</b></span>
+                        <span>死信/损坏 <b className="font-mono text-destructive">{failedQueueTotal}</b></span>
                       </div>
                     ) : (
                       <StatusBadge tone="warning">Redis 不可用</StatusBadge>
@@ -931,16 +931,16 @@ export default function SystemTasksPage() {
                   </div>
                 </div>
 
-                <div className="max-h-[330px] overflow-auto border-t border-[var(--color-border)]">
+                <div className="max-h-[330px] overflow-auto border-t border-border">
                   <table className="w-full min-w-[930px] table-fixed text-xs">
-                    <thead className="sticky top-0 z-[1] bg-[rgba(254,252,249,0.97)] text-left text-[10px] text-[var(--color-text-hint)] backdrop-blur">
+                    <thead className="sticky top-0 z-[1] bg-card/97 text-left text-[10px] text-muted-foreground/70 backdrop-blur">
                       <tr>
                         <th className="w-[25%] px-4 py-2.5">任务名称</th>
                         <th className="w-[13%] px-3 py-2.5">任务类型</th>
                         <th className="w-[10%] px-3 py-2.5">状态</th>
                         <th className="w-[18%] px-3 py-2.5">下次执行 / 队列</th>
-                        <th className="w-[21%] px-3 py-2.5">最近执行结果</th>
-                        <th className="w-[13%] px-3 py-2.5">操作</th>
+                        <th className="w-[19%] px-3 py-2.5">最近执行结果</th>
+                        <th className="w-[15%] whitespace-nowrap px-3 py-2.5">操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -948,47 +948,47 @@ export default function SystemTasksPage() {
                         const statusMeta = taskStatusMeta(task.status);
                         const resultMeta = runResultMeta(task.last_status);
                         return (
-                          <tr key={`scheduled:${task.task_id}`} className="border-t border-[var(--color-border-light)] transition hover:bg-white/65">
+                          <tr key={`scheduled:${task.task_id}`} className="border-t border-border/60 transition hover:bg-card/65">
                             <td className="px-4 py-2.5 align-middle">
                               <div className="flex min-w-0 items-center gap-2.5">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                                   {task.task_type === "system" ? <Database className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
                                 </span>
                                 <div className="min-w-0">
-                                  <p className="truncate text-[11px] font-semibold text-[var(--ink)]">{task.name}</p>
-                                  <p className="mt-0.5 truncate font-mono text-[9px] text-[var(--color-text-hint)]">{task.task_id}</p>
+                                  <p className="truncate text-[11px] font-semibold text-foreground">{task.name}</p>
+                                  <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{task.task_id}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <p className="text-[10px] font-medium text-[var(--color-text-secondary)]">{task.task_type === "system" ? "系统任务" : "定时任务"}</p>
-                              <p className="mt-0.5 truncate font-mono text-[9px] text-[var(--color-text-hint)]">{task.executor} · {task.task_id}</p>
+                              <p className="text-[10px] font-medium text-muted-foreground">{task.task_type === "system" ? "系统任务" : "定时任务"}</p>
+                              <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{task.executor} · {task.task_id}</p>
                             </td>
                             <td className="px-3 py-2.5 align-middle"><StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge></td>
                             <td className="px-3 py-2.5 align-middle">
-                              <p className="whitespace-nowrap text-[10px] font-medium text-[var(--color-text-primary)]">
+                              <p className="whitespace-nowrap text-[10px] font-medium text-foreground">
                                 {task.next_run_at ? formatTime(task.next_run_at) : task.next_run_label || (task.task_type === "system" ? "宿主机 timer" : "—")}
                               </p>
-                              <p className="mt-0.5 truncate text-[9px] text-[var(--color-text-hint)]">
+                              <p className="mt-0.5 truncate text-[9px] text-muted-foreground/70">
                                 {task.note && ["unavailable", "unobservable"].includes(task.status)
                                   ? task.note
                                   : task.enabled ? task.schedule : task.note || "配置已停用"}
                               </p>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <div className="flex items-center gap-1.5"><StatusBadge tone={resultMeta.tone}>{resultMeta.label}</StatusBadge>{task.last_run_at ? <span className="text-[9px] text-[var(--color-text-hint)]">{formatTime(task.last_run_at)}</span> : null}</div>
-                              <p className="mt-1 truncate text-[9px] text-[var(--color-text-secondary)]">
+                              <div className="flex items-center gap-1.5"><StatusBadge tone={resultMeta.tone}>{resultMeta.label}</StatusBadge>{task.last_run_at ? <span className="text-[9px] text-muted-foreground/70">{formatTime(task.last_run_at)}</span> : null}</div>
+                              <p className="mt-1 truncate text-[9px] text-muted-foreground">
                                 {task.task_id === "postgres_backup" && task.artifact_name
                                   ? `${task.artifact_name} · ${formatBytes(task.artifact_size_bytes)}`
                                   : task.last_message || "等待首次执行记录"}
                               </p>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <div className="flex items-center gap-1">
-                                <button type="button" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-light)]" onClick={() => { setSelectedAsyncId(null); setSelectedScheduledId(task.task_id); }}>
+                              <div className="flex flex-nowrap items-center gap-0.5">
+                                <button type="button" className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent" onClick={() => { setSelectedAsyncId(null); setSelectedScheduledId(task.task_id); }}>
                                   <Eye className="h-3 w-3" />详情
                                 </button>
-                                <button type="button" disabled={!task.can_run_now || runScheduled.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-light)] disabled:cursor-not-allowed disabled:opacity-40" onClick={() => setPendingOperation({ kind: "run-scheduled", task })}>
+                                <button type="button" disabled={!task.can_run_now || runScheduled.isPending} className="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40" onClick={() => setPendingOperation({ kind: "run-scheduled", task })}>
                                   <Play className="h-3 w-3" />{task.task_id === "postgres_backup" ? "备份" : "执行"}
                                 </button>
                               </div>
@@ -1011,49 +1011,49 @@ export default function SystemTasksPage() {
                                 ? "等待 Worker"
                                 : statusLabelZh(task.status);
                         return (
-                          <tr key={`async:${task.task_id}`} className="border-t border-[var(--color-border-light)] transition hover:bg-white/65">
+                          <tr key={`async:${task.task_id}`} className="border-t border-border/60 transition hover:bg-card/65">
                             <td className="px-4 py-2.5 align-middle">
                               <div className="flex min-w-0 items-center gap-2.5">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-bg-input)] text-[var(--color-primary-dark)]">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-accent-foreground">
                                   <Workflow className="h-3.5 w-3.5" />
                                 </span>
                                 <div className="min-w-0">
-                                  <p className="truncate text-[11px] font-semibold text-[var(--ink)]">{asyncTaskName(task.task_type)}</p>
-                                  <p className="mt-0.5 truncate font-mono text-[9px] text-[var(--color-text-hint)]">{task.task_id}</p>
+                                  <p className="truncate text-[11px] font-semibold text-foreground">{asyncTaskName(task.task_type)}</p>
+                                  <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{task.task_id}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
-                              <p className="text-[10px] font-medium text-[var(--color-text-secondary)]">异步任务</p>
-                              <p className="mt-0.5 truncate font-mono text-[9px] text-[var(--color-text-hint)]">{task.task_type}</p>
+                              <p className="text-[10px] font-medium text-muted-foreground">异步任务</p>
+                              <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{task.task_type}</p>
                             </td>
                             <td className="px-3 py-2.5 align-middle"><StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge></td>
                             <td className="px-3 py-2.5 align-middle">
-                              <p className="text-[10px] font-medium text-[var(--color-text-primary)]">{queueLocationLabelZh(task.queue_location)}</p>
-                              <p className="mt-0.5 text-[9px] text-[var(--color-text-hint)]">重试 {task.retry_count}/{task.max_retries || "—"} · 代次 {task.generation}</p>
+                              <p className="text-[10px] font-medium text-foreground">{queueLocationLabelZh(task.queue_location)}</p>
+                              <p className="mt-0.5 text-[9px] text-muted-foreground/70">重试 {task.retry_count}/{task.max_retries || "—"} · 代次 {task.generation}</p>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
                               <div className="flex items-center gap-1.5">
-                                <span className={`h-1.5 w-1.5 rounded-full ${task.last_error ? "bg-[var(--color-danger)]" : task.queue_location === "processing" ? "bg-[var(--color-success)]" : "bg-[var(--color-primary)]"}`} />
-                                <span className={`truncate text-[10px] font-medium ${task.last_error ? "text-[var(--color-danger)]" : "text-[var(--color-text-primary)]"}`}>{recentLabel}</span>
+                                <span className={`h-1.5 w-1.5 rounded-full ${task.last_error ? "bg-destructive" : task.queue_location === "processing" ? "bg-success" : "bg-primary"}`} />
+                                <span className={`truncate text-[10px] font-medium ${task.last_error ? "text-destructive" : "text-foreground"}`}>{recentLabel}</span>
                               </div>
-                              <p className="mt-1 truncate text-[9px] text-[var(--color-text-hint)]">{task.last_error || formatTime(task.updated_at || task.created_at)}</p>
+                              <p className="mt-1 truncate text-[9px] text-muted-foreground/70">{task.last_error || formatTime(task.updated_at || task.created_at)}</p>
                             </td>
                             <td className="px-3 py-2.5 align-middle">
                               <div className="flex items-center gap-0.5">
-                                <button type="button" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-light)]" onClick={() => { setSelectedScheduledId(null); setSelectedAsyncId(task.task_id); }}>
+                                <button type="button" className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent" onClick={() => { setSelectedScheduledId(null); setSelectedAsyncId(task.task_id); }}>
                                   <Eye className="h-3 w-3" />详情
                                 </button>
                                 {retryable ? (
-                                  <button type="button" disabled={retryAsync.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-light)] disabled:opacity-40" onClick={() => retryAsync.mutate(task.task_id)}>
+                                  <button type="button" disabled={retryAsync.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent disabled:opacity-40" onClick={() => retryAsync.mutate(task.task_id)}>
                                     <RotateCcw className="h-3 w-3" />重试
                                   </button>
                                 ) : cancellable ? (
-                                  <button type="button" disabled={cancelAsync.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-danger-light)] hover:text-[var(--color-danger)] disabled:opacity-40" onClick={() => setPendingOperation({ kind: "cancel-async", task })}>
+                                  <button type="button" disabled={cancelAsync.isPending} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-semibold text-muted-foreground hover:bg-destructive-light hover:text-destructive disabled:opacity-40" onClick={() => setPendingOperation({ kind: "cancel-async", task })}>
                                     <Ban className="h-3 w-3" />取消
                                   </button>
                                 ) : task.trace_id ? (
-                                  <button type="button" className="inline-flex h-7 items-center rounded-lg px-2 text-[10px] font-semibold text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-light)]" onClick={() => openTrace(task.trace_id)}>Trace</button>
+                                  <button type="button" className="inline-flex h-7 items-center rounded-lg px-2 text-[10px] font-semibold text-accent-foreground hover:bg-accent" onClick={() => openTrace(task.trace_id)}>Trace</button>
                                 ) : null}
                               </div>
                             </td>
@@ -1063,7 +1063,7 @@ export default function SystemTasksPage() {
 
                       {!visibleTaskCount ? (
                         <tr>
-                          <td className="px-5 py-8 text-center text-[11px] text-[var(--color-text-secondary)]" colSpan={6}>
+                          <td className="px-5 py-8 text-center text-[11px] text-muted-foreground" colSpan={6}>
                             {taskScope === "async" && !data.redis.available
                               ? "Redis 当前不可用，无法读取异步任务实例；定时任务仍可在“定时任务”页签查看。"
                               : scheduledTasks.isFetching || asyncTasks.isFetching
@@ -1083,8 +1083,8 @@ export default function SystemTasksPage() {
                 <CardHeader className="px-4 py-3.5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-sm font-semibold text-[var(--ink)]">当前需要关注</h2>
-                      <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">仅保留高价值异常与永久失败。</p>
+                      <h2 className="text-sm font-semibold text-foreground">当前需要关注</h2>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">仅保留高价值异常与永久失败。</p>
                     </div>
                     <StatusBadge tone={health.issues.length ? healthTone(health.severity) : "success"}>
                       {health.issues.length ? `${health.issues.length} 项` : "正常"}
@@ -1093,43 +1093,43 @@ export default function SystemTasksPage() {
                 </CardHeader>
                 <CardContent className="space-y-2.5 p-4">
                   {health.issues.length > 0 ? health.issues.slice(0, 3).map((issue) => (
-                    <div key={issue.code} className={`rounded-xl border px-3 py-2.5 ${issue.severity === "error" ? "border-[var(--color-danger)]/30 bg-[var(--color-danger-light)]/65" : "border-[var(--color-warning)]/40 bg-[var(--color-warning-light)]/65"}`}>
+                    <div key={issue.code} className={`rounded-xl border px-3 py-2.5 ${issue.severity === "error" ? "border-destructive/30 bg-destructive-light/65" : "border-warning/40 bg-warning-light/65"}`}>
                       <div className="flex items-start gap-2">
                         {issue.severity === "error" ? (
-                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--color-danger)]" />
+                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                         ) : (
-                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#9b6f3b]" />
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning-foreground" />
                         )}
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[9px] font-medium text-[var(--color-text-hint)]">{ISSUE_CODE_LABELS_ZH[issue.code] || issue.code}</span>
+                            <span className="text-[9px] font-medium text-muted-foreground/70">{ISSUE_CODE_LABELS_ZH[issue.code] || issue.code}</span>
                             <StatusBadge tone={issue.severity === "error" ? "danger" : "warning"}>{severityLabelZh(issue.severity)}</StatusBadge>
                           </div>
-                          <p className="mt-1 text-[11px] leading-5 text-[var(--color-text-primary)]">{issue.message}</p>
+                          <p className="mt-1 text-[11px] leading-5 text-foreground">{issue.message}</p>
                           {issue.value !== null && issue.value !== undefined ? (
-                            <p className="mt-0.5 font-mono text-[9px] text-[var(--color-text-hint)]">当前值: {issue.value}</p>
+                            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground/70">当前值: {issue.value}</p>
                           ) : null}
                         </div>
                       </div>
                     </div>
                   )) : (
-                    <div className="flex items-center gap-2 rounded-xl border border-[var(--color-success)]/25 bg-[var(--color-success-light)] px-3 py-3 text-[11px] text-[var(--color-success)]">
+                    <div className="flex items-center gap-2 rounded-xl border border-success/25 bg-success-light px-3 py-3 text-[11px] text-success">
                       <CheckCircle2 className="h-4 w-4" />
                       当前未检测到需要人工处理的任务异常。
                     </div>
                   )}
 
-                  <div className="rounded-xl border border-[var(--color-border-light)] bg-white/55 px-3 py-2.5">
+                  <div className="rounded-xl border border-border/60 bg-card/55 px-3 py-2.5">
                     <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-semibold text-[var(--ink)]">最近永久失败</span>
-                      <span className="text-[var(--color-text-hint)]">{data.outbox.recent_failures.length} 条</span>
+                      <span className="font-semibold text-foreground">最近永久失败</span>
+                      <span className="text-muted-foreground/70">{data.outbox.recent_failures.length} 条</span>
                     </div>
                     <div className="mt-1.5 space-y-1.5">
                       {data.outbox.recent_failures.slice(0, 3).map((failure) => (
-                        <div key={failure.outbox_id} className="flex items-center justify-between gap-2 rounded-lg bg-[var(--color-bg-input)]/65 px-2.5 py-2">
+                        <div key={failure.outbox_id} className="flex items-center justify-between gap-2 rounded-lg bg-muted/65 px-2.5 py-2">
                           <div className="min-w-0">
-                            <p className="truncate font-mono text-[10px] font-semibold text-[var(--ink)]">{failure.task_type}</p>
-                            <p className="mt-0.5 truncate text-[9px] text-[var(--color-text-hint)]">{failure.last_error || failure.task_id}</p>
+                            <p className="truncate font-mono text-[10px] font-semibold text-foreground">{failure.task_type}</p>
+                            <p className="mt-0.5 truncate text-[9px] text-muted-foreground/70">{failure.last_error || failure.task_id}</p>
                           </div>
                           <Button
                             size="sm"
@@ -1144,7 +1144,7 @@ export default function SystemTasksPage() {
                         </div>
                       ))}
                       {!data.outbox.recent_failures.length ? (
-                        <p className="py-1 text-[10px] text-[var(--color-text-hint)]">暂无永久失败记录。</p>
+                        <p className="py-1 text-[10px] text-muted-foreground/70">暂无永久失败记录。</p>
                       ) : null}
                     </div>
                   </div>
@@ -1153,8 +1153,8 @@ export default function SystemTasksPage() {
 
               <Card className="rounded-2xl">
                 <CardHeader className="px-4 py-3.5">
-                  <h2 className="text-sm font-semibold text-[var(--ink)]">Trace 链路查询</h2>
-                  <p className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">关联 Outbox、Redis 任务、Worker 与答题投影回执。</p>
+                  <h2 className="text-sm font-semibold text-foreground">Trace 链路查询</h2>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">关联 Outbox、Redis 任务、Worker 与答题投影回执。</p>
                 </CardHeader>
                 <CardContent className="p-4">
                   <form
@@ -1184,24 +1184,24 @@ export default function SystemTasksPage() {
 
                   <div className="mt-3 max-h-[330px] space-y-2 overflow-y-auto pr-0.5">
                     {!traceId ? (
-                      <div className="rounded-xl border border-dashed border-[var(--color-border)] px-3 py-4 text-center text-[10px] text-[var(--color-text-hint)]">
+                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-[10px] text-muted-foreground/70">
                         输入 trace_id 后查看完整链路。
                       </div>
                     ) : traceQuery.isFetching ? (
-                      <div className="h-20 animate-pulse rounded-xl bg-[var(--color-bg-input)]" />
+                      <div className="h-20 animate-pulse rounded-xl bg-muted" />
                     ) : traceQuery.isError ? (
-                      <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger-light)] px-3 py-3 text-[10px] text-[var(--color-danger)]">
+                      <div className="rounded-xl border border-destructive/30 bg-destructive-light px-3 py-3 text-[10px] text-destructive">
                         查询失败，请确认 trace_id 格式与后端状态。
                       </div>
                     ) : traceQuery.data?.items.length ? (
                       traceQuery.data.items.map((item) => {
                         const stage = traceStageState(item, traceQuery.data?.redis_available ?? false);
                         return (
-                          <div key={item.outbox_id} className="rounded-xl border border-[var(--color-border-light)] bg-white/55 p-2.5">
+                          <div key={item.outbox_id} className="rounded-xl border border-border/60 bg-card/55 p-2.5">
                             <div className="mb-2 flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="truncate font-mono text-[10px] font-semibold text-[var(--ink)]">{item.task_type}</p>
-                                <p className="mt-0.5 truncate font-mono text-[9px] text-[var(--color-text-hint)]">{item.task_id}</p>
+                                <p className="truncate font-mono text-[10px] font-semibold text-foreground">{item.task_type}</p>
+                                <p className="mt-0.5 truncate font-mono text-[9px] text-muted-foreground/70">{item.task_id}</p>
                               </div>
                               <StatusBadge tone={traceStatusTone(item.queue?.status || item.outbox_status)}>{statusLabelZh(item.queue?.status || item.outbox_status)}</StatusBadge>
                             </div>
@@ -1212,7 +1212,7 @@ export default function SystemTasksPage() {
                               <TraceStage label="答题投影" value={stage.projection.value} tone={stage.projection.tone} />
                             </div>
                             {item.outbox_error || item.queue?.last_error ? (
-                              <p className="mt-2 line-clamp-2 rounded-lg bg-[var(--color-danger-light)] px-2 py-1.5 text-[9px] leading-4 text-[var(--color-danger)]">
+                              <p className="mt-2 line-clamp-2 rounded-lg bg-destructive-light px-2 py-1.5 text-[9px] leading-4 text-destructive">
                                 {item.outbox_error || item.queue?.last_error}
                               </p>
                             ) : null}
@@ -1220,7 +1220,7 @@ export default function SystemTasksPage() {
                         );
                       })
                     ) : (
-                      <div className="rounded-xl border border-dashed border-[var(--color-border)] px-3 py-4 text-center text-[10px] text-[var(--color-text-hint)]">
+                      <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-[10px] text-muted-foreground/70">
                         未找到与该 trace_id 关联的任务。
                       </div>
                     )}
@@ -1238,8 +1238,8 @@ export default function SystemTasksPage() {
         className="w-full max-w-xl"
         title={
           <div>
-            <p className="text-xs font-semibold text-[var(--ink)]">任务详情</p>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--color-text-hint)]">
+            <p className="text-xs font-semibold text-foreground">任务详情</p>
+            <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/70">
               {selectedScheduledTask?.task_id || selectedAsyncId || ""}
             </p>
           </div>
@@ -1247,14 +1247,14 @@ export default function SystemTasksPage() {
       >
         {selectedScheduledTask ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/55 p-4">
+            <div className="rounded-2xl border border-border/60 bg-muted/55 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    {selectedScheduledTask.task_type === "system" ? <Database className="h-4 w-4 text-[var(--color-primary-dark)]" /> : <CalendarClock className="h-4 w-4 text-[var(--color-primary-dark)]" />}
-                    <h3 className="text-base font-semibold text-[var(--ink)]">{selectedScheduledTask.name}</h3>
+                    {selectedScheduledTask.task_type === "system" ? <Database className="h-4 w-4 text-accent-foreground" /> : <CalendarClock className="h-4 w-4 text-accent-foreground" />}
+                    <h3 className="text-base font-semibold text-foreground">{selectedScheduledTask.name}</h3>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-[var(--color-text-secondary)]">{selectedScheduledTask.description}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">{selectedScheduledTask.description}</p>
                 </div>
                 {(() => {
                   const meta = taskStatusMeta(selectedScheduledTask.status);
@@ -1272,29 +1272,29 @@ export default function SystemTasksPage() {
                 ["最近耗时", selectedScheduledTask.last_duration_ms != null ? `${selectedScheduledTask.last_duration_ms} ms` : "—"],
                 ["是否启用", selectedScheduledTask.enabled ? "已启用" : "已停用"],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl border border-[var(--color-border-light)] px-3 py-2.5">
-                  <p className="text-[10px] text-[var(--color-text-hint)]">{label}</p>
-                  <p className="mt-1 text-xs font-medium text-[var(--ink)]">{value}</p>
+                <div key={label} className="rounded-xl border border-border/60 px-3 py-2.5">
+                  <p className="text-[10px] text-muted-foreground/70">{label}</p>
+                  <p className="mt-1 text-xs font-medium text-foreground">{value}</p>
                 </div>
               ))}
             </div>
 
-            <div className="rounded-xl border border-[var(--color-border-light)] px-3 py-3">
-              <p className="text-[10px] font-semibold text-[var(--color-text-hint)]">最近执行结果</p>
+            <div className="rounded-xl border border-border/60 px-3 py-3">
+              <p className="text-[10px] font-semibold text-muted-foreground/70">最近执行结果</p>
               <div className="mt-2 flex items-center gap-2">
                 {(() => {
                   const meta = runResultMeta(selectedScheduledTask.last_status);
                   return <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>;
                 })()}
-                <span className="text-xs text-[var(--color-text-secondary)]">{selectedScheduledTask.last_message || "暂无执行记录"}</span>
+                <span className="text-xs text-muted-foreground">{selectedScheduledTask.last_message || "暂无执行记录"}</span>
               </div>
             </div>
 
             {selectedScheduledTask.task_id === "postgres_backup" ? (
               <div className="space-y-3">
-                <div className="rounded-xl border border-[var(--color-border-light)] px-3 py-3">
+                <div className="rounded-xl border border-border/60 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-semibold text-[var(--color-text-hint)]">PostgreSQL 备份状态</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground/70">PostgreSQL 备份状态</p>
                     <StatusBadge tone={selectedScheduledTask.executor_available === true ? "success" : "warning"}>
                       {selectedScheduledTask.executor_available === true
                         ? "定时器正常"
@@ -1312,33 +1312,33 @@ export default function SystemTasksPage() {
                       ["定时器", selectedScheduledTask.timer_unit || "postgres-backup.timer"],
                       ["执行能力", selectedScheduledTask.can_run_now ? (selectedScheduledTask.service_loaded ? "systemd 服务" : selectedScheduledTask.script_available ? "项目备份脚本" : selectedScheduledTask.pg_dump_available ? "pg_dump 兜底" : "当前不可执行") : "当前不可执行"],
                     ].map(([label, value]) => (
-                      <div key={label} className="min-w-0 rounded-lg bg-[var(--color-bg-input)]/65 px-2.5 py-2">
-                        <p className="text-[9px] text-[var(--color-text-hint)]">{label}</p>
-                        <p className="mt-1 break-all text-[10px] font-medium text-[var(--ink)]">{value}</p>
+                      <div key={label} className="min-w-0 rounded-lg bg-muted/65 px-2.5 py-2">
+                        <p className="text-[9px] text-muted-foreground/70">{label}</p>
+                        <p className="mt-1 break-all text-[10px] font-medium text-foreground">{value}</p>
                       </div>
                     ))}
                   </div>
-                  {selectedScheduledTask.note ? <p className="mt-2 text-[10px] leading-5 text-[#8d6639]">{selectedScheduledTask.note}</p> : null}
+                  {selectedScheduledTask.note ? <p className="mt-2 text-[10px] leading-5 text-warning-foreground">{selectedScheduledTask.note}</p> : null}
                 </div>
 
-                <div className="rounded-xl border border-[var(--color-border-light)] px-3 py-3">
+                <div className="rounded-xl border border-border/60 px-3 py-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-semibold text-[var(--color-text-hint)]">最近备份</p>
-                    <span className="font-mono text-[9px] text-[var(--color-text-hint)]">{backupHistory.data?.total ?? selectedScheduledTask.backup_count ?? 0} 个文件</span>
+                    <p className="text-[10px] font-semibold text-muted-foreground/70">最近备份</p>
+                    <span className="font-mono text-[9px] text-muted-foreground/70">{backupHistory.data?.total ?? selectedScheduledTask.backup_count ?? 0} 个文件</span>
                   </div>
-                  <div className="mt-2 divide-y divide-[var(--color-border-light)]">
+                  <div className="mt-2 divide-y divide-border/60">
                     {backupHistory.isFetching ? (
-                      <p className="py-3 text-[10px] text-[var(--color-text-hint)]">正在读取备份目录…</p>
+                      <p className="py-3 text-[10px] text-muted-foreground/70">正在读取备份目录…</p>
                     ) : backupHistory.data?.items.length ? backupHistory.data.items.map((item) => (
                       <div key={`${item.name}:${item.created_at}`} className="flex items-center justify-between gap-3 py-2">
                         <div className="min-w-0">
-                          <p className="truncate font-mono text-[10px] font-medium text-[var(--ink)]">{item.name}</p>
-                          <p className="mt-0.5 text-[9px] text-[var(--color-text-hint)]">{formatTime(item.created_at)} · {item.method || "external"}</p>
+                          <p className="truncate font-mono text-[10px] font-medium text-foreground">{item.name}</p>
+                          <p className="mt-0.5 text-[9px] text-muted-foreground/70">{formatTime(item.created_at)} · {item.method || "external"}</p>
                         </div>
-                        <span className="shrink-0 font-mono text-[9px] text-[var(--color-text-secondary)]">{formatBytes(item.size_bytes)}</span>
+                        <span className="shrink-0 font-mono text-[9px] text-muted-foreground">{formatBytes(item.size_bytes)}</span>
                       </div>
                     )) : (
-                      <p className="py-3 text-[10px] text-[var(--color-text-hint)]">当前备份目录中尚未发现可展示的备份文件。</p>
+                      <p className="py-3 text-[10px] text-muted-foreground/70">当前备份目录中尚未发现可展示的备份文件。</p>
                     )}
                   </div>
                 </div>
@@ -1359,21 +1359,21 @@ export default function SystemTasksPage() {
         ) : selectedAsyncId ? (
           taskDetail.isFetching ? (
             <div className="space-y-3">
-              <div className="h-24 animate-pulse rounded-2xl bg-[var(--color-bg-input)]" />
-              <div className="h-48 animate-pulse rounded-2xl bg-[var(--color-bg-input)]" />
+              <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+              <div className="h-48 animate-pulse rounded-2xl bg-muted" />
             </div>
           ) : taskDetail.isError || !taskDetail.data ? (
-            <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger-light)] p-4 text-xs text-[var(--color-danger)]">无法读取任务详情，任务可能已结束并从 Redis 中清理。</div>
+            <div className="rounded-xl border border-destructive/25 bg-destructive-light p-4 text-xs text-destructive">无法读取任务详情，任务可能已结束并从 Redis 中清理。</div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[var(--color-border-light)] bg-[var(--color-bg-input)]/55 p-4">
+              <div className="rounded-2xl border border-border/60 bg-muted/55 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Workflow className="h-4 w-4 text-[var(--color-primary-dark)]" />
-                      <h3 className="text-base font-semibold text-[var(--ink)]">{asyncTaskName(taskDetail.data.task_type)}</h3>
+                      <Workflow className="h-4 w-4 text-accent-foreground" />
+                      <h3 className="text-base font-semibold text-foreground">{asyncTaskName(taskDetail.data.task_type)}</h3>
                     </div>
-                    <p className="mt-1 font-mono text-[10px] text-[var(--color-text-hint)]">{taskDetail.data.task_type}</p>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">{taskDetail.data.task_type}</p>
                   </div>
                   {(() => {
                     const meta = taskStatusMeta(taskDetail.data.status, taskDetail.data.queue_location);
@@ -1391,32 +1391,32 @@ export default function SystemTasksPage() {
                   ["创建时间", formatTime(taskDetail.data.created_at)],
                   ["更新时间", formatTime(taskDetail.data.updated_at)],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-[var(--color-border-light)] px-3 py-2.5">
-                    <p className="text-[10px] text-[var(--color-text-hint)]">{label}</p>
-                    <p className="mt-1 break-all text-xs font-medium text-[var(--ink)]">{value}</p>
+                  <div key={label} className="rounded-xl border border-border/60 px-3 py-2.5">
+                    <p className="text-[10px] text-muted-foreground/70">{label}</p>
+                    <p className="mt-1 break-all text-xs font-medium text-foreground">{value}</p>
                   </div>
                 ))}
               </div>
 
               {(taskDetail.data.trace_id || taskDetail.data.request_id) ? (
-                <div className="rounded-xl border border-[var(--color-border-light)] px-3 py-3">
-                  <p className="text-[10px] font-semibold text-[var(--color-text-hint)]">关联标识</p>
-                  {taskDetail.data.trace_id ? <p className="mt-2 break-all font-mono text-[10px] text-[var(--ink)]">trace: {taskDetail.data.trace_id}</p> : null}
-                  {taskDetail.data.request_id ? <p className="mt-1 break-all font-mono text-[10px] text-[var(--color-text-secondary)]">request: {taskDetail.data.request_id}</p> : null}
+                <div className="rounded-xl border border-border/60 px-3 py-3">
+                  <p className="text-[10px] font-semibold text-muted-foreground/70">关联标识</p>
+                  {taskDetail.data.trace_id ? <p className="mt-2 break-all font-mono text-[10px] text-foreground">trace: {taskDetail.data.trace_id}</p> : null}
+                  {taskDetail.data.request_id ? <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">request: {taskDetail.data.request_id}</p> : null}
                 </div>
               ) : null}
 
               {taskDetail.data.last_error ? (
-                <div className="rounded-xl border border-[var(--color-danger)]/25 bg-[var(--color-danger-light)] px-3 py-3">
-                  <p className="text-[10px] font-semibold text-[var(--color-danger)]">最近错误</p>
-                  <p className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-[var(--color-danger)]">{taskDetail.data.last_error}</p>
+                <div className="rounded-xl border border-destructive/25 bg-destructive-light px-3 py-3">
+                  <p className="text-[10px] font-semibold text-destructive">最近错误</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] leading-5 text-destructive">{taskDetail.data.last_error}</p>
                 </div>
               ) : null}
 
               {taskDetail.data.payload_summary ? (
-                <div className="rounded-xl border border-[var(--color-border-light)] px-3 py-3">
-                  <p className="text-[10px] font-semibold text-[var(--color-text-hint)]">Payload 摘要</p>
-                  <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--color-bg-input)] p-3 font-mono text-[10px] leading-5 text-[var(--color-text-secondary)]">{JSON.stringify(taskDetail.data.payload_summary, null, 2)}</pre>
+                <div className="rounded-xl border border-border/60 px-3 py-3">
+                  <p className="text-[10px] font-semibold text-muted-foreground/70">Payload 摘要</p>
+                  <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted p-3 font-mono text-[10px] leading-5 text-muted-foreground">{JSON.stringify(taskDetail.data.payload_summary, null, 2)}</pre>
                 </div>
               ) : null}
 
@@ -1462,6 +1462,6 @@ export default function SystemTasksPage() {
           if (pendingOperation?.kind === "cancel-async") cancelAsync.mutate(pendingOperation.task.task_id);
         }}
       />
-    </div>
+    </ManagementPage>
   );
 }

@@ -29,14 +29,14 @@ export function buildBatchCompleteResultState(
           isFailed,
           label: isFailed ? "失败" : "跳过",
           containerClass: isFailed
-            ? "border-[var(--color-danger)]/40 bg-[var(--color-danger-light)]/30"
-            : "border-[var(--color-border)] bg-white/60",
+            ? "border-destructive/40 bg-destructive-light/30"
+            : "border-border bg-card/60",
           labelClass: isFailed
-            ? "text-[var(--color-danger)]"
-            : "text-[var(--color-text-hint)]",
+            ? "text-destructive"
+            : "text-muted-foreground/70",
           errorClass: isFailed
-            ? "text-[var(--color-danger)]"
-            : "text-[var(--color-text-secondary)]",
+            ? "text-destructive"
+            : "text-muted-foreground",
         };
       }),
   };

@@ -39,12 +39,12 @@ export function CustomCheckbox({
         relative inline-flex items-center justify-center
         h-[18px] w-[18px] shrink-0 rounded-[4px] border
         transition-all duration-150 active:scale-90
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-1
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1
         ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}
         ${
           checked || isMixed
-            ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
-            : "border-[var(--color-border)] bg-white hover:border-[var(--color-primary)]"
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-card hover:border-primary"
         }
         ${className}
       `}

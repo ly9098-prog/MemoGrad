@@ -15,9 +15,7 @@ import {
   syncDerivedMultiBlankFields,
   type BlankOptionGroup,
   type BlankOption,
-  type BlankAnswerMap,
   type MultiBlankEditState,
-  type MultiBlankAction,
 } from "../multi-blank-choice-utils";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -930,7 +928,8 @@ describe("answerMap canonical answer sync", () => {
 
   it("clear ① → answer incomplete", () => {
     const answerMap: Record<string, string> = { "①": "D", "②": "A" };
-    const { "①": _removed, ...rest } = answerMap;
+    const rest = { ...answerMap };
+    delete rest["①"];
     const canonical = serializeBlankAnswer(rest, groupIds);
     expect(canonical).toBe("②:A");
     expect(Object.keys(rest)).toHaveLength(1);

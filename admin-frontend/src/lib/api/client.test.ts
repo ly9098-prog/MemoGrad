@@ -49,9 +49,8 @@ describe("apiRequest — auth refresh", () => {
     let refreshCount = 0;
     let normalCount = 0;
 
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       const path = typeof url === "string" ? url : "";
-      const headers = init instanceof Request ? init.headers : init?.headers;
 
       if (path.includes("/auth/refresh")) {
         refreshCount++;
@@ -82,9 +81,7 @@ describe("apiRequest — auth refresh", () => {
     const onExpired = vi.fn();
     setOnAuthExpired(onExpired);
 
-    let callCount = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
-      callCount++;
       return new Response(JSON.stringify({ detail: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     });
 
