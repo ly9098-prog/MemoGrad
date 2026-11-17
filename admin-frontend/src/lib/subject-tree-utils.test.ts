@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   flattenSubjects,
+  visibleSubjects,
   buildSubjectRelations,
   summarizeSubjects,
   scopeLabel,
@@ -37,6 +38,17 @@ describe("flattenSubjects", () => {
   });
   it("handles empty", () => {
     expect(flattenSubjects([])).toEqual([]);
+  });
+});
+
+describe("visibleSubjects", () => {
+  it("hides the entire descendant branch while preserving other roots", () => {
+    const flat = flattenSubjects([...tree, makeNode(5)]);
+    expect(visibleSubjects(flat, "", new Set([1])).map(item => item.id)).toEqual([1, 5]);
+    expect(visibleSubjects(flat, "", new Set([3])).map(item => item.id)).toEqual([1, 2, 3, 5]);
+  });
+  it("shows matching descendants and their ancestor context even in collapsed branches", () => {
+    expect(visibleSubjects(flattenSubjects(tree), "进程", new Set([1, 3])).map(item => item.id)).toEqual([1, 3, 4]);
   });
 });
 

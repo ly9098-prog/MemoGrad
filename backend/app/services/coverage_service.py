@@ -12,6 +12,7 @@ from app.models.question import Question
 from app.models.question_knowledge_point import QuestionKnowledgePoint
 from app.models.syllabus import SyllabusKnowledgePoint, SyllabusVersion
 from app.services import recommendation_quality_service, syllabus_service
+from app.services.knowledge_outline import load_outline
 
 
 class CoverageError(ValueError):
@@ -422,6 +423,9 @@ async def build_coverage_report(
     members = await _load_members(db, version, subject_id)
     kp_ids = [int(member.knowledge_point_id) for member, _ in members]
     subject_ids = sorted({int(member.subject_id) for member, _ in members})
+    outline = await load_outline(
+        db, subject_ids, {int(member.knowledge_point_id): member for member, _ in members}
+    )
     scope_conditions = [
         Question.subject_id.in_(subject_ids),
         Question.is_active.is_(True),
@@ -740,6 +744,7 @@ async def build_coverage_report(
                 "subject_code": subject.code,
                 "subject_name": subject.name,
                 "name": member.name_snapshot,
+                **outline.get(kp_id, {}),
                 "total_question_count": total,
                 "past_exam_choice_count": int(past_counts.get(kp_id, 0)),
                 "mock_choice_count": int(mock_counts.get(kp_id, 0)),

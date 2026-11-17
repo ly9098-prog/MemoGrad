@@ -16,7 +16,8 @@ describe("admin workspace layout contract", () => {
   });
   it("joins the sidebar without a floating panel gutter or shadow", () => {
     expect(workspace).toMatch(/margin:\s*0;/);
-    expect(workspace).toMatch(/border-radius:\s*20px 0 0 0;/);
+    expect(workspace).toMatch(/border:\s*0;/);
+    expect(workspace).toMatch(/border-radius:\s*0;/);
     expect(workspace).not.toContain("box-shadow");
   });
 

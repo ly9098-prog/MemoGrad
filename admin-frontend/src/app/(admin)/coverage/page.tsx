@@ -21,9 +21,11 @@ import {
   WorkspaceSelect,
   workspaceStyles as ws,
 } from "@/components/admin/workspace";
+import { groupKnowledgeChapters, outlineLabel } from "@/lib/knowledge-outline";
 import { getQuestionTypeLabel } from "@/lib/question-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type {
   CoverageMatrixItem,
@@ -55,6 +57,10 @@ export default function CoveragePage() {
   const [yearTo, setYearTo] = useState("");
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState<CoverageStatus | "">("");
+
+  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
+    new Set(),
+  );
 
   const versionsQuery = useQuery({
     queryKey: ["syllabus", "versions", "coverage"],
@@ -121,9 +127,24 @@ export default function CoveragePage() {
     placeholderData: (previousData) => previousData,
   });
 
+  const debouncedKeyword = useDebouncedValue(keyword, 200);
   const filteredItems = useMemo(() => {
-    return filterCoverageItems(reportQuery.data?.items ?? [], keyword, status);
-  }, [keyword, reportQuery.data?.items, status]);
+    return filterCoverageItems(reportQuery.data?.items ?? [], debouncedKeyword, status);
+  }, [debouncedKeyword, reportQuery.data?.items, status]);
+
+  const chapters = useMemo(
+    () => groupKnowledgeChapters(filteredItems),
+    [filteredItems],
+  );
+  const isSearching = Boolean(keyword.trim() || status);
+  function toggleChapter(key: string) {
+    setCollapsedChapters((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   const summary = reportQuery.data?.summary;
   const quality = reportQuery.data?.quality_issues;
@@ -214,6 +235,7 @@ export default function CoveragePage() {
             <label className={ws.field}>
               <span>考纲版本</span>
               <WorkspaceSelect
+                aria-label="考纲版本"
                 value={versionId}
                 onChange={(value) => {
                   setVersionId(value);
@@ -230,6 +252,7 @@ export default function CoveragePage() {
             <label className={ws.field}>
               <span>科目范围</span>
               <WorkspaceSelect
+                aria-label="科目范围"
                 value={subjectId}
                 onChange={setSubjectId}
                 options={[
@@ -371,6 +394,7 @@ export default function CoveragePage() {
         ) : null}
         <WorkspaceSectionHeader
           title="知识点覆盖矩阵"
+          description={`${chapters.length} 个章节分组 · ${filteredItems.length} 个知识点 · 按章节顺序排列`}
           actions={
             <div className={ws.coverageLocalFilters}>
               <label className={ws.search}>
@@ -515,160 +539,229 @@ export default function CoveragePage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredItems.map((item: CoverageMatrixItem) => (
-                    <tr key={item.syllabus_knowledge_point_id}>
-                      <td className={ws.knowledgeCell}>
-                        <p>{item.name}</p>
-                        <p className={ws.caption}>
-                          {item.subject_name} · KP #{item.knowledge_point_id}
-                        </p>
-                        {item.years.length ? (
-                          <p className={ws.caption}>
-                            年份 {item.years.slice(0, 6).join(" / ")}
-                          </p>
-                        ) : null}
-                        {Object.keys(item.question_type_counts).length ? (
-                          <p className={ws.caption}>
-                            {Object.entries(item.question_type_counts)
-                              .map(
-                                ([type, count]) =>
-                                  `${getQuestionTypeLabel(type)} ${count}`,
-                              )
-                              .join(" · ")}
-                          </p>
-                        ) : null}
-                        {item.sources.length ? (
-                          <p
-                            className={ws.caption}
-                            title={item.sources.join(" / ")}
-                          >
-                            来源 {item.sources.join(" / ")}
-                          </p>
-                        ) : null}
-                        {item.issues.length ? (
-                          <p className="mt-2 text-xs leading-5 text-warning-foreground">
-                            {item.issues.join("；")}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="text-right font-medium">
-                        {item.total_question_count}
-                      </td>
-                      <td className="text-right">
-                        {item.past_exam_choice_count}
-                      </td>
-                      <td className="text-right">{item.mock_choice_count}</td>
-                      <td className="text-right">
-                        {item.difficulty_easy_count}
-                      </td>
-                      <td className="text-right">
-                        {item.difficulty_medium_count}
-                      </td>
-                      <td className="text-right">
-                        {item.difficulty_hard_count}
-                      </td>
-                      <td className="text-right">
-                        {item.missing_analysis_count}
-                      </td>
-                      <td>
-                        <StatusBadge tone={coverageTone(item.status)}>
-                          {STATUS_LABEL[item.status]}
-                        </StatusBadge>
-                      </td>
-                      <td>
-                        <div className={ws.matrixAction}>
-                          <Link
-                            href={questionBankHref(item.knowledge_point_id)}
-                            className={ws.textLink}
-                          >
-                            看题库
-                          </Link>
-                          <Link
-                            href="/imports/text-import"
-                            className={ws.textLink}
-                          >
-                            去导题
-                            <ArrowUpRight size={12} aria-hidden="true" />
-                          </Link>
-                        </div>
-                      </td>
+                {chapters.map((chapter) => (
+                  <tbody key={chapter.key}>
+                    <tr className={ws.matrixChapterRow}>
+                      <th colSpan={10} scope="rowgroup">
+                        <button
+                          type="button"
+                          aria-expanded={
+                            isSearching || !collapsedChapters.has(chapter.key)
+                          }
+                          onClick={() => toggleChapter(chapter.key)}
+                          disabled={isSearching}
+                        >
+                          <ChevronDown
+                            size={14}
+                            aria-hidden="true"
+                            className={
+                              !isSearching && collapsedChapters.has(chapter.key)
+                                ? "-rotate-90"
+                                : ""
+                            }
+                          />
+                          <span>{chapter.subject}</span>
+                          <strong>{chapter.name}</strong>
+                          <small>{chapter.items.length} 项</small>
+                        </button>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
+                    {(isSearching || !collapsedChapters.has(chapter.key)) &&
+                      chapter.items.map((item: CoverageMatrixItem) => (
+                        <tr key={item.syllabus_knowledge_point_id}>
+                          <td
+                            className={ws.knowledgeCell}
+                            style={{
+                              paddingInlineStart: `${24 + Math.min(item.outline_depth ?? 0, 5) * 12}px`,
+                            }}
+                          >
+                            <p>{outlineLabel(item)}</p>
+                            <p className={ws.caption}>
+                              {item.subject_name} · KP #
+                              {item.knowledge_point_id}
+                            </p>
+                            {item.years.length ? (
+                              <p className={ws.caption}>
+                                年份 {item.years.slice(0, 6).join(" / ")}
+                              </p>
+                            ) : null}
+                            {Object.keys(item.question_type_counts).length ? (
+                              <p className={ws.caption}>
+                                {Object.entries(item.question_type_counts)
+                                  .map(
+                                    ([type, count]) =>
+                                      `${getQuestionTypeLabel(type)} ${count}`,
+                                  )
+                                  .join(" · ")}
+                              </p>
+                            ) : null}
+                            {item.sources.length ? (
+                              <p
+                                className={ws.caption}
+                                title={item.sources.join(" / ")}
+                              >
+                                来源 {item.sources.join(" / ")}
+                              </p>
+                            ) : null}
+                            {item.issues.length ? (
+                              <p className="mt-2 text-xs leading-5 text-warning-foreground">
+                                {item.issues.join("；")}
+                              </p>
+                            ) : null}
+                          </td>
+                          <td className="text-right font-medium">
+                            {item.total_question_count}
+                          </td>
+                          <td className="text-right">
+                            {item.past_exam_choice_count}
+                          </td>
+                          <td className="text-right">
+                            {item.mock_choice_count}
+                          </td>
+                          <td className="text-right">
+                            {item.difficulty_easy_count}
+                          </td>
+                          <td className="text-right">
+                            {item.difficulty_medium_count}
+                          </td>
+                          <td className="text-right">
+                            {item.difficulty_hard_count}
+                          </td>
+                          <td className="text-right">
+                            {item.missing_analysis_count}
+                          </td>
+                          <td>
+                            <StatusBadge tone={coverageTone(item.status)}>
+                              {STATUS_LABEL[item.status]}
+                            </StatusBadge>
+                          </td>
+                          <td>
+                            <div className={ws.matrixAction}>
+                              <Link
+                                href={questionBankHref(item.knowledge_point_id)}
+                                className={ws.textLink}
+                              >
+                                看题库
+                              </Link>
+                              <Link
+                                href="/imports/text-import"
+                                className={ws.textLink}
+                              >
+                                去导题
+                                <ArrowUpRight size={12} aria-hidden="true" />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                ))}
               </table>
             </div>
             <div className={ws.matrixMobile}>
-              {filteredItems.map((item) => (
-                <details key={item.syllabus_knowledge_point_id}>
-                  <summary>
+              {chapters.map((chapter) => (
+                <section key={chapter.key}>
+                  <button
+                    type="button"
+                    className={ws.mobileChapterHeader}
+                    aria-expanded={
+                      isSearching || !collapsedChapters.has(chapter.key)
+                    }
+                    onClick={() => toggleChapter(chapter.key)}
+                    disabled={isSearching}
+                  >
+                    <ChevronDown
+                      size={14}
+                      aria-hidden="true"
+                      className={
+                        !isSearching && collapsedChapters.has(chapter.key)
+                          ? "-rotate-90"
+                          : ""
+                      }
+                    />
                     <span>
-                      <strong>{item.name}</strong>
-                      <small>
-                        {item.subject_name} · {item.total_question_count} 道题
-                      </small>
+                      <small>{chapter.subject}</small>
+                      <strong>{chapter.name}</strong>
                     </span>
-                    <StatusBadge tone={coverageTone(item.status)}>
-                      {STATUS_LABEL[item.status]}
-                    </StatusBadge>
-                    <ChevronDown size={16} aria-hidden="true" />
-                  </summary>
-                  <div className={ws.matrixMobileBody}>
-                    <dl>
-                      {[
-                        ["真题选择", item.past_exam_choice_count],
-                        ["模拟选择", item.mock_choice_count],
-                        ["简单", item.difficulty_easy_count],
-                        ["中等", item.difficulty_medium_count],
-                        ["困难", item.difficulty_hard_count],
-                        ["缺解析", item.missing_analysis_count],
-                      ].map(([label, value]) => (
-                        <div key={String(label)}>
-                          <dt>{label}</dt>
-                          <dd>{value}</dd>
+                    <small>{chapter.items.length} 项</small>
+                  </button>
+                  {(isSearching || !collapsedChapters.has(chapter.key)) &&
+                    chapter.items.map((item) => (
+                      <details key={item.syllabus_knowledge_point_id}>
+                        <summary>
+                          <span>
+                            <strong>{outlineLabel(item)}</strong>
+                            <small>
+                              {item.subject_name} · {item.total_question_count}{" "}
+                              道题
+                            </small>
+                          </span>
+                          <StatusBadge tone={coverageTone(item.status)}>
+                            {STATUS_LABEL[item.status]}
+                          </StatusBadge>
+                          <ChevronDown size={16} aria-hidden="true" />
+                        </summary>
+                        <div className={ws.matrixMobileBody}>
+                          <dl>
+                            {[
+                              ["真题选择", item.past_exam_choice_count],
+                              ["模拟选择", item.mock_choice_count],
+                              ["简单", item.difficulty_easy_count],
+                              ["中等", item.difficulty_medium_count],
+                              ["困难", item.difficulty_hard_count],
+                              ["缺解析", item.missing_analysis_count],
+                            ].map(([label, value]) => (
+                              <div key={String(label)}>
+                                <dt>{label}</dt>
+                                <dd>{value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                          <p className={ws.caption}>
+                            KP #{item.knowledge_point_id}
+                            {item.years.length
+                              ? ` · 年份 ${item.years.join(" / ")}`
+                              : ""}
+                          </p>
+                          {item.sources.length ? (
+                            <p className={ws.caption}>
+                              来源 {item.sources.join(" / ")}
+                            </p>
+                          ) : null}
+                          {Object.keys(item.question_type_counts).length ? (
+                            <p className={ws.caption}>
+                              {Object.entries(item.question_type_counts)
+                                .map(
+                                  ([type, count]) =>
+                                    `${getQuestionTypeLabel(type)} ${count}`,
+                                )
+                                .join(" · ")}
+                            </p>
+                          ) : null}
+                          {item.issues.length ? (
+                            <p className="mt-2 text-xs leading-5 text-warning-foreground">
+                              {item.issues.join("；")}
+                            </p>
+                          ) : null}
+                          <div className={`${ws.actions} mt-3`}>
+                            <Link
+                              href={questionBankHref(item.knowledge_point_id)}
+                              className={ws.actionLink}
+                            >
+                              看题库
+                            </Link>
+                            <Link
+                              href="/imports/text-import"
+                              className={ws.textLink}
+                            >
+                              去导题
+                              <ArrowUpRight size={14} aria-hidden="true" />
+                            </Link>
+                          </div>
                         </div>
-                      ))}
-                    </dl>
-                    <p className={ws.caption}>
-                      KP #{item.knowledge_point_id}
-                      {item.years.length
-                        ? ` · 年份 ${item.years.join(" / ")}`
-                        : ""}
-                    </p>
-                    {item.sources.length ? (
-                      <p className={ws.caption}>
-                        来源 {item.sources.join(" / ")}
-                      </p>
-                    ) : null}
-                    {Object.keys(item.question_type_counts).length ? (
-                      <p className={ws.caption}>
-                        {Object.entries(item.question_type_counts)
-                          .map(
-                            ([type, count]) =>
-                              `${getQuestionTypeLabel(type)} ${count}`,
-                          )
-                          .join(" · ")}
-                      </p>
-                    ) : null}
-                    {item.issues.length ? (
-                      <p className="mt-2 text-xs leading-5 text-warning-foreground">
-                        {item.issues.join("；")}
-                      </p>
-                    ) : null}
-                    <div className={`${ws.actions} mt-3`}>
-                      <Link
-                        href={questionBankHref(item.knowledge_point_id)}
-                        className={ws.actionLink}
-                      >
-                        看题库
-                      </Link>
-                      <Link href="/imports/text-import" className={ws.textLink}>
-                        去导题
-                        <ArrowUpRight size={14} aria-hidden="true" />
-                      </Link>
-                    </div>
-                  </div>
-                </details>
+                      </details>
+                    ))}
+                </section>
               ))}
             </div>
           </>

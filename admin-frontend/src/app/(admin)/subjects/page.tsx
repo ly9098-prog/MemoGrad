@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle, RefreshCw, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  Folder,
+  FolderOpen,
+  LoaderCircle,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import {
   EmptyState,
   ManagementSkeletonRows,
@@ -22,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiRequest } from "@/lib/api/client";
 import type {
   AdminSubjectListResponse,
@@ -32,6 +41,7 @@ import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
 import {
   flattenSubjects,
+  visibleSubjects,
   buildSubjectRelations,
   summarizeSubjects,
   scopeLabel,
@@ -58,6 +68,7 @@ export default function SubjectsPage() {
   const [actionNotice, setActionNotice] = useState<ActionNotice>(null);
   const [blockedSubjectId, setBlockedSubjectId] = useState<number | null>(null);
   const [keyword, setKeyword] = useState("");
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
 
   const query = useQuery({
     queryKey: ["subjects", "include-inactive"],
@@ -154,15 +165,11 @@ export default function SubjectsPage() {
   const activeCoreCount = coreSubjects.filter((item) => item.is_active).length;
   const inactiveSubjectCount = flat.filter((item) => !item.is_active).length;
   const scopeReady = Boolean(productRoot?.is_active) && activeCoreCount >= 4;
-  const normalizedKeyword = keyword.trim().toLowerCase();
+  const debouncedKeyword = useDebouncedValue(keyword, 200);
+  const normalizedKeyword = debouncedKeyword.trim().toLowerCase();
   const filteredFlat = useMemo(() => {
-    if (!normalizedKeyword) return flat;
-    return flat.filter((subject) =>
-      `${subject.name} ${subject.code} ${subject.path}`
-        .toLowerCase()
-        .includes(normalizedKeyword),
-    );
-  }, [flat, normalizedKeyword]);
+    return visibleSubjects(flat, normalizedKeyword, collapsedIds);
+  }, [flat, normalizedKeyword, collapsedIds]);
   const { activeDescendantsById } = useMemo(
     () => buildSubjectRelations(query.data?.items || []),
     [query.data],
@@ -368,6 +375,7 @@ export default function SubjectsPage() {
                         className={ws.subjectRow}
                         data-root={subject.is_product_root}
                         data-blocked={blockedSubjectId === subject.id}
+                        data-depth={subject.depth}
                       >
                         <td>
                           <div
@@ -379,7 +387,55 @@ export default function SubjectsPage() {
                             }
                           >
                             <div>
+                              {subject.children?.length ? (
+                                <button
+                                  type="button"
+                                  className={ws.subjectBranch}
+                                  aria-label={`${normalizedKeyword || !collapsedIds.has(subject.id) ? "收起" : "展开"}${subject.name}`}
+                                  aria-expanded={
+                                    Boolean(normalizedKeyword) ||
+                                    !collapsedIds.has(subject.id)
+                                  }
+                                  disabled={Boolean(normalizedKeyword)}
+                                  onClick={() =>
+                                    setCollapsedIds((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(subject.id))
+                                        next.delete(subject.id);
+                                      else next.add(subject.id);
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  <ChevronDown
+                                    size={14}
+                                    aria-hidden="true"
+                                    className={
+                                      !normalizedKeyword &&
+                                      collapsedIds.has(subject.id)
+                                        ? "-rotate-90"
+                                        : ""
+                                    }
+                                  />
+                                  {!normalizedKeyword &&
+                                  collapsedIds.has(subject.id) ? (
+                                    <Folder size={16} aria-hidden="true" />
+                                  ) : (
+                                    <FolderOpen size={16} aria-hidden="true" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span
+                                  className={ws.subjectLeaf}
+                                  aria-hidden="true"
+                                />
+                              )}
                               <strong>{subject.name}</strong>
+                              {subject.children?.length ? (
+                                <span className={ws.caption}>
+                                  {subject.children.length} 个下级
+                                </span>
+                              ) : null}
                               {isUpdating ? (
                                 <LoaderCircle
                                   size={14}

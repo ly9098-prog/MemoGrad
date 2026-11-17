@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CustomSelect } from "@/components/ui/custom-select";
 import styles from "./workspace.module.css";
 
 export { styles as workspaceStyles };
@@ -224,26 +225,16 @@ export function WorkspaceSelect({
   "aria-labelledby"?: string;
 }) {
   return (
-    <select
+    <CustomSelect
       {...props}
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={onChange}
       className={cn(styles.nativeSelect, className)}
-    >
-      {!options.some((option) => option.value === "") ? (
-        <option value="" disabled={!clearable}>
-          {placeholder}
-        </option>
-      ) : null}
-      {options.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-          disabled={option.disabled}
-        >
-          {option.label}
-        </option>
-      ))}
-    </select>
+      menuClassName={styles.selectMenu}
+      placeholder={placeholder}
+      clearable={clearable}
+      searchable={options.length > 8}
+      options={[...options]}
+    />
   );
 }

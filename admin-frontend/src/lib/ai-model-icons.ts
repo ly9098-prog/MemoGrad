@@ -8,6 +8,10 @@ const PROVIDER_ICONS: Record<string, string> = {
   openai: "/model-icons/gpt.svg",
   anthropic: "/model-icons/claude.svg",
   gemini: "/model-icons/gemini.png",
+  paddle: "/model-icons/paddleocr.png",
+  paddleocr: "/model-icons/paddleocr.png",
+  paddleocr_vl: "/model-icons/paddleocr.png",
+  "paddleocr-vl": "/model-icons/paddleocr.png",
 };
 
 export function getAiProviderIcon(provider: string): string | null {
@@ -17,6 +21,7 @@ export function getAiProviderIcon(provider: string): string | null {
 export function getAiModelIcon(modelName?: string | null): string | null {
   const name = modelName?.trim();
   if (!name) return null;
+  if (/(^|[/:])paddle(?:ocr)?(?:[-_/:]|$)/i.test(name)) return PROVIDER_ICONS.paddleocr;
   if (/(^|[/:])deepseek(?:[-/:]|$)/i.test(name)) return PROVIDER_ICONS.deepseek;
   if (/(^|[/:])(?:qwen|qwq)(?:[-/:\d]|$)/i.test(name)) return PROVIDER_ICONS.qwen;
   if (/(^|[/:])(?:glm|chatglm)(?:[-/:\d]|$)/i.test(name)) return PROVIDER_ICONS.glm;

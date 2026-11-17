@@ -63,6 +63,8 @@ export function questionIdHref(questionId: number): string {
 }
 
 export type CoverageItemLike = {
+  chapter_name?: string | null;
+  outline_path?: string[];
   status: CoverageStatus;
   subject_name: string;
   subject_code: string;
@@ -115,7 +117,7 @@ export function filterCoverageItems<T extends CoverageItemLike>(
   return items.filter((item) => {
     if (status && item.status !== status) return false;
     if (!normalized) return true;
-    return `${item.subject_name} ${item.subject_code} ${item.name}`.toLowerCase().includes(normalized);
+    return `${item.subject_name} ${item.subject_code} ${item.name} ${item.chapter_name ?? ""} ${item.outline_path?.join(" ") ?? ""}`.toLowerCase().includes(normalized);
   });
 }
 

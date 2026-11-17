@@ -256,7 +256,7 @@ describe("syllabus page mutation contracts", () => {
     expect(h.request.mock.calls.map(([path]) => path)).toEqual([
       "/knowledge/syllabus/versions",
       "/knowledge/syllabus/versions/12",
-      "/knowledge/syllabus/versions/12/catalog",
+      "/knowledge/syllabus/versions/12/catalog?include_inactive=true",
       "/knowledge/syllabus/versions/12/coverage",
       "/knowledge/syllabus/versions/12/mappings",
       "/knowledge/syllabus/versions/5",

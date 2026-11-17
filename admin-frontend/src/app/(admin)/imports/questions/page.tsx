@@ -33,13 +33,11 @@ import {
   WorkspaceHeader,
   WorkspaceSurface,
   WorkspaceFilters,
-  WorkspaceSectionHeader,
-  WorkspaceMetrics,
-  WorkspaceMetric,
   WorkspaceNotice,
   WorkspaceSelect,
   workspaceStyles as ws,
 } from "@/components/admin/workspace";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import {
   getQuestionTypeLabel,
@@ -388,17 +386,28 @@ export default function ImportQuestionsPage() {
   const [previewId, setPreviewId] = useState<number | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
 
+  const keyword = useDebouncedValue(filters.keyword);
+  const batchId = useDebouncedValue(filters.batch_id);
+  const subjectId = useDebouncedValue(filters.subject_id);
+
   const queryParams = useMemo(
     () => ({
       page: 1,
       page_size: 50,
-      batch_id: filters.batch_id || batchIdParam,
+      batch_id: batchId || batchIdParam,
       status: filters.status,
-      subject_id: filters.subject_id ? Number(filters.subject_id) : undefined,
+      subject_id: subjectId ? Number(subjectId) : undefined,
       source_type: filters.source_type,
-      keyword: filters.keyword,
+      keyword,
     }),
-    [batchIdParam, filters],
+    [
+      batchIdParam,
+      batchId,
+      subjectId,
+      keyword,
+      filters.status,
+      filters.source_type,
+    ],
   );
 
   const questions = useQuery({
@@ -408,6 +417,7 @@ export default function ImportQuestionsPage() {
         `/imports/review-queue${toQuery(queryParams)}`,
       ),
     retry: false,
+    placeholderData: (previous) => previous,
   });
 
   const items = questions.data?.items ?? [];
@@ -440,11 +450,10 @@ export default function ImportQuestionsPage() {
   ].filter(Boolean).length;
 
   return (
-    <WorkspacePage embedded>
+    <WorkspacePage embedded className={ws.compactQuestions}>
       <WorkspaceHeader
         title="导入题目列表"
         description="检索暂存题目，检查重复检测与解析内容"
-        meta={<span>查看详情不会改变审核状态，发布仍需人工审核</span>}
         actions={
           <Link
             href="/imports/review"
@@ -456,37 +465,28 @@ export default function ImportQuestionsPage() {
         }
       />
       <WorkspaceSurface>
-        <WorkspaceMetrics>
-          <WorkspaceMetric
-            label="匹配总数"
-            value={
-              questions.isError ? "—" : (questions.data?.total ?? items.length)
-            }
-            hint="当前筛选的全部结果"
-            loading={questions.isLoading}
-          />
-          <WorkspaceMetric
-            label="本页记录"
-            value={questions.isError ? "—" : items.length}
-            hint="每页最多 50 条"
-            loading={questions.isLoading}
-          />
-          <WorkspaceMetric
-            label="本页待审核"
-            value={questions.isError ? "—" : pendingCount}
-            hint="等待人工确认"
-            loading={questions.isLoading}
-            tone={pendingCount ? "attention" : "default"}
-          />
-          <WorkspaceMetric
-            label="本页疑似重复"
-            value={questions.isError ? "—" : duplicateCount}
-            hint="发布前核对原题"
-            loading={questions.isLoading}
-            tone={duplicateCount ? "attention" : "default"}
-          />
-        </WorkspaceMetrics>
-        <WorkspaceSectionHeader title="暂存题目" />
+        <div className={ws.questionSummary} aria-label="题目统计">
+          <span>
+            匹配{" "}
+            <strong>
+              {questions.isError
+                ? "—"
+                : questions.isLoading
+                  ? "…"
+                  : (questions.data?.total ?? items.length)}
+            </strong>{" "}
+            条
+          </span>
+          <span>
+            本页 <strong>{items.length}</strong> 条
+          </span>
+          <span>
+            本页待审核 <strong>{pendingCount}</strong>
+          </span>
+          <span>
+            本页疑似重复 <strong>{duplicateCount}</strong>
+          </span>
+        </div>
         <div className={ws.questionFilters}>
           <label className={ws.field}>
             <span>搜索内容</span>
@@ -507,7 +507,7 @@ export default function ImportQuestionsPage() {
             summary={
               additionalFilterCount
                 ? `${additionalFilterCount} 项已应用`
-                : "批次、科目与审核状态"
+                : undefined
             }
             className={ws.questionFilterDisclosure}
           >
@@ -559,7 +559,10 @@ export default function ImportQuestionsPage() {
             </Button>
           </WorkspaceNotice>
         ) : null}
-        <section aria-label="暂存题目结果" aria-busy={questions.isLoading}>
+        <p className={ws.questionLoading} role="status">
+          {questions.isFetching && !questions.isLoading ? "正在更新结果…" : ""}
+        </p>
+        <section aria-label="暂存题目结果" aria-busy={questions.isFetching}>
           {questions.isLoading ? (
             <ManagementSkeletonRows rows={5} />
           ) : (

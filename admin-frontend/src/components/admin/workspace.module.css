@@ -1828,3 +1828,315 @@
     animation-duration: 0ms;
   }
 }
+
+/* Chapters use continuous rows and quiet background levels, not nested cards. */
+.chapter {
+  margin-bottom: 16px;
+}
+.chapterHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 12px;
+  background: #e8f0f780;
+}
+.chapterToggle {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.chapterToggle strong {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.chapterToggle small,
+.chapterSelect {
+  color: var(--ws-muted);
+  font-size: 11px;
+  line-height: 20px;
+}
+.chapterToggle small {
+  white-space: nowrap;
+}
+.chapterSelect {
+  display: flex;
+  flex: none;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+}
+.chapterSelect > span:first-child {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid #6b879f;
+  border-radius: 4px;
+  background: #fff;
+}
+.chapterSelect[aria-checked="true"] > span:first-child,
+.chapterSelect[aria-checked="mixed"] > span:first-child {
+  border-color: var(--ws-blue);
+  background: var(--ws-blue);
+  color: white;
+}
+.catalogOutline {
+  padding-block: 4px;
+}
+.catalogOutline .catalogItem {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 0;
+}
+.catalogOutline .catalogItem[data-depth="0"] strong {
+  color: var(--ws-blue);
+  font-weight: 600;
+}
+.catalogItem[data-checked="true"]:enabled {
+  background: #e3edf759;
+}
+.catalogItem:disabled {
+  background: transparent;
+}
+.catalogItem:disabled > span:first-child {
+  border-color: transparent;
+  background: #e8eff5;
+  color: var(--ws-muted);
+}
+.readonlyBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #e7f0f86b;
+}
+.readonlyBar p {
+  flex: 1 1 240px;
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 24px;
+}
+.table .matrixChapterRow th {
+  padding: 0 24px;
+  background: #e2ecf6;
+  text-align: left;
+}
+.matrixChapterRow button {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.matrixChapterRow button > span {
+  color: var(--ws-muted);
+  font-size: 12px;
+}
+.matrixChapterRow strong {
+  color: var(--ws-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.matrixChapterRow small {
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.mobileChapterHeader {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #e2ecf6;
+  text-align: left;
+}
+.mobileChapterHeader > span {
+  flex: 1;
+  min-width: 0;
+}
+.mobileChapterHeader strong,
+.mobileChapterHeader small {
+  display: block;
+  line-height: 20px;
+}
+.mobileChapterHeader strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.mobileChapterHeader small {
+  color: var(--ws-muted);
+  font-size: 11px;
+}
+.subjectBranch {
+  display: inline-flex;
+  flex: none;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  color: var(--ws-blue);
+}
+.subjectLeaf {
+  width: 38px;
+  height: 20px;
+  flex: none;
+  background:
+    linear-gradient(#94abc280, #94abc280) 14px 0 / 1px 12px no-repeat,
+    linear-gradient(#94abc280, #94abc280) 14px 12px / 16px 1px no-repeat;
+}
+.subjectRow[data-depth="0"] {
+  background: #e7eff780;
+}
+.subjectRow[data-depth="0"] strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.subjectName > small {
+  margin-inline-start: 38px;
+}
+.selectMenu {
+  --foreground: #152b3b;
+  --muted-foreground: #4d647a;
+  --primary: #25638a;
+  --accent: #e3edf7;
+  --card: #f7fbff;
+  --border: #b5c7d8;
+  color: #152b3b;
+  border: 1px solid #d6e2ed;
+  border-radius: 10px;
+  background: #f7fbfff5;
+  box-shadow: 0 12px 32px #152b3b1c;
+  backdrop-filter: blur(20px);
+  font-variant-numeric: tabular-nums;
+}
+.selectMenu :is(button, input):focus-visible {
+  outline: 2px solid #25638a;
+  outline-offset: -2px;
+}
+@media (max-width: 767px) {
+  .chapterHeader {
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding: 4px 8px;
+  }
+  .chapterToggle {
+    flex: 1 1 170px;
+  }
+  .chapterSelect {
+    min-height: 40px;
+  }
+  .readonlyBar {
+    padding: 12px 16px;
+  }
+  .subjectName > div {
+    gap: 4px;
+  }
+  .subjectBranch {
+    gap: 4px;
+  }
+  .subjectBranch > svg:last-child {
+    display: none;
+  }
+  .subjectLeaf {
+    width: 14px;
+    background-position:
+      2px 0,
+      2px 12px;
+    background-size:
+      1px 12px,
+      10px 1px;
+  }
+  .subjectName > small {
+    margin-inline-start: 18px;
+  }
+}
+
+/* Explicit filter grids: details/display:contents is not a grid flattening boundary. */
+.questionFilters {
+  grid-template-columns: minmax(240px, 1.25fr) minmax(0, 3fr);
+  align-items: start;
+}
+.questionFilters > :first-child { grid-column: auto; }
+.questionFilterDisclosure { display: block; }
+.questionFilterDisclosure .filterFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.questionFilters .search { flex: none; height: 44px; max-width: none; }
+.questionFilters .field { align-content: start; }
+@media (min-width: 768px) {
+  .questionFilterDisclosure > summary { display: none; }
+}
+@media (max-width: 1023px) {
+  .questionFilters { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .questionFilterDisclosure .filterFields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.subjectShortcuts { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:0 24px 16px; }
+.catalogGroup { scroll-margin-top:16px; }
+.catalogRow { display:flex; align-items:center; gap:8px; padding-inline-end:12px; }
+.catalogRow .catalogItem { flex:1; min-width:0; padding-inline-start:0; }
+.catalogRow .catalogItem > input { flex:none; width:18px; height:18px; margin:0; accent-color:var(--ws-blue); cursor:pointer; }
+.catalogRow .catalogItem[data-readonly="true"] { cursor:default; }
+.catalogRow .catalogItem[data-disabled="true"] { color:var(--ws-muted); }
+.catalogRow .catalogItem > .readonlyMembership { width:auto; height:auto; border:0; border-radius:0; background:transparent; color:var(--ws-muted); font-size:11px; white-space:nowrap; }
+@media (max-width:767px) { .subjectShortcuts {padding-inline:16px; gap:4px;} }
+@media (max-width: 767px) {
+  .versionEditor .toolbar > .actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+  .versionEditor .toolbar > .caption {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
+/* Queue density: let the first question lead the viewport. */
+.compactQuestions .header {
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.compactQuestions .headerCopy h1 { font-size: 22px; line-height: 30px; }
+.compactQuestions .headerCopy p { margin-top: 2px; font-size: 12px; line-height: 20px; }
+.questionSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 16px 20px 0;
+  color: var(--ws-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.questionSummary strong { margin-inline: 4px; color: var(--ws-ink); font-weight: 600; }
+.compactQuestions .questionFilters { padding: 12px 20px 8px; gap: 12px; }
+.compactQuestions .questionFilters .field { gap: 4px; }
+.compactQuestions .questionFilters .search { height: 36px; }
+.compactQuestions .questionFilters :is(input, [role="combobox"]) { height: 36px; min-height: 36px; }
+.questionLoading { min-height: 16px; padding-inline: 20px; font-size: 11px; color: var(--ws-muted); }
+.compactQuestions .questionRow { padding-block: 16px; }
+
+@media (max-width: 767px) {
+  .compactQuestions .header { align-items: flex-start; gap: 8px 12px; }
+  .compactQuestions .headerCopy h1 { font-size: 20px; line-height: 28px; }
+  .compactQuestions .headerCopy p { max-width: none; }
+  .questionSummary { padding: 12px 16px 0; gap: 4px 16px; }
+  .compactQuestions .questionFilters { padding: 12px 16px 4px; gap: 8px; }
+  .compactQuestions .questionFilterDisclosure > summary { min-height: 40px; padding-block: 8px; }
+  .compactQuestions .questionFilterDisclosure > summary small { display: inline; margin-inline-start: 8px; }
+  .compactQuestions .questionFilters :is(input, [role="combobox"]),
+  .compactQuestions .questionFilters .search { height: 40px; min-height: 40px; }
+
+}

@@ -17,6 +17,7 @@ from app.models.syllabus import (
     SyllabusKnowledgePointMapping,
     SyllabusVersion,
 )
+from app.services.knowledge_outline import load_outline
 
 
 class SyllabusError(ValueError):
@@ -360,12 +361,15 @@ async def replace_memberships(
     return await get_version_detail(db, version_id)
 
 
-async def get_catalog(db: AsyncSession, version_id: int) -> dict:
+async def get_catalog(
+    db: AsyncSession, version_id: int, *, include_inactive: bool = False
+) -> dict:
     version = await db.get(SyllabusVersion, version_id)
     if version is None:
         raise SyllabusError("考纲版本不存在")
     _, cores = await _root_and_core_subjects(db)
     core_ids = [int(s.id) for s in cores]
+    outline = await load_outline(db, core_ids)
     included_ids = {
         int(value)
         for value in (
@@ -380,7 +384,8 @@ async def get_catalog(db: AsyncSession, version_id: int) -> dict:
         select(KnowledgePoint, Subject)
         .join(Subject, Subject.id == KnowledgePoint.subject_id)
         .where(
-            KnowledgePoint.subject_id.in_(core_ids), KnowledgePoint.is_active.is_(True)
+            KnowledgePoint.subject_id.in_(core_ids),
+            True if include_inactive else KnowledgePoint.is_active.is_(True),
         )
         .order_by(
             Subject.sort_order.asc(), KnowledgePoint.name.asc(), KnowledgePoint.id.asc()
@@ -398,6 +403,8 @@ async def get_catalog(db: AsyncSession, version_id: int) -> dict:
                 "description": kp.description,
                 "difficulty_level": int(kp.difficulty_level or 3),
                 "included": int(kp.id) in included_ids,
+                "is_active": bool(kp.is_active),
+                **outline.get(int(kp.id), {}),
             }
             for kp, subject in rows.all()
         ],

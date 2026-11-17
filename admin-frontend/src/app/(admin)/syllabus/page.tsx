@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
-  Check,
   ChevronDown,
   Link2,
   Plus,
@@ -35,10 +34,16 @@ import {
   workspaceStyles as ws,
 } from "@/components/admin/workspace";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { KnowledgeLabelEditor } from "@/components/admin/knowledge-label-editor";
+import { ScrollToTop } from "@/components/admin/scroll-to-top";
+import { KnowledgeCatalogTree } from "@/components/admin/knowledge-catalog-tree";
+import { withOutlineAncestors } from "@/lib/knowledge-outline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiRequest } from "@/lib/api/client";
 import type {
+  SyllabusCatalogItem,
   SyllabusCatalogResponse,
   SyllabusCoverageResponse,
   SyllabusMappingItem,
@@ -91,6 +96,14 @@ export default function SyllabusPage() {
     kind: "activate" | "archive" | "delete-mapping";
     mappingId?: number;
   } | null>(null);
+  const [chapterExpansion, setChapterExpansion] = useState({
+    open: false,
+    revision: 0,
+  });
+
+  const [labelEditor, setLabelEditor] = useState<{item: SyllabusCatalogItem | null; parent?: SyllabusCatalogItem} | null>(null);
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
+  const initializedVersion = useRef<number | null>(null);
 
   const versionsQuery = useQuery({
     queryKey: ["syllabus", "versions"],
@@ -119,9 +132,10 @@ export default function SyllabusPage() {
   const catalogQuery = useQuery({
     queryKey: ["syllabus", "catalog", selectedVersionId],
     enabled: Boolean(selectedVersionId),
+    refetchOnWindowFocus: false,
     queryFn: () =>
       apiRequest<SyllabusCatalogResponse>(
-        `/knowledge/syllabus/versions/${selectedVersionId}/catalog`,
+        `/knowledge/syllabus/versions/${selectedVersionId}/catalog?include_inactive=true`,
       ),
   });
 
@@ -153,15 +167,17 @@ export default function SyllabusPage() {
   });
 
   useEffect(() => {
-    if (!catalogQuery.data) return;
-    setSelectedKnowledgePointIds(
-      new Set(
-        catalogQuery.data.items
-          .filter((item) => item.included)
-          .map((item) => item.knowledge_point_id),
-      ),
-    );
-  }, [catalogQuery.data]);
+    const data = catalogQuery.data;
+    if (!data || data.syllabus_version_id !== selectedVersionId) return;
+    const enabled = new Set(data.items.filter(item=>item.is_active !== false).map(item=>item.knowledge_point_id));
+    if (initializedVersion.current !== selectedVersionId) {
+      initializedVersion.current = selectedVersionId;
+      setSelectedKnowledgePointIds(new Set(data.items.filter(item=>item.included && (detailQuery.data?.status !== "draft" || item.is_active !== false)).map(item=>item.knowledge_point_id)));
+    } else if (detailQuery.data?.status === "draft") {
+      // A label refresh must not erase the current unsaved member selection.
+      setSelectedKnowledgePointIds(current=>new Set([...current].filter(id=>enabled.has(id))));
+    }
+  }, [catalogQuery.data, selectedVersionId, detailQuery.data?.status]);
 
   useEffect(() => {
     if (!catalogKeyword.trim()) return;
@@ -242,7 +258,10 @@ export default function SyllabusPage() {
           }),
         },
       ),
-    onSuccess: refreshAll,
+    onSuccess: async (data) => {
+      setSelectedKnowledgePointIds(new Set(data.knowledge_points.map(item=>item.knowledge_point_id)));
+      await refreshAll();
+    },
   });
 
   const activateMutation = useMutation({
@@ -298,13 +317,26 @@ export default function SyllabusPage() {
 
   const detail = detailQuery.data;
   const catalog = catalogQuery.data?.items ?? [];
-  const normalizedCatalogKeyword = catalogKeyword.trim().toLowerCase();
+  const settledCatalogKeyword = useDebouncedValue(catalogKeyword, 200);
+  const normalizedCatalogKeyword = settledCatalogKeyword.trim().toLowerCase();
   const visibleCatalog = useMemo(() => {
-    return filterCatalogItems(catalog, normalizedCatalogKeyword);
+    return withOutlineAncestors(catalog, filterCatalogItems(catalog, normalizedCatalogKeyword));
   }, [catalog, normalizedCatalogKeyword]);
   const groupedCatalog = useMemo(() => {
     return groupCatalogBySubject(visibleCatalog);
   }, [visibleCatalog]);
+  const subjectShortcuts = useMemo(() => groupCatalogBySubject(catalog), [catalog]);
+  useEffect(() => {
+    if (!jumpTarget || normalizedCatalogKeyword) return;
+    const element = document.getElementById(`syllabus-group-${encodeURIComponent(jumpTarget)}`);
+    if (!element) return;
+    const frame = requestAnimationFrame(() => {
+      element.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      element.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      setJumpTarget(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [jumpTarget, normalizedCatalogKeyword]);
   const activeVersion = versionsQuery.data?.find(
     (item) => item.status === "active",
   );
@@ -323,16 +355,6 @@ export default function SyllabusPage() {
     includedIds,
   );
 
-  function toggleKnowledgePoint(id: number) {
-    if (!detail || detail.status !== "draft" || !canWrite) return;
-    setSelectedKnowledgePointIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   function toggleSubjectGroup(subjectKey: string) {
     setCollapsedSubjects((current) => {
       const next = new Set(current);
@@ -344,9 +366,17 @@ export default function SyllabusPage() {
 
   function expandAllSubjects() {
     setCollapsedSubjects(new Set());
+    setChapterExpansion((current) => ({
+      open: true,
+      revision: current.revision + 1,
+    }));
   }
 
   function collapseAllSubjects() {
+    setChapterExpansion((current) => ({
+      open: false,
+      revision: current.revision + 1,
+    }));
     setCollapsedSubjects(
       new Set(groupedCatalog.map(([subjectKey]) => subjectKey)),
     );
@@ -392,7 +422,7 @@ export default function SyllabusPage() {
                     ? `当前生效 ${activeVersion.effective_year}`
                     : "尚未设置当前版本"}
             </StatusBadge>
-            <span>当前版本只读，草稿可调整成员</span>
+            <span>成员范围在草稿中编辑，规范标签可单独管理</span>
           </>
         }
         actions={
@@ -538,6 +568,7 @@ export default function SyllabusPage() {
                 <label className={ws.field}>
                   <span>版本编码</span>
                   <Input
+                    id="syllabus-create-code"
                     placeholder="例如 syllabus-2027"
                     value={createForm.code}
                     onChange={(event) =>
@@ -680,10 +711,13 @@ export default function SyllabusPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      disabled={
+                        saving || catalogQuery.isLoading || catalogQuery.isError
+                      }
                       onClick={() =>
                         setSelectedKnowledgePointIds(
                           new Set(
-                            catalog.map((item) => item.knowledge_point_id),
+                            catalog.filter(item => item.is_active !== false).map((item) => item.knowledge_point_id),
                           ),
                         )
                       }
@@ -693,7 +727,9 @@ export default function SyllabusPage() {
                     <Button
                       size="sm"
                       disabled={
-                        membershipMutation.isPending ||
+                        saving ||
+                        catalogQuery.isLoading ||
+                        catalogQuery.isError ||
                         selectedKnowledgePointIds.size === 0 ||
                         !membershipDirty
                       }
@@ -705,6 +741,41 @@ export default function SyllabusPage() {
                   </div>
                 ) : null}
               </div>
+              {detail.status !== "draft" || !canWrite ? (
+                <div className={ws.readonlyBar}>
+                  <p>
+                    {!canWrite
+                      ? "当前账号没有知识点写入权限，可查看成员范围"
+                      : `${detail.status === "active" ? "当前生效" : "已归档"}版本的范围已固定。切换草稿后可勾选知识点，历史版本保持可追溯。`}
+                  </p>
+                  {canWrite ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const draft = versionsQuery.data?.find(
+                          (item) => item.status === "draft",
+                        );
+                        if (draft) setSelectedVersionId(draft.id);
+                        else {
+                          setShowCreateForm(true);
+                          window.requestAnimationFrame(() =>
+                            document
+                              .getElementById("syllabus-create-code")
+                              ?.focus(),
+                          );
+                        }
+                      }}
+                    >
+                      {versionsQuery.data?.some(
+                        (item) => item.status === "draft",
+                      )
+                        ? "切换到可编辑草稿"
+                        : "新建可编辑草稿"}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <div className={ws.toolbar}>
                 <label className={ws.search}>
                   <Search aria-hidden="true" />
@@ -727,11 +798,12 @@ export default function SyllabusPage() {
                   ) : null}
                 </label>
                 <div className={ws.actions}>
+                  {canWrite ? <Button variant="secondary" size="sm" onClick={()=>setLabelEditor({item:null})}><Plus size={14} aria-hidden="true" />新增标签</Button> : null}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={expandAllSubjects}
-                    disabled={!groupedCatalog.length || !collapsedSubjects.size}
+                    disabled={!groupedCatalog.length}
                   >
                     全部展开
                   </Button>
@@ -754,6 +826,14 @@ export default function SyllabusPage() {
                   {catalog.length}
                 </p>
               </div>
+              <nav className={ws.subjectShortcuts} aria-label="快速跳转科目">
+                <span className={ws.caption}>跳转科目</span>
+                {subjectShortcuts.map(([key, items])=><Button key={key} size="sm" variant="ghost" onClick={()=>{
+                  setCatalogKeyword("");
+                  setCollapsedSubjects(current=>{const next=new Set(current);next.delete(key);return next;});
+                  setJumpTarget(key);
+                }}>{items[0].subject_name}</Button>)}
+              </nav>
               {catalogQuery.isError ? (
                 <WorkspaceNotice tone="danger">
                   知识点目录读取失败，请刷新重试。
@@ -776,7 +856,7 @@ export default function SyllabusPage() {
                   const collapsed = collapsedSubjects.has(subjectKey);
                   const groupId = `syllabus-subject-${encodeURIComponent(subjectKey)}`;
                   return (
-                    <section key={subjectKey} className={ws.catalogGroup}>
+                    <section key={subjectKey} id={`syllabus-group-${encodeURIComponent(subjectKey)}`} className={ws.catalogGroup}>
                       <button
                         type="button"
                         className={ws.catalogGroupHeader}
@@ -803,43 +883,23 @@ export default function SyllabusPage() {
                         />
                       </button>
                       <div id={groupId} hidden={collapsed}>
-                        <div className={ws.catalogItems}>
-                          {items.map((item) => {
-                            const checked = selectedKnowledgePointIds.has(
-                              item.knowledge_point_id,
-                            );
-                            return (
-                              <button
-                                key={item.knowledge_point_id}
-                                type="button"
-                                role="checkbox"
-                                aria-checked={checked}
-                                disabled={
-                                  detail.status !== "draft" ||
-                                  !canWrite ||
-                                  membershipMutation.isPending
-                                }
-                                onClick={() =>
-                                  toggleKnowledgePoint(item.knowledge_point_id)
-                                }
-                                className={ws.catalogItem}
-                              >
-                                <span aria-hidden="true">
-                                  {checked ? (
-                                    <Check size={14} strokeWidth={2} />
-                                  ) : null}
-                                </span>
-                                <span className="min-w-0">
-                                  <strong>{item.name}</strong>
-                                  <small>
-                                    难度 {item.difficulty_level} · KP #
-                                    {item.knowledge_point_id}
-                                  </small>
-                                </span>
-                              </button>
-                            );
+                        <KnowledgeCatalogTree
+                          key={`${subjectKey}:${normalizedCatalogKeyword}:${chapterExpansion.revision}`}
+                          items={items}
+                          selected={selectedKnowledgePointIds}
+                          editable={detail.status === "draft" && canWrite}
+                          canWrite={canWrite}
+                          busy={saving}
+                          initiallyOpen={Boolean(normalizedCatalogKeyword) || chapterExpansion.open}
+                          onSelect={(ids, checked) => setSelectedKnowledgePointIds(current => {
+                            const next = new Set(current);
+                            for (const id of ids) { if (checked) next.add(id); else next.delete(id); }
+                            return next;
                           })}
-                        </div>
+                          onAdd={parent => setLabelEditor({item:null, parent})}
+                          onEdit={item => setLabelEditor({item})}
+                          onSaved={refreshAll}
+                        />
                       </div>
                     </section>
                   );
@@ -858,6 +918,8 @@ export default function SyllabusPage() {
           )}
         </div>
       </WorkspaceSurface>
+      <ScrollToTop />
+      {labelEditor ? <KnowledgeLabelEditor item={labelEditor.item} parent={labelEditor.parent} catalog={catalog} onClose={()=>setLabelEditor(null)} onSaved={refreshAll} /> : null}
       {detail ? (
         <WorkspaceSurface>
           <WorkspaceSectionHeader
@@ -930,90 +992,88 @@ export default function SyllabusPage() {
               <div className={ws.mappingGrid}>
                 <label className={ws.field}>
                   <span>来源版本</span>
-                  <select
-                    className={ws.nativeSelect}
-                    value={mappingSourceVersionId ?? ""}
-                    onChange={(event) =>
-                      setMappingSourceVersionId(
-                        Number(event.target.value) || null,
-                      )
+                  <WorkspaceSelect
+                    aria-label="来源版本"
+                    value={
+                      mappingSourceVersionId
+                        ? String(mappingSourceVersionId)
+                        : ""
                     }
-                  >
-                    <option value="" disabled>
-                      请选择来源版本
-                    </option>
-                    {(versionsQuery.data ?? [])
+                    onChange={(value) =>
+                      setMappingSourceVersionId(Number(value) || null)
+                    }
+                    placeholder="请选择来源版本"
+                    clearable={false}
+                    options={(versionsQuery.data ?? [])
                       .filter((item) => item.id !== detail.id)
-                      .map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} · {STATUS_LABEL[item.status]}
-                        </option>
-                      ))}
-                  </select>
+                      .map((item) => ({
+                        value: String(item.id),
+                        label: `${item.name} · ${STATUS_LABEL[item.status]}`,
+                      }))}
+                  />
                 </label>
                 <label className={ws.field}>
                   <span>关系类型</span>
-                  <select
-                    className={ws.nativeSelect}
+                  <WorkspaceSelect
+                    aria-label="关系类型"
                     value={mappingForm.relation_type}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setMappingForm({
                         ...mappingForm,
-                        relation_type: event.target.value as
-                          "merged" | "split" | "replaced",
+                        relation_type: value as "merged" | "split" | "replaced",
                       })
                     }
-                  >
-                    <option value="replaced">替换 replaced</option>
-                    <option value="merged">合并 merged</option>
-                    <option value="split">拆分 split</option>
-                  </select>
+                    clearable={false}
+                    options={[
+                      { value: "replaced", label: "替换 replaced" },
+                      { value: "merged", label: "合并 merged" },
+                      { value: "split", label: "拆分 split" },
+                    ]}
+                  />
                 </label>
                 <label className={ws.field}>
                   <span>旧版知识点</span>
-                  <select
-                    className={ws.nativeSelect}
-                    value={mappingForm.from_syllabus_knowledge_point_id || ""}
-                    onChange={(event) =>
+                  <WorkspaceSelect
+                    aria-label="旧版知识点"
+                    value={
+                      mappingForm.from_syllabus_knowledge_point_id
+                        ? String(mappingForm.from_syllabus_knowledge_point_id)
+                        : ""
+                    }
+                    onChange={(value) =>
                       setMappingForm({
                         ...mappingForm,
-                        from_syllabus_knowledge_point_id: Number(
-                          event.target.value,
-                        ),
+                        from_syllabus_knowledge_point_id: Number(value),
                       })
                     }
-                  >
-                    <option value="">请选择</option>
-                    {(sourceDetailQuery.data?.knowledge_points ?? []).map(
-                      (item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.subject_name} · {item.name}
-                        </option>
-                      ),
-                    )}
-                  </select>
+                    options={(
+                      sourceDetailQuery.data?.knowledge_points ?? []
+                    ).map((item) => ({
+                      value: String(item.id),
+                      label: `${item.subject_name} · ${item.name}`,
+                    }))}
+                  />
                 </label>
                 <label className={ws.field}>
                   <span>新版知识点</span>
-                  <select
-                    className={ws.nativeSelect}
-                    value={mappingForm.to_syllabus_knowledge_point_id || ""}
-                    onChange={(event) =>
+                  <WorkspaceSelect
+                    aria-label="新版知识点"
+                    value={
+                      mappingForm.to_syllabus_knowledge_point_id
+                        ? String(mappingForm.to_syllabus_knowledge_point_id)
+                        : ""
+                    }
+                    onChange={(value) =>
                       setMappingForm({
                         ...mappingForm,
-                        to_syllabus_knowledge_point_id: Number(
-                          event.target.value,
-                        ),
+                        to_syllabus_knowledge_point_id: Number(value),
                       })
                     }
-                  >
-                    <option value="">请选择</option>
-                    {(detail.knowledge_points ?? []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.subject_name} · {item.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={(detail.knowledge_points ?? []).map((item) => ({
+                      value: String(item.id),
+                      label: `${item.subject_name} · ${item.name}`,
+                    }))}
+                  />
                 </label>
               </div>
               <div className="mt-4 flex flex-wrap items-end gap-4">

@@ -25,6 +25,7 @@ export function CustomCheckbox({
 
   return (
     <button
+      {...rest}
       type="button"
       role="checkbox"
       aria-checked={ariaChecked}

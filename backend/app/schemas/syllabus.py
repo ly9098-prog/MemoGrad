@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 
 from app.schemas.base import BaseModel
+from app.schemas.knowledge_outline import KnowledgeOutlineFields
 
 SyllabusStatus = Literal["draft", "active", "archived"]
 SyllabusMappingType = Literal[
@@ -59,7 +60,8 @@ class SyllabusMembershipReplace(BaseModel):
     knowledge_point_ids: list[int] = Field(default_factory=list, max_length=5000)
 
 
-class SyllabusCatalogItem(BaseModel):
+class SyllabusCatalogItem(KnowledgeOutlineFields):
+    is_active: bool = True
     knowledge_point_id: int
     subject_id: int
     subject_code: str
@@ -68,6 +70,57 @@ class SyllabusCatalogItem(BaseModel):
     description: str | None = None
     difficulty_level: int
     included: bool = False
+
+
+class KnowledgeLabelCreate(BaseModel):
+    subject_id: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = Field(default=None, max_length=4000)
+    difficulty_level: int = Field(default=3, ge=1, le=5)
+    parent_knowledge_point_id: int | None = Field(default=None, gt=0)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("标签名称不能为空")
+        return value
+
+
+class KnowledgeLabelUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    description: str | None = Field(default=None, max_length=4000)
+    difficulty_level: int | None = Field(default=None, ge=1, le=5)
+    is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("标签名称不能为空")
+        return value
+
+    @model_validator(mode="after")
+    def require_update(self):
+        if not self.model_fields_set:
+            raise ValueError("至少提供一个要更新的字段")
+        for field in ("name", "difficulty_level", "is_active"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} 不能为 null")
+        return self
+
+
+class KnowledgeLabelResponse(BaseModel):
+    id: int
+    subject_id: int
+    name: str
+    description: str | None = None
+    difficulty_level: int
+    is_active: bool
 
 
 class SyllabusCatalogResponse(BaseModel):

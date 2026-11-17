@@ -9,6 +9,7 @@ import {
   statusTone,
 } from "./syllabus-utils";
 import type { SyllabusCatalogItem } from "./api/types";
+import { groupKnowledgeChapters } from "./knowledge-outline";
 
 const items: SyllabusCatalogItem[] = [
   { knowledge_point_id: 1, subject_id: 1, subject_code: "data_structure", subject_name: "数据结构", name: "树", difficulty_level: 2, included: true },
@@ -16,6 +17,26 @@ const items: SyllabusCatalogItem[] = [
   { knowledge_point_id: 3, subject_id: 1, subject_code: "data_structure", subject_name: "数据结构", name: "图", difficulty_level: 3, included: true },
   { knowledge_point_id: 4, subject_id: 3, subject_code: "operating_system", subject_name: "操作系统", name: "进程", difficulty_level: 2, included: false },
 ];
+
+describe("chapter organization", () => {
+  it("keeps filtered children in their chapter without requiring the chapter root in results", () => {
+    const chapterItems = [
+      {...items[0], chapter_id: 20, chapter_name: "第2章 线性表", outline_order: 12},
+      {...items[2], chapter_id: 10, chapter_name: "第1章 绪论", outline_order: 1},
+    ];
+    expect(groupKnowledgeChapters(chapterItems).map(group => group.key)).toEqual(["1:10", "1:20"]);
+    expect(groupKnowledgeChapters([chapterItems[0]])[0].name).toBe("第2章 线性表");
+  });
+  it("keeps unclassified points visible and separates subjects", () => {
+    expect(groupKnowledgeChapters(items)).toHaveLength(3);
+    expect(groupKnowledgeChapters(items)[0].name).toBe("未归入章节");
+  });
+  it("finds a whole chapter by its title and a section by its full path", () => {
+    const points = [{...items[0], chapter_name: "第2章 线性表", outline_path: ["第2章 线性表", "2.1 结构"]}];
+    expect(filterCatalogItems(points, "第2章")).toHaveLength(1);
+    expect(filterCatalogItems(points, "2.1")).toHaveLength(1);
+  });
+});
 
 describe("filterCatalogItems", () => {
   it("returns all when keyword empty", () => {

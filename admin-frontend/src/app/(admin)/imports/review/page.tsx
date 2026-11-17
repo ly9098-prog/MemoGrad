@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatChinaClock } from "@/lib/time";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { hasPermission } from "@/lib/permissions/permissions";
@@ -152,16 +153,9 @@ export default function ImportReviewPage() {
     const t = setTimeout(() => updateMessage(null), 5000);
     return () => clearTimeout(t);
   }, [message]);
-  const [debouncedKeyword, setDebouncedKeyword] = useState(filters.keyword);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedKeyword(filters.keyword), 300);
-    return () => clearTimeout(timer);
-  }, [filters.keyword]);
   const [page, setPage] = useState(1);
-  // Reset page to 1 whenever filters change
-  useEffect(() => {
-    setPage(1);
-  }, [filters.batch_id, filters.status, filters.subject_id, filters.source_type, filters.risk_level, filters.answer_status, debouncedKeyword]);
+  const debouncedKeyword = useDebouncedValue(filters.keyword, 300, () => setPage(1));
+  const debouncedBatchId = useDebouncedValue(filters.batch_id, 300, () => setPage(1));
   const [detailView, setDetailView] = useState<"formatted" | "json">("formatted");
   const [editing, setEditing] = useState(false);
   // Track visual segment edits (stem & option segments) during editing
@@ -253,14 +247,14 @@ export default function ImportReviewPage() {
 
   const queryParams = useMemo(
     () => buildReviewQueueParams({
-      batch_id: filters.batch_id,
+      batch_id: debouncedBatchId,
       status: filters.status,
       subject_id: filters.subject_id,
       source_type: filters.source_type,
       risk_level: filters.risk_level,
       answer_status: filters.answer_status,
     }, page, batchIdParam, debouncedKeyword),
-    [page, batchIdParam, filters.batch_id, filters.status, filters.subject_id, filters.source_type, filters.risk_level, filters.answer_status, debouncedKeyword],
+    [page, batchIdParam, debouncedBatchId, filters.status, filters.subject_id, filters.source_type, filters.risk_level, filters.answer_status, debouncedKeyword],
   );
 
   const queue = useQuery({
@@ -550,7 +544,17 @@ export default function ImportReviewPage() {
     });
   };
 
+  const clearBatchFromUrl = () => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("batch_id")) return;
+    url.searchParams.delete("batch_id");
+    // Next's native history integration updates useSearchParams without scrolling.
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  };
+
   const updateFilter = (key: ReviewFilterKey, value: string) => {
+    if (key === "batch_id" && !value) clearBatchFromUrl();
+    if (key !== "batch_id") setPage(1);
     setFilters((current) => {
       const nextFilters = reduceReviewFilters(current, key, value);
       updateSelectedIds((selectedIds) =>
@@ -575,6 +579,8 @@ export default function ImportReviewPage() {
   };
 
   const resetFilters = () => {
+    clearBatchFromUrl();
+    setPage(1);
     const nextFilters = createDefaultReviewFilters();
     setFilters(nextFilters);
     updateSelectedIds((selectedIds) =>

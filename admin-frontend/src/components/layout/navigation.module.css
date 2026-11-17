@@ -327,16 +327,9 @@
   flex: 1;
   overflow-y: auto;
   margin: 0;
-  border: 1px solid var(--border);
-  border-right: 0;
-  border-bottom: 0;
-  border-radius: 20px 0 0 0;
-  background:
-    radial-gradient(48rem 28rem at 8% -10%, var(--admin-ambient-blue, rgba(75, 136, 173, 0.18)), transparent 68%),
-    radial-gradient(38rem 24rem at 94% 2%, var(--admin-ambient-violet, rgba(179, 151, 197, 0.13)), transparent 64%),
-    radial-gradient(42rem 26rem at 72% 72%, var(--admin-ambient-teal, rgba(119, 177, 161, 0.11)), transparent 70%),
-    linear-gradient(180deg, #eef6fb 0%, var(--admin-canvas, #f3f7fb) 24rem);
-  border-color: var(--admin-line-strong, var(--border));
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, #eff5fb, var(--admin-canvas, #f3f7fb) 24rem);
 }
 
 .mobileNavigationButton {
@@ -412,7 +405,7 @@
 
 @media (max-width: 639px) {
   .workspace {
-    border-radius: 16px 0 0 0;
+    border-radius: 0;
   }
 }
 
