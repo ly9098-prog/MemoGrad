@@ -40,6 +40,7 @@
 ## Contents
 
 - [Overview](#overview)
+- [Product Preview](#product-preview)
 - [Architecture](#architecture)
 - [Capabilities](#capabilities)
 - [Quick Start](#quick-start)
@@ -60,6 +61,19 @@ MemoGrad is a complete postgraduate-exam study platform that combines a WeChat M
 | Admin Console | In production | Question governance, import review, RBAC, AI/OCR/vector settings, audit logs |
 | Backend API | In production | Public/admin API layers, Redis queue, AI gateway, OCR pipeline |
 | Production Deployment | In production | Docker Compose, Nginx, PostgreSQL, Redis, backup tasks |
+
+<a id="product-preview"></a>
+## Product Preview
+
+<p align="center">
+  <img src="assets/admin-dashboard.webp" alt="MemoGrad admin dashboard with operations trends, review queues, annual question heatmap, AI usage overview, and system health" width="100%" />
+</p>
+
+<p align="center">
+  <sub>Admin console · Question operations, review queues, annual activity, AI usage, and system health in one view (sample data)</sub>
+</p>
+
+The admin workspace combines user and question growth, pending review queues, annual 2D/3D activity distribution, AI usage quality, and runtime health so operators can quickly locate work that needs attention.
 
 ## Architecture
 
