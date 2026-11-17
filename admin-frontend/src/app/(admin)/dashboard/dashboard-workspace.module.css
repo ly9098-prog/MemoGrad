@@ -15,8 +15,8 @@
   --dash-summary-muted: #4f657e;
   --dash-glass-surface: linear-gradient(135deg, #ffffffc9, #ffffff8f 62%, #f4f8ffb8);
   --dash-glass-shadow: inset 0 1px 0 #ffffffed, inset 0 -1px 0 #ffffff52, 0 8px 24px #26486d09;
-  --dash-overview-surface: linear-gradient(118deg, #dce9f9b8, #f1f7ffb3 45%, #ffffff9e);
-  --dash-ai-surface: linear-gradient(110deg, #dce8f6c7, #edf4fcad 42%, #ffffffa8);
+  --dash-overview-surface: #ffffff6b;
+  --dash-ai-surface: var(--dash-overview-surface);
   --dash-featured-ink: #2d527d;
   --dash-record-surface: #edf3fa;
   --dash-record-selected: #dce9f6;
@@ -35,10 +35,7 @@
   width: calc(100% + 4rem);
   margin: -2rem;
   padding: 28px 32px 40px;
-  background:
-    radial-gradient(ellipse at 8% 12%, #d1e1f5a3, transparent 38%),
-    radial-gradient(ellipse at 96% 48%, #dbe4f380, transparent 46%),
-    linear-gradient(135deg, #edf2f9 0%, #f4f6fa 48%, #e8eef6 100%);
+  background: linear-gradient(180deg, #eff5fc, #eaf1f9);
   color: var(--dash-ink);
   font-variant-numeric: tabular-nums;
   overflow-anchor: none;
@@ -64,14 +61,12 @@
 .refreshButton:hover { background: #eaf0f5; border-color: #b8cbd7; }
 .refreshButton:disabled { cursor: wait; opacity: 0.6; }
 
-.overviewSurface { --dash-muted: #4d647a; --dash-faint: var(--dash-muted); min-width: 0; margin-top: 28px; padding: 28px; border-radius: 16px; background: #edf4fc; box-shadow: inset 0 1px 0 #ffffffe6; }
-.metricBand { min-width: 0; }
+.overviewSurface { --dash-muted: #4d647a; --dash-faint: var(--dash-muted); min-width: 0; margin-top: 28px; border-radius: 16px; background: #f4f8fc; box-shadow: inset 0 1px 0 #ffffffe6; }
+.metricBand { min-width: 0; padding: 24px 24px 0; }
 .metricGrid { display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(3, minmax(0, 1fr)); gap: 32px; align-items: start; }
 .metricCell { min-width: 0; padding-block: 4px; }
 .metricCell[data-featured="true"] { color: var(--dash-featured-ink); }
-.metricTopline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.metricLabel { color: var(--dash-muted); font-size: 13px; line-height: 20px; }
-.metricIcon { display: inline-flex; color: var(--dash-faint); }
+.metricLabel { display: block; color: var(--dash-muted); font-size: 13px; line-height: 20px; }
 .metricValue { display: block; margin-top: 12px; color: var(--dash-summary-ink); font-size: 36px; font-weight: 500; line-height: 52px; letter-spacing: -0.025em; }
 .metricHint { display: flex; flex-wrap: wrap; gap: 0 8px; margin-top: 4px; color: var(--dash-muted); font-size: 12px; line-height: 20px; }
 .metricHint > span { white-space: nowrap; }
@@ -86,10 +81,10 @@
 .animatedDigit.digitSettled { animation: none; }
 
 .workspaceGrid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(296px, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
-.overviewSurface .workspaceGrid { margin-top: 36px; gap: 32px; }
+.overviewSurface .workspaceGrid { margin-top: 8px; }
 .trendPanel, .todoPanel, .activityPanel, .distributionPanel { min-width: 0; padding: 24px; border-radius: 16px; }
 .activityPanel { border: 1px solid #ffffffe0; background: #f9fbfe; box-shadow: var(--dash-glass-shadow); }
-.overviewSurface .trendPanel, .overviewSurface .todoPanel { padding: 0; border-radius: 0; }
+.overviewSurface .trendPanel, .overviewSurface .todoPanel { border-radius: 0; }
 .distributionPanel { border-radius: 0; }
 .activityPanel, .distributionPanel { display: flex; flex-direction: column; align-self: stretch; }
 .panelHeader, .panelHeading { justify-content: space-between; align-items: flex-start; gap: 16px; }
@@ -98,6 +93,8 @@
 .segmented button, .periodButton { display: inline-flex; min-height: 28px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border-radius: 6px; color: var(--dash-muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
 .segmented button[aria-pressed="true"], .periodButton[aria-pressed="true"] { background: var(--dash-surface); color: var(--dash-ink); box-shadow: 0 1px 3px #152b3b0d; }
 .segmented button:hover, .periodButton:hover { color: var(--dash-ink); }
+.periodSwitch, .distributionPanel .segmented { padding: 2px; }
+.periodButton, .distributionPanel .segmented button { min-height: 32px; }
 .summaryGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
 .summaryStat { min-width: 0; padding: 8px; border-radius: 8px; text-align: left; }
 .summaryStat:hover { background: #f3f6f8; }
@@ -131,9 +128,9 @@
 .chartState, .chartLoading { display: flex; min-height: 252px; align-items: center; justify-content: center; border-radius: 8px; color: var(--dash-muted); font-size: 13px; }
 .chartLoading { background: #f2f5f8; }
 
-.todoPanel { display: flex; flex-direction: column; }
+.todoPanel { display: flex; flex-direction: column; align-self: stretch; }
 .miniCount { flex: none; margin-top: 4px; color: var(--dash-muted); font-size: 11px; white-space: nowrap; }
-.todoList { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.todoList { display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: 8px; margin-top: 20px; }
 .todoRow { position: relative; display: flex; min-height: 64px; align-items: center; gap: 12px; padding: 12px 4px; border-radius: 6px; }
 a.todoRow:hover { background: #ffffffb3; }
 a.todoRow:focus-visible { background: #ffffffb3; outline-offset: 2px; }
@@ -260,12 +257,12 @@ a.todoRow:is(:hover, :focus-visible) .todoChevron { color: var(--dash-blue); tra
 
 @supports (backdrop-filter: blur(16px)) {
   .activityPanel { background: var(--dash-glass-surface); backdrop-filter: blur(20px) saturate(125%); }
-  .overviewSurface { background: var(--dash-overview-surface); backdrop-filter: blur(20px) saturate(125%); }
+  .overviewSurface { background: var(--dash-overview-surface); backdrop-filter: blur(24px) saturate(110%); }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .activityPanel { background: #f9fbfe; backdrop-filter: none; }
-  .overviewSurface { background: #edf4fc; backdrop-filter: none; }
+  .overviewSurface { background: #f4f8fc; backdrop-filter: none; }
 }
 
 @media (forced-colors: active) {
@@ -279,7 +276,7 @@ a.todoRow:is(:hover, :focus-visible) .todoChevron { color: var(--dash-blue); tra
   .workspaceGrid { grid-template-columns: minmax(0, 1.75fr) minmax(260px, 1fr); gap: 20px; }
   .trendPanel, .todoPanel, .activityPanel, .distributionPanel { padding: 20px; }
   .activityPanel .panelHeader, .distributionPanel .panelHeader { flex-wrap: wrap; gap: 8px; }
-  .overviewSurface { padding: 24px; }
+  .metricBand { padding: 20px 20px 0; }
   .metricGrid { gap: 24px; }
   .systemPanel { grid-template-columns: 1fr; gap: 20px; }
 }
@@ -304,14 +301,14 @@ a.todoRow:is(:hover, :focus-visible) .todoChevron { color: var(--dash-blue); tra
   .header h1 { font-size: 26px; line-height: 32px; }
   .headerDescription { max-width: none; font-size: 12px; }
   .datePill span { display: inline; }
-  .overviewSurface { margin-top: 20px; padding: 20px 16px; border-radius: 12px; }
+  .overviewSurface { margin-top: 20px; border-radius: 12px; }
+  .metricBand { padding: 20px 16px 0; }
   .metricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 20px; align-items: start; }
   .metricCell { padding: 0; }
   .metricValue { margin-top: 8px; line-height: 44px; }
   .metricCell[data-featured="true"] .metricValue { font-size: 36px; line-height: 44px; }
   .metricHint { min-height: 20px; }
   .workspaceGrid { gap: 20px; margin-top: 20px; }
-  .overviewSurface .workspaceGrid { gap: 28px; margin-top: 28px; }
   .trendPanel, .todoPanel, .activityPanel, .distributionPanel { padding: 16px; border-radius: 12px; }
   .distributionPanel { border-radius: 0; }
   .panelHeader { flex-wrap: wrap; gap: 12px; }
@@ -349,7 +346,7 @@ a.todoRow:is(:hover, :focus-visible) .todoChevron { color: var(--dash-blue); tra
   .refreshToast { right: 16px; left: 16px; top: 16px; }
 }
 @media (pointer: coarse) {
-  .segmented button, .periodButton, .textSwitch button, .sectionLink, .refreshButton, .activityHint button, .dataDisclosure summary, .peakButton { min-height: 44px; }
+  .segmented button, .distributionPanel .segmented button, .periodButton, .textSwitch button, .sectionLink, .refreshButton, .activityHint button, .dataDisclosure summary, .peakButton { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dashboard *, .refreshToast * { animation: none !important; transition: none !important; }

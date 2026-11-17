@@ -38,7 +38,7 @@ const trends: DailyTrendPoint[] = Array.from({ length: 30 }, (_, index) => ({
 }));
 const stats: AIStatsResponse = {
   today_calls: 0, monthly_calls: 10, success_rate: 80, avg_latency_ms: 1250,
-  total_tokens: 12345, estimated_cost: 0.02, daily_trends: trends,
+  total_tokens: 12345, model_name: "glm-4.6", daily_trends: trends,
 };
 
 function elements(node: unknown, predicate: (element: Element) => boolean): Element[] {
@@ -97,9 +97,21 @@ describe("dashboard AI overview presentation", () => {
     const tree = AiStatCards({ data: stats, loading: false });
     expect(text(tree)).toContain("80.0");
     expect(text(tree)).toContain("1.25");
-    expect(text(tree)).toContain("12,345");
-    expect(text(tree)).toContain("0.02");
-    expect(text(tree)).toContain("本月估算，非账单");
+    expect(text(tree)).toContain("12.35K");
+    expect(text(tree)).toContain("glm-4.6");
+    expect(text(tree)).not.toContain("预计费用");
+    expect(elements(tree, (element) => element.props["aria-hidden"] === true && text(element) === "12.35K")).toHaveLength(1);
+    expect(elements(tree, (element) => element.props.className === "sr-only" && text(element) === "12,345 Token")).toHaveLength(1);
+    expect(elements(tree, (element) => element.props.title === "12,345 Token")).toHaveLength(1);
+    expect(elements(tree, (element) => element.props.src === "/model-icons/glm.svg")).toHaveLength(1);
+  });
+
+  it("keeps unknown models as text without a mismatched brand icon", () => {
+    const custom = AiStatCards({ data: { ...stats, model_name: "custom-model" }, loading: false });
+    expect(text(custom)).toContain("custom-model");
+    expect(elements(custom, (element) => typeof element.props.src === "string")).toEqual([]);
+    const missing = AiStatCards({ data: { ...stats, model_name: null }, loading: false });
+    expect(text(missing)).toContain("调用记录未提供模型名称");
   });
 
   it("switches 7/30 day windows and retains server MM/DD labels across a month boundary", () => {

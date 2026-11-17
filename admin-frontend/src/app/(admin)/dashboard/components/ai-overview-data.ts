@@ -22,6 +22,13 @@ export function formatAiNumber(value: number | null, digits = 0): string {
   });
 }
 
+export function formatAiTokens(value: number | null): string {
+  return !validAiValue(value) ? "--" : value.toLocaleString("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  });
+}
+
 export function getAiSummary(stats?: AIStatsResponse) {
   const hasCalls = validAiValue(stats?.monthly_calls) && stats.monthly_calls > 0;
   const read = (value: unknown) => validAiValue(value) ? value : null;
@@ -29,13 +36,15 @@ export function getAiSummary(stats?: AIStatsResponse) {
     ? stats.success_rate : null;
   const latency = hasCalls && validAiValue(stats?.avg_latency_ms) ? stats.avg_latency_ms / 1000 : null;
   const sampleHint = stats?.monthly_calls === 0 ? "本月暂无调用样本" : "本月调用样本未知";
+  const tokens = read(stats?.total_tokens);
+  const modelName = hasCalls && typeof stats?.model_name === "string" ? stats.model_name.trim() : "";
   return [
     { key: "today", label: "今日调用", value: formatAiNumber(read(stats?.today_calls)), unit: "次", hint: "上海自然日" },
     { key: "monthly", label: "本月调用", value: formatAiNumber(read(stats?.monthly_calls)), unit: "次", hint: "本月累计" },
     { key: "success", label: "调用成功率", value: formatAiNumber(rate, 1), unit: "%", hint: hasCalls ? "本月调用" : sampleHint },
     { key: "latency", label: "平均响应", value: formatAiNumber(latency, 2), unit: "秒", hint: hasCalls ? "本月调用均值" : sampleHint },
-    { key: "tokens", label: "Token 消耗", value: formatAiNumber(read(stats?.total_tokens)), unit: "Token", hint: "本月累计" },
-    { key: "cost", label: "预计费用", value: formatAiNumber(read(stats?.estimated_cost), 2), unit: "元", hint: "本月估算，非账单" },
+    { key: "tokens", label: "Token 消耗", value: formatAiTokens(tokens), exactValue: tokens === null ? undefined : formatAiNumber(tokens), unit: "Token", hint: "本月累计" },
+    { key: "model", label: "主要调用模型", value: modelName || "--", unit: "", hint: !hasCalls ? sampleHint : modelName ? "本月调用次数最多" : "调用记录未提供模型名称" },
   ];
 }
 

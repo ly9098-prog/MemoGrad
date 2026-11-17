@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Brain, Cpu, Globe, Key,
@@ -9,6 +10,7 @@ import {
   Loader2, AlertTriangle, Wifi, ChevronDown, Eye, EyeOff, Link2, MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getAiModelIcon, getAiProviderIcon } from "@/lib/ai-model-icons";
 import { apiRequest } from "@/lib/api/client";
 import type {
   AdminAiModelConfig,
@@ -28,7 +30,7 @@ const PROVIDER_ICONS: Record<string, React.ElementType> = {
 };
 
 const PROVIDER_COLORS: Record<string, string> = {
-  deepseek: "#5b7b9a", openai: "#6b9b6b", anthropic: "#c49a6b",
+  deepseek: "#5b7b9a", openai: "#6b9b6b", anthropic: "#c49a6b", gemini: "#4f72b8",
   "qwen-vl": "#7c5ce7", qwen: "#7c5ce7", glm: "#4f72b8",
   minimax: "#8b6bb1", moonshot: "#506c8f", openrouter: "#5d6b76", relay: "#52758f",
   paddleocr: "#e67e22", paddleocr_vl: "#e67e22", "paddleocr-vl": "#e67e22",
@@ -41,13 +43,15 @@ type ProviderPreset = {
 };
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
-  { value: "openai", label: "OpenAI", description: "OpenAI 官方或标准 OpenAI-compatible 服务" },
+  { value: "openai", label: "GPT / OpenAI", description: "OpenAI 官方或标准 OpenAI-compatible 服务" },
+  { value: "anthropic", label: "Claude / Anthropic", description: "Claude 的 OpenAI-compatible 服务，通过兼容网关接入" },
+  { value: "gemini", label: "Gemini / Google", description: "Gemini 的 OpenAI-compatible API" },
   { value: "deepseek", label: "DeepSeek", description: "DeepSeek OpenAI-compatible API" },
   { value: "qwen", label: "Qwen / 百炼", description: "阿里云百炼兼容模式、Qwen 文本模型" },
   { value: "qwen-vl", label: "Qwen-VL", description: "Qwen 视觉语言模型的 OpenAI-compatible 接口" },
   { value: "glm", label: "GLM / 智谱", description: "智谱 GLM OpenAI-compatible API" },
   { value: "minimax", label: "MiniMax", description: "MiniMax OpenAI-compatible API" },
-  { value: "moonshot", label: "Moonshot / Kimi", description: "Moonshot OpenAI-compatible API" },
+  { value: "moonshot", label: "Kimi / Moonshot", description: "Moonshot OpenAI-compatible API" },
   { value: "openrouter", label: "OpenRouter", description: "OpenRouter 多模型聚合接口" },
   { value: "relay", label: "第三方 / Relay", description: "第三方 OpenAI-compatible API，支持 /v1 Base URL 或完整 chat/completions 地址" },
   { value: "vllm", label: "vLLM", description: "自部署 vLLM OpenAI-compatible Server" },
@@ -315,8 +319,15 @@ function CompatibleExampleImporter({ disabled = false, onApply }: CompatibleExam
   );
 }
 
-function getProviderIcon(p: string) { return PROVIDER_ICONS[p] || Brain; }
 function getProviderColor(p: string) { return PROVIDER_COLORS[p] || "#5b7b9a"; }
+
+function ProviderIcon({ provider, modelName, size = 16 }: { provider: string; modelName?: string; size?: number }) {
+  const source = getAiModelIcon(modelName) ?? getAiProviderIcon(provider);
+  const Fallback = PROVIDER_ICONS[provider] ?? Brain;
+  return source
+    ? <Image src={source} alt="" width={size} height={size} className="shrink-0 object-contain" unoptimized />
+    : <Fallback style={{ color: getProviderColor(provider), width: size, height: size }} />;
+}
 
 const inputCls =
   "h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-primary";
@@ -397,7 +408,6 @@ function ProviderSelect({
     >
       {filtered.length > 0 ? filtered.map((item) => {
         const selected = normalizedValue === item.value;
-        const Icon = getProviderIcon(item.value);
         const color = getProviderColor(item.value);
         return (
           <button
@@ -417,7 +427,7 @@ function ProviderSelect({
               className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md border"
               style={{ background: `${color}08`, borderColor: `${color}25` }}
             >
-              <Icon className="h-3.5 w-3.5" style={{ color }} />
+              <ProviderIcon provider={item.value} size={14} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2">
@@ -1915,7 +1925,6 @@ export function ModelCards() {
                   </tr>
                 ))
               : modelList.map((model) => {
-                  const Icon = getProviderIcon(model.provider);
                   const color = getProviderColor(model.provider);
                   const featureList = configuredFeatures(model)
                     .map((feature) => FEATURE_LABELS[feature])
@@ -1941,7 +1950,7 @@ export function ModelCards() {
                               className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border"
                               style={{ background: `${color}08`, borderColor: `${color}25` }}
                             >
-                              <Icon className="h-4 w-4" style={{ color }} />
+                              <ProviderIcon provider={model.provider} modelName={model.name} />
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">

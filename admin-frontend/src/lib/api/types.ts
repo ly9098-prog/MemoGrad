@@ -555,7 +555,7 @@ export type AIStatsResponse = {
   success_rate: number;
   avg_latency_ms: number;
   total_tokens: number;
-  estimated_cost: number;
+  model_name?: string | null;
   daily_trends: DailyTrendPoint[];
 };
 

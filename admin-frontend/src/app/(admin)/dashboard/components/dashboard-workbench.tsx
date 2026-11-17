@@ -17,7 +17,6 @@ import {
   Server,
   ShieldAlert,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type {
@@ -86,7 +85,6 @@ function StatusPill({ tone, children }: { tone: StatusTone; children: ReactNode 
 }
 
 function MetricCell({
-  icon,
   label,
   value,
   hint,
@@ -97,7 +95,6 @@ function MetricCell({
   metricKey,
   featured = false,
 }: {
-  icon: ReactNode;
   label: string;
   value: string;
   hint: ReactNode;
@@ -110,10 +107,7 @@ function MetricCell({
 }) {
   return (
     <div className={styles.metricCell} data-tone={tone} data-accent={accent} data-ready={!loading} data-featured={featured}>
-      <div className={styles.metricTopline}>
-        <span className={styles.metricLabel}>{label}</span>
-        <span className={styles.metricIcon}>{icon}</span>
-      </div>
+      <span className={styles.metricLabel}>{label}</span>
       {loading ? (
         <span className={styles.metricSkeleton} aria-label={`正在加载${label}`} />
       ) : (
@@ -275,7 +269,6 @@ export function renderDashboardWorkbench({
               label="题目总量"
               value={numberValue(overview.data?.questions_total)}
               hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(questionsToday)}`}
-              icon={<Database size={15} />}
               loading={overview.isLoading}
               accent="blue"
               motionOrder={0}
@@ -286,7 +279,6 @@ export function renderDashboardWorkbench({
               label="小程序用户"
               value={numberValue(overview.data?.users_total)}
               hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(usersToday)}`}
-              icon={<Users size={15} />}
               loading={overview.isLoading}
               accent="blue"
               motionOrder={1}
@@ -296,7 +288,6 @@ export function renderDashboardWorkbench({
               label="待审核题目"
               value={numberValue(pendingReview)}
               hint={overview.isError ? "数据暂不可用" : pendingReview == null ? "正在读取审核队列" : pendingReview > 0 ? "等待人工审核" : "当前无待审核"}
-              icon={<ShieldCheck size={15} />}
               loading={overview.isLoading}
               tone={(pendingReview ?? 0) > 0 ? "alert" : "default"}
               accent="amber"
@@ -307,7 +298,6 @@ export function renderDashboardWorkbench({
               label="待处理导入"
               value={numberValue(pendingImports)}
               hint={overview.isError ? "数据暂不可用" : <><span>累计 {numberValue(overview.data?.imports_total)} 批次</span><span>今日 +{numberValue(importsToday)}</span></>}
-              icon={<FileClock size={15} />}
               loading={overview.isLoading}
               tone={(pendingImports ?? 0) > 0 ? "alert" : "default"}
               accent="violet"
@@ -333,7 +323,7 @@ export function renderDashboardWorkbench({
             <div className={styles.panelHeading}>
               <div>
                 <h2 id="dashboard-todo-title">需要处理</h2>
-                <p>按现有队列计数，进入对应工作区。</p>
+                <p>当前审核、导入与审计队列</p>
               </div>
               <span className={styles.miniCount}>{overview.data ? todoCount > 0 ? `${todoCount} 个队列` : "暂无待办" : "等待数据"}</span>
             </div>

@@ -44,5 +44,5 @@ class AdminAIStatsResponse(BaseModel):
     success_rate: float
     avg_latency_ms: float
     total_tokens: int
-    estimated_cost: float
+    model_name: str | None = None
     daily_trends: list[DailyTrendPoint]

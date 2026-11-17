@@ -7,9 +7,9 @@
   align-items: stretch;
   min-width: 0;
   margin-top: 20px;
-  padding: 28px;
+  padding: 24px;
   border-radius: 16px;
-  background: #eaf2fc;
+  background: #f4f8fc;
   box-shadow: inset 0 1px 0 #ffffffe6;
   color: var(--dash-ink);
   font-variant-numeric: tabular-nums;
@@ -28,13 +28,16 @@
 .metric .metricHint { margin-top: 4px; color: var(--dash-summary-muted); font-size: 12px; line-height: 20px; }
 .metricSkeleton { min-width: 56px; border-radius: 4px; background: #c4d4e8; color: transparent; }
 .metric[data-metric="today"] .metricValue { color: var(--dash-featured-ink); }
+.metric[data-metric="model"] dd { align-items: center; flex-wrap: nowrap; gap: 8px; }
+.metric[data-metric="model"] .metricValue { min-width: 0; font-size: 18px; line-height: 24px; letter-spacing: 0; }
+.modelIcon { width: 20px; height: 20px; flex: none; object-fit: contain; }
 .trend { display: flex; flex-direction: column; min-width: 0; }
 .trendHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .trendHeader h3 { font-size: 14px; font-weight: 600; line-height: 22px; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; }
-.segmented { --segments: 2; position: relative; display: inline-grid; grid-template-columns: repeat(var(--segments), minmax(0, 1fr)); padding: 3px; border-radius: 8px; background: color-mix(in srgb, var(--dash-line) 60%, transparent); }
+.segmented { --segments: 2; position: relative; display: inline-grid; grid-template-columns: repeat(var(--segments), minmax(0, 1fr)); padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--dash-line) 60%, transparent); }
 .segmented[data-segments="4"] { --segments: 4; }
-.segmented::before { position: absolute; inset: 3px auto 3px 3px; width: calc((100% - 6px) / var(--segments)); border-radius: 6px; background: var(--dash-surface); content: ""; transition: transform 240ms var(--dash-ease); }
+.segmented::before { position: absolute; inset: 2px auto 2px 2px; width: calc((100% - 4px) / var(--segments)); border-radius: 6px; background: var(--dash-surface); content: ""; transition: transform 240ms var(--dash-ease); }
 .segmented[data-active="1"]::before { transform: translateX(100%); }
 .segmented[data-active="2"]::before { transform: translateX(200%); }
 .segmented[data-active="3"]::before { transform: translateX(300%); }
@@ -75,14 +78,18 @@
 @keyframes revealArea { from { opacity: 0; } to { opacity: 1; } }
 
 @supports (backdrop-filter: blur(16px)) {
-  .overview { background: var(--dash-ai-surface); backdrop-filter: blur(20px) saturate(125%); }
+  .overview { background: var(--dash-ai-surface); backdrop-filter: blur(24px) saturate(110%); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .overview { background: #eaf2fc; backdrop-filter: none; }
+  .overview { background: #f4f8fc; backdrop-filter: none; }
 }
 @media (forced-colors: active) {
   .overview { border: 1px solid CanvasText; background: Canvas; color: CanvasText; box-shadow: none; backdrop-filter: none; }
   .metricsPanel, .metric[data-metric="today"] .metricValue { color: CanvasText; }
+}
+
+@container (max-width: 1080px) {
+  .overview { padding: 20px; }
 }
 
 @container (max-width: 960px) {
@@ -95,7 +102,7 @@
   .overview { gap: 28px; padding: 20px 16px; border-radius: 12px; }
   .metrics { gap: 24px 20px; }
   .metricValue, .metricSkeleton { font-size: 24px; line-height: 30px; }
-  .metric[data-metric="tokens"] .metricValue { font-size: 20px; }
+  .metric[data-metric="model"] .metricValue { font-size: 16px; line-height: 22px; }
   .controls { width: 100%; }
   .segmented button { min-width: 38px; padding-inline: 8px; }
 }
