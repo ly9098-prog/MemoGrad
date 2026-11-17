@@ -555,7 +555,7 @@ export type AIStatsResponse = {
   success_rate: number;
   avg_latency_ms: number;
   total_tokens: number;
-  estimated_cost: number;
+  model_name?: string | null;
   daily_trends: DailyTrendPoint[];
 };
 
@@ -1528,7 +1528,17 @@ export type SyllabusVersionDetail = SyllabusVersionSummary & {
   knowledge_points: SyllabusKnowledgePointItem[];
 };
 
-export type SyllabusCatalogItem = {
+export type KnowledgeOutline = {
+  parent_knowledge_point_id?: number | null;
+  chapter_id?: number | null;
+  chapter_name?: string | null;
+  outline_path?: string[];
+  outline_depth?: number;
+  outline_order?: number;
+};
+
+export type SyllabusCatalogItem = KnowledgeOutline & {
+  is_active?: boolean;
   knowledge_point_id: number;
   subject_id: number;
   subject_code: string;
@@ -1585,7 +1595,7 @@ export type CoverageSyllabusSummary = {
   effective_year: number;
 };
 
-export type CoverageMatrixItem = {
+export type CoverageMatrixItem = KnowledgeOutline & {
   syllabus_knowledge_point_id: number;
   knowledge_point_id: number;
   subject_id: number;

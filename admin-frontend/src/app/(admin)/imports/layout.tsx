@@ -1,10 +1,22 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardCheck, FileQuestion, FileText, Images, UploadCloud, Wrench } from "lucide-react";
+import {
+  ClipboardCheck,
+  FileQuestion,
+  FileText,
+  Images,
+  UploadCloud,
+  Wrench,
+} from "lucide-react";
 import { ManagementPage } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
+import {
+  WorkspacePage,
+  workspaceStyles as ws,
+} from "@/components/admin/workspace";
 
 const importTabs = [
   { href: "/imports/questions", label: "题目列表", icon: FileQuestion },
@@ -15,8 +27,57 @@ const importTabs = [
   { href: "/imports/maintenance", label: "运维", icon: Wrench },
 ];
 
-export default function ImportsLayout({ children }: { children: React.ReactNode }) {
+export default function ImportsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const revealCurrentTab = () => {
+      const active = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!active) return;
+      const item = active.getBoundingClientRect();
+      const viewport = nav.getBoundingClientRect();
+      if (item.left < viewport.left || item.right > viewport.right) {
+        nav.scrollLeft +=
+          (item.left + item.right - viewport.left - viewport.right) / 2;
+      }
+    };
+    revealCurrentTab();
+    const observer = new ResizeObserver(revealCurrentTab);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  const isClearWorkspace =
+    pathname === "/imports/questions" || pathname === "/imports/maintenance";
+  if (isClearWorkspace) {
+    return (
+      <WorkspacePage>
+        <nav ref={navRef} aria-label="导入工作区导航" className={ws.importNav}>
+          {importTabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                aria-current={pathname === tab.href ? "page" : undefined}
+              >
+                <Icon aria-hidden="true" />
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+        {children}
+      </WorkspacePage>
+    );
+  }
 
   return (
     <ManagementPage className="pb-10">
@@ -26,7 +87,8 @@ export default function ImportsLayout({ children }: { children: React.ReactNode 
       >
         {importTabs.map((tab) => {
           const Icon = tab.icon;
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+          const active =
+            pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
             <Link
               key={tab.href}

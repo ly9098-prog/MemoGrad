@@ -3,21 +3,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Archive, ChevronDown, ChevronRight, ClipboardCheck, History, Plus, RefreshCw, Search } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Plus, RefreshCw, Search, X } from "lucide-react";
 
 import {
   EmptyState,
-  FieldLabel,
-  ManagementNotice,
-  ManagementPage,
   ManagementSkeletonRows,
-  PremiumSection,
-  PremiumSectionHeader,
-  PremiumStat,
   StatusBadge,
 } from "@/components/admin/management-ui";
+import {
+  WorkspacePage,
+  WorkspaceHeader,
+  WorkspaceSurface,
+  WorkspaceSectionHeader,
+  WorkspaceMetrics,
+  WorkspaceMetric,
+  WorkspaceNotice,
+  WorkspaceSelect,
+  workspaceStyles as ws,
+} from "@/components/admin/workspace";
 import { Button } from "@/components/ui/button";
-import { CustomSelect } from "@/components/ui/custom-select";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import type {
@@ -26,20 +31,25 @@ import type {
   AdminExamPaperType,
 } from "@/lib/api/types";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import { statusMeta, paperTypeLabel, paperYearBadgeLabel, computePaperSummary, filterPapers, buildStatusSegments, stableDesktopListHeight, stableMobileListHeight } from "@/lib/exam-paper-utils";
+import {
+  statusMeta,
+  paperTypeLabel,
+  computePaperSummary,
+  filterPapers,
+  buildStatusSegments,
+  stableDesktopListHeight,
+  stableMobileListHeight,
+} from "@/lib/exam-paper-utils";
 import { hasPermission } from "@/lib/permissions/permissions";
-import { DEFAULT_EXAM_YEAR, EXAM_YEAR_OPTIONS, isSupportedExamYear } from "@/lib/exam-years";
+import {
+  DEFAULT_EXAM_YEAR,
+  EXAM_YEAR_OPTIONS,
+  isSupportedExamYear,
+} from "@/lib/exam-years";
 
 const typeOptions = [
   { label: "历年真题 · 选择题", value: "past_exam_choice" },
   { label: "模拟卷 · 选择题", value: "mock_choice" },
-];
-
-const statusOptions = [
-  { label: "全部状态", value: "" },
-  { label: "草稿", value: "draft" },
-  { label: "已发布", value: "published" },
-  { label: "已归档", value: "archived" },
 ];
 
 export default function ExamPapersPage() {
@@ -48,7 +58,8 @@ export default function ExamPapersPage() {
   const permissions = useAuthStore((state) => state.permissions);
   const canWrite = hasPermission(permissions, "question:write");
   const [title, setTitle] = useState("");
-  const [paperType, setPaperType] = useState<AdminExamPaperType>("past_exam_choice");
+  const [paperType, setPaperType] =
+    useState<AdminExamPaperType>("past_exam_choice");
   const [year, setYear] = useState(DEFAULT_EXAM_YEAR);
   const [durationMin, setDurationMin] = useState("75");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -57,10 +68,14 @@ export default function ExamPapersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [displayStatusFilter, setDisplayStatusFilter] = useState("");
   const [displayKeyword, setDisplayKeyword] = useState("");
-  const [resultsTransitionPhase, setResultsTransitionPhase] = useState<"idle" | "leaving" | "pre-enter" | "entering">("idle");
+  const [resultsTransitionPhase, setResultsTransitionPhase] = useState<
+    "idle" | "leaving" | "pre-enter" | "entering"
+  >("idle");
   const displayedFilterRef = useRef({ status: "", keyword: "" });
   const targetFilterRef = useRef({ status: "", keyword: "" });
-  const resultsTransitionPhaseRef = useRef<"idle" | "leaving" | "pre-enter" | "entering">("idle");
+  const resultsTransitionPhaseRef = useRef<
+    "idle" | "leaving" | "pre-enter" | "entering"
+  >("idle");
   const leaveFallbackTimerRef = useRef<number | null>(null);
   const enterFallbackTimerRef = useRef<number | null>(null);
   const enterFrameRef = useRef<number | null>(null);
@@ -85,8 +100,15 @@ export default function ExamPapersPage() {
         body: JSON.stringify({
           title: title.trim(),
           paper_type: paperType,
-          year: paperType === "past_exam_choice" ? Number(year) : (year ? Number(year) : null),
-          duration_sec: durationMin ? Math.max(1, Number(durationMin)) * 60 : null,
+          year:
+            paperType === "past_exam_choice"
+              ? Number(year)
+              : year
+                ? Number(year)
+                : null,
+          duration_sec: durationMin
+            ? Math.max(1, Number(durationMin)) * 60
+            : null,
         }),
       }),
     onSuccess: async (paper) => {
@@ -99,10 +121,13 @@ export default function ExamPapersPage() {
   const summary = useMemo(() => computePaperSummary(papers), [papers]);
   const normalizedKeyword = settledKeyword.trim().toLowerCase();
 
-  const updateResultsTransitionPhase = useCallback((phase: "idle" | "leaving" | "pre-enter" | "entering") => {
-    resultsTransitionPhaseRef.current = phase;
-    setResultsTransitionPhase(phase);
-  }, []);
+  const updateResultsTransitionPhase = useCallback(
+    (phase: "idle" | "leaving" | "pre-enter" | "entering") => {
+      resultsTransitionPhaseRef.current = phase;
+      setResultsTransitionPhase(phase);
+    },
+    [],
+  );
 
   const clearLeaveFallback = useCallback(() => {
     if (leaveFallbackTimerRef.current !== null) {
@@ -129,11 +154,14 @@ export default function ExamPapersPage() {
     }
   }, []);
 
-  const commitDisplayedFilter = useCallback((nextFilter: { status: string; keyword: string }) => {
-    displayedFilterRef.current = nextFilter;
-    setDisplayStatusFilter(nextFilter.status);
-    setDisplayKeyword(nextFilter.keyword);
-  }, []);
+  const commitDisplayedFilter = useCallback(
+    (nextFilter: { status: string; keyword: string }) => {
+      displayedFilterRef.current = nextFilter;
+      setDisplayStatusFilter(nextFilter.status);
+      setDisplayKeyword(nextFilter.keyword);
+    },
+    [],
+  );
 
   const startResultsEnter = useCallback(() => {
     clearEnterFrames();
@@ -147,7 +175,8 @@ export default function ExamPapersPage() {
         updateResultsTransitionPhase("entering");
         enterFallbackTimerRef.current = window.setTimeout(() => {
           enterFallbackTimerRef.current = null;
-          if (resultsTransitionPhaseRef.current === "entering") updateResultsTransitionPhase("idle");
+          if (resultsTransitionPhaseRef.current === "entering")
+            updateResultsTransitionPhase("idle");
         }, 260);
       });
     });
@@ -164,7 +193,9 @@ export default function ExamPapersPage() {
     const nextFilter = { status: statusFilter, keyword: normalizedKeyword };
     targetFilterRef.current = nextFilter;
     const currentFilter = displayedFilterRef.current;
-    const isSameAsDisplayed = currentFilter.status === nextFilter.status && currentFilter.keyword === nextFilter.keyword;
+    const isSameAsDisplayed =
+      currentFilter.status === nextFilter.status &&
+      currentFilter.keyword === nextFilter.keyword;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       clearLeaveFallback();
@@ -182,7 +213,8 @@ export default function ExamPapersPage() {
         updateResultsTransitionPhase("entering");
         enterFallbackTimerRef.current = window.setTimeout(() => {
           enterFallbackTimerRef.current = null;
-          if (resultsTransitionPhaseRef.current === "entering") updateResultsTransitionPhase("idle");
+          if (resultsTransitionPhaseRef.current === "entering")
+            updateResultsTransitionPhase("idle");
         }, 260);
       }
       return undefined;
@@ -212,277 +244,385 @@ export default function ExamPapersPage() {
     updateResultsTransitionPhase,
   ]);
 
-  useEffect(() => () => {
-    clearLeaveFallback();
-    clearEnterFallback();
-    clearEnterFrames();
-  }, [clearEnterFallback, clearEnterFrames, clearLeaveFallback]);
+  useEffect(
+    () => () => {
+      clearLeaveFallback();
+      clearEnterFallback();
+      clearEnterFrames();
+    },
+    [clearEnterFallback, clearEnterFrames, clearLeaveFallback],
+  );
 
   const filteredPapers = useMemo(
     () => filterPapers(papers, displayStatusFilter, displayKeyword),
     [displayKeyword, displayStatusFilter, papers],
   );
   const isSearchSettling = settledKeyword !== keyword;
-  const isResultsTransitioning = isSearchSettling || resultsTransitionPhase !== "idle";
+  const isResultsTransitioning =
+    isSearchSettling || resultsTransitionPhase !== "idle";
   const stableDesktopHeight = stableDesktopListHeight(papers.length);
   const stableMobileHeight = stableMobileListHeight(papers.length);
   const statusSegments = buildStatusSegments(papers, summary);
   const queryFailed = query.isError;
 
   return (
-    <ManagementPage className="space-y-5">
-      <PremiumSection>
-        <PremiumSectionHeader
-          icon={<ClipboardCheck className="h-4 w-4" />}
-          title="试卷管理"
-          titleAs="h1"
-          titleClassName="text-[26px] tracking-[-0.04em] md:text-[28px]"
-          description="集中维护历年真题与模拟卷的题序、分值和发布状态。已发布试卷固定题目版本，题库后续编辑不会影响历史作答。"
-          meta={
-            <>
-              <StatusBadge tone="accent">仅支持单选题</StatusBadge>
-              <span>发布后冻结题序与题目版本</span>
-            </>
-          }
-          aside={
-            <>
-              {canWrite ? (
-                <Button onClick={() => setShowCreateForm((value) => !value)} aria-expanded={showCreateForm}>
-                  <Plus className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${showCreateForm ? "rotate-45" : ""}`} />
-                  {showCreateForm ? "收起新建" : "新建试卷"}
-                </Button>
-              ) : null}
-              <Button variant="secondary" onClick={() => query.refetch()} disabled={query.isFetching}>
-                <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
-                刷新
+    <WorkspacePage>
+      <WorkspaceHeader
+        title="试卷管理"
+        description="整理历年真题与模拟卷，维护题序、分值和发布状态"
+        meta={
+          <span>
+            仅支持单选题 · 发布后冻结题序与题目版本，后续题库编辑不影响历史作答
+          </span>
+        }
+        actions={
+          <>
+            {canWrite ? (
+              <Button
+                onClick={() => setShowCreateForm((value) => !value)}
+                aria-expanded={showCreateForm}
+                aria-controls="exam-create-form"
+              >
+                {showCreateForm ? (
+                  <X size={16} aria-hidden="true" />
+                ) : (
+                  <Plus size={16} aria-hidden="true" />
+                )}
+                {showCreateForm ? "收起新建" : "新建试卷"}
               </Button>
-            </>
-          }
-        />
-        <div className="grid gap-px sm:grid-cols-2 xl:grid-cols-4">
-          <PremiumStat icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="全部试卷" value={queryFailed ? "—" : summary.total} hint={queryFailed ? "试卷数据不可用" : "包含草稿、已发布与已归档"} />
-          <PremiumStat icon={<Plus className="h-3.5 w-3.5" />} label="待整理草稿" value={queryFailed ? "—" : summary.draft} hint={queryFailed ? "试卷数据不可用" : "仍可调整题目和基础信息"} accent="amber" tone={!queryFailed && summary.draft > 0 ? "alert" : "default"} />
-          <PremiumStat icon={<Archive className="h-3.5 w-3.5" />} label="已发布" value={queryFailed ? "—" : summary.published} hint={queryFailed ? "试卷数据不可用" : "题目版本已冻结"} accent="teal" />
-          <PremiumStat icon={<History className="h-3.5 w-3.5" />} label="历史作答" value={queryFailed ? "—" : summary.attempts} hint={queryFailed ? "试卷数据不可用" : "所有试卷累计作答次数"} accent="violet" />
-        </div>
-
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+            >
+              <RefreshCw
+                size={14}
+                aria-hidden="true"
+                className={query.isFetching ? "animate-spin" : ""}
+              />
+              刷新
+            </Button>
+          </>
+        }
+      />
+      <WorkspaceSurface>
+        <WorkspaceMetrics>
+          <WorkspaceMetric
+            label="全部试卷"
+            value={queryFailed ? "—" : summary.total}
+            hint="草稿、已发布与已归档"
+            loading={query.isLoading}
+          />
+          <WorkspaceMetric
+            label="待整理草稿"
+            value={queryFailed ? "—" : summary.draft}
+            hint="可调整题目与基础信息"
+            tone={summary.draft ? "attention" : "default"}
+            loading={query.isLoading}
+          />
+          <WorkspaceMetric
+            label="已发布"
+            value={queryFailed ? "—" : summary.published}
+            hint="题目版本已冻结"
+            loading={query.isLoading}
+          />
+          <WorkspaceMetric
+            label="历史作答"
+            value={queryFailed ? "—" : summary.attempts.toLocaleString()}
+            hint="所有试卷累计作答次数"
+            loading={query.isLoading}
+          />
+        </WorkspaceMetrics>
         {canWrite ? (
           <div
+            id="exam-create-form"
             aria-hidden={!showCreateForm}
             inert={!showCreateForm}
-            className={`grid border-t border-[var(--admin-line)] transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+            className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${showCreateForm ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
           >
-            <div className="overflow-hidden bg-secondary/20">
-              <div className="flex items-start justify-between gap-3 px-5 pt-4">
-                <div>
-                  <h2 className="text-[13px] font-semibold tracking-[-0.015em] text-foreground">新建试卷</h2>
-                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">先建立草稿，再进入组卷页补充题目、分值和来源信息。</p>
+            <div className="overflow-hidden">
+              <section className={ws.createForm} aria-label="新建试卷">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-medium">新建试卷</h2>
+                    <p className={`${ws.caption} mt-1`}>
+                      先创建草稿，再补充题目、分值和来源
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCreateForm(false)}
+                  >
+                    收起
+                    <X size={14} aria-hidden="true" />
+                  </Button>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>
-                  收起
-                  <ChevronDown className="h-4 w-4 rotate-180" />
-                </Button>
-              </div>
-              <div className="grid gap-4 px-5 pb-5 pt-3 md:grid-cols-2 xl:grid-cols-[minmax(280px,2fr)_minmax(180px,1fr)_140px_170px_minmax(124px,auto)] xl:items-end">
-                <label>
-                  <FieldLabel>试卷名称</FieldLabel>
-                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例如：2025 年真题选择题" />
-                </label>
-                <label>
-                  <FieldLabel>类型</FieldLabel>
-                  <CustomSelect value={paperType} options={typeOptions} onChange={(value) => setPaperType(value as AdminExamPaperType)} clearable={false} />
-                </label>
-                <label>
-                  <FieldLabel>年份</FieldLabel>
-                  <CustomSelect
-                    value={year}
-                    options={[...EXAM_YEAR_OPTIONS]}
-                    onChange={setYear}
-                    placeholder="选择年份"
-                    clearable={paperType !== "past_exam_choice"}
-                  />
-                </label>
-                <label>
-                  <FieldLabel>建议时长（分钟）</FieldLabel>
-                  <Input value={durationMin} onChange={(event) => setDurationMin(event.target.value.replace(/\D/g, ""))} placeholder="75" />
-                </label>
-                <Button
-                  className="w-full xl:w-auto"
-                  onClick={() => createMutation.mutate()}
-                  disabled={
-                    !title.trim()
-                    || createMutation.isPending
-                    || (paperType === "past_exam_choice" && !isSupportedExamYear(year))
-                    || (paperType === "mock_choice" && Boolean(year) && !isSupportedExamYear(year))
-                  }
-                >
-                  <Plus className="h-4 w-4" />
-                  创建草稿
-                </Button>
-              </div>
-              {createMutation.isError ? (
-                <ManagementNotice className="mx-5 mb-5 mt-0" tone="danger">
-                  {createMutation.error instanceof Error ? createMutation.error.message : "创建失败，请检查名称、年份和时长后重试。"}
-                </ManagementNotice>
-              ) : null}
+                <div className={ws.createGrid}>
+                  <label className={ws.field}>
+                    <span>试卷名称</span>
+                    <Input
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="例如：2025 年真题选择题"
+                    />
+                  </label>
+                  <label className={ws.field}>
+                    <span>类型</span>
+                    <WorkspaceSelect
+                      value={paperType}
+                      options={typeOptions}
+                      onChange={(value) =>
+                        setPaperType(value as AdminExamPaperType)
+                      }
+                      clearable={false}
+                    />
+                  </label>
+                  <label className={ws.field}>
+                    <span>年份</span>
+                    <WorkspaceSelect
+                      value={year}
+                      options={EXAM_YEAR_OPTIONS}
+                      onChange={setYear}
+                      placeholder="选择年份"
+                      clearable={paperType !== "past_exam_choice"}
+                    />
+                  </label>
+                  <label className={ws.field}>
+                    <span>建议时长（分钟）</span>
+                    <Input
+                      inputMode="numeric"
+                      value={durationMin}
+                      onChange={(event) =>
+                        setDurationMin(event.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="75"
+                    />
+                  </label>
+                </div>
+                <div className={ws.actions}>
+                  <Button
+                    onClick={() => createMutation.mutate()}
+                    disabled={
+                      !title.trim() ||
+                      createMutation.isPending ||
+                      (paperType === "past_exam_choice" &&
+                        !isSupportedExamYear(year)) ||
+                      (paperType === "mock_choice" &&
+                        Boolean(year) &&
+                        !isSupportedExamYear(year))
+                    }
+                  >
+                    <Plus size={16} aria-hidden="true" />
+                    {createMutation.isPending ? "创建中…" : "创建草稿"}
+                  </Button>
+                  <span className={ws.caption}>草稿创建后进入组卷详情</span>
+                </div>
+                {createMutation.isError ? (
+                  <div className="mt-4" role="alert">
+                    <WorkspaceNotice tone="danger">
+                      {createMutation.error instanceof Error
+                        ? createMutation.error.message
+                        : "创建失败，请检查名称、年份和时长后重试。"}
+                    </WorkspaceNotice>
+                  </div>
+                ) : null}
+              </section>
             </div>
           </div>
         ) : null}
-      </PremiumSection>
-
-      <PremiumSection className="overflow-hidden">
-        <PremiumSectionHeader
-          title="试卷列表"
-          description={query.isError ? "试卷数据暂不可用，请点击刷新重试。" : query.isLoading ? "正在读取试卷数据" : `显示 ${filteredPapers.length} / ${papers.length} 份试卷，点击任意一行进入组卷详情。`}
-          aside={
-          <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center">
-            <div className="hidden items-center rounded-[11px] border border-border bg-secondary/50 p-1 sm:flex" role="group" aria-label="按状态筛选试卷">
-              {statusSegments.map((segment) => {
-                const active = statusFilter === segment.value;
-                return (
-                  <button
-                    key={segment.value || "all"}
-                    type="button"
-                    onClick={() => setStatusFilter(segment.value)}
-                    className={`flex h-8 items-center gap-1.5 rounded-[8px] px-3 text-xs font-semibold transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.98] motion-reduce:transform-none ${active ? "bg-card text-foreground shadow-[0_2px_8px_rgba(31,49,61,0.08)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground"}`}
-                    aria-pressed={active}
-                  >
-                    {segment.label}
-                    <span className={`text-[10px] tabular-nums ${active ? "text-primary" : "text-muted-foreground/70"}`}>{segment.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <label className="relative block w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-              <Input className="h-10 bg-card pl-9 pr-3 shadow-none" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索名称、来源或年份" aria-label="搜索试卷" />
-            </label>
-            <CustomSelect className="h-10 w-full bg-card sm:hidden" value={statusFilter} onChange={setStatusFilter} options={statusOptions} placeholder="全部状态" />
-          </div>
+        <WorkspaceSectionHeader
+          title="试卷目录"
+          description={
+            query.isError
+              ? "试卷读取失败，现有筛选条件已保留"
+              : query.isLoading
+                ? "正在读取试卷"
+                : `显示 ${filteredPapers.length} / ${papers.length} 份 · 通过试卷名称进入组卷详情`
           }
         />
+        <div className={ws.examControls}>
+          <div className={ws.segments} role="group" aria-label="按状态筛选试卷">
+            {statusSegments.map((segment) => (
+              <button
+                key={segment.value || "all"}
+                type="button"
+                onClick={() => setStatusFilter(segment.value)}
+                aria-pressed={statusFilter === segment.value}
+              >
+                {segment.label}
+                <span>{query.isError ? "—" : segment.count}</span>
+              </button>
+            ))}
+          </div>
+          <label className={ws.search}>
+            <Search aria-hidden="true" />
+            <Input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="搜索名称、来源或年份"
+              aria-label="搜索试卷"
+            />
+          </label>
+        </div>
         {query.isError ? (
-          <div className="p-5">
-            <ManagementNotice tone="danger" title="试卷列表读取失败">
-              当前无法读取试卷数据。请检查接口状态后点击右上角“刷新”重试，现有筛选条件不会被清空。
-            </ManagementNotice>
-          </div>
+          <WorkspaceNotice tone="danger" title="试卷列表读取失败">
+            请使用右上角刷新重试。
+          </WorkspaceNotice>
         ) : query.isLoading ? (
-          <div className="min-h-[300px]">
-            <ManagementSkeletonRows rows={4} />
-          </div>
+          <ManagementSkeletonRows rows={4} />
         ) : (
           <div
             aria-busy={isResultsTransitioning}
             onTransitionEnd={(event) => {
-              if (event.currentTarget !== event.target || event.propertyName !== "opacity") return;
-              if (resultsTransitionPhaseRef.current === "leaving") {
+              if (
+                event.currentTarget !== event.target ||
+                event.propertyName !== "opacity"
+              )
+                return;
+              if (resultsTransitionPhaseRef.current === "leaving")
                 finishResultsLeave();
-              } else if (resultsTransitionPhaseRef.current === "entering") {
+              else if (resultsTransitionPhaseRef.current === "entering") {
                 clearEnterFallback();
                 updateResultsTransitionPhase("idle");
               }
             }}
-            className={`transition-opacity motion-reduce:transition-none motion-reduce:opacity-100 ${
-              resultsTransitionPhase === "leaving"
-                ? "pointer-events-none opacity-0 duration-[110ms] ease-[cubic-bezier(0.4,0,1,1)] will-change-[opacity]"
-                : resultsTransitionPhase === "pre-enter"
-                  ? "pointer-events-none opacity-0 duration-0 will-change-[opacity]"
-                  : resultsTransitionPhase === "entering"
-                    ? "opacity-100 duration-[190ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[opacity]"
-                    : "opacity-100 duration-0"
-            }`}
+            className={`transition-opacity motion-reduce:transition-none motion-reduce:opacity-100 ${resultsTransitionPhase === "leaving" ? "pointer-events-none opacity-0 duration-[110ms]" : resultsTransitionPhase === "pre-enter" ? "pointer-events-none opacity-0 duration-0" : resultsTransitionPhase === "entering" ? "opacity-100 duration-[190ms]" : "opacity-100 duration-0"}`}
           >
             <div
-              className="hidden max-h-[720px] overflow-auto [scrollbar-gutter:stable] md:block"
+              className={`${ws.paperDesktop} ${ws.tableScroll} max-h-[680px]`}
               style={{ minHeight: stableDesktopHeight }}
+              tabIndex={0}
+              role="region"
+              aria-label="试卷目录，可横向滚动"
             >
-              {filteredPapers.length > 0 ? (
-                <table className="w-full min-w-[920px] text-sm">
-                  <thead className="sticky top-0 z-10 bg-secondary/95 text-left text-[11px] font-semibold tracking-[0.015em] text-muted-foreground shadow-[0_1px_0_var(--border)] backdrop-blur-md">
+              {filteredPapers.length ? (
+                <table className={`${ws.table} min-w-[880px]`}>
+                  <caption className="sr-only">试卷目录与发布状态</caption>
+                  <thead>
                     <tr>
-                      <th className="px-5 py-3">试卷</th>
-                      <th className="px-4 py-3">类型</th>
-                      <th className="px-4 py-3 text-right">题目 / 分值</th>
-                      <th className="px-4 py-3 text-right">建议时长</th>
-                      <th className="px-4 py-3 text-right">历史作答</th>
-                      <th className="px-4 py-3">状态</th>
-                      <th className="w-12 px-4 py-3" />
+                      <th scope="col">年份</th>
+                      <th scope="col">试卷 / 来源</th>
+                      <th scope="col" className="text-right">
+                        题目 / 分值
+                      </th>
+                      <th scope="col" className="text-right">
+                        建议时长
+                      </th>
+                      <th scope="col" className="text-right">
+                        历史作答
+                      </th>
+                      <th scope="col">状态</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredPapers.map((paper) => {
                       const status = statusMeta(paper.status);
-                      const yearBadge = paperYearBadgeLabel(paper);
                       return (
-                        <tr
-                          key={paper.id}
-                          tabIndex={0}
-                          role="button"
-                          onClick={() => router.push(`/exams/${paper.public_id}`)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              router.push(`/exams/${paper.public_id}`);
-                            }
-                          }}
-                          aria-label={`打开试卷 ${paper.title}`}
-                          className="group relative cursor-pointer border-t border-border transition-[background-color] duration-200 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none"
-                        >
-                          <td className="px-5 py-4">
-                            <div className="flex min-w-0 items-center gap-2">
-                              {yearBadge ? <span className="shrink-0 rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">{yearBadge}</span> : null}
-                              <p className="max-w-[430px] truncate font-semibold leading-5 text-foreground">{paper.title}</p>
-                            </div>
-                            <p className="mt-1 text-[11px] leading-5 text-muted-foreground/70">版本 v{paper.version}{paper.source ? ` · ${paper.source}` : ""}</p>
+                        <tr key={paper.id}>
+                          <td>
+                            <span className={ws.yearNumber}>
+                              {paper.year ?? "—"}
+                            </span>
                           </td>
-                          <td className="px-4 py-4 text-muted-foreground">{paperTypeLabel(paper)}</td>
-                          <td className="px-4 py-4 text-right tabular-nums"><span className="font-semibold text-foreground">{paper.question_count}</span><span className="text-muted-foreground/70"> / {paper.total_choice_score} 分</span></td>
-                          <td className="px-4 py-4 text-right tabular-nums text-muted-foreground">{paper.duration_sec ? `${Math.round(paper.duration_sec / 60)} 分钟` : "不限时"}</td>
-                          <td className="px-4 py-4 text-right tabular-nums text-muted-foreground">{paper.attempt_count}</td>
-                          <td className="px-4 py-4"><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
-                          <td className="px-4 py-4 text-muted-foreground/70"><ChevronRight aria-hidden="true" className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none" /></td>
+                          <td className="max-w-[440px]">
+                            <Link
+                              href={`/exams/${paper.public_id}`}
+                              className={ws.paperLink}
+                            >
+                              {paper.title}
+                            </Link>
+                            <p className={ws.caption}>
+                              {paperTypeLabel(paper)} · v{paper.version}
+                              {paper.source ? ` · ${paper.source}` : ""}
+                            </p>
+                          </td>
+                          <td className="text-right">
+                            <span className="font-medium">
+                              {paper.question_count}
+                            </span>
+                            <span className={ws.muted}>
+                              {" "}
+                              / {paper.total_choice_score} 分
+                            </span>
+                          </td>
+                          <td className={`text-right ${ws.muted}`}>
+                            {paper.duration_sec
+                              ? `${Math.round(paper.duration_sec / 60)} 分钟`
+                              : "不限时"}
+                          </td>
+                          <td className={`text-right ${ws.muted}`}>
+                            {paper.attempt_count.toLocaleString()}
+                          </td>
+                          <td>
+                            <StatusBadge tone={status.tone}>
+                              {status.label}
+                            </StatusBadge>
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               ) : (
-                <div className="grid h-full min-h-[176px] place-items-center">
-                  <EmptyState>{papers.length === 0 ? "还没有试卷。创建一份草稿后即可开始组卷。" : "当前筛选没有匹配的试卷。清空搜索或切换状态后再试。"}</EmptyState>
-                </div>
+                <EmptyState>
+                  {papers.length === 0
+                    ? "还没有试卷。创建一份草稿后即可开始组卷。"
+                    : "当前筛选没有匹配的试卷。清空搜索或切换状态后再试。"}
+                </EmptyState>
               )}
             </div>
-
             <div
-              className="divide-y divide-border md:hidden"
+              className={ws.paperMobile}
               style={{ minHeight: stableMobileHeight }}
             >
-              {filteredPapers.length > 0 ? filteredPapers.map((paper) => {
-                const status = statusMeta(paper.status);
-                const yearBadge = paperYearBadgeLabel(paper);
-                return (
-                  <button key={paper.id} type="button" className="group flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" onClick={() => router.push(`/exams/${paper.public_id}`)}>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="font-semibold leading-5 text-foreground">{paper.title}</p>
-                        <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+              {filteredPapers.length ? (
+                filteredPapers.map((paper) => {
+                  const status = statusMeta(paper.status);
+                  return (
+                    <article key={paper.id}>
+                      <div>
+                        <Link
+                          href={`/exams/${paper.public_id}`}
+                          className={ws.paperLink}
+                        >
+                          {paper.title}
+                          <ChevronRight
+                            size={14}
+                            className="ml-1 inline"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                        <StatusBadge tone={status.tone}>
+                          {status.label}
+                        </StatusBadge>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{yearBadge ? `${paper.year} 年 · ` : ""}{paperTypeLabel(paper)} · {paper.question_count} 题 · {paper.total_choice_score} 分</p>
-                      <p className="mt-2 text-[11px] text-muted-foreground/70">v{paper.version} · 历史作答 {paper.attempt_count} 次</p>
-                    </div>
-                    <ChevronRight aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-1" />
-                  </button>
-                );
-              }) : (
-                <div className="grid h-full min-h-[176px] place-items-center">
-                  <EmptyState>{papers.length === 0 ? "还没有试卷。创建一份草稿后即可开始组卷。" : "当前筛选没有匹配的试卷。清空搜索或切换状态后再试。"}</EmptyState>
-                </div>
+                      <p>
+                        {paper.year ? `${paper.year} 年 · ` : ""}
+                        {paperTypeLabel(paper)} · {paper.question_count} 题 /{" "}
+                        {paper.total_choice_score} 分<br />
+                        {paper.duration_sec
+                          ? `${Math.round(paper.duration_sec / 60)} 分钟`
+                          : "不限时"}{" "}
+                        · v{paper.version} · 历史作答{" "}
+                        {paper.attempt_count.toLocaleString()} 次
+                        {paper.source ? ` · ${paper.source}` : ""}
+                      </p>
+                    </article>
+                  );
+                })
+              ) : (
+                <EmptyState>
+                  {papers.length === 0
+                    ? "还没有试卷。创建一份草稿后即可开始组卷。"
+                    : "当前筛选没有匹配的试卷。清空搜索或切换状态后再试。"}
+                </EmptyState>
               )}
             </div>
           </div>
         )}
-      </PremiumSection>
-    </ManagementPage>
+      </WorkspaceSurface>
+    </WorkspacePage>
   );
 }

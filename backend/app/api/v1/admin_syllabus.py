@@ -1,6 +1,7 @@
 """Admin API for versioned 408 syllabus governance."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_security import require_permissions
@@ -8,6 +9,9 @@ from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
 from app.models.syllabus import SyllabusKnowledgePoint, SyllabusVersion
 from app.schemas.syllabus import (
+    KnowledgeLabelCreate,
+    KnowledgeLabelResponse,
+    KnowledgeLabelUpdate,
     SyllabusCatalogResponse,
     SyllabusCoverageResponse,
     SyllabusMappingCreate,
@@ -18,10 +22,12 @@ from app.schemas.syllabus import (
     SyllabusVersionSummary,
     SyllabusVersionUpdate,
 )
-from app.services import syllabus_service
+from app.services import knowledge_catalog_service, syllabus_service
 from app.services.admin_audit_service import write_admin_audit
 
-router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/knowledge/syllabus", tags=["admin-syllabus"])
+router = APIRouter(
+    prefix=f"{API_ADMIN_V1_PREFIX}/knowledge/syllabus", tags=["admin-syllabus"]
+)
 
 
 def _http_error(exc: syllabus_service.SyllabusError) -> HTTPException:
@@ -128,12 +134,15 @@ async def update_version(
 @router.get("/versions/{version_id}/catalog", response_model=SyllabusCatalogResponse)
 async def get_catalog(
     version_id: int,
+    include_inactive: bool = False,
     _=Depends(require_permissions("knowledge:read")),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         return SyllabusCatalogResponse(
-            **await syllabus_service.get_catalog(db, version_id)
+            **await syllabus_service.get_catalog(
+                db, version_id, include_inactive=include_inactive
+            )
         )
     except syllabus_service.SyllabusError as exc:
         raise _http_error(exc) from exc
@@ -322,4 +331,93 @@ async def get_coverage(
             **await syllabus_service.get_coverage(db, version_id)
         )
     except syllabus_service.SyllabusError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post(
+    "/catalog/knowledge-points", response_model=KnowledgeLabelResponse, status_code=201
+)
+async def create_label(
+    data: KnowledgeLabelCreate,
+    request: Request,
+    current_admin=Depends(require_permissions("knowledge:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        point = await knowledge_catalog_service.create_label(db, data.model_dump())
+        await write_admin_audit(
+            db,
+            current_admin,
+            "knowledge_label.create",
+            "knowledge_point",
+            point.id,
+            detail={"subject_id": point.subject_id},
+            request=request,
+        )
+        await db.commit()
+        await knowledge_catalog_service.invalidate_label_cache(point.subject_id)
+        return KnowledgeLabelResponse.model_validate(point, from_attributes=True)
+    except syllabus_service.SyllabusError as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
+
+
+@router.patch(
+    "/catalog/knowledge-points/{point_id}", response_model=KnowledgeLabelResponse
+)
+async def update_label(
+    point_id: int,
+    data: KnowledgeLabelUpdate,
+    request: Request,
+    current_admin=Depends(require_permissions("knowledge:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        values = data.model_dump(exclude_unset=True)
+        point = await knowledge_catalog_service.update_label(db, point_id, values)
+        await write_admin_audit(
+            db,
+            current_admin,
+            "knowledge_label.update",
+            "knowledge_point",
+            point.id,
+            detail={"fields": sorted(data.model_fields_set)},
+            request=request,
+        )
+        await db.commit()
+        await knowledge_catalog_service.invalidate_label_cache(point.subject_id)
+        return KnowledgeLabelResponse.model_validate(point, from_attributes=True)
+    except syllabus_service.SyllabusError as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
+
+
+@router.delete("/catalog/knowledge-points/{point_id}")
+async def delete_label(
+    point_id: int,
+    request: Request,
+    current_admin=Depends(require_permissions("knowledge:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        subject_id = await knowledge_catalog_service.delete_label(db, point_id)
+        await write_admin_audit(
+            db,
+            current_admin,
+            "knowledge_label.delete",
+            "knowledge_point",
+            point_id,
+            detail={},
+            request=request,
+        )
+        await db.commit()
+        await knowledge_catalog_service.invalidate_label_cache(subject_id)
+        return {"success": True, "id": point_id}
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409, detail="标签存在引用，不能删除；可改为禁用"
+        ) from exc
+    except syllabus_service.SyllabusError as exc:
+        await db.rollback()
         raise _http_error(exc) from exc

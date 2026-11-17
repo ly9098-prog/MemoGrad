@@ -1,7 +1,14 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
 
@@ -50,6 +57,10 @@ export function CustomSelect({
   disabled,
   className,
   clearable = true,
+  menuClassName,
+  id,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledby,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -60,10 +71,22 @@ export function CustomSelect({
   disabled?: boolean;
   className?: string;
   clearable?: boolean;
+  menuClassName?: string;
+  id?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement>();
+  const captureTrigger = useCallback((element: HTMLDivElement | null) => {
+    ref.current = element;
+    setPortalContainer(
+      element?.closest<HTMLElement>('[data-slot="dialog-content"]') ??
+        undefined,
+    );
+  }, []);
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -71,13 +94,14 @@ export function CustomSelect({
   const listboxId = useId();
 
   const selected = options.find((o) => o.value === value);
-  const filtered = searchable && search
-    ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(search.toLowerCase()) ||
-          o.value.toLowerCase().includes(search.toLowerCase()),
-      )
-    : options;
+  const filtered =
+    searchable && search
+      ? options.filter(
+          (o) =>
+            o.label.toLowerCase().includes(search.toLowerCase()) ||
+            o.value.toLowerCase().includes(search.toLowerCase()),
+        )
+      : options;
 
   // Correct active index after filtering changes
   useEffect(() => {
@@ -91,6 +115,12 @@ export function CustomSelect({
     setActiveIndex(-1);
   }, []);
 
+  const selectValue = (nextValue: string) => {
+    onChange(nextValue);
+    close();
+    ref.current?.querySelector("button")?.focus();
+  };
+
   useEffect(() => {
     const handler = (e: PointerEvent) => {
       const target = e.target as Node;
@@ -98,7 +128,8 @@ export function CustomSelect({
       close();
     };
     document.addEventListener("pointerdown", handler, { capture: true });
-    return () => document.removeEventListener("pointerdown", handler, { capture: true });
+    return () =>
+      document.removeEventListener("pointerdown", handler, { capture: true });
   }, [close, dropdownEl]);
 
   useEffect(() => {
@@ -127,20 +158,32 @@ export function CustomSelect({
   // Scroll active item into view
   useEffect(() => {
     if (!open || activeIndex < 0) return;
-    const el = listRef.current?.children[activeIndex] as HTMLElement | undefined;
+    const el = listRef.current?.children[activeIndex] as
+      | HTMLElement
+      | undefined;
     el?.scrollIntoView({ block: "nearest" });
   }, [open, activeIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === " " && e.target instanceof HTMLInputElement) return;
+    if (
+      (e.key === "Delete" || e.key === "Backspace") &&
+      !(e.target instanceof HTMLInputElement) &&
+      clearable &&
+      value
+    ) {
+      e.preventDefault();
+      onChange("");
+      close();
+      return;
+    }
     if (e.key === "Enter") {
       if (open) {
         if (activeIndex >= 0 && activeIndex < filtered.length) {
           e.preventDefault();
           const option = filtered[activeIndex];
           if (option && !option.disabled) {
-            onChange(option.value);
-            setOpen(false);
-            setActiveIndex(-1);
+            selectValue(option.value);
           }
         }
       } else {
@@ -193,28 +236,38 @@ export function CustomSelect({
       setActiveIndex(last ?? -1);
       return;
     }
-    if (e.key === "Enter" && activeIndex >= 0 && activeIndex < filtered.length) {
+    if (
+      e.key === "Enter" &&
+      activeIndex >= 0 &&
+      activeIndex < filtered.length
+    ) {
       e.preventDefault();
       const option = filtered[activeIndex];
       if (option && !option.disabled) {
-        onChange(option.value);
-        setOpen(false);
-        setActiveIndex(-1);
+        selectValue(option.value);
       }
       return;
     }
   };
 
   return (
-    <div ref={ref} className="relative min-w-0" onKeyDown={handleKeyDown}>
+    <div
+      ref={captureTrigger}
+      className="relative min-w-0"
+      onKeyDown={handleKeyDown}
+    >
       <button
         type="button"
+        id={id}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledby}
         onClick={() => !disabled && setOpen((v) => !v)}
         disabled={disabled}
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
+        aria-keyshortcuts={clearable && value ? "Delete Backspace" : undefined}
         className={cn(
           "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-[9px] border bg-muted pl-3 pr-2 text-sm outline-none transition-all duration-150",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
@@ -242,8 +295,7 @@ export function CustomSelect({
         )}
         {clearable && value && (
           <span
-            role="button"
-            tabIndex={-1}
+            aria-hidden="true"
             className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 hover:bg-border hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
@@ -272,6 +324,8 @@ export function CustomSelect({
 
       {open && (
         <PortalDropdown
+          container={portalContainer}
+          className={menuClassName}
           id={listboxId}
           triggerRef={ref}
           setDropdownEl={setDropdownEl}
@@ -281,7 +335,7 @@ export function CustomSelect({
           searchRef={searchRef}
           filtered={filtered}
           value={value}
-          onChange={(v) => { onChange(v); setOpen(false); setActiveIndex(-1); }}
+          onChange={selectValue}
           listRef={listRef}
           activeIndex={activeIndex}
           onActiveIndexChange={setActiveIndex}
@@ -293,6 +347,8 @@ export function CustomSelect({
 }
 
 function PortalDropdown({
+  container,
+  className,
   id,
   triggerRef,
   setDropdownEl,
@@ -308,6 +364,8 @@ function PortalDropdown({
   onActiveIndexChange,
   searchPlaceholder,
 }: {
+  container?: HTMLElement;
+  className?: string;
   id: string;
   triggerRef: React.RefObject<HTMLDivElement | null>;
   setDropdownEl: (el: HTMLDivElement | null) => void;
@@ -336,13 +394,25 @@ function PortalDropdown({
       const btn = triggerRef.current?.querySelector("button");
       if (!btn) return;
       const rect = btn.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom - 12;
-      const spaceAbove = rect.top - 12;
+      // Radix Dialog makes body siblings inert. Keep its menu inside the
+      // focus scope, and account for the dialog's transformed/scrolling origin.
+      const bounds = container?.getBoundingClientRect();
+      const visibleTop = Math.max(0, bounds?.top ?? 0);
+      const visibleBottom = Math.min(
+        window.innerHeight,
+        bounds?.bottom ?? window.innerHeight,
+      );
+      const spaceBelow = visibleBottom - rect.bottom - 12;
+      const spaceAbove = rect.top - visibleTop - 12;
       const dir = spaceBelow >= spaceAbove ? "down" : "up";
-      const maxH = dir === "down" ? Math.min(spaceBelow, 320) : Math.min(spaceAbove, 320);
+      const maxH =
+        dir === "down" ? Math.min(spaceBelow, 320) : Math.min(spaceAbove, 320);
 
       const minDropdownWidth = searchable ? 280 : Math.max(rect.width, 180);
-      const dropdownWidth = Math.min(Math.max(rect.width, minDropdownWidth), window.innerWidth - 16);
+      const dropdownWidth = Math.min(
+        Math.max(rect.width, minDropdownWidth),
+        Math.min(window.innerWidth, bounds?.width ?? window.innerWidth) - 16,
+      );
 
       let top: number | undefined;
       let bottom: number | undefined;
@@ -352,19 +422,43 @@ function PortalDropdown({
         bottom = window.innerHeight - rect.top + 4;
       }
 
+      const viewportLeft = Math.max(
+        Math.max(8, (bounds?.left ?? 0) + 8),
+        Math.min(
+          rect.left,
+          Math.min(window.innerWidth, bounds?.right ?? window.innerWidth) -
+            dropdownWidth -
+            8,
+        ),
+      );
       setStyle({
-        position: "fixed",
+        position: container ? "absolute" : "fixed",
         zIndex: 9999,
         visibility: "visible",
         width: dropdownWidth,
-        minWidth: minDropdownWidth,
+        minWidth: dropdownWidth,
         maxHeight: Math.max(Math.min(maxH, window.innerHeight - 24), 96),
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        top,
-        bottom,
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - dropdownWidth - 8)),
+        top:
+          container && top !== undefined
+            ? top - bounds!.top + container.scrollTop - container.clientTop
+            : top,
+        bottom:
+          container && bottom !== undefined
+            ? bounds!.bottom -
+              rect.top +
+              4 -
+              container.scrollTop -
+              container.clientTop
+            : bottom,
+        left: container
+          ? viewportLeft -
+            bounds!.left +
+            container.scrollLeft -
+            container.clientLeft
+          : viewportLeft,
       });
     };
 
@@ -376,7 +470,7 @@ function PortalDropdown({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [triggerRef, searchable]);
+  }, [triggerRef, searchable, container]);
 
   return createPortal(
     <div
@@ -387,19 +481,32 @@ function PortalDropdown({
       className={cn(
         "admin-content-theme rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
         mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+        className,
       )}
       style={style}
       onKeyDown={(event) => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
+          event.stopPropagation();
           const direction = event.key === "ArrowDown" ? 1 : -1;
-          onActiveIndexChange(getNextEnabledIndex(activeIndex < 0 ? -1 : activeIndex, direction, filtered));
+          onActiveIndexChange(
+            getNextEnabledIndex(
+              activeIndex < 0 ? -1 : activeIndex,
+              direction,
+              filtered,
+            ),
+          );
           return;
         }
-        if (event.key === "Enter" && activeIndex >= 0 && activeIndex < filtered.length) {
+        if (
+          event.key === "Enter" &&
+          activeIndex >= 0 &&
+          activeIndex < filtered.length
+        ) {
           const option = filtered[activeIndex];
           if (option && !option.disabled) {
             event.preventDefault();
+            event.stopPropagation();
             onChange(option.value);
           }
         }
@@ -433,7 +540,9 @@ function PortalDropdown({
         onTouchMove={(event) => event.stopPropagation()}
       >
         {filtered.length === 0 ? (
-          <div className="px-4 py-6 text-center text-xs text-muted-foreground/70">无匹配选项</div>
+          <div className="px-4 py-6 text-center text-xs text-muted-foreground/70">
+            无匹配选项
+          </div>
         ) : (
           filtered.map((opt, idx) => {
             const isSelected = opt.value === value;
@@ -455,16 +564,28 @@ function PortalDropdown({
                   !isSelected && !isActive && "hover:bg-accent/40",
                   opt.disabled && "cursor-not-allowed opacity-40",
                 )}
-                onMouseEnter={() => { onActiveIndexChange(idx); }}
+                onMouseEnter={() => {
+                  onActiveIndexChange(idx);
+                }}
               >
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {isSelected && (
-                    <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      className="h-4 w-4 text-primary"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   )}
                 </span>
-                <span className="min-w-0 flex-1 truncate whitespace-nowrap">{opt.label}</span>
+                <span className="min-w-0 flex-1 truncate whitespace-nowrap">
+                  {opt.label}
+                </span>
                 {opt.suffix && (
                   <span
                     className="max-w-[120px] shrink-0 truncate whitespace-nowrap text-[10px] text-muted-foreground/70"
@@ -479,6 +600,6 @@ function PortalDropdown({
         )}
       </div>
     </div>,
-    document.body,
+    container ?? document.body,
   );
 }

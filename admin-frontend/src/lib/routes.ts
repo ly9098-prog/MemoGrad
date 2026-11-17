@@ -95,8 +95,8 @@ export function getActiveAdminRoute(
 
 const dashboardRoute: AdminRoute = {
   href: "/dashboard",
-  label: "总览",
-  description: "指标与趋势",
+  label: "工作台",
+  description: "运营指标与待办",
   permission: "dashboard:read",
   icon: Gauge,
 };

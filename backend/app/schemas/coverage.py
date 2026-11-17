@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field
 
 from app.schemas.base import BaseModel
+from app.schemas.knowledge_outline import KnowledgeOutlineFields
 
 CoverageStatus = Literal["empty", "insufficient", "imbalanced", "healthy"]
 ExamYearCoverageStatus = Literal["missing", "draft", "invalid", "complete", "archived"]
@@ -15,7 +16,7 @@ class CoverageSyllabusSummary(BaseModel):
     effective_year: int
 
 
-class CoverageMatrixItem(BaseModel):
+class CoverageMatrixItem(KnowledgeOutlineFields):
     syllabus_knowledge_point_id: int
     knowledge_point_id: int
     subject_id: int

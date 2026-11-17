@@ -20,7 +20,9 @@ from app.models.question_knowledge_point import QuestionKnowledgePoint
 from app.models.syllabus import SyllabusKnowledgePoint, SyllabusVersion
 from app.models.user import User
 from app.models.user_knowledge_state import UserKnowledgeState
-from app.services import knowledge_map_service
+from app.schemas.coverage import CoverageReportResponse
+from app.schemas.syllabus import SyllabusCatalogResponse
+from app.services import coverage_service, knowledge_map_service, syllabus_service
 
 
 async def _make_database(tmp_path):
@@ -212,6 +214,30 @@ async def test_overview_is_fail_closed_without_active_syllabus(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_admin_catalog_and_coverage_share_authoritative_outline(tmp_path):
+    engine, session_factory = await _make_database(tmp_path)
+    try:
+        ids = await _seed(session_factory)
+        async with session_factory() as db:
+            catalog = SyllabusCatalogResponse.model_validate(
+                await syllabus_service.get_catalog(db, ids["version"])
+            )
+            coverage = CoverageReportResponse.model_validate(
+                await coverage_service.build_coverage_report(
+                    db, syllabus_version_id=ids["version"]
+                )
+            )
+        child = next(item for item in catalog.items if item.knowledge_point_id == 2)
+        covered = next(item for item in coverage.items if item.knowledge_point_id == 2)
+        assert child.parent_knowledge_point_id == covered.parent_knowledge_point_id == 1
+        assert child.chapter_id == covered.chapter_id == 1
+        assert child.outline_depth == covered.outline_depth == 1
+        assert len(catalog.items) >= len(coverage.items) > 0
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_overview_only_uses_active_canonical_408_scope(tmp_path):
     engine, session_factory = await _make_database(tmp_path)
     try:
@@ -336,5 +362,251 @@ async def test_point_detail_rejects_points_outside_active_408_scope(tmp_path):
             os_map = await knowledge_map_service.get_subject_map(db, 9, ids["os"])
         assert detail is None
         assert os_map is not None
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_catalog_label_mutations_preserve_snapshots_and_guard_delete(tmp_path):
+    from app.schemas.syllabus import KnowledgeLabelResponse
+    from app.services import knowledge_catalog_service as labels
+
+    engine, factory = await _make_database(tmp_path)
+    await _seed(factory)
+    try:
+        async with factory() as db:
+            member = await db.scalar(select(SyllabusKnowledgePoint).limit(1))
+            version_id = member.syllabus_version_id
+            old_name = member.name_snapshot
+            point = await labels.update_label(
+                db,
+                member.knowledge_point_id,
+                {
+                    "name": "规范标签修订",
+                    "difficulty_level": 4,
+                    "description": "修订说明",
+                    "is_active": False,
+                },
+            )
+            assert point.normalized_name == "规范标签修订"
+            assert (
+                KnowledgeLabelResponse.model_validate(
+                    point, from_attributes=True
+                ).is_active
+                is False
+            )
+            assert member.name_snapshot == old_name
+            assert not any(
+                row["knowledge_point_id"] == point.id
+                for row in (await syllabus_service.get_catalog(db, version_id))["items"]
+            )
+            full = await syllabus_service.get_catalog(
+                db, version_id, include_inactive=True
+            )
+            assert (
+                next(
+                    row
+                    for row in full["items"]
+                    if row["knowledge_point_id"] == point.id
+                )["is_active"]
+                is False
+            )
+            with pytest.raises(syllabus_service.SyllabusError, match="不能删除"):
+                await labels.delete_label(db, point.id)
+            # New leaf labels may be removed with their incoming placement edge.
+            parent = await db.scalar(
+                select(KnowledgePoint)
+                .where(KnowledgePoint.is_active.is_(True))
+                .limit(1)
+            )
+            leaf = await labels.create_label(
+                db,
+                {
+                    "name": "  新标签  ",
+                    "subject_id": parent.subject_id,
+                    "description": None,
+                    "difficulty_level": 3,
+                    "parent_knowledge_point_id": parent.id,
+                },
+            )
+            leaf_id = leaf.id
+            await labels.delete_label(db, leaf_id)
+            assert await db.get(KnowledgePoint, leaf_id) is None
+            assert (
+                await db.scalar(
+                    select(KnowledgeEdge.id).where(
+                        KnowledgeEdge.target_knowledge_point_id == leaf_id
+                    )
+                )
+                is None
+            )
+            # Existing graph descendants cannot be orphaned by deleting a parent.
+            with pytest.raises(syllabus_service.SyllabusError, match="不能删除"):
+                await labels.delete_label(db, parent.id)
+            await db.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_label_parent_validation_and_reference_guard(tmp_path):
+    from pydantic import ValidationError
+
+    from app.schemas.syllabus import KnowledgeLabelCreate, KnowledgeLabelUpdate
+    from app.services import knowledge_catalog_service as labels
+
+    engine, factory = await _make_database(tmp_path)
+    await _seed(factory)
+    try:
+        with pytest.raises(ValidationError):
+            KnowledgeLabelCreate(subject_id=10, name="  ")
+        with pytest.raises(ValidationError):
+            KnowledgeLabelUpdate(name="标签", difficulty_level=9)
+        with pytest.raises(ValidationError):
+            KnowledgeLabelUpdate()
+        with pytest.raises(ValidationError):
+            KnowledgeLabelUpdate(name=None)
+        with pytest.raises(ValidationError):
+            KnowledgeLabelUpdate(is_active=None)
+        async with factory() as db:
+            parent = await db.scalar(select(KnowledgePoint).limit(1))
+            other = await db.scalar(
+                select(Subject.id)
+                .where(
+                    Subject.id != parent.subject_id,
+                    Subject.code.in_(EXAM408_CORE_CODES),
+                )
+                .limit(1)
+            )
+            with pytest.raises(syllabus_service.SyllabusError, match="同一科目"):
+                await labels.create_label(
+                    db,
+                    {
+                        "subject_id": other,
+                        "name": "错误父项",
+                        "parent_knowledge_point_id": parent.id,
+                    },
+                )
+            leaf = await labels.create_label(
+                db, {"subject_id": parent.subject_id, "name": "没有边但有历史考纲引用"}
+            )
+            version = await db.scalar(select(SyllabusVersion).limit(1))
+            db.add(
+                SyllabusKnowledgePoint(
+                    syllabus_version_id=version.id,
+                    knowledge_point_id=leaf.id,
+                    subject_id=leaf.subject_id,
+                    name_snapshot=leaf.name,
+                    normalized_name_snapshot=leaf.normalized_name,
+                    difficulty_level_snapshot=3,
+                    sort_order=99,
+                )
+            )
+            await db.flush()
+            with pytest.raises(syllabus_service.SyllabusError, match="考纲"):
+                await labels.delete_label(db, leaf.id)
+            await db.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_label_http_permissions_validation_and_audit(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+
+    from app.api.v1.admin_syllabus import router
+    from app.core import admin_security
+    from app.core.database import get_db
+    from app.models.admin import AuditLog
+    from app.services import knowledge_catalog_service as labels
+
+    engine, factory = await _make_database(tmp_path)
+    await _seed(factory)
+    app = FastAPI()
+    app.include_router(router)
+
+    async def database():
+        async with factory() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    app.dependency_overrides[admin_security.get_current_admin] = lambda: (
+        SimpleNamespace(id=None, username="label-unit-test", role_id=1)
+    )
+    granted = set()
+    monkeypatch.setattr(
+        admin_security,
+        "_get_permission_names",
+        AsyncMock(side_effect=lambda *_: granted),
+    )
+    cache_mock = AsyncMock()
+    monkeypatch.setattr(labels, "invalidate_label_cache", cache_mock)
+    prefix = "/api/admin/v1/knowledge/syllabus/catalog/knowledge-points"
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            data = {"subject_id": 10, "name": "新建规范节点", "difficulty_level": 3}
+            assert (await client.post(prefix, json=data)).status_code == 403
+            assert (await client.patch(prefix + "/1", json=data)).status_code in {
+                403,
+                422,
+            }
+            assert (await client.delete(prefix + "/1")).status_code == 403
+            granted.add("knowledge:write")
+            assert (
+                await client.post(prefix, json={**data, "name": "  "})
+            ).status_code == 422
+            created = await client.post(prefix, json=data)
+            assert created.status_code == 201, created.text
+            point_id = created.json()["id"]
+            disabled = await client.patch(
+                prefix + f"/{point_id}",
+                json={
+                    "description": "应保留的说明",
+                    "is_active": False,
+                },
+            )
+            assert disabled.status_code == 200, disabled.text
+            assert disabled.json()["is_active"] is False
+
+            renamed = await client.patch(
+                prefix + f"/{point_id}",
+                json={"name": "重命名规范节点", "difficulty_level": 4},
+            )
+            assert renamed.status_code == 200, renamed.text
+            assert renamed.json()["name"] == "重命名规范节点"
+            assert renamed.json()["description"] == "应保留的说明"
+            assert renamed.json()["is_active"] is False
+
+            reenabled = await client.patch(
+                prefix + f"/{point_id}", json={"is_active": True}
+            )
+            assert reenabled.status_code == 200, reenabled.text
+            assert reenabled.json()["name"] == "重命名规范节点"
+            assert reenabled.json()["difficulty_level"] == 4
+            assert reenabled.json()["description"] == "应保留的说明"
+            assert (
+                await client.patch(prefix + f"/{point_id}", json={})
+            ).status_code == 422
+            assert (await client.delete(prefix + f"/{point_id}")).status_code == 200
+            async with factory() as db:
+                actions = list(
+                    (
+                        await db.scalars(select(AuditLog.action).order_by(AuditLog.id))
+                    ).all()
+                )
+                assert actions == [
+                    "knowledge_label.create",
+                    "knowledge_label.update",
+                    "knowledge_label.update",
+                    "knowledge_label.update",
+                    "knowledge_label.delete",
+                ]
+            assert cache_mock.await_count == 5
     finally:
         await engine.dispose()

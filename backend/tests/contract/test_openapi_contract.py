@@ -16,6 +16,8 @@ from app.main import app
 CRITICAL_OPERATIONS = {
     ("/api/admin/v1/auth/login", "post"): "AdminTokenResponse",
     ("/api/admin/v1/dashboard/overview", "get"): "AdminDashboardOverview",
+    ("/api/admin/v1/dashboard/ai-stats", "get"): "AdminAIStatsResponse",
+    ("/api/admin/v1/ai-settings/stats", "get"): "AdminAIStatsResponse",
     ("/api/admin/v1/system/health", "get"): "SystemHealthResponse",
     ("/api/admin/v1/tasks/diagnostics", "get"): "TaskDiagnosticsResponse",
     ("/api/admin/v1/tasks/trace/{trace_id}", "get"): "TaskTraceResponse",
@@ -70,3 +72,10 @@ def test_openapi_operation_ids_are_unique():
             if previous != location:
                 duplicates.append(f"{operation_id}: {previous} / {location}")
     assert not duplicates, "duplicate OpenAPI operationId(s):\n" + "\n".join(duplicates)
+
+
+def test_ai_statistics_exposes_recorded_model_name_without_price_estimates():
+    properties = app.openapi()["components"]["schemas"]["AdminAIStatsResponse"]["properties"]
+    assert "model_name" in properties
+    assert "estimated_cost" not in properties
+    assert {"today_calls", "monthly_calls", "success_rate", "avg_latency_ms", "total_tokens", "daily_trends"} <= properties.keys()

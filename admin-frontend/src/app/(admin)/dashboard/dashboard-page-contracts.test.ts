@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   states: [] as unknown[], index: 0, setters: [] as ReturnType<typeof vi.fn>[],
   queries: [] as Query[], refetches: [] as ReturnType<typeof vi.fn>[],
   authenticated: true, bootstrapping: false,
+  roleName: "admin",
   permissions: ["dashboard:read", "system:read"] as string[],
   request: vi.fn(), toQuery: vi.fn((query: Record<string, unknown>) => {
     void query;
@@ -45,6 +46,7 @@ vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: unknown) => unknown) => select({
     isAuthenticated: h.authenticated, isBootstrapping: h.bootstrapping,
     permissions: h.permissions,
+    role: { name: h.roleName },
   }),
 }));
 vi.mock("@/lib/api/client", () => ({ apiRequest: h.request, toQuery: h.toQuery }));
@@ -63,6 +65,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-29T18:00:00Z"));
   h.states = []; h.index = 0; h.setters = []; h.queries = []; h.refetches = [];
   h.authenticated = true; h.bootstrapping = false;
+  h.roleName = "admin";
   h.permissions = ["dashboard:read", "system:read"];
   h.request.mockReset().mockResolvedValue({});
   h.fetchQuery.mockReset().mockImplementation((query: Query) => query.queryFn());
@@ -77,19 +80,20 @@ describe("dashboard page request ownership", () => {
     { authenticated: false, bootstrapping: false },
     { authenticated: true, bootstrapping: true },
     { authenticated: false, bootstrapping: true },
-  ])("gates all seven requests during authentication transition (%j)", (state) => {
+  ])("gates all requests during authentication transition (%j)", (state) => {
     h.authenticated = state.authenticated;
     h.bootstrapping = state.bootstrapping;
     DashboardPage();
-    expect(h.queries).toHaveLength(7);
+    expect(h.queries).toHaveLength(8);
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(h.request).not.toHaveBeenCalled();
   });
 
   it("keeps the five owned contracts and shared task diagnostic read separate", async () => {
     DashboardPage();
-    expect(h.queries.every((query) => query.enabled === true)).toBe(true);
-    await Promise.all(h.queries.map((query) => query.queryFn()));
+    expect(h.queries.slice(0, 7).every((query) => query.enabled === true)).toBe(true);
+    expect(h.queries[7].enabled).toBe(false);
+    await Promise.all(h.queries.filter((query) => query.enabled).map((query) => query.queryFn()));
     expect(h.request.mock.calls).toEqual([
       ["/dashboard/overview"], ["/dashboard/daily?fixture"],
       ["/dashboard/questions-stats"], ["/health/ready"],
@@ -97,9 +101,45 @@ describe("dashboard page request ownership", () => {
       ["/dashboard/daily?fixture"],
     ]);
     expect(h.queries.map((query) => query.staleTime)).toEqual([
-      30_000, 30_000, 60_000, 30_000, 60_000, 30_000, 300_000,
+      30_000, 30_000, 60_000, 30_000, 60_000, 30_000, 300_000, 60_000,
     ]);
-    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false, false]);
+    expect(h.queries.slice(3).map((query) => query.retry)).toEqual([1, false, false, false, false]);
+  });
+
+  it("reads the moved AI overview only with the existing settings access and skips duplicate AI statistics", async () => {
+    h.roleName = "super_admin";
+    h.permissions.push("ai_setting:read");
+    const tree = DashboardPage();
+    expect(h.queries[4].enabled).toBe(false);
+    expect(h.queries[7]).toMatchObject({
+      queryKey: ["ai-settings", "stats", 30], enabled: true, staleTime: 60_000,
+    });
+    await h.queries[7].queryFn();
+    expect(h.request).toHaveBeenCalledExactlyOnceWith("/ai-settings/stats?days=30");
+    expect(find(tree, (element) => element.props.href === "/ai-settings?tab=models")).toBeDefined();
+  });
+
+  it.each([
+    { roleName: "admin", permissions: ["dashboard:read", "ai_setting:read"] },
+    { roleName: "super_admin", permissions: ["dashboard:read"] },
+    { roleName: "super_admin", permissions: ["ai_setting:read"] },
+  ])("does not expose the AI settings overview or models outside its gate (%j)", ({ roleName, permissions }) => {
+    h.roleName = roleName;
+    h.permissions = permissions;
+    const tree = DashboardPage();
+    expect(h.queries[7].enabled).toBe(false);
+    expect(find(tree, (element) => element.props.href === "/ai-settings?tab=models")).toBeUndefined();
+  });
+
+  it("refreshes the moved AI statistics without refetching the inactive basic query", async () => {
+    h.roleName = "super_admin";
+    h.permissions.push("ai_setting:read");
+    const tree = DashboardPage();
+    const button = find(tree, (element) => element.type === "button")!;
+    (button.props.onClick as () => void)();
+    await Promise.resolve();
+    expect(h.refetches[4]).not.toHaveBeenCalled();
+    expect(h.refetches[7]).toHaveBeenCalledExactlyOnceWith();
   });
 
   it("does not request shared task diagnostics without system:read", () => {
@@ -112,7 +152,7 @@ describe("dashboard page request ownership", () => {
   it("gates every dashboard request without dashboard:read", () => {
     h.permissions = [];
     DashboardPage();
-    expect(h.queries).toHaveLength(7);
+    expect(h.queries).toHaveLength(8);
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(h.request).not.toHaveBeenCalled();
   });
@@ -124,7 +164,7 @@ describe("dashboard page request ownership", () => {
       root,
       (element) =>
         element.type === ManagementPanel &&
-        element.props.title === "无权限查看仪表盘",
+        element.props.title === "无权限查看工作台",
     );
     expect(panel).toBeDefined();
     expect(find(panel, (element) => element.props.children === "无法加载运营数据")).toBeDefined();
@@ -190,6 +230,8 @@ describe("dashboard page request ownership", () => {
       },
       readyHealth: { data: undefined, isLoading: false },
       aiStats: { data: undefined, isLoading: false },
+      aiSettingsStats: { data: undefined, isLoading: false },
+      canReadAiSettings: false,
       taskDiagnostics: { data: undefined, isLoading: false },
       activity: { data: [], isLoading: false },
       activityRange: { from: "2025-10-31", to: "2026-10-30" },
@@ -210,7 +252,7 @@ describe("dashboard page request ownership", () => {
     h.refetches[2].mockRejectedValue(new Error("synthetic offline"));
     const button = find(root, (element) => element.type === "button")!;
     (button.props.onClick as () => void)();
-    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    expect(h.refetches.map((refetch) => refetch.mock.calls.length)).toEqual([1, 1, 1, 1, 1, 1, 1, 0]);
     await Promise.resolve();
     expect(h.setters[1].mock.calls).toEqual([[true]]);
     release();
@@ -244,6 +286,6 @@ describe("dashboard page request ownership", () => {
     expect(button.props.disabled).toBe(true);
     const portal = find(root, (element) => element.type === BodyPortal)!;
     expect(portal).toBeDefined();
-    expect(find(portal, (element) => element.props["aria-label"] === "正在刷新仪表盘数据")).toBeDefined();
+    expect(find(portal, (element) => element.props["aria-label"] === "正在刷新工作台数据")).toBeDefined();
   });
 });

@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from fastapi import Request
-from sqlalchemy import Date, cast, func, select, text
+from sqlalchemy import Date, cast, func, select, text, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_security import AdminPrincipal
@@ -234,8 +234,9 @@ async def get_ai_stats(
     错题分析等对话类调用。仪表盘需要展示完整 AI 运行情况，因此两类日志必须
     合并统计；仅统计 ``AiGenerationLog`` 会在只有对话类 AI 调用时长期显示 0。
 
-    默认汇总指标（成功率、耗时、Token、费用）保持“本月”语义，兼容 AI 设置
-    页面。仪表盘可传 ``summary_days``，让这些汇总指标与“最近 N 天”卡片口径一致。
+    默认汇总指标（成功率、耗时、Token、主要模型）保持“本月”语义。
+    仪表盘可传 ``summary_days``，让这些汇总指标与“最近 N 天”摘要口径一致。
+    主要模型按两类日志合并后的调用次数选取，同次数按模型名排序。
     """
     today_date = shanghai_today()
     today_start = shanghai_date_utc_range(today_date)[0]
@@ -383,17 +384,33 @@ async def get_ai_stats(
         round(summary_duration_ms / summary_calls, 1) if summary_calls > 0 else 0.0
     )
 
-    # 费用估算：假设输入占 75%，输出占 25%
-    # 输入: ¥1/1M tokens, 输出: ¥2/1M tokens
-    input_tokens_est = int(summary_tokens * 0.75)
-    output_tokens_est = summary_tokens - input_tokens_est
-    estimated_cost = (
-        round(
-            (input_tokens_est / 1_000_000 * 1.0 + output_tokens_est / 1_000_000 * 2.0)
-            * 100
-        )
-        / 100
-    )
+    model_name = None
+    if summary_calls > 0:
+        model_usage = union_all(
+            *(
+                select(
+                    func.trim(model.model).label("model"),
+                    func.count().label("calls"),
+                )
+                .where(
+                    model.created_at >= summary_start,
+                    model.created_at < tomorrow_start,
+                )
+                .group_by(model.model)
+                for model in (AiGenerationLog, AiChat)
+            )
+        ).subquery()
+        leading_model = (
+            await db.execute(
+                select(model_usage.c.model)
+                .group_by(model_usage.c.model)
+                .order_by(func.sum(model_usage.c.calls).desc(), model_usage.c.model.asc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        # 历史日志的协议占位符不是实际模型名，也不能用当前配置补写历史。
+        if leading_model and leading_model.casefold() != "openai-compatible":
+            model_name = leading_model
 
     return AdminAIStatsResponse(
         today_calls=today_calls,
@@ -401,7 +418,7 @@ async def get_ai_stats(
         success_rate=success_rate,
         avg_latency_ms=avg_latency_ms,
         total_tokens=summary_tokens,
-        estimated_cost=estimated_cost,
+        model_name=model_name,
         daily_trends=[DailyTrendPoint(**d) for d in daily_trends],
     )
 

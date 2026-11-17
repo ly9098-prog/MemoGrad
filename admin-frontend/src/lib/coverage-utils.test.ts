@@ -24,6 +24,13 @@ const items: CoverageItemLike[] = [
   { status: "imbalanced", subject_name: "组成原理", subject_code: "CO", name: "CPU" },
 ];
 
+it("filters coverage by chapter title and ancestor section path", () => {
+  const points = [{...items[0], chapter_name: "第5章 树", outline_path: ["第5章 树", "5.2 二叉树"]}];
+  expect(filterCoverageItems(points, "第5章", "")).toHaveLength(1);
+  expect(filterCoverageItems(points, "5.2", "empty")).toHaveLength(1);
+  expect(filterCoverageItems(points, "5.2", "healthy")).toHaveLength(0);
+});
+
 describe("computeStatusCounts", () => {
   it("counts by status", () => {
     const c = computeStatusCounts(items);

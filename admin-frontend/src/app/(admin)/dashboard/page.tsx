@@ -25,9 +25,11 @@ export default function DashboardPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const permissions = useAuthStore((state) => state.permissions);
+  const roleName = useAuthStore((state) => state.role?.name);
   const canReadDashboard = hasPermission(permissions, "dashboard:read");
   const canRequestDashboard = isAuthenticated && !isBootstrapping && canReadDashboard;
   const canReadSystem = hasPermission(permissions, "system:read");
+  const canReadAiSettings = roleName === "super_admin" && hasPermission(permissions, "ai_setting:read");
   const [period, setPeriod] = useState<Period>("7d");
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [referenceTime, setReferenceTime] = useState(Date.now);
@@ -67,7 +69,7 @@ export default function DashboardPage() {
   const aiStats = useQuery({
     queryKey: ["dashboard", "ai-stats"],
     queryFn: () => apiRequest<AIStatsResponse>("/dashboard/ai-stats?days=7"),
-    enabled: canRequestDashboard,
+    enabled: canRequestDashboard && !canReadAiSettings,
     staleTime: 60_000,
     retry: false,
   });
@@ -84,6 +86,13 @@ export default function DashboardPage() {
     enabled: canRequestDashboard,
     staleTime: 300_000,
     refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const aiSettingsStats = useQuery({
+    queryKey: ["ai-settings", "stats", 30],
+    queryFn: () => apiRequest<AIStatsResponse>("/ai-settings/stats?days=30"),
+    enabled: canRequestDashboard && canReadAiSettings,
+    staleTime: 60_000,
     retry: false,
   });
 
@@ -118,7 +127,6 @@ export default function DashboardPage() {
           : daily.refetch(),
         stats.refetch(),
         readyHealth.refetch(),
-        aiStats.refetch(),
         dateChanged
           ? queryClient.fetchQuery({
               queryKey: ["dashboard", "activity", nextActivityRange],
@@ -127,6 +135,7 @@ export default function DashboardPage() {
             })
           : activity.refetch(),
       ];
+      refreshes.push(canReadAiSettings ? aiSettingsStats.refetch() : aiStats.refetch());
       if (canReadSystem) refreshes.push(taskDiagnostics.refetch());
       await Promise.allSettled(refreshes);
     } finally {
@@ -138,13 +147,13 @@ export default function DashboardPage() {
     return (
       <ManagementPage className="space-y-5">
         <header className="border-b border-border pb-5">
-          <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">运营总览</h1>
+          <h1 className="text-[30px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">工作台</h1>
           <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
             聚合用户、题库、审核、导入、AI 与系统状态的实时运营视图。
           </p>
         </header>
         <ManagementPanel
-          title="无权限查看仪表盘"
+          title="无权限查看工作台"
           description="当前角色未被授予 dashboard:read 权限。"
           icon={<ShieldAlert className="h-4 w-4" />}
           variant="quiet"
@@ -153,7 +162,7 @@ export default function DashboardPage() {
             <ShieldAlert className="h-8 w-8 text-muted-foreground/60" aria-hidden="true" />
             <p className="text-sm font-semibold text-foreground">无法加载运营数据</p>
             <p className="max-w-md text-xs leading-5 text-muted-foreground">
-              请联系超级管理员为当前角色分配“仪表盘查看”权限。
+              请联系超级管理员为当前角色分配 dashboard:read（工作台查看）权限。
             </p>
           </div>
         </ManagementPanel>
@@ -171,10 +180,12 @@ export default function DashboardPage() {
     daily,
     stats,
     readyHealth,
-    aiStats,
+    aiStats: canReadAiSettings ? aiSettingsStats : aiStats,
     taskDiagnostics,
     activity,
     activityRange,
+    aiSettingsStats,
+    canReadAiSettings,
     canReadSystem,
     canReadImports,
     canReadAudit,

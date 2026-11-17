@@ -5,6 +5,7 @@
  */
 
 import type { SyllabusCatalogItem } from "@/lib/api/types";
+import { matchesOutline } from "@/lib/knowledge-outline";
 
 export type BadgeTone = "success" | "warning" | "neutral";
 
@@ -50,9 +51,7 @@ export function filterCatalogItems(
 ): SyllabusCatalogItem[] {
   if (!keyword) return items;
   const normalized = keyword.toLowerCase();
-  return items.filter((item) =>
-    `${item.subject_name} ${item.name} ${item.knowledge_point_id}`.toLowerCase().includes(normalized),
-  );
+  return items.filter((item) => matchesOutline(item, normalized));
 }
 
 

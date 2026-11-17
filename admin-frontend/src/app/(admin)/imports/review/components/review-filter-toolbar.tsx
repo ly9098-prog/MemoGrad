@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, ChevronDown, Search, X } from "lucide-react";
-import type { RefObject } from "react";
+import { useRef, type RefObject } from "react";
+import { useOutsideClick } from "@/lib/use-outside-click";
 import type { ImportBatchListItem } from "@/lib/api/types";
 import { shouldShowReviewFilterReset, type ReviewFilters } from "../review-query-state";
 import type { ReviewSubjectOption } from "../review-subject-state";
@@ -69,13 +70,17 @@ function FilterDropdown({
   setOpen: (open: boolean | ((current: boolean) => boolean)) => void;
   onChange: (value: string) => void;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useOutsideClick(ref, open, () => setOpen(false));
   const activeOption = options.find((o) => o.value === value);
   const buttonLabel = value
     ? `${label}：${activeOption?.shortLabel || activeOption?.label || value}`
     : label;
 
   return (
-    <div className="relative">
+    <div ref={ref} className="relative" onKeyDown={(event) => {
+      if (event.key === "Escape") { setOpen(false); ref.current?.querySelector("button")?.focus(); }
+    }}>
       <button
         type="button"
         className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none transition ${
@@ -83,6 +88,9 @@ function FilterDropdown({
             ? "border-primary bg-accent/20 text-accent-foreground"
             : "border-border bg-card text-foreground hover:border-primary/50"
         }`}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="true"
         onClick={() => setOpen((current) => !current)}
       >
         <span>{buttonLabel}</span>
@@ -102,8 +110,7 @@ function FilterDropdown({
                     ? "bg-accent/20 text-accent-foreground font-semibold"
                     : "text-foreground"
                 }`}
-                onMouseDown={(event) => {
-                  event.preventDefault();
+                onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
                 }}
@@ -139,7 +146,7 @@ export function ReviewFilterToolbar({
   onDropdownChange,
 }: ReviewFilterToolbarProps) {
   const setDropdown = (key: DropdownKey, open: boolean | ((current: boolean) => boolean)) => {
-    onDropdownChange(key, typeof open === "function" ? false : open);
+    onDropdownChange(key, typeof open === "function" ? open(dropdownState[key]) : open);
   };
   const closeOtherDropdowns = (except: DropdownKey) => {
     (["risk", "answerStatus", "subject", "status"] as DropdownKey[]).forEach((key) => {
@@ -230,6 +237,7 @@ export function ReviewFilterToolbar({
                 <input
                   className="h-8 w-48 rounded-lg border border-border bg-card px-2.5 pr-14 text-xs text-foreground outline-none transition-colors focus:border-primary"
                   placeholder="批次 ID"
+                  aria-label="批次 ID"
                   value={filters.batch_id || batchIdParam}
                   onChange={(event) => onFilterChange("batch_id", event.target.value)}
                   onFocus={() => onDropdownChange("batch", true)}
@@ -240,6 +248,7 @@ export function ReviewFilterToolbar({
                     className="absolute right-6 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-muted-foreground/70 hover:text-destructive transition"
                     onClick={() => { onFilterChange("batch_id", ""); onDropdownChange("batch", false); }}
                     title="清空批次"
+                    aria-label="清空批次"
                   >
                     <X className="h-3 w-3" />
                   </button>

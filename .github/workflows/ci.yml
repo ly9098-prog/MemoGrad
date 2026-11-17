@@ -627,6 +627,7 @@ jobs:
             tests/architecture/test_study_plan_boundaries.py \
             tests/architecture/test_knowledge_diagnosis_boundaries.py \
             tests/test_services/test_dashboard_stats_compatibility.py \
+            tests/test_services/test_admin_ai_stats.py \
             tests/test_services/test_token_user_service_compatibility.py \
             tests/test_services/test_avatar_decompression_guard.py \
             tests/test_deploy_nginx_forwarded_for.py \
