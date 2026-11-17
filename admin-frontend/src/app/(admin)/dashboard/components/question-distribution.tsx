@@ -12,7 +12,7 @@ const DIMENSIONS: { key: Dimension; label: string }[] = [
   { key: "by_review_status", label: "审核" },
   { key: "by_difficulty", label: "难度" },
 ];
-const SUBJECT_COLORS = ["#d4e5ee", "#cfe5dd", "#e1dcec", "#e9dfcd", "#ead9de"];
+const SUBJECT_COLORS = ["#b9d2e8", "#c9ddeb", "#d9e7f1", "#e6eef7", "#edf2f9"];
 const STATUS_NAMES: Record<string, string> = { published: "已发布", approved: "已审核", pending: "待审核", rejected: "已驳回", draft: "草稿" };
 const STATUS_COLORS: Record<string, string> = { published: "#bcd7e7", approved: "#c6e2d6", pending: "#eedbb6", rejected: "#e8cbd0", draft: "#dde4e8" };
 

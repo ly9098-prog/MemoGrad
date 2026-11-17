@@ -1,16 +1,17 @@
 "use client";
 
 import { Box, Grid2X2, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { DashboardDailyPoint } from "@/lib/api/types";
 import { AnimatedDigits } from "./animated-digits";
+import { RecordDialog } from "./record-dialog";
 import { buildActivityModel, type ActivityMetric } from "./activity-model";
 import styles from "../dashboard-workspace.module.css";
 
 type View = "2d" | "3d";
 type Point = [number, number];
 type Face = { points: Point[]; cell: number; shade: number };
-type Engine = { setView: (view: View) => void; reset: () => void };
+type Engine = { setView: (view: View) => void; reset: () => void; syncSelection: () => void };
 const PALETTE = ["#e7edf0", "#c5dce7", "#87b4cb", "#4e8eaf", "#246589"];
 const ease = (value: number) => value < 0.5 ? 4 * value ** 3 : 1 - (-2 * value + 2) ** 3 / 2;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -43,8 +44,10 @@ export function ActivitySkyline({
 }) {
   const [metric, setMetric] = useState<ActivityMetric>("questions_new");
   const [view, setView] = useState<View>("3d");
-  const [active, setActive] = useState<number | null>(null);
+  const [activeDate, setActiveDate] = useState<string | null>(null);
+  const [recordDate, setRecordDate] = useState<string | null>(null);
   const [canvasUnavailable, setCanvasUnavailable] = useState(false);
+  const [recordsExpanded, setRecordsExpanded] = useState(false);
   const finePointer = useSyncExternalStore(subscribePointer, () => window.matchMedia(POINTER_QUERY).matches, () => false);
   const model = useMemo(() => buildActivityModel(data ?? [], from, to, metric), [data, from, to, metric]);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -52,9 +55,40 @@ export function ActivitySkyline({
   const engineRef = useRef<Engine | null>(null);
   const lastViewRef = useRef<View>("3d");
   const enteredRef = useRef(false);
-  const selected = active == null ? null : model.cells[active];
+  const recordsExpandedRef = useRef(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const pinnedDateRef = useRef<string | null>(null);
+  const selected = model.cells.find((cell) => cell.inRange && cell.date === activeDate);
   const unit = metric === "questions_new" ? "题" : "批次";
   const hasData = model.coveredDays > 0;
+
+  const revealRecord = useCallback((date: string) => {
+    if (!recordsExpandedRef.current) return;
+    const table = tableRef.current;
+    const row = table?.querySelector<HTMLTableRowElement>(`tr[data-date="${date}"]`);
+    if (!table || !row) return;
+    const bounds = table.getBoundingClientRect();
+    const rowBounds = row.getBoundingClientRect();
+    table.scrollTop += rowBounds.top - bounds.top - (table.clientHeight - rowBounds.height) / 2;
+  }, []);
+
+  const commitDate = useCallback((date: string) => {
+    pinnedDateRef.current = date;
+    setActiveDate(date);
+    setRecordDate(date);
+    revealRecord(date);
+  }, [revealRecord]);
+
+  const changeRecordsExpanded = (expanded: boolean) => {
+    recordsExpandedRef.current = expanded;
+    setRecordsExpanded(expanded);
+  };
+
+  useEffect(() => {
+    if (!recordsExpanded || !pinnedDateRef.current) return;
+    const frame = requestAnimationFrame(() => revealRecord(pinnedDateRef.current!));
+    return () => cancelAnimationFrame(frame);
+  }, [recordsExpanded, revealRecord]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -74,11 +108,14 @@ export function ActivitySkyline({
     let elevation = 0;
     let yawGoal = 0;
     let elevationGoal = 0;
-    let activeIndex: number | null = null;
+    const pinnedIndex = model.cells.findIndex((cell) => cell.date === pinnedDateRef.current);
+    let activeIndex: number | null = pinnedIndex < 0 ? null : pinnedIndex;
     let faces: Face[] = [];
     let frame = 0;
     let lastTime = 0;
     let visible = false;
+    let previewTimer: ReturnType<typeof setTimeout> | undefined;
+    let previewIndex: number | null = null;
     let drag: { id: number; x: number; y: number; yaw: number; elevation: number; moved: boolean } | null = null;
 
     const draw = () => {
@@ -187,11 +224,38 @@ export function ActivitySkyline({
       canvas.height = Math.round(height * ratio);
       draw();
     };
-    const select = (index: number | null) => {
-      if (index === activeIndex) return;
-      activeIndex = index;
-      setActive(index);
+    const inspect = (index: number | null, commit = false) => {
+      if (index == null) return;
+      if (activeIndex !== index) {
+        activeIndex = index;
+        draw();
+      }
+      const date = model.cells[index].date;
+      if (commit) {
+        clearTimeout(previewTimer);
+        previewIndex = null;
+        commitDate(date);
+      } else if (previewIndex !== index) {
+        clearTimeout(previewTimer);
+        previewIndex = index;
+        previewTimer = setTimeout(() => {
+          setActiveDate(date);
+        }, 100);
+      }
+    };
+    const clearPreview = () => {
+      clearTimeout(previewTimer);
+      previewIndex = null;
+      if (pinnedDateRef.current) setActiveDate(pinnedDateRef.current);
+      const pinnedIndex = model.cells.findIndex((cell) => cell.date === pinnedDateRef.current);
+      activeIndex = pinnedIndex < 0 ? null : pinnedIndex;
       draw();
+    };
+    const clearSelection = () => {
+      pinnedDateRef.current = null;
+      setActiveDate(null);
+      setRecordDate(null);
+      clearPreview();
     };
     const hit = (event: PointerEvent) => {
       const bounds = canvas.getBoundingClientRect();
@@ -210,32 +274,44 @@ export function ActivitySkyline({
         drag.moved = true;
         yawGoal = clamp(drag.yaw + (event.clientX - drag.x) * 0.005, -0.35, 0.65);
         elevationGoal = clamp(drag.elevation + (event.clientY - drag.y) * 0.003, -0.22, 0.4);
-        select(null);
+        clearPreview();
         kick();
-      } else if (!drag?.moved && event.pointerType === "mouse") select(hit(event));
+      } else if (!drag?.moved && event.pointerType === "mouse") {
+        const index = hit(event);
+        if (index == null) {
+          clearTimeout(previewTimer);
+          previewIndex = null;
+        } else inspect(index);
+      }
     };
     const pointerUp = (event: PointerEvent) => {
-      if (!drag?.moved) select(hit(event));
+      if (event.button !== 0) return;
+      if (!drag?.moved) inspect(hit(event), true);
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
       drag = null;
     };
-    const pointerLeave = () => { if (!drag) select(null); };
-    const pointerCancel = () => { drag = null; select(null); };
+    const pointerLeave = () => { if (!drag) clearPreview(); };
+    const pointerCancel = () => { drag = null; clearPreview(); };
     const reset = () => { yawGoal = 0; elevationGoal = 0; kick(); };
     const keyDown = (event: KeyboardEvent) => {
       const first = model.cells.findIndex((cell) => cell.inRange);
       const last = model.cells.length - 1;
       const moves: Record<string, number> = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 };
-      if (event.key === "Escape") { select(null); return; }
+      if (event.key === "Escape") { clearSelection(); return; }
       if (event.key === "Home" || event.key === "End" || event.key in moves) {
         event.preventDefault();
         const next = event.key === "Home" ? first : event.key === "End" ? last : activeIndex == null ? last : activeIndex + moves[event.key];
-        select(clamp(next, first, last));
+        inspect(clamp(next, first, last), true);
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const next = activeIndex != null && activeIndex >= first ? activeIndex : last;
+        inspect(next, true);
       }
     };
     engineRef.current = {
       setView(next) { target = next === "3d" ? 1 : 0; if (target === 0) reset(); kick(); },
       reset,
+      syncSelection: clearPreview,
     };
     const observer = new ResizeObserver(resize);
     observer.observe(stage);
@@ -257,6 +333,7 @@ export function ActivitySkyline({
     canvas.addEventListener("dblclick", reset);
     return () => {
       cancelAnimationFrame(frame);
+      clearTimeout(previewTimer);
       observer.disconnect();
       visibility.disconnect();
       reduce.removeEventListener("change", kick);
@@ -270,7 +347,7 @@ export function ActivitySkyline({
       canvas.removeEventListener("dblclick", reset);
       engineRef.current = null;
     };
-  }, [model, hasData]);
+  }, [model, hasData, commitDate]);
 
   useEffect(() => {
     lastViewRef.current = view;
@@ -293,34 +370,77 @@ export function ActivitySkyline({
           </strong><span>{unit}新增</span>
         </div>
         <div className={styles.textSwitch} role="group" aria-label="活动统计内容">
-          <button type="button" aria-pressed={metric === "questions_new"} onClick={() => { setMetric("questions_new"); setActive(null); }}>新增题目</button>
-          <button type="button" aria-pressed={metric === "imports_new"} onClick={() => { setMetric("imports_new"); setActive(null); }}>导入批次</button>
+          <button type="button" aria-pressed={metric === "questions_new"} onClick={() => setMetric("questions_new")}>新增题目</button>
+          <button type="button" aria-pressed={metric === "imports_new"} onClick={() => setMetric("imports_new")}>导入批次</button>
         </div>
       </div>
       {loading && !hasData ? <div className={styles.activityState} role="status">正在读取年度活动记录</div> : !hasData ? (
         <div className={styles.activityState} role={error ? "alert" : "status"}>{error ? "活动记录加载失败，请刷新重试" : "暂无活动记录，新增题目后可在这里查看"}</div>
       ) : (
         <>
+          <div className={styles.activityRange}><span>{from} — {to}</span><span>按上海自然日统计</span></div>
           <div ref={stageRef} className={styles.skylineStage} data-view={view}>
-            <canvas ref={canvasRef} className={styles.skylineCanvas} tabIndex={0} role="img" aria-label={`近一年${metric === "questions_new" ? "新增题目" : "导入批次"}，${model.coveredDays}天记录。使用方向键逐日查看，Home 和 End 跳到首尾日期`} aria-describedby="dashboard-activity-selection" />
-            <div id="dashboard-activity-selection" className={styles.skylineReadout} aria-live="polite" aria-atomic="true">
-              {selected?.inRange ? <><span>{selected.date}</span><strong>{selected.count == null ? "未返回数据" : `${selected.count.toLocaleString("zh-CN")} ${unit}`}</strong></> : <><span>{from} — {to}</span><span>按上海自然日统计</span></>}
-            </div>
-            {canvasUnavailable ? <p className={styles.canvasFallback}>当前浏览器无法显示活动图，请展开下方每日记录</p> : null}
+            <canvas ref={canvasRef} className={styles.skylineCanvas} tabIndex={0} role="img" aria-label={`近一年${metric === "questions_new" ? "新增题目" : "导入批次"}，${model.coveredDays}天记录。方向键逐日查看，Home 和 End 跳到首尾日期，点按选择日期后可查看每日记录`} aria-describedby="dashboard-activity-selection" />
+            {canvasUnavailable ? <p className={styles.canvasFallback}>当前浏览器无法显示活动图，请查看下方每日记录</p> : null}
+          </div>
+          <div id="dashboard-activity-selection" className={styles.skylineReadout} aria-live="polite" aria-atomic="true">
+            <span>{selected ? selected.date : "选择日期查看记录"}</span>
+            <strong>{selected ? selected.count == null ? "未返回数据" : `${selected.count.toLocaleString("zh-CN")} ${unit}` : "—"}</strong>
           </div>
           <div className={styles.activityFoot}>
-            <span><strong>{model.activeDays}</strong> 天有新增<span className={styles.activityDivider}>/</span>单日最高 <strong>{model.peak.toLocaleString("zh-CN")}</strong> {unit}{model.peakDate ? ` · ${model.peakDate.slice(5)}` : ""}</span>
+            <span>
+              <strong>{model.activeDays}</strong> 天有新增<span className={styles.activityDivider}>/</span>
+              {model.peakDate ? (
+                <button
+                  type="button"
+                  className={styles.peakButton}
+                  aria-label={`查看单日最高记录：${model.peakDate}，${model.peak.toLocaleString("zh-CN")}${unit}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={recordsExpanded}
+                  aria-controls={recordsExpanded ? "dashboard-activity-records-panel" : undefined}
+                  onClick={(event) => {
+                    if (!model.peakDate) return;
+                    event.currentTarget.focus({ preventScroll: true });
+                    changeRecordsExpanded(true);
+                    commitDate(model.peakDate);
+                    engineRef.current?.syncSelection();
+                  }}
+                >
+                  单日最高 <strong>{model.peak.toLocaleString("zh-CN")}</strong> {unit} · {model.peakDate.slice(5)}
+                </button>
+              ) : <>单日最高 <strong>{model.peak.toLocaleString("zh-CN")}</strong> {unit}</>}
+            </span>
             <div className={styles.heatLegend} aria-label="颜色由浅到深表示每日新增数量由少到多"><span>少</span>{PALETTE.map((color) => <i key={color} style={{ backgroundColor: color }} />)}<span>多</span></div>
           </div>
-          <div className={styles.activityHint}>
-            <span>{finePointer ? view === "3d" ? "拖动旋转 · 双击复位 · 方向键查看日期" : "悬停或点按查看日期 · 方向键逐日浏览" : "点按查看日期 · 可切换 2D 查看每日密度"}</span>
-            {view === "3d" && finePointer ? <button type="button" onClick={() => engineRef.current?.reset()} aria-label="复位活动图视角"><RotateCcw size={13} />复位</button> : null}
-          </div>
+          {finePointer ? <div className={styles.activityHint} data-visible={view === "3d"} inert={view !== "3d"} aria-hidden={view !== "3d"}>
+            <span>拖动旋转 · 双击复位</span>
+            <button type="button" onClick={() => engineRef.current?.reset()} aria-label="复位活动图视角"><RotateCcw size={13} />复位</button>
+          </div> : null}
           {error ? <p className={styles.inlineWarning} role="status">更新失败，当前保留上次读取的活动记录</p> : null}
           {model.coveredDays < 365 ? <p className={styles.inlineWarning}>已返回 {model.coveredDays} 天记录；未返回的日期不计为 0</p> : null}
-          <details className={styles.dataDisclosure}><summary>查看每日记录</summary><div className={styles.activityTable}><table><caption className="sr-only">年度活动每日记录</caption><thead><tr><th>日期</th><th>新增{unit === "题" ? "题目" : "导入"}</th></tr></thead><tbody>{model.cells.filter((cell) => cell.inRange).map((cell) => <tr key={cell.date}><th scope="row">{cell.date}</th><td>{cell.count == null ? "未返回数据" : `${cell.count.toLocaleString("zh-CN")} ${unit}`}</td></tr>)}</tbody></table></div></details>
         </>
       )}
+    {hasData && <RecordDialog
+      id="dashboard-activity-records-panel"
+      label="每日记录"
+      meta={`${model.coveredDays} 天数据`}
+      open={recordsExpanded}
+      onOpenChange={changeRecordsExpanded}
+      onReady={() => { if (pinnedDateRef.current) revealRecord(pinnedDateRef.current); }}
+    >
+            <div id="dashboard-activity-records" ref={tableRef} className={styles.activityTable} tabIndex={0} role="region" aria-label="年度活动每日记录">
+              <table>
+                <caption className="sr-only">年度活动每日记录</caption>
+                <thead><tr><th scope="col">日期</th><th scope="col">新增{unit === "题" ? "题目" : "导入"}</th></tr></thead>
+                <tbody>{model.cells.filter((cell) => cell.inRange).map((cell) => (
+                  <tr key={cell.date} data-date={cell.date} data-selected={recordDate === cell.date}>
+                    <th scope="row">{cell.date}{recordDate === cell.date ? <span className="sr-only">，已选日期</span> : null}</th>
+                    <td>{cell.count == null ? "未返回数据" : `${cell.count.toLocaleString("zh-CN")} ${unit}`}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+    </RecordDialog>}
     </section>
   );
 }

@@ -1,0 +1,95 @@
+import { describe, expect, it } from "vitest";
+import type { AIStatsResponse, DailyTrendPoint } from "@/lib/api/types";
+import {
+  AI_CHART,
+  formatAiTrendValue,
+  getAiSummary,
+  getAiTrendGeometry,
+  getAiTrendKeyboardIndex,
+  getAiTrendValue,
+  getAiTrendWindow,
+} from "./ai-overview-data";
+
+const point: DailyTrendPoint = { date: "11/17", calls: 10, tokens: 12345, success_rate: 80, avg_latency_ms: 1250 };
+const stats: AIStatsResponse = {
+  today_calls: 7, monthly_calls: 100, success_rate: 98.5, avg_latency_ms: 1250,
+  total_tokens: 12345, estimated_cost: 0.02, daily_trends: [point],
+};
+
+describe("AI overview data accuracy", () => {
+  it("keeps all six summary fields, exact Token counts and the server cost precision", () => {
+    expect(getAiSummary(stats).map(({ key, value, unit }) => ({ key, value, unit }))).toEqual([
+      { key: "today", value: "7", unit: "次" },
+      { key: "monthly", value: "100", unit: "次" },
+      { key: "success", value: "98.5", unit: "%" },
+      { key: "latency", value: "1.25", unit: "秒" },
+      { key: "tokens", value: "12,345", unit: "Token" },
+      { key: "cost", value: "0.02", unit: "元" },
+    ]);
+  });
+
+  it("keeps missing summary data unknown and real zero counts visible", () => {
+    expect(getAiSummary().every((item) => item.value === "--")).toBe(true);
+    const result = getAiSummary({ ...stats, today_calls: 0, monthly_calls: 0, total_tokens: 0, estimated_cost: 0 });
+    expect(result.map((item) => item.value)).toEqual(["0", "0", "--", "--", "0", "0.00"]);
+    expect(result[2].hint).toBe("本月暂无调用样本");
+  });
+
+  it("rejects invalid negative, infinite and out-of-range summary measurements", () => {
+    expect(getAiSummary({ ...stats, today_calls: Number.NaN, monthly_calls: -1, total_tokens: Infinity, estimated_cost: -1 })
+      .every((item) => item.value === "--")).toBe(true);
+    expect(getAiSummary({ ...stats, success_rate: 101, avg_latency_ms: -10 }).slice(2, 4)
+      .map((item) => item.value)).toEqual(["--", "--"]);
+  });
+
+  it("takes the latest 7 or 30 server buckets without synthesizing missing dates", () => {
+    const trends = Array.from({ length: 30 }, (_, index) => ({ ...point, date: `day-${index}` }));
+    expect(getAiTrendWindow(trends, 7).map((item) => item.date)).toEqual(trends.slice(23).map((item) => item.date));
+    expect(getAiTrendWindow(trends, 30)).toEqual(trends);
+    expect(getAiTrendWindow(undefined, 7)).toEqual([]);
+    expect(getAiTrendWindow([point], 30)).toEqual([point]);
+  });
+
+  it("treats zero-call quality measurements as absent without replacing real 0% failures", () => {
+    const empty = { ...point, calls: 0, tokens: 0, success_rate: 100, avg_latency_ms: 99 };
+    expect(getAiTrendValue(empty, "success")).toBeNull();
+    expect(getAiTrendValue(empty, "latency")).toBeNull();
+    expect(getAiTrendValue(empty, "calls")).toBe(0);
+    expect(getAiTrendValue(empty, "tokens")).toBe(0);
+    expect(getAiTrendValue({ ...point, success_rate: 0 }, "success")).toBe(0);
+    expect(formatAiTrendValue(getAiTrendValue(point, "latency"), "latency")).toBe("1.25 秒");
+  });
+
+  it("breaks quality paths at days without samples and keeps each metric on its own scale", () => {
+    const data = [point, { ...point, calls: 0 }, { ...point, date: "11/19" }];
+    const success = getAiTrendGeometry(data, "success");
+    expect(success.ceiling).toBe(100);
+    expect(success.points[1].y).toBeNull();
+    expect(success.path.match(/M/g)).toHaveLength(2);
+    expect(success.path).not.toContain("NaN");
+    expect(getAiTrendGeometry(data, "calls").ceiling).toBeGreaterThanOrEqual(10);
+    expect(getAiTrendGeometry(data, "tokens").ceiling).toBeGreaterThan(12000);
+    expect(getAiTrendGeometry(data, "latency").ceiling).toBeGreaterThanOrEqual(1.25);
+  });
+
+  it("keeps empty, zero and single-day geometries finite at a narrow measured width", () => {
+    expect(getAiTrendGeometry([], "calls").path).toBe("");
+    const single = getAiTrendGeometry([{ ...point, calls: 0 }], "calls", 240);
+    expect(single.ceiling).toBeGreaterThan(0);
+    expect(single.points[0].x).toBe((AI_CHART.left + 240 - AI_CHART.right) / 2);
+    expect(single.points[0].y).toBe(AI_CHART.height - AI_CHART.bottom);
+    expect(single.path).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("bounds keyboard navigation and supports endpoints and clearing a selected day", () => {
+    expect(getAiTrendKeyboardIndex("ArrowRight", null, 7)).toBe(0);
+    expect(getAiTrendKeyboardIndex("ArrowLeft", null, 7)).toBe(6);
+    expect(getAiTrendKeyboardIndex("ArrowLeft", 0, 7)).toBe(0);
+    expect(getAiTrendKeyboardIndex("ArrowRight", 6, 7)).toBe(6);
+    expect(getAiTrendKeyboardIndex("Home", 5, 7)).toBe(0);
+    expect(getAiTrendKeyboardIndex("End", 0, 7)).toBe(6);
+    expect(getAiTrendKeyboardIndex("Escape", 5, 7)).toBeNull();
+    expect(getAiTrendKeyboardIndex("x", 5, 7)).toBe(5);
+    expect(getAiTrendKeyboardIndex("Home", null, 0)).toBeNull();
+  });
+});

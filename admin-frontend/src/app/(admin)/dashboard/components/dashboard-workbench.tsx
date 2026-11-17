@@ -40,6 +40,7 @@ import { AnimatedDigits } from "./animated-digits";
 import { DashboardTrendChart } from "./dashboard-trend-chart";
 import { ActivitySkyline } from "./activity-skyline";
 import { QuestionDistribution } from "./question-distribution";
+import { DashboardAiOverview } from "./dashboard-ai-overview";
 import styles from "../dashboard-workspace.module.css";
 
 type Period = "7d" | "30d";
@@ -69,6 +70,8 @@ export interface DashboardWorkbenchProps {
   taskDiagnostics: QueryState<TaskDiagnosticsResponse>;
   activity: QueryState<DashboardDailyPoint[]>;
   activityRange: { from: string; to: string };
+  aiSettingsStats: QueryState<AIStatsResponse>;
+  canReadAiSettings: boolean;
   canReadSystem: boolean;
   canReadImports: boolean;
   canReadAudit: boolean;
@@ -92,19 +95,21 @@ function MetricCell({
   accent = "blue",
   motionOrder = 0,
   metricKey,
+  featured = false,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
-  hint: string;
+  hint: ReactNode;
   loading?: boolean;
   tone?: MetricTone;
   accent?: MetricAccent;
   motionOrder?: number;
   metricKey: string;
+  featured?: boolean;
 }) {
   return (
-    <div className={styles.metricCell} data-tone={tone} data-accent={accent} data-ready={!loading}>
+    <div className={styles.metricCell} data-tone={tone} data-accent={accent} data-ready={!loading} data-featured={featured}>
       <div className={styles.metricTopline}>
         <span className={styles.metricLabel}>{label}</span>
         <span className={styles.metricIcon}>{icon}</span>
@@ -189,6 +194,8 @@ export function renderDashboardWorkbench({
   taskDiagnostics,
   activity,
   activityRange,
+  aiSettingsStats,
+  canReadAiSettings,
   canReadSystem,
   canReadImports,
   canReadAudit,
@@ -224,7 +231,7 @@ export function renderDashboardWorkbench({
     <div className={styles.dashboard}>
       {manualRefreshing ? (
         <BodyPortal>
-          <div className={styles.refreshToast} role="status" aria-live="polite" aria-label="正在刷新仪表盘数据">
+          <div className={styles.refreshToast} role="status" aria-live="polite" aria-label="正在刷新工作台数据">
             <span className={styles.refreshToastIcon}>
               <RefreshCw className="h-4 w-4 animate-spin" />
             </span>
@@ -238,9 +245,9 @@ export function renderDashboardWorkbench({
 
       <header className={styles.header}>
         <div className={styles.headerCopy}>
-          <h1>运营总览</h1>
+          <h1>工作台</h1>
           <p className={styles.headerDescription}>
-            题库的积累、平台的增长，以及今天需要处理的事
+            题库、今日待办与 AI 解析运行概况
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -261,113 +268,131 @@ export function renderDashboardWorkbench({
         </div>
       </header>
 
-      <section className={styles.metricBand} aria-label="核心运营指标">
-        <div className={styles.metricGrid}>
-          <MetricCell
-            label="小程序用户"
-            value={numberValue(overview.data?.users_total)}
-            hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(usersToday)}`}
-            icon={<Users size={15} />}
-            loading={overview.isLoading}
-            accent="blue"
-            motionOrder={0}
-            metricKey="metric:users_total"
-          />
-          <MetricCell
-            label="题目总量"
-            value={numberValue(overview.data?.questions_total)}
-            hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(questionsToday)}`}
-            icon={<Database size={15} />}
-            loading={overview.isLoading}
-            accent="teal"
-            motionOrder={1}
-            metricKey="metric:questions_total"
-          />
-          <MetricCell
-            label="待审核题目"
-            value={numberValue(pendingReview)}
-            hint={overview.isError ? "数据暂不可用" : pendingReview == null ? "正在读取审核队列" : pendingReview > 0 ? "进入下方队列继续审核" : "当前无待审核"}
-            icon={<ShieldCheck size={15} />}
-            loading={overview.isLoading}
-            tone={(pendingReview ?? 0) > 0 ? "alert" : "default"}
-            accent="amber"
-            motionOrder={2}
-            metricKey="metric:pending_review"
-          />
-          <MetricCell
-            label="待处理导入"
-            value={numberValue(pendingImports)}
-            hint={`累计 ${numberValue(overview.data?.imports_total)} 批次 · 今日 +${numberValue(importsToday)}`}
-            icon={<FileClock size={15} />}
-            loading={overview.isLoading}
-            tone={(pendingImports ?? 0) > 0 ? "alert" : "default"}
-            accent="violet"
-            motionOrder={3}
-            metricKey="metric:pending_imports"
-          />
-        </div>
-      </section>
-
-      <div className={styles.analysisGrid}>
-        <DashboardTrendChart
-          data={daily.data}
-          loading={daily.isLoading}
-          error={daily.isError}
-          period={period}
-          onPeriodChange={onPeriodChange}
-        />
-
-        <section
-          className={styles.todoPanel}
-          aria-labelledby="dashboard-todo-title"
-        >
-          <div className={styles.panelHeading}>
-            <div>
-              <h2 id="dashboard-todo-title">需要处理</h2>
-              <p>按现有队列计数，进入对应工作区。</p>
-            </div>
-            <span className={styles.miniCount}>{overview.data ? todoCount > 0 ? `${todoCount} 个队列` : "暂无待办" : "等待数据"}</span>
-          </div>
-          <div className={styles.todoList}>
-            <TodoRow
-              icon={<ShieldCheck size={16} />}
+      <div className={styles.overviewSurface}>
+        <section className={styles.metricBand} aria-label="核心运营指标">
+          <div className={styles.metricGrid}>
+            <MetricCell
+              label="题目总量"
+              value={numberValue(overview.data?.questions_total)}
+              hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(questionsToday)}`}
+              icon={<Database size={15} />}
+              loading={overview.isLoading}
+              accent="blue"
+              motionOrder={0}
+              metricKey="metric:questions_total"
+              featured
+            />
+            <MetricCell
+              label="小程序用户"
+              value={numberValue(overview.data?.users_total)}
+              hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(usersToday)}`}
+              icon={<Users size={15} />}
+              loading={overview.isLoading}
+              accent="blue"
+              motionOrder={1}
+              metricKey="metric:users_total"
+            />
+            <MetricCell
               label="待审核题目"
               value={numberValue(pendingReview)}
-              hint={overview.isError ? "队列计数暂不可用" : reviewHint}
-              href={reviewHref}
-              tone={(pendingReview ?? 0) > 0 ? "attention" : "default"}
+              hint={overview.isError ? "数据暂不可用" : pendingReview == null ? "正在读取审核队列" : pendingReview > 0 ? "等待人工审核" : "当前无待审核"}
+              icon={<ShieldCheck size={15} />}
+              loading={overview.isLoading}
+              tone={(pendingReview ?? 0) > 0 ? "alert" : "default"}
+              accent="amber"
+              motionOrder={2}
+              metricKey="metric:pending_review"
             />
-            <TodoRow
-              icon={<FileClock size={16} />}
+            <MetricCell
               label="待处理导入"
               value={numberValue(pendingImports)}
-              hint={overview.isError ? "队列计数暂不可用" : importsHint}
-              href={canReadImports ? "/imports/review" : undefined}
-              tone={(pendingImports ?? 0) > 0 ? "attention" : "default"}
-            />
-            <TodoRow
-              icon={<ShieldAlert size={16} />}
-              label="关键审计"
-              value={numberValue(criticalAudit)}
-              hint={overview.isError ? "队列计数暂不可用" : auditHint}
-              href={canReadAudit ? "/audit-logs" : undefined}
-              tone={(criticalAudit ?? 0) > 0 ? "danger" : "default"}
+              hint={overview.isError ? "数据暂不可用" : <><span>累计 {numberValue(overview.data?.imports_total)} 批次</span><span>今日 +{numberValue(importsToday)}</span></>}
+              icon={<FileClock size={15} />}
+              loading={overview.isLoading}
+              tone={(pendingImports ?? 0) > 0 ? "alert" : "default"}
+              accent="violet"
+              motionOrder={3}
+              metricKey="metric:pending_imports"
             />
           </div>
-          <div className={styles.queueNote}><span>审核与导入均需人工确认</span><span>只读总览</span></div>
         </section>
+
+        <div className={styles.workspaceGrid}>
+          <DashboardTrendChart
+            data={daily.data}
+            loading={daily.isLoading}
+            error={daily.isError}
+            period={period}
+            onPeriodChange={onPeriodChange}
+          />
+
+          <section
+            className={styles.todoPanel}
+            aria-labelledby="dashboard-todo-title"
+          >
+            <div className={styles.panelHeading}>
+              <div>
+                <h2 id="dashboard-todo-title">需要处理</h2>
+                <p>按现有队列计数，进入对应工作区。</p>
+              </div>
+              <span className={styles.miniCount}>{overview.data ? todoCount > 0 ? `${todoCount} 个队列` : "暂无待办" : "等待数据"}</span>
+            </div>
+            <div className={styles.todoList}>
+              <TodoRow
+                icon={<ShieldCheck size={16} />}
+                label="待审核题目"
+                value={numberValue(pendingReview)}
+                hint={overview.isError ? "队列计数暂不可用" : reviewHint}
+                href={reviewHref}
+                tone={(pendingReview ?? 0) > 0 ? "attention" : "default"}
+              />
+              <TodoRow
+                icon={<FileClock size={16} />}
+                label="待处理导入"
+                value={numberValue(pendingImports)}
+                hint={overview.isError ? "队列计数暂不可用" : importsHint}
+                href={canReadImports ? "/imports/review" : undefined}
+                tone={(pendingImports ?? 0) > 0 ? "attention" : "default"}
+              />
+              <TodoRow
+                icon={<ShieldAlert size={16} />}
+                label="关键审计"
+                value={numberValue(criticalAudit)}
+                hint={overview.isError ? "队列计数暂不可用" : auditHint}
+                href={canReadAudit ? "/audit-logs" : undefined}
+                tone={(criticalAudit ?? 0) > 0 ? "danger" : "default"}
+              />
+            </div>
+            <div className={styles.queueNote}><span>审核与导入均需人工确认</span><span>只读总览</span></div>
+          </section>
+        </div>
       </div>
 
-      <div className={styles.explorationGrid}>
+      <div className={styles.workspaceGrid}>
         <ActivitySkyline data={activity.data} loading={activity.isLoading} error={activity.isError} from={activityRange.from} to={activityRange.to} />
         <QuestionDistribution data={stats.data} loading={stats.isLoading} error={stats.isError} />
       </div>
+
+      {canReadAiSettings ? (
+        <section className={styles.aiSection} aria-labelledby="dashboard-ai-title">
+          <header className={styles.operationsHeader}>
+            <div>
+              <h2 id="dashboard-ai-title">AI 解析总览</h2>
+              <p>调用、质量与本月用量</p>
+            </div>
+            <Link href="/ai-settings?tab=models" className={styles.sectionLink}>
+              管理模型<ChevronRight size={12} aria-hidden="true" />
+            </Link>
+          </header>
+          <DashboardAiOverview data={aiSettingsStats.data} loading={aiSettingsStats.isLoading} error={aiSettingsStats.isError} />
+        </section>
+      ) : null}
 
       <section className={styles.operationsSection} aria-labelledby="dashboard-operations-title">
         <header className={styles.operationsHeader}>
           <div>
             <h2 id="dashboard-operations-title">系统运行</h2>
-            <p>AI 用量、异步任务与核心服务</p>
+            <p>{canReadAiSettings ? "异步任务与核心服务" : "AI 用量、异步任务与核心服务"}</p>
           </div>
           {canReadSystem ? (
             <Link href="/system/tasks" className={styles.sectionLink}>
@@ -379,8 +404,8 @@ export function renderDashboardWorkbench({
 
         <div className={styles.operationsDeck}>
           <div className={styles.systemPanel}>
-            <div className={styles.systemMetrics}>
-              <div className={styles.systemGroup}>
+            <div className={styles.systemMetrics} data-single={canReadAiSettings}>
+              {!canReadAiSettings ? <div className={styles.systemGroup}>
                 <div className={styles.systemGroupTitle}>
                   <Cpu size={12} />
                   AI 运行
@@ -420,7 +445,7 @@ export function renderDashboardWorkbench({
                         : "AI 运行指标暂不可用。"}
                   </div>
                 )}
-              </div>
+              </div> : null}
 
               <div className={styles.systemGroup}>
                 <div className={styles.systemGroupTitle}>
@@ -459,7 +484,7 @@ export function renderDashboardWorkbench({
             <div className={styles.systemRows}>
               <SystemRow
                 icon={<Server size={12} className={styles.systemIcon} />}
-                label="Dashboard API"
+                label="工作台 API"
                 status={
                   overview.isError
                     ? { tone: "error", label: "异常" }

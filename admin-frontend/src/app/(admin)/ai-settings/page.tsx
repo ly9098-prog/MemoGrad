@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   Ban,
   Bot,
-  LayoutDashboard,
   Power,
   Save,
   ScanText,
@@ -14,28 +13,27 @@ import {
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Toggle } from "@/components/ui/toggle";
 import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
-import { apiRequest, toQuery } from "@/lib/api/client";
+import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import type { AISettings, AISettingsPatchRequest, AIStatsResponse, AdminAiConfigsResponse, AdminAiModelConfig } from "@/lib/api/types";
-import { StatCards } from "./components/stat-cards";
-import { TrendChart } from "./components/trend-chart";
+import type { AISettings, AISettingsPatchRequest, AdminAiConfigsResponse, AdminAiModelConfig } from "@/lib/api/types";
 import { ModelCards } from "./components/model-cards";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
 import { VectorConfigSection } from "./components/vector-config-section";
 import { resolveAiModels, computeUsageRate } from "@/lib/ai-model-resolver";
 
-type Tab = "overview" | "models" | "ocr" | "completion" | "vector" | "system";
+type Tab = "models" | "ocr" | "completion" | "vector" | "system";
 
 const TABS: { key: Tab; label: string; icon: ReactNode; color: string }[] = [
-  { key: "overview", label: "总览", icon: <LayoutDashboard className="h-3.5 w-3.5" />, color: "#5b7b9a" },
   { key: "models", label: "模型", icon: <Bot className="h-3.5 w-3.5" />, color: "#6b9b6b" },
   { key: "ocr", label: "OCR", icon: <ScanText className="h-3.5 w-3.5" />, color: "#c49a6b" },
   { key: "completion", label: "补全", icon: <Sparkles className="h-3.5 w-3.5" />, color: "#9a7aba" },
@@ -44,13 +42,22 @@ const TABS: { key: Tab; label: string; icon: ReactNode; color: string }[] = [
 ];
 
 export default function AISettingsPage() {
+  return (
+    <Suspense fallback={<ManagementPage><p role="status" className="text-sm text-muted-foreground">正在加载 AI 设置…</p></ManagementPage>}>
+      <AISettingsContent />
+    </Suspense>
+  );
+}
+
+function AISettingsContent() {
+  const searchParams = useSearchParams();
+  const activeTab = TABS.find((tab) => tab.key === searchParams.get("tab"))?.key ?? "models";
   const role = useAuthStore((s) => s.role);
   const isSuperAdmin = role?.name === "super_admin";
   const queryClient = useQueryClient();
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   function showToast(msg: string) {
     const el = document.createElement("div");
@@ -62,6 +69,7 @@ export default function AISettingsPage() {
 
   const settings = useQuery({
     queryKey: ["ai-settings"],
+    enabled: isSuperAdmin,
     queryFn: async () => {
       const data = await apiRequest<AISettings>("/ai-settings");
       setEnabled(data.ai_parse_enabled);
@@ -70,19 +78,16 @@ export default function AISettingsPage() {
     },
   });
 
-  const stats = useQuery({
-    queryKey: ["ai-settings", "stats"],
-    queryFn: () => apiRequest<AIStatsResponse>(`/ai-settings/stats${toQuery({ days: 30 })}`),
-  });
-
   const configs = useQuery({
     queryKey: ["ai-configs"],
+    enabled: isSuperAdmin,
     queryFn: () => apiRequest<AdminAiConfigsResponse>("/ai-configs"),
     select: (data) => data.configs,
   });
 
   const models = useQuery({
     queryKey: ["ai-models"],
+    enabled: isSuperAdmin,
     queryFn: () => apiRequest<AdminAiModelConfig[]>("/ai-models"),
   });
 
@@ -156,16 +161,19 @@ export default function AISettingsPage() {
     />
     <div className="admin-panel overflow-hidden rounded-2xl animate-rise-in">
       {/* ── Tab bar ── */}
-      <div className="flex border-b border-border/60 bg-muted/30">
+      <nav aria-label="AI 设置栏目" className="flex border-b border-border/60 bg-muted/30">
         {TABS.map((t) => {
           const active = activeTab === t.key;
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("tab", t.key);
           return (
-            <button
+            <Link
               key={t.key}
-              type="button"
-              onClick={() => setActiveTab(t.key)}
+              href={`/ai-settings?${params.toString()}`}
+              scroll={false}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-3 text-xs transition-all",
+                "flex min-w-0 flex-1 items-center justify-center gap-1.5 py-3 text-xs transition-colors focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                 active ? "font-semibold" : "font-medium text-muted-foreground/70 hover:text-muted-foreground",
               )}
               style={{
@@ -175,27 +183,13 @@ export default function AISettingsPage() {
             >
               {t.icon}
               {t.label}
-            </button>
+            </Link>
           );
         })}
-      </div>
+      </nav>
 
       {/* ── Tab content ── */}
       <div className="p-5">
-        {/* ═══ 总览 ═══ */}
-        {activeTab === "overview" && (
-          <div className="space-y-5 animate-rise-in">
-            {stats.isError ? (
-              <p className="rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
-                {getErrorMessage(stats.error)}
-              </p>
-            ) : (
-              <StatCards stats={stats.data} loading={stats.isLoading} />
-            )}
-            <TrendChart trends={stats.data?.daily_trends} loading={stats.isLoading} />
-          </div>
-        )}
-
         {/* ═══ 模型 ═══ */}
         {activeTab === "models" && (
           <div className="animate-rise-in">
