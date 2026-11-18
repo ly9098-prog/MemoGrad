@@ -4,11 +4,7 @@
   <view class="home-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="home-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="brand-lockup">
-        <view class="brand-mark">
-          <view class="brand-mark-line line-one"></view>
-          <view class="brand-mark-line line-two"></view>
-          <view class="brand-mark-dot"></view>
-        </view>
+        <image class="brand-mark brand-mark-image" src="/assets/icons/brand-logo.png" mode="aspectFit" aria-label="MemoGrad" />
         <view class="brand-copy">
           <text class="brand-name">MEMOGRAD</text>
           <text class="brand-caption">STUDY DESK</text>
@@ -41,62 +37,58 @@
       <text class="editorial-title">{{greeting}}，{{displayName}}</text>
       <view class="editorial-rule"></view>
     </view>
-    <text class="editorial-subtitle">今天，先完成最该做的事。</text>
+    <text class="editorial-subtitle">错题优先，今天先把薄弱点补齐。</text>
   </view>
 
-  <!-- Top study card rebuilt to match the supplied reference composition -->
+  <!-- Mint home: data-driven circular daily-goal hero -->
   <view class="focus-card route-enter-page delay-one">
-    <image class="focus-bg-art" src="/assets/icons/home-hero/top-card-background-cropped.png" mode="scaleToFill" />
-    <view class="focus-bg-wash" aria-hidden="true"></view>
-    <view class="focus-hero-visual" aria-hidden="true">
-      <image class="focus-curve-image" src="/assets/icons/home-hero/smart-study-curve.png" mode="aspectFit" />
-    </view>
-
     <view class="focus-content {{guestMode ? 'focus-content-guest' : ''}}">
       <view class="focus-topline">
         <view class="focus-status focus-status-light">
-          <image class="focus-kicker-icon" src="/assets/icons/home-hero/smart-study-leaf.png" mode="aspectFit" />
+          <view class="focus-status-dot"></view>
           <text>{{primaryTaskKicker}}</text>
         </view>
-        <view wx:if="{{!guestMode}}" class="focus-plan-anchor" bindtap="goStudyPlan" hover-class="soft-pressed" aria-role="button" aria-label="查看学习目标">
-          <text class="focus-plan-anchor-label">目标</text>
-        </view>
       </view>
 
-      <view class="focus-title-line">
-        <text class="focus-title">{{primaryTaskTitle}}</text>
-      </view>
-      <text class="focus-desc">{{primaryTaskDesc}}</text>
+      <view class="focus-body">
+        <view class="focus-copy">
+          <view class="focus-title-line">
+            <text class="focus-title">{{primaryTaskTitle}}</text>
+          </view>
+          <text class="focus-desc">{{primaryTaskDesc}}</text>
 
-      <view wx:if="{{!guestMode}}" class="progress-head">
-        <view class="progress-head-copy">
-          <text class="progress-label">今日刷题进度</text>
-          <text class="progress-head-sub">目标题量 {{todayGoalTotal}} 题</text>
-        </view>
-        <view class="progress-pair">
-          <text class="progress-value">{{_animGoalDone}} / {{todayGoalTotal}}</text>
-        </view>
-      </view>
-      <view wx:if="{{!guestMode}}" class="focus-progress-track">
-        <view class="focus-progress-fill" style="width: {{_animLevelProgress}}%;"></view>
-      </view>
-      <view wx:if="{{!guestMode}}" class="progress-foot">
-        <text>{{missionText}}</text>
-        <text>{{_animLevelProgress}}%</text>
-      </view>
-      <text wx:else class="focus-guest-hint">{{missionText}}</text>
+          <view wx:if="{{!guestMode}}" class="progress-head">
+            <view class="progress-head-copy">
+              <text class="progress-label">今日刷题进度</text>
+              <text class="progress-head-sub">目标题量 {{todayGoalTotal}} 题</text>
+            </view>
+            <view class="progress-pair">
+              <text class="progress-value">{{_animGoalDone}} / {{todayGoalTotal}}</text>
+            </view>
+          </view>
+          <text wx:if="{{guestMode}}" class="focus-guest-hint">{{missionText}}</text>
 
-      <view class="focus-actions">
-        <view class="primary-action" bindtap="startPrimaryTask" hover-class="primary-action-pressed">
-          <text>{{primaryTaskAction}}</text>
-          <view class="primary-action-arrow">↗</view>
+          <view class="focus-actions">
+            <view class="primary-action" bindtap="startPrimaryTask" hover-class="primary-action-pressed">
+              <text>{{primaryTaskAction}}</text>
+              <view class="primary-action-arrow">↗</view>
+            </view>
+            <view wx:if="{{!guestMode}}" class="secondary-action" bindtap="startSecondaryTask" hover-class="secondary-action-pressed">
+              <text>学习报告</text>
+            </view>
+            <view wx:else class="secondary-action is-locked" aria-disabled="true">
+              <text>学习报告</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </view>
         </view>
-        <view wx:if="{{!guestMode}}" class="secondary-action" bindtap="startSecondaryTask" hover-class="secondary-action-pressed">
-          <text>查看学习报告</text>
-          <image class="secondary-action-icon" src="/assets/icons/home-hero/study-report.png" mode="aspectFit" />
-        </view>
-        <view wx:else class="secondary-action is-locked" aria-disabled="true">
-          <text>学习报告</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+
+        <view wx:if="{{!guestMode}}" class="focus-ring-wrap" aria-label="今日题量 {{_animGoalDone}} / {{todayGoalTotal}}，完成 {{_animLevelProgress}}%">
+          <view class="focus-ring" style="background: conic-gradient(#7ED8B5 0deg, #55C89B {{_animLevelProgress * 3.6}}deg, #E0F1EB {{_animLevelProgress * 3.6}}deg 360deg);">
+            <view class="focus-ring-inner">
+              <text class="focus-ring-value">{{_animGoalDone}} / {{todayGoalTotal}}</text>
+              <text class="focus-ring-label">今日题量</text>
+            </view>
+          </view>
         </view>
       </view>
 

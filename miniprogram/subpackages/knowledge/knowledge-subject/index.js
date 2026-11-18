@@ -1,7 +1,7 @@
 const api = require('../../../utils/api')
 const { knowledgePracticeSync } = require('../../../utils/storage')
 const { buildKnowledgeGroups, summarizeGroups } = require('./tree-groups')
-const { POINTS_PER_PAGE, buildScene, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle } = require('./graph-layout')
+const { POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle } = require('./graph-layout')
 const STATUS_TEXT = { no_data: '未开始', insufficient: '数据不足', weak: '薄弱', developing: '提升中', good: '良好', mastered: '已掌握' }
 const FILTERS = [
 { id: 'all', label: '全部' }, { id: 'weak', label: '需强化', statuses: ['weak', 'developing'] },
@@ -261,6 +261,7 @@ groupChips: [], quickGroupChips: [], themeGroupCount: 0, themeSheetOpen: false, 
 scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
 pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphInteracting: false,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
+forcePanelOpen: false, forceControls: [],
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
 indexNodes: [], indexCount: 0, indexDisplayCount: 0, hasMore: false, indexSearchOpen: false, indexSearchFocused: false,
 indexQuery: '', indexSearchDraft: '', indexSearchPending: false, indexSearchResultCount: 0, indexNavigatingId: 0,
@@ -283,6 +284,13 @@ this._indexDetailRevealToken = 0
 this._indexDetailRevealTimer = null
 this._pageVisible = true
 this._focusNodeId = 0
+this._forces = { ...DEFAULT_FORCES }
+this._manualPositions = {}
+this._sceneNodeIndex = new Map()
+this._sceneEdgeLinks = new Map()
+this._dragNodeId = ''
+this._forceTimer = null
+this.setData({ forceControls: this.forceControlData() })
 this._expandedNodeIds = new Set()
 this._indexSearchFootprintHeight = 0
 this._indexSearchRetentionHeight = 0
@@ -291,7 +299,7 @@ try {
 const info = wx.getWindowInfo ? wx.getWindowInfo() : {}
 width = Number(info.windowWidth) || width
 } catch (error) { }
-this._frame = { left: 0, top: 0, width: width * 702 / 750, height: width * 860 / 750 }
+this._frame = { left: 0, top: 0, width: width * 702 / 750, height: width * 660 / 750 }
 this._camera = fitCamera(this._frame)
 if (!Number.isInteger(this.subjectId) || this.subjectId <= 0) {
 this.setData({ loading: false, error: '科目参数无效' })
@@ -586,7 +594,7 @@ _buildMapNodes(data) {
       ...item, aliases, name: String(item.name || '未命名知识点'), status,
       statusText: pendingSync ? '已作答 · 待更新' : STATUS_TEXT[status],
       tone: status === 'weak' || status === 'developing' ? 'weak' : (status === 'good' || status === 'mastered' ? 'stable' : 'unseen'),
-      scoreText: score == null ? '待建立' : `${score}%`, hasScore: score != null,
+      scoreText: score == null ? '待建立' : `${score}%`, hasScore: score != null, scorePercent: score == null ? 0 : score,
       accuracyText: pendingSync ? (receiptAccuracy == null ? '已作答' : `${receiptAccuracy}%`) : (backendAccuracy == null ? '暂无' : `${backendAccuracy}%`),
       attempt_count: attemptCount,
       pendingSync,
@@ -834,23 +842,30 @@ _resolveActiveGroup(availableGroups) {
 },
 
 _buildSceneState(availableGroups, activeGroupKey, focusNodeId) {
-  let scene = buildScene(availableGroups, this.data.subject, {
+  const options = {
     groupKey: activeGroupKey,
+    activeGroupKey,
     focusNodeId,
-    page: this._graphPage || 0,
     selectedId: this._selectedId,
-  })
-  let focusNodeIdResolved = Number(scene.focusNodeId) || 0
+    forces: this._forces,
+    manualPositions: this._manualPositions,
+  }
+  let scene = buildScene(availableGroups, this.data.subject, options)
+  const focusNodeIdResolved = Number(scene.focusNodeId) || 0
   let selectedId = this._selectedId
   if (!scene.pointIds.some(id => Number(id) === Number(selectedId))) {
     selectedId = scene.focused && scene.pointIds.length ? Number(scene.pointIds[0]) : 0
-    scene = buildScene(availableGroups, this.data.subject, {
-      groupKey: activeGroupKey,
-      focusNodeId: focusNodeIdResolved,
-      page: scene.page,
-      selectedId,
-    })
+    scene = buildScene(availableGroups, this.data.subject, { ...options, focusNodeId: focusNodeIdResolved, selectedId })
   }
+  this._sceneNodeIndex = new Map(scene.nodes.map((node, index) => [node.id, index]))
+  this._sceneEdgeLinks = new Map()
+  scene.edges.forEach((edge, index) => {
+    ;[edge.from, edge.to].forEach((nodeId) => {
+      const list = this._sceneEdgeLinks.get(nodeId) || []
+      list.push(index)
+      this._sceneEdgeLinks.set(nodeId, list)
+    })
+  })
   return { scene, focusNodeId: focusNodeIdResolved, selectedId }
 },
 
@@ -1859,6 +1874,79 @@ wx.showToast({ title: '练习页打开失败，请重试', icon: 'none' })
 })
 },
 retry() { return this.loadMap() },
+forceControlData() {
+const forces = this._forces || DEFAULT_FORCES
+return [
+{ key: 'center', label: '图谱向心力', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
+{ key: 'repel', label: '节点间的排斥力', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(2) },
+{ key: 'link', label: '相连节点间的吸引力', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
+{ key: 'distance', label: '连线长度', min: 120, max: 360, step: 5, value: forces.distance, valueText: String(Math.round(forces.distance)) },
+]
+},
+toggleForcePanel() { this.setData({ forcePanelOpen: !this.data.forcePanelOpen }) },
+closeForcePanel() { this.setData({ forcePanelOpen: false }) },
+preventBackgroundScroll() {},
+changeForce(event) {
+const key = String(event.currentTarget.dataset.key || '')
+const value = Number(event.detail.value)
+if (!Object.prototype.hasOwnProperty.call(this._forces || {}, key) || !Number.isFinite(value)) return
+this._forces[key] = value
+this.setData({ forceControls: this.forceControlData() })
+clearTimeout(this._forceTimer)
+this._forceTimer = setTimeout(() => {
+this._forceTimer = null
+if (!this._unloaded && this.data.subject) this.applyView(false, false)
+}, 120)
+},
+resetForces() {
+clearTimeout(this._forceTimer)
+this._forceTimer = null
+this._forces = { ...DEFAULT_FORCES }
+this._manualPositions = {}
+this.setData({ forceControls: this.forceControlData() })
+if (this.data.subject) this.applyView(false, false)
+},
+onGraphBackgroundTap() {
+if (Date.now() < (this._suppressTapUntil || 0)) return
+if (this.data.forcePanelOpen) { this.closeForcePanel(); return }
+const now = Date.now()
+if (now - (this._lastGraphTap || 0) < 320) {
+this._lastGraphTap = 0
+this.resetView()
+return
+}
+this._lastGraphTap = now
+},
+startGraphNodeTouch(event) {
+this._dragNodeId = (event.touches || []).length === 1 ? String(event.currentTarget.dataset.nodeId || '') : ''
+},
+moveDraggedNode(point) {
+const gesture = this._gesture
+const nodeId = gesture && gesture.dragNodeId
+const index = this._sceneNodeIndex && this._sceneNodeIndex.get(nodeId)
+if (!this._camera || !this._frame || index === undefined || !this.data.scene) return
+const nodes = this.data.scene.nodes || []
+const node = nodes[index]
+if (!node) return
+const offset = gesture.dragOffset || { x: 0, y: 0 }
+node.cx = Math.max(24, Math.min(776, (point.x - this._camera.x) / this._camera.scale + offset.x))
+node.cy = Math.max(24, Math.min(896, (point.y - this._camera.y) / this._camera.scale + offset.y))
+this._manualPositions[nodeId] = { x: node.cx, y: node.cy }
+const patch = {
+[`scene.nodes[${index}].cx`]: node.cx,
+[`scene.nodes[${index}].cy`]: node.cy,
+[`scene.nodes[${index}].style`]: dotStyle(node),
+}
+const linked = (this._sceneEdgeLinks && this._sceneEdgeLinks.get(nodeId)) || []
+linked.forEach((edgeIndex) => {
+const edge = this.data.scene.edges[edgeIndex]
+const fromIndex = this._sceneNodeIndex.get(edge.from)
+const toIndex = this._sceneNodeIndex.get(edge.to)
+if (fromIndex === undefined || toIndex === undefined) return
+patch[`scene.edges[${edgeIndex}].style`] = edgeStyle(nodes[fromIndex], nodes[toIndex])
+})
+this.setData(patch)
+},
 measureViewport(reset = false) {
 if (!wx.createSelectorQuery || !this.data.subject) return
 wx.createSelectorQuery().in(this).select('#atlas-viewport').boundingClientRect(rect => {
@@ -1915,9 +2003,20 @@ this.stopCameraInertia()
 const touches = this.touchPositions(event)
 if (!touches.length) return
 const now = Date.now()
+if (touches.length > 1) this._dragNodeId = ''
 this._gesture = {
 touches, camera: { ...this._camera }, moved: touches.length > 1,
 lastPoint: touches[0], lastAt: now, velocityX: 0, velocityY: 0,
+dragNodeId: touches.length === 1 ? String(this._dragNodeId || '') : '',
+}
+if (this._gesture.dragNodeId && this._sceneNodeIndex) {
+const nodeIndex = this._sceneNodeIndex.get(this._gesture.dragNodeId)
+const node = nodeIndex === undefined ? null : (this.data.scene.nodes || [])[nodeIndex]
+if (node) {
+const worldX = (touches[0].x - this._camera.x) / this._camera.scale
+const worldY = (touches[0].y - this._camera.y) / this._camera.scale
+this._gesture.dragOffset = { x: node.cx - worldX, y: node.cy - worldY }
+}
 }
 if (!this.data.graphInteracting) this.setData({ graphInteracting: true })
 },
@@ -1927,6 +2026,13 @@ const touches = this.touchPositions(event)
 if (!touches.length) return
 if (touches.length !== this._gesture.touches.length) { this.startGraphTouch(event); return }
 const start = this._gesture
+if (start.dragNodeId && touches.length === 1) {
+const dx = touches[0].x - start.touches[0].x
+const dy = touches[0].y - start.touches[0].y
+if (Math.abs(dx) + Math.abs(dy) > PAN_THRESHOLD) start.moved = true
+if (start.moved) this.moveDraggedNode(touches[0])
+return
+}
 if (touches.length > 1) {
 const a = start.touches; const b = touches
 const distance = Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y)
@@ -1960,9 +2066,10 @@ endGraphTouch(event) {
 const gesture = this._gesture
 if (gesture && gesture.moved) this._suppressTapUntil = Date.now() + 280
 this._gesture = null
+this._dragNodeId = ''
 if (event && event.touches && event.touches.length) { this.startGraphTouch(event); return }
 const cancelled = event && event.type === 'touchcancel'
-if (!cancelled && gesture && gesture.moved && gesture.touches.length === 1) {
+if (!cancelled && gesture && gesture.moved && !gesture.dragNodeId && gesture.touches.length === 1) {
 const speed = Math.hypot(gesture.velocityX, gesture.velocityY)
 if (speed >= INERTIA_MIN_SPEED) {
 this.startCameraInertia(gesture.velocityX, gesture.velocityY)
