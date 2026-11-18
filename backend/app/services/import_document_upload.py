@@ -13,6 +13,7 @@ from app.features.pipeline_orchestrator import (
 )
 from app.schemas.import_review import PdfPageRangeInfo, PipelineUploadResponse
 from app.services import import_pipeline_service as runtime
+from app.services.import_enqueue_outcome import require_known_enqueue_outcome
 from app.services.import_pipeline_admission import admit_pipeline_record
 from app.services.import_upload_request import UploadRequest
 from app.services.staging_storage import StagingObject, async_store_file
@@ -132,6 +133,7 @@ async def start_document_upload(
             created_by=request.created_by,
             source_sha256=source_sha256,
         )
+        require_known_enqueue_outcome(result, pipeline_id)
         if not result:
             await _set_pipeline_store(
                 pipeline_id,

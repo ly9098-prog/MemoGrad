@@ -268,7 +268,7 @@ async def test_batch_queue_rejection_restores_only_selected_failed_item(
         queue,
         "enqueue_batch_image_job",
         AsyncMock(
-            return_value=EnqueueResult(accepted=False, reason="redis_unavailable"),
+            return_value=EnqueueResult(accepted=False, reason="queue_full"),
         ),
     )
     with pytest.raises(recovery.ImportRecoveryError) as exc:
@@ -292,3 +292,30 @@ async def test_successful_batch_item_is_never_resubmitted(db, monkeypatch):
         await batch.retry_batch_image_item(db, 1, upload())
     assert exc.value.status_code == 409
     enqueue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["pipeline", "batch"])
+async def test_uncertain_recovery_delivery_preserves_the_new_owner(db, monkeypatch, kind):
+    from app.services.import_enqueue_outcome import ImportEnqueueUncertainError
+
+    if kind == "pipeline":
+        await seed_pipeline(db)
+        function, args, name = recovery.resume_import, (db, "img-failed", upload(), {}), "enqueue_admin_resume"
+    else:
+        await seed_batch(db)
+        function, args, name = batch.retry_batch_image_item, (db, 2, upload()), "enqueue_batch_image_job"
+    monkeypatch.setattr(queue, name, AsyncMock(return_value=EnqueueResult(
+        accepted=False, reason="redis_unavailable",
+    )))
+    with pytest.raises(ImportEnqueueUncertainError):
+        await function(*args)
+    row = (await db.get(ImportPipeline, "img-failed") if kind == "pipeline"
+           else await db.get(ImportBatchJob, "job-1"))
+    await db.refresh(row)
+    assert row.status == "queued" and row.current_owner_token.startswith("pending:")
+    if kind == "batch":
+        item = await db.get(ImportBatchJobItem, 2)
+        await db.refresh(item)
+        assert item.status == "pending"
+        assert (await db.get(ImportBatchJobItem, 1)).review_batch_id == "success-batch"

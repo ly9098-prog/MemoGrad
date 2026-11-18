@@ -15,6 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_batch_job import ImportBatchJob, ImportBatchJobItem
 from app.services import import_pipeline_service as runtime
+from app.services.import_enqueue_outcome import (
+    ImportEnqueueUncertainError,
+    require_known_enqueue_outcome,
+)
 from app.services.import_recovery_context import load_recovery_context
 from app.services.import_recovery_service import (
     ImportRecoveryError,
@@ -157,10 +161,13 @@ async def retry_batch_image_item(
             source_files=[item.source_file or file.filename or "image.png"],
             retry_token=retry_token,
         )
+        require_known_enqueue_outcome(result, job.job_id)
         if not result:
             raise ImportRecoveryError(
                 runtime._queue_rejection_message(result.reason), 503
             )
+    except ImportEnqueueUncertainError:
+        raise
     except Exception:
         await _restore_item(db, item, job, retry_token)
         raise

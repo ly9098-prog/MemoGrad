@@ -28,6 +28,7 @@ import struct
 import tempfile
 import warnings
 from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger("postgraduate-ai.upload")
 
@@ -115,32 +116,22 @@ async def stream_to_temp(
             max_size = getattr(settings, "IMAGE_IMPORT_MAX_BYTES", 10 * 1024 * 1024)
 
     loop = asyncio.get_running_loop()
-    fd, path = await loop.run_in_executor(None, _create_temp, suffix)
-    total = 0
+    creation = loop.run_in_executor(None, _create_temp, suffix)
     try:
-        while True:
-            chunk = await upload.read(65536)  # 64KB chunks
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > max_size:
-                await loop.run_in_executor(None, _close_and_unlink, fd, path)
-                raise ValueError(
-                    f"文件超过大小限制（{max_size // (1024 * 1024)}MB）",
-                )
-            await loop.run_in_executor(None, os.write, fd, chunk)
-        await loop.run_in_executor(None, os.close, fd)
-    except ValueError:
+        fd, path = await asyncio.shield(creation)
+    except asyncio.CancelledError:
+        # The executor keeps running after its caller is cancelled. Recover the
+        # result before propagating cancellation so the late fd/path has an owner.
+        fd, path = await _drain_io(creation)
+        _close_and_unlink(fd, path)
         raise
-    except Exception:
-        try:
-            await loop.run_in_executor(None, os.close, fd)
-        except OSError:
-            pass
-        try:
-            await loop.run_in_executor(None, os.unlink, path)
-        except OSError:
-            pass
+    try:
+        total = await _receive_upload(upload, fd, max_size)
+        os.close(fd)
+    except BaseException:
+        # Cancellation and read-side ValueError need the same cleanup as I/O
+        # errors. Writes have already drained before the descriptor is closed.
+        _close_and_unlink(fd, path)
         raise
 
     return TempFile(
@@ -149,6 +140,43 @@ async def stream_to_temp(
         original_name=getattr(upload, "filename", "") or "",
         content_type=getattr(upload, "content_type", "") or "",
     )
+
+
+async def _receive_upload(upload: Any, fd: int, max_size: int) -> int:
+    total = 0
+    while chunk := await upload.read(65536):
+        total += len(chunk)
+        if total > max_size:
+            raise ValueError(f"文件超过大小限制（{max_size // (1024 * 1024)}MB）")
+        writing = asyncio.get_running_loop().run_in_executor(
+            None, _write_all, fd, chunk
+        )
+        try:
+            await asyncio.shield(writing)
+        except asyncio.CancelledError:
+            # Do not close/reuse the fd while its executor thread can still write.
+            await _drain_io(writing)
+            raise
+    return total
+
+
+async def _drain_io(work: asyncio.Future[Any]) -> Any:
+    """Finish an owned executor operation even if shutdown cancels us again."""
+    while not work.done():
+        try:
+            await asyncio.shield(work)
+        except asyncio.CancelledError:
+            continue
+    return work.result()
+
+
+def _write_all(fd: int, chunk: bytes) -> None:
+    remaining = memoryview(chunk)
+    while remaining:
+        written = os.write(fd, remaining)
+        if written <= 0:
+            raise OSError("Upload temporary file write made no progress")
+        remaining = remaining[written:]
 
 
 def _create_temp(suffix: str) -> tuple[int, str]:

@@ -175,6 +175,7 @@ def assert_batch_arguments(state, payload, kwargs):
         subject_id=payload.get("subject_id"),
         options=payload.get("options", {}),
         concurrency=payload.get("concurrency", 2),
+        execution_fence=("task-test", "owner-test", 7),
     )
 
 

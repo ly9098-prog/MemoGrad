@@ -59,6 +59,12 @@ def clear_fencing_context(token: contextvars.Token) -> None:
     _fencing_ctx.reset(token)
 
 
+def get_fencing_context() -> dict[str, Any] | None:
+    """Read the current worker fence without exposing a mutable context value."""
+    fence = _fencing_ctx.get()
+    return dict(fence) if fence is not None else None
+
+
 _CHECKPOINT_REDIS_PREFIX = "import:pipeline:checkpoint"
 _CHECKPOINT_TTL = 86400  # 24h，与 _PIPELINE_STATUS_TTL 对齐
 

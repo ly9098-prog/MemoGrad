@@ -65,4 +65,5 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
         subject_id=subject_id,
         options=options,
         concurrency=concurrency,
+        execution_fence=(state.task.task_id, state.task.owner_token, state.task.generation),
     )

@@ -14,6 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.features import pipeline_orchestrator as orchestrator
 from app.models.import_pipeline import ImportPipeline
 from app.services import import_pipeline_service as runtime
+from app.services.import_enqueue_outcome import (
+    ImportEnqueueUncertainError,
+    require_known_enqueue_outcome,
+)
 from app.services.import_recovery_context import load_recovery_context
 from app.services.import_upload_request import UploadRequest
 from app.services.import_upload_service import _validate_upload
@@ -241,10 +245,13 @@ async def resume_import(
     try:
         await _write_resume_status(pipeline_id, row.source_type, snapshot)
         result = await _enqueue_resume(pipeline_id, staging, inputs, retry_token)
+        require_known_enqueue_outcome(result, pipeline_id)
         if not result:
             raise ImportRecoveryError(
                 runtime._queue_rejection_message(result.reason), 503
             )
+    except ImportEnqueueUncertainError:
+        raise
     except Exception:
         await _restore_failed_resume(db, row, previous, retry_token)
         raise

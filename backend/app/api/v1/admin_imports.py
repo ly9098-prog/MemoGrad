@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.import_sse_metrics as import_sse_metrics
+from app.api.v1.admin_import_ocr_text import router as ocr_text_router
 from app.core.admin_guards import (
     admin_rate_limit,
     finish_idempotency,
@@ -83,6 +84,7 @@ from app.services.admin_import_service import (
     reject_import_question,
     update_import_question,
 )
+from app.services.import_enqueue_outcome import ImportEnqueueUncertainError
 from app.services.import_pipeline_service import (
     get_pipeline_status as svc_get_pipeline_status,
 )
@@ -99,6 +101,7 @@ from app.services.streaming_upload_handler import stream_to_temp, validate_image
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/imports", tags=["admin-imports"])
+router.include_router(ocr_text_router)
 
 _SSE_MAX_CONNECTIONS_PER_USER = 5
 _SSE_MAX_GLOBAL_CONNECTIONS = 50
@@ -224,10 +227,13 @@ async def upload_import_file(
             page_end=page_end,
             created_by=f"admin:{current_admin.id}",
         )
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
-        tmp.close()
         raise HTTPException(status_code=400, detail=str(exc))
-    tmp.detach()
+    finally:
+        # Workers consume the durable staging object, not this request's file.
+        tmp.close()
     return result
 
 
@@ -435,6 +441,8 @@ async def admin_resume_pipeline(
             "image_fast_mode": image_fast_mode,
             "subject": subject, "subject_id": subject_id,
         })
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ImportRecoveryError as exc:
         raise HTTPException(status_code=exc.status_code, detail={"code": exc.code}) from exc
 
@@ -1269,7 +1277,7 @@ async def batch_image_upload(
     subject_id: int | None = None,
     concurrency: int | None = None,
     enable_ai_repair: bool = True,
-    confidence_threshold: float = 0.6,
+    confidence_threshold: float = Query(0.6, ge=0, le=1, allow_inf_nan=False),
     batch_fast_mode: bool = Query(
         True,
         description="批量图片快速模式：OCR 后跳过逐块纠错/代码重建/Roman 独立调用，仅保留题目级 AI repair",
@@ -1301,6 +1309,10 @@ async def batch_image_upload(
     - image_id: 向后兼容的单图模式。多图时传 image_ids[]。
     """
     from app.features import batch_image_import_service as batch_svc
+    from app.services.batch_image_idempotency import (
+        BatchSubmissionConflictError,
+        validate_submission_ids,
+    )
 
     if not files:
         raise HTTPException(status_code=400, detail="未上传任何图片")
@@ -1309,6 +1321,13 @@ async def batch_image_upload(
             status_code=400,
             detail=f"单次最多上传 {settings.BATCH_IMAGE_MAX_FILES} 张图片",
         )
+
+    try:
+        validate_submission_ids(
+            request_id=request_id, batch_id=batch_id, image_id=image_id, image_ids=image_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # P0-3: only validate dependencies matching the requested ocr_mode
     from app.features.ocr_mode import resolve_ocr_mode, validate_ocr_mode_dependencies
@@ -1338,13 +1357,12 @@ async def batch_image_upload(
             len(files),
         )
 
-    import hashlib as _hashlib
-
-    sources: list[batch_svc.BatchImageSource] = []
-    sources_with_sha: list[tuple[batch_svc.BatchImageSource, str, str]] = []
-    rejected_files: list[str] = []
-    seq = 0
+    temporaries = []
     try:
+        sources: list[batch_svc.BatchImageSource] = []
+        sources_with_sha: list[tuple[batch_svc.BatchImageSource, str, str]] = []
+        rejected_files: list[str] = []
+        seq = 0
         for idx, upload in enumerate(files):
             filename = upload.filename or f"image_{seq + 1}"
 
@@ -1367,6 +1385,7 @@ async def batch_image_upload(
                 tmp = await stream_to_temp(
                     upload, max_size=settings.IMAGE_IMPORT_MAX_BYTES or 0, suffix=suffix
                 )
+                temporaries.append(tmp)
             except ValueError as exc:
                 rejected_files.append(f"{filename}: {exc}")
                 continue
@@ -1382,11 +1401,9 @@ async def batch_image_upload(
                 continue
 
             # Compute source_sha256 for content-level dedup
-            source_sha256 = _hashlib.sha256()
-            with open(tmp.path, "rb") as fh:
-                for chunk in iter(lambda: fh.read(65536), b""):
-                    source_sha256.update(chunk)
-            source_sha256_hex = source_sha256.hexdigest()
+            from app.services.import_pipeline_admission import _hash_file
+
+            source_sha256_hex = await asyncio.to_thread(_hash_file, tmp.path)
 
             seq += 1
 
@@ -1408,11 +1425,16 @@ async def batch_image_upload(
             sources.append(source_obj)
             sources_with_sha.append((source_obj, source_sha256_hex, per_image_id))
 
-            # Detach — the temp file persists but will be staged below
-            tmp.detach()
-
         # Stage all source files to persistent storage for cross-process access
         from app.services.staging_storage import async_store_file
+
+        try:
+            validate_submission_ids(
+                request_id=request_id, batch_id=batch_id, image_id=image_id,
+                image_ids=[entry[2] for entry in sources_with_sha],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         staging_object_ids: list[str] = []
         for src in sources:
@@ -1423,104 +1445,130 @@ async def batch_image_upload(
                     mime="image/png",
                 )
                 staging_object_ids.append(staging_obj.object_id)
-            except Exception:
-                logger.warning(
-                    "Failed to stage batch image %s, marking as failed",
-                    src.source_file,
+            except Exception as exc:
+                logger.warning("Failed to stage batch image %s", src.source_file, exc_info=True)
+                raise HTTPException(
+                    status_code=503, detail="图片暂存失败，请稍后重新上传"
+                ) from exc
+
+        if not sources:
+            raise HTTPException(
+                status_code=400,
+                detail="没有可处理的图片"
+                + (f"（{rejected_files[0]}）" if rejected_files else ""),
+            )
+
+        concurrency = batch_svc.clamp_concurrency(concurrency)
+        job_id = batch_svc.new_job_id()
+        options = {
+            "enable_ai_repair": enable_ai_repair,
+            "confidence_threshold": confidence_threshold,
+            "batch_fast_mode": batch_fast_mode,
+            "ocr_mode": resolved_mode,
+        }
+
+        # P0-4: pass per-file image_import_id + source_sha256
+        per_file_image_ids = [sid[2] for sid in sources_with_sha]
+        per_file_sha256 = [sid[1] for sid in sources_with_sha]
+        try:
+            job = await batch_svc.create_batch_job(
+                db,
+                job_id=job_id,
+                sources=sources,
+                subject=subject,
+                subject_id=subject_id,
+                concurrency=concurrency,
+                created_by=f"admin:{current_admin.id}",
+                batch_import_id=batch_id,
+                image_import_id=image_id,
+                request_id=request_id,
+                per_file_image_ids=per_file_image_ids,
+                per_file_sha256=per_file_sha256,
+                options=options,
+                rejected_files=rejected_files,
+            )
+        except BatchSubmissionConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        # Idempotency: duplicate submission returns existing job_id
+        is_duplicate = job.status == "duplicate"
+        if is_duplicate:
+            from app.models.import_batch_job import ImportBatchJob
+
+            existing_job = await db.get(ImportBatchJob, job.job_id, populate_existing=True)
+            logger.info(
+                "Duplicate batch image upload, returning existing job_id=%s", job.job_id
+            )
+            if (existing_job.status != "queued" or existing_job.current_owner_token
+                    or not existing_job.submission_fingerprint):
+                return BatchImageUploadResponse(
+                    job_id=job.job_id,
+                    status=existing_job.status,
+                    total=existing_job.total,
+                    rejected=len(rejected_files),
+                    rejected_files=rejected_files,
+                    concurrency=existing_job.concurrency,
+                    duplicate=True,
                 )
-                staging_object_ids.append("")
-    except Exception:
-        # Clean up temp files on error
-        for src in sources:
-            if os.path.exists(src.temp_path):
-                try:
-                    os.unlink(src.temp_path)
-                except OSError:
-                    pass
-        raise
+            # A producer may have lost its enqueue reply or exited after DB
+            # commit. Replaying this same task_id repairs the handoff; Redis's
+            # idempotency guard prevents a second execution if it was accepted.
+            job_id = existing_job.job_id
 
-    if not sources:
-        raise HTTPException(
-            status_code=400,
-            detail="没有可处理的图片"
-            + (f"（{rejected_files[0]}）" if rejected_files else ""),
-        )
+        # Enqueue via durable queue — replaces BackgroundTasks (P0-3)
+        from app.services.import_recovery_context import save_recovery_context
+        from app.services.task_queue_worker import enqueue_batch_image_job
 
-    concurrency = batch_svc.clamp_concurrency(concurrency)
-    job_id = batch_svc.new_job_id()
-    options = {
-        "enable_ai_repair": enable_ai_repair,
-        "confidence_threshold": confidence_threshold,
-        "batch_fast_mode": batch_fast_mode,
-        "ocr_mode": ocr_mode,
-    }
+        await save_recovery_context(job_id, {
+            "subject": subject, "subject_id": subject_id, "options": options,
+        })
 
-    # P0-4: pass per-file image_import_id + source_sha256
-    per_file_image_ids = [sid[2] for sid in sources_with_sha]
-    per_file_sha256 = [sid[1] for sid in sources_with_sha]
-    job = await batch_svc.create_batch_job(
-        db,
-        job_id=job_id,
-        sources=sources,
-        subject=subject,
-        subject_id=subject_id,
-        concurrency=concurrency,
-        created_by=f"admin:{current_admin.id}",
-        batch_import_id=batch_id,
-        image_import_id=image_id,
-        request_id=request_id,
-        per_file_image_ids=per_file_image_ids,
-        per_file_sha256=per_file_sha256,
-    )
+        from functools import partial
 
-    # Idempotency: duplicate submission returns existing job_id
-    is_duplicate = job.status == "duplicate"
-    if is_duplicate:
-        logger.info(
-            "Duplicate batch image upload, returning existing job_id=%s", job.job_id
-        )
+        from sqlalchemy.exc import OperationalError
+
+        from app.services.batch_image_admission import dispatch_batch_admission
+
+        try:
+            result = await dispatch_batch_admission(db, job_id, partial(
+                enqueue_batch_image_job,
+                job_id=job_id,
+                staging_object_ids=staging_object_ids,
+                subject=subject,
+                subject_id=subject_id,
+                options=options,
+                concurrency=concurrency,
+                source_files=[src.source_file for src in sources],
+            ))
+        except ImportEnqueueUncertainError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except OperationalError as exc:
+            await db.rollback()
+            raise HTTPException(status_code=503, detail="任务准入暂不可用，请查询状态后重试") from exc
+        if result is not None and not result:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"任务队列已满，请稍后重试: {result.reason}",
+            )
+
+        from app.models.import_batch_job import ImportBatchJob
+
+        admitted = await db.get(ImportBatchJob, job_id, populate_existing=True)
+
         return BatchImageUploadResponse(
-            job_id=job.job_id,
-            status="queued",
-            total=0,
-            rejected=0,
-            rejected_files=[],
-            concurrency=concurrency,
-            duplicate=True,
+            job_id=job_id,
+            status=admitted.status,
+            total=admitted.total,
+            rejected=len(rejected_files),
+            rejected_files=rejected_files,
+            concurrency=admitted.concurrency,
+            duplicate=is_duplicate,
         )
-
-    # Enqueue via durable queue — replaces BackgroundTasks (P0-3)
-    from app.services.import_recovery_context import save_recovery_context
-    from app.services.task_queue_worker import enqueue_batch_image_job
-
-    await save_recovery_context(job_id, {
-        "subject": subject, "subject_id": subject_id, "options": options,
-    })
-
-    result = await enqueue_batch_image_job(
-        job_id=job_id,
-        staging_object_ids=staging_object_ids,
-        subject=subject,
-        subject_id=subject_id,
-        options=options,
-        concurrency=concurrency,
-        source_files=[src.source_file for src in sources],
-    )
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"任务队列已满，请稍后重试: {result.reason}",
-        )
-
-    return BatchImageUploadResponse(
-        job_id=job_id,
-        status="queued",
-        total=len(sources),
-        rejected=len(rejected_files),
-        rejected_files=rejected_files,
-        concurrency=concurrency,
-        duplicate=False,
-    )
+    finally:
+        # Staging is content-addressed and may be shared by other jobs. Only
+        # these request-owned temporary files are safe to remove immediately.
+        for temporary in temporaries:
+            temporary.close()
 
 
 @router.get("/batch-image/{job_id}", response_model=BatchImageJobStatusResponse)
@@ -1736,6 +1784,8 @@ async def retry_batch_image_item(
 
     try:
         return await retry_item(db, item_id, file)
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ImportRecoveryError as exc:
         raise HTTPException(status_code=exc.status_code, detail={"code": exc.code}) from exc
 
