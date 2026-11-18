@@ -3,7 +3,8 @@ import { isValidElement, Suspense, type ReactElement } from "react";
 import AISettingsPage from "./page";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ModelCards } from "./components/model-cards";
+import { ModelWorkbench } from "./components/model-workbench";
+import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overview";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
 import ExperimentsPage from "../recommendation/experiments/page";
@@ -114,7 +115,7 @@ beforeEach(() => {
 });
 
 describe("AI configuration request ownership", () => {
-  it("keeps settings hydration and model registration after moving statistics to the dashboard", async () => {
+  it("keeps settings hydration, statistics and model registration", async () => {
     renderAiSettings();
     const settings = { ai_parse_enabled: false, monthly_call_limit: 42 };
     h.request.mockResolvedValue(settings);
@@ -123,10 +124,13 @@ describe("AI configuration request ownership", () => {
     expect(h.setters[1]).toHaveBeenCalledWith(false);
     await h.queries[1].queryFn();
     await h.queries[2].queryFn();
+    await h.queries[3].queryFn();
     expect(h.request.mock.calls.map(([url]) => url)).toEqual([
-      "/ai-settings", "/ai-configs", "/ai-models",
+      "/ai-settings", "/ai-settings/stats?fixture", "/ai-configs", "/ai-models",
     ]);
-    expect(h.queries.map((query) => query.queryKey)).toEqual([["ai-settings"], ["ai-configs"], ["ai-models"]]);
+    expect(h.queries.map((query) => query.queryKey)).toEqual([
+      ["ai-settings"], ["ai-settings", "stats"], ["ai-configs"], ["ai-models"],
+    ]);
   });
 
   it("publishes the server-confirmed settings into cache after PATCH", async () => {
@@ -146,16 +150,16 @@ describe("AI configuration request ownership", () => {
     expect(h.queries).toEqual([]);
   });
 
-  it.each(["", "tab=", "tab=overview", "tab=unknown"])("defaults invalid or absent tabs to models (%s)", (search) => {
+  it.each(["", "tab=", "tab=unknown"])("defaults invalid or absent tabs to overview (%s)", (search) => {
     h.search = search;
     const tree = renderAiSettings();
-    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=models");
-    expect(find(tree, (element) => element.type === ModelCards)).toBeDefined();
-    expect(find(tree, (element) => typeof element.props.href === "string" && element.props.href.includes("tab=overview"))).toBeUndefined();
+    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=overview");
+    expect(find(tree, (element) => element.type === ModelWorkbench)).toBeUndefined();
   });
 
   it.each([
-    { tab: "models", component: ModelCards },
+    { tab: "overview", component: DashboardAiOverview },
+    { tab: "models", component: ModelWorkbench },
     { tab: "ocr", component: OcrAccordion },
     { tab: "completion", component: AiCompletionPreview },
     { tab: "vector", component: VectorConfigSection },
@@ -183,7 +187,7 @@ describe("AI configuration request ownership", () => {
     h.roleName = "admin";
     const tree = renderAiSettings();
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
-    expect(find(tree, (element) => element.type === ModelCards || element.type === ConfirmDialog)).toBeUndefined();
+    expect(find(tree, (element) => element.type === ModelWorkbench || element.type === ConfirmDialog)).toBeUndefined();
   });
 
   it("opens confirmation before writing and only submits the confirmed settings draft", () => {

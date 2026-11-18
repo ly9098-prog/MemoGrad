@@ -80,7 +80,22 @@ describe("AI overview data accuracy", () => {
   });
 
   it("uses provider icons for explicit candidates while leaving generic gateways unbranded", () => {
-    for (const provider of ["moonshot", "openai", "anthropic", "gemini"]) {
+    for (const provider of [
+      "moonshot",
+      "openai",
+      "anthropic",
+      "gemini",
+      "minimax",
+      "openrouter",
+      "dashscope",
+      "volcengine",
+      "siliconflow",
+      "azure",
+      "ollama",
+      "lmstudio",
+      "vllm",
+      "paddle",
+    ]) {
       expect(getAiProviderIcon(provider)).toMatch(/^\/model-icons\//);
     }
     expect(getAiProviderIcon("relay")).toBeNull();
