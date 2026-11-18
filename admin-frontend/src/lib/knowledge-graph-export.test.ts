@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildKnowledgeGraphHtml,
   buildKnowledgeGraphSvg,
+  exportLinkCoordinates,
   graphExportFilename,
   type ExportGraphInput,
 } from "./knowledge-graph-export";
@@ -41,8 +42,8 @@ describe("buildKnowledgeGraphSvg", () => {
 
   it("draws labels below their nodes", () => {
     const svg = buildKnowledgeGraphSvg(makeInput()) ?? "";
-    expect(svg).toContain('cy="20.0"');
-    expect(svg).toMatch(/<text x="10\.0" y="41\.0"/);
+    expect(svg).toMatch(/data-node-id="1"[^>]*transform="translate\([\d.]+ [\d.]+\)"/);
+    expect(svg).toContain('<text x="0" y="26.00" text-anchor="middle"');
     expect(svg).toContain("线性表");
   });
 
@@ -62,6 +63,38 @@ describe("buildKnowledgeGraphSvg", () => {
     expect(svg).toContain('stroke-dasharray="5 4"');
     expect(svg).toContain('marker-end="url(#kg-arrow)"');
   });
+
+  it("wraps complete long names and keeps labels readable on a widely dispersed graph", () => {
+    const name = "归并排序、基数排序和计数排序的时间复杂度与空间复杂度";
+    const svg = buildKnowledgeGraphSvg(makeInput({
+      nodes: [
+        { id: 1, name, x: -20000, y: 0, radius: 10, color: "#24688F" },
+        { id: 2, name: "绪论", x: 20000, y: 20000, radius: 18, color: "#24688F", isChapterRoot: true },
+      ],
+    })) ?? "";
+    const label = /data-node-id="1"[\s\S]*?<text[^>]*>([\s\S]*?)<\/text>/.exec(svg)?.[1] ?? "";
+    expect(label.match(/<tspan /g)?.length).toBeGreaterThan(1);
+    expect(label.replace(/<[^>]*>/g, "")).toBe(name);
+    expect(svg).toContain('font-size="13"');
+    expect(svg).toContain('font-size="15"');
+    expect(Number(/width="([\d.]+)" height="[\d.]+" font-family/.exec(svg)?.[1])).toBeLessThan(1900);
+  });
+
+  it("does not embed active color URLs or dangling edges", () => {
+    const svg = buildKnowledgeGraphSvg(makeInput({
+      nodes: [{ id: 1, name: "有效节点", x: 0, y: 0, radius: 8, color: "url(https://example.test)" }],
+    })) ?? "";
+    expect(svg).not.toContain("example.test");
+    expect(svg).not.toContain("data-source");
+    expect(svg).not.toMatch(/NaN|Infinity/);
+  });
+});
+
+describe("exportLinkCoordinates", () => {
+  it("stops directed edges at node boundaries and keeps coincident endpoints finite", () => {
+    expect(exportLinkCoordinates({ x: 0, y: 0, radius: 8 }, { x: 100, y: 0, radius: 5 })).toEqual([9, 0, 92, 0]);
+    expect(exportLinkCoordinates({ x: 4, y: 2, radius: 8 }, { x: 4, y: 2, radius: 5 })).toEqual([4, 2, 4, 2]);
+  });
 });
 
 describe("buildKnowledgeGraphHtml", () => {
@@ -75,6 +108,10 @@ describe("buildKnowledgeGraphHtml", () => {
     expect(html).toContain("<svg></svg>");
     expect(html).toContain("&lt;b&gt;标题&lt;/b&gt;");
     expect(html).toContain("2 个知识点");
+    const script = /<script>([\s\S]*)<\/script>/.exec(html)?.[1] ?? "";
+    expect(script).not.toContain("<b>标题</b>");
+    expect(() => new Function(script)).not.toThrow();
+    expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+href=/);
   });
 });
 

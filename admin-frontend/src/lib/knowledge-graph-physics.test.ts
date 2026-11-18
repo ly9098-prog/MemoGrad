@@ -46,7 +46,64 @@ function medianLinkLength(data: ReturnType<typeof fixture>) {
   return distances[Math.floor(distances.length / 2)];
 }
 
+function chapterFixture() {
+  const data = fixture(120);
+  for (const node of data.nodes) {
+    node.chapter_id = Math.floor(node.id / 10) * 10;
+    node.chapter_order = Math.floor(node.id / 10);
+    node.is_chapter_root = node.id % 10 === 0;
+  }
+  return data;
+}
+
 describe("knowledge graph physics", () => {
+  it("applies chapter distances to numeric and resolved endpoints, keeping unknown chapters neutral", () => {
+    const data = chapterFixture();
+    const forces = createGraphForces(data.nodes, data.links, DEFAULT_GRAPH_FORCES);
+    const distance = forces.link.distance();
+    const within = { source: 0, target: 1 };
+    const between = { source: 0, target: 10 };
+    expect(distance(within, 0, [within])).toBe(324);
+    expect(distance(between, 0, [between])).toBe(108);
+    expect(distance({ source: data.nodes[0], target: data.nodes[1] }, 0, [])).toBe(324);
+    data.nodes[0].chapter_id = null;
+    expect(distance(within, 0, [within])).toBe(180);
+  });
+
+  it("places chapter roots from left to right without fixing them in place", () => {
+    const data = chapterFixture();
+    prewarmGraphLayout(data.nodes, data.links);
+    const roots = data.nodes.filter((node) => node.is_chapter_root);
+    expect(roots.every((node, index) => index === 0 || node.x! > roots[index - 1].x!)).toBe(true);
+    expect(data.nodes.every((node) => node.fx == null && node.fy == null)).toBe(true);
+  });
+
+  it("keeps chapter order under dense cross-chapter links and yields to active dragging", () => {
+    const data = fixture(80);
+    for (const node of data.nodes) {
+      node.chapter_id = Math.floor(node.id / 10) * 10;
+      node.chapter_order = Math.floor(node.id / 10);
+      node.is_chapter_root = node.id % 10 === 0;
+    }
+    for (let target = 71; target < 80; target += 1) data.links.push({ source: 0, target });
+    prewarmGraphLayout(data.nodes, data.links);
+    const roots = data.nodes.filter((node) => node.is_chapter_root);
+    const ordered = () => roots.every((node, index) => index === 0 || node.x! > roots[index - 1].x!);
+    expect(ordered()).toBe(true);
+    const simulation = simulationFor(data);
+    simulation.alpha(1).tick(900);
+    expect(ordered()).toBe(true);
+    const first = roots[0];
+    first.fx = roots[roots.length - 1].x! + 500;
+    simulation.alpha(0.8).tick(20);
+    expect(first.x).toBe(first.fx);
+    expect(ordered()).toBe(false);
+    first.fx = undefined;
+    simulation.alpha(0.8).tick(280);
+    expect(ordered()).toBe(true);
+    expect(roots.every((node) => node.fx == null && node.fy == null)).toBe(true);
+  });
+
   it("separates a 120-node graph using finite, deterministic initial positions", () => {
     const first = fixture(120);
     const second = fixture(120);

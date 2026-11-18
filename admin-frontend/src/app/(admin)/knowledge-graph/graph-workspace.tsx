@@ -104,10 +104,10 @@ const EXPORT_OPTIONS: Array<{
   hint: string;
   Icon: typeof ImageIcon;
 }> = [
-  { format: "png", label: "PNG 图片", hint: "完整图谱 · 2× 清晰度", Icon: ImageIcon },
-  { format: "jpg", label: "JPG 图片", hint: "完整图谱 · 体积更小", Icon: FileImage },
-  { format: "svg", label: "SVG 矢量", hint: "完整图谱 · 可缩放", Icon: FileCode2 },
-  { format: "html", label: "HTML 页面", hint: "完整图谱 · 带标题图例", Icon: FileText },
+  { format: "png", label: "PNG 图片", hint: "当前视图 · 高清图片", Icon: ImageIcon },
+  { format: "jpg", label: "JPG 图片", hint: "当前视图 · 体积更小", Icon: FileImage },
+  { format: "svg", label: "SVG 矢量", hint: "当前视图 · 可缩放", Icon: FileCode2 },
+  { format: "html", label: "HTML 页面", hint: "离线浏览 · 可拖动缩放", Icon: FileText },
 ];
 
 type Cluster = {
@@ -997,9 +997,20 @@ export default function KnowledgeGraphWorkspace() {
   function exportGraph(format: GraphExportFormat) {
     setExportOpen(false);
     const title = `${subjectName}知识图谱`;
+    const visibleConfidence = graphData.links.length
+      ? Math.round(graphData.links.reduce((sum, link) => sum + link.confidence, 0) / graphData.links.length * 100)
+      : 0;
     const subtitle =
-      `${graphData.nodes.length} 个知识点 · ${graphData.links.length} 条关系` +
-      ` · 平均置信度 ${confidence}%`;
+      `当前视图 ${graphData.nodes.length}/${summary?.total_nodes ?? graphData.nodes.length} 个知识点` +
+      ` · ${graphData.links.length}/${summary?.total_edges ?? graphData.links.length} 条关系` +
+      ` · 关系置信度 ${visibleConfidence}%`;
+    const clusters = graphData.clusters
+      .filter((cluster) => cluster.count > 0)
+      .map((cluster) => ({
+        label: cluster.label,
+        color: colorOverrides[clusterStorageKey(cluster)] ?? cluster.color,
+        count: cluster.count,
+      }));
     const svg = buildKnowledgeGraphSvg({
       title,
       subtitle,
@@ -1010,15 +1021,10 @@ export default function KnowledgeGraphWorkspace() {
         y: node.y,
         radius: node.radius * appearance.nodeScale,
         color: effectiveNodeColor(node, colorOverrides),
+        isChapterRoot: node.is_chapter_root,
       })),
       links: graphData.links,
-      clusters: graphData.clusters
-        .filter((cluster) => cluster.count > 0)
-        .map((cluster) => ({
-          label: cluster.label,
-          color: colorOverrides[clusterStorageKey(cluster)] ?? cluster.color,
-          count: cluster.count,
-        })),
+      clusters,
       linkWidth: 0.72 * appearance.linkWidth,
       arrows: appearance.arrows,
     });
@@ -1066,7 +1072,7 @@ export default function KnowledgeGraphWorkspace() {
       return;
     }
     downloadBlob(
-      new Blob([buildKnowledgeGraphHtml(svg, { title, subtitle })], {
+      new Blob([buildKnowledgeGraphHtml(svg, { title, subtitle, clusters })], {
         type: "text/html;charset=utf-8",
       }),
       filename,
