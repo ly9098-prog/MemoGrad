@@ -427,6 +427,32 @@ class TestRetryFunctions:
 
 
 class TestRetryBehavior:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("error_type,phase", [
+        (httpx.ReadTimeout, "read"), (httpx.ConnectTimeout, "connect"),
+        (httpx.WriteTimeout, "write"), (httpx.PoolTimeout, "pool"),
+    ])
+    async def test_empty_timeout_detail_includes_phase_budget_and_no_secrets(self, monkeypatch, error_type, phase):
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            raise error_type("", request=request)
+
+        monkeypatch.setattr("app.services.ocr_paddlex_http_client._compute_backoff", lambda *a, **kw: 0)
+        cfg = _config(remote_url="http://user:password@127.0.0.1:9/ocr?token=secret",
+                      remote_auth_token="private-auth-token")
+        async with _mock_async_client(handler) as hc:
+            worker = PaddleXHttpOcrWorkerClient(cfg, http_client=hc)
+            result = await worker._do_recognize(_FAKE_PNG, 0, "isolated-request", None)
+            await worker.shutdown()
+        detail = result.result["error"]
+        assert result.stable_error_code == STABLE_ERROR_CODES["REMOTE_TIMEOUT"]
+        assert f"{error_type.__name__} ({phase} timeout=" in detail
+        assert "4 attempts" in detail and "total deadline=" in detail
+        assert len(calls) == 4
+        assert all(secret not in detail for secret in ["private-auth-token", "password", "token=secret", "http://"])
+
     """End-to-end retry behavior via mock transport."""
 
     @pytest.mark.asyncio

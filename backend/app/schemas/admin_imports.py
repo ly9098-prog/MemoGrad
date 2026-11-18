@@ -159,6 +159,7 @@ class AdminImportBatchDetail(AdminImportBatchListItem):
     items: list[AdminImportQuestionItemBrief]
     page: int
     page_size: int
+    total: int = 0
     total_pages: int
 
 

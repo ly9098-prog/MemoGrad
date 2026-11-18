@@ -5,6 +5,7 @@ from pathlib import Path
 
 from app.core.database import async_session
 from app.features.pipeline_checkpoint import ensure_pipeline_record
+from app.services.import_recovery_context import save_recovery_context
 from app.services.import_upload_request import UploadRequest
 
 
@@ -44,4 +45,20 @@ async def admit_pipeline_record(
             source_sha256=source_sha256,
             status="queued",
         )
+    await save_recovery_context(pipeline_id, {
+        "source_type": source_type,
+        "source_file": request.filename,
+        "subject": request.subject,
+        "subject_id": request.subject_id,
+        "created_by": request.created_by,
+        "source_sha256": source_sha256,
+        "options": {
+            "enable_ai_repair": request.enable_ai_repair,
+            "confidence_threshold": request.confidence_threshold,
+            "image_fast_mode": request.image_fast_mode,
+            "import_mode": request.import_mode,
+            "page_start": request.page_start,
+            "page_end": request.page_end,
+        },
+    })
     return source_sha256

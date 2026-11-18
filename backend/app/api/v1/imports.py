@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,9 +31,11 @@ from app.schemas.question_import import (
 from app.services.import_pipeline_service import (
     get_pipeline_status as svc_get_pipeline_status,
 )
+from app.services.import_recovery_service import ImportRecoveryError
 from app.services.import_upload_service import (
     start_import_pipeline as svc_start_import_pipeline,
 )
+from app.services.public_pipeline_resume_service import submit_public_resume
 from app.services.streaming_upload_handler import stream_to_temp
 from app.services.task_queue_worker import enqueue_resume_pipeline
 from app.services.upload_validator import get_upload_validator
@@ -502,30 +504,22 @@ async def resume_pipeline(
             mime="application/octet-stream",
         )
 
-        result = await enqueue_resume_pipeline(
-            pipeline_id=pipeline_id,
-            staging_object_id=_resume_staging.object_id,
-            subject=subject,
-            subject_id=None,
-            options=options,
+        await submit_public_resume(
+            db, pipeline_row, _resume_staging.object_id,
+            subject, options, enqueue_resume_pipeline,
         )
-        if not result:
-            tmp.close()
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"任务队列已满，请稍后重试: {result.reason}",
-            )
 
-        # Detach — the background worker (run_resume_background) takes ownership
-        tmp.detach()
         return PipelineResumeResponse(
             pipeline_id=pipeline_id,
             status="running",
             resumed_chunks=resumed_chunks,
         )
+    except ImportRecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except ValueError as exc:
-        tmp.close()
         raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        tmp.close()
 
 
 # ---------------------------------------------------------------------------

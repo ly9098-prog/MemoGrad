@@ -75,6 +75,28 @@ def _is_retryable_exception(exc: Exception) -> bool:
     )
 
 
+def _remote_failure_detail(exc: BaseException, config: OcrRuntimeConfig) -> str:
+    """Describe transport failures without logging URLs, headers or exception text."""
+    phase = "request"
+    timeout = config.remote_read_timeout_sec
+    if isinstance(exc, httpx.ConnectTimeout):
+        phase, timeout = "connect", config.remote_connect_timeout_sec
+    elif isinstance(exc, httpx.ReadTimeout):
+        phase = "read"
+    elif isinstance(exc, httpx.WriteTimeout):
+        phase, timeout = "write", config.remote_connect_timeout_sec
+    elif isinstance(exc, httpx.PoolTimeout):
+        phase, timeout = "pool", config.remote_connect_timeout_sec
+    if isinstance(exc, httpx.TimeoutException):
+        return (
+            f"{type(exc).__name__} ({phase} timeout={timeout}s; "
+            f"total deadline={config.total_deadline}s)"
+        )
+    if isinstance(exc, _RetryableError):
+        return f"HTTP {exc.status_code}" if exc.status_code else "Transient HTTP failure"
+    return type(exc).__name__
+
+
 def _compute_backoff(
     attempt: int,
     *,
@@ -770,7 +792,7 @@ class PaddleXHttpOcrWorkerClient:
                 return self._make_error(
                     page_index,
                     STABLE_ERROR_CODES["REMOTE_HTTP_ERROR"],
-                    f"Non-retryable error: {e}",
+                    f"Non-retryable error: {_remote_failure_detail(e, self._config)}",
                 )
 
         # All retries exhausted
@@ -781,7 +803,8 @@ class PaddleXHttpOcrWorkerClient:
             return self._make_error(
                 page_index,
                 last_error_code,
-                f"All retries exhausted: {last_exc}",
+                f"All retries exhausted after {retry_count + 1} attempts: "
+                f"{_remote_failure_detail(last_exc, self._config)}",
             )
         return self._make_error(
             page_index,

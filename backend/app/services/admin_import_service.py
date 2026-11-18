@@ -490,8 +490,11 @@ async def list_import_batches(
     status: str | None = None,
     source_type: str | None = None,
     keyword: str | None = None,
+    batch_id: str | None = None,
 ) -> tuple[list[dict], int]:
     conditions = _batch_conditions(status, source_type, keyword)
+    if batch_id is not None:
+        conditions.append(QuestionImport.batch_id == batch_id)
     total_query = select(func.count()).select_from(
         select(QuestionImport.batch_id)
         .where(*conditions)
@@ -545,6 +548,7 @@ async def get_import_batch_detail(
         items=items,
         page=page,
         page_size=page_size,
+        total=int(total or 0),
         total_pages=max(ceil(int(total or 0) / page_size), 1) if total else 0,
     )
 

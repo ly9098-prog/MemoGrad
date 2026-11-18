@@ -2,6 +2,7 @@ from datetime import datetime
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -99,17 +100,19 @@ def _question_item():
 
 
 def test_list_import_batches(monkeypatch):
-    monkeypatch.setattr(admin_imports, "list_import_batches", AsyncMock(return_value=([_batch()], 1)))
+    listing = AsyncMock(return_value=([_batch()], 1))
+    monkeypatch.setattr(admin_imports, "list_import_batches", listing)
     app.dependency_overrides[get_current_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
-        resp = client.get("/api/admin/v1/imports")
+        resp = client.get("/api/admin/v1/imports?batch_id=batch-1")
     finally:
         app.dependency_overrides.clear()
 
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
     assert resp.json()["items"][0]["batch_id"] == "batch-1"
+    assert listing.await_args.kwargs["batch_id"] == "batch-1"
 
 
 def test_get_import_batch_detail(monkeypatch):
@@ -145,6 +148,65 @@ def test_list_pipelines_uses_static_route(monkeypatch):
     assert resp.json()["items"] == []
     list_pipelines.assert_awaited_once()
     detail.assert_not_called()
+
+
+def test_batch_retry_multipart_contract_and_pipeline_resume_response(monkeypatch):
+    from app.services import batch_image_recovery_service, import_recovery_service
+
+    batch = AsyncMock(return_value={"job_id": "job-1", "item_id": 4, "status": "queued",
+                                   "review_batch_id": None, "question_count": 0, "error_message": None})
+    pipeline = AsyncMock(return_value={"pipeline_id": "img-1", "status": "processing",
+                                      "resumed_chunks": [], "failed_stage": None,
+                                      "completed_stages": 0, "artifact_stages": [], "true_resume": False})
+    monkeypatch.setattr(batch_image_recovery_service, "retry_batch_image_item", batch)
+    monkeypatch.setattr(import_recovery_service, "resume_import", pipeline)
+    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        response = client.post("/api/admin/v1/imports/batch-image/items/4/retry",
+                               files={"file": ("original.png", _minimal_png_bytes(), "image/png")})
+        resume = client.post("/api/admin/v1/imports/pipelines/img-1/resume",
+                             files={"file": ("original.png", _minimal_png_bytes(), "image/png")})
+        missing = client.post("/api/admin/v1/imports/batch-image/items/4/retry")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200 and response.json() == batch.return_value
+    assert batch.await_args.args[1] == 4
+    assert batch.await_args.args[2].filename == "original.png"
+    assert resume.status_code == 200 and resume.json() == pipeline.return_value
+    assert missing.status_code == 422
+
+
+@pytest.mark.parametrize(("status_code", "error_code"), [
+    (400, "IMPORT_SOURCE_MISMATCH"),
+    (409, "IMPORT_RECOVERY_CONTEXT_EXPIRED"),
+    (503, "IMPORT_RECOVERY_QUEUE_UNAVAILABLE"),
+])
+def test_recovery_preserves_public_machine_error_code_and_requires_write(
+    monkeypatch, status_code, error_code,
+):
+    from app.core import admin_security
+    from app.services import batch_image_recovery_service
+    from app.services.import_recovery_service import ImportRecoveryError
+
+    retry = AsyncMock(side_effect=ImportRecoveryError("raw internal detail", status_code, error_code))
+    permissions = AsyncMock(return_value={"import:read"})
+    monkeypatch.setattr(batch_image_recovery_service, "retry_batch_image_item", retry)
+    monkeypatch.setattr(admin_security, "_get_permission_names", permissions)
+    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        path = "/api/admin/v1/imports/batch-image/items/4/retry"
+        files = {"file": ("original.png", _minimal_png_bytes(), "image/png")}
+        assert client.post(path, files=files).status_code == 403
+        retry.assert_not_awaited()
+        permissions.return_value = {"import:write"}
+        response = client.post(path, files=files)
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == status_code
+    assert response.json()["error"]["code"] == error_code
+    assert "raw internal detail" not in response.text
 
 
 def test_create_enrich_task_and_status(monkeypatch):

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +40,7 @@ async def run_image_ocr_stage(request: ImageOcrStageRequest) -> ImageOcrStageRes
     )
     runtime_diagnostics = request.build_runtime_diagnostics()
     await request.set_status(
+        request.pipeline_id,
         status="ocr_running",
         diagnostics={"ocr_runtime": runtime_diagnostics},
         stages={"upload": {"status": "completed"}, "ocr": {"status": "running"}},
@@ -67,6 +67,7 @@ async def run_image_ocr_stage(request: ImageOcrStageRequest) -> ImageOcrStageRes
 
     logger.info(_completion_log(request, diagnostics))
     await request.set_status(
+        request.pipeline_id,
         status="parsing",
         raw_text_preview=cleaned_text[:500],
         stats={"ocr": diagnostics},
@@ -93,6 +94,7 @@ async def _fail_empty_result(
     diagnostics: dict,
 ) -> None:
     await request.set_status(
+        request.pipeline_id,
         status="failed",
         stats={"ocr": diagnostics},
         diagnostics={

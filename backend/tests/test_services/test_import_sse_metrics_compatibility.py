@@ -218,12 +218,10 @@ class TestAdminImportsMutationSites:
             and isinstance(node.target.value.value, ast.Name)
             and node.target.value.value.id == "import_sse_metrics"
         ]
-        # Five counters are incremented in place via +=; "active" is a
-        # derived gauge assigned via = sum(active_conns.values()) and is
-        # pinned separately below.
-        assert len(counters_aug_assigns) == 5
-        for node in counters_aug_assigns:
-            assert isinstance(node.target.slice, ast.Constant)
+        assert all(isinstance(node.target.slice, ast.Constant) for node in counters_aug_assigns)
+        assert {node.target.slice.value for node in counters_aug_assigns} == set(counters) - {
+            "active",
+        }
 
     def test_active_counter_is_assigned_gauge(self):
         import ast

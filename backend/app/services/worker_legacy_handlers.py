@@ -98,6 +98,12 @@ async def handle_resume_pipeline(context: LegacyTaskContext) -> None:
 
 
 async def handle_admin_resume(context: LegacyTaskContext) -> None:
+    if context.payload.get("source_type") == "image":
+        await handle_image_pipeline(context)
+        return
+    if context.payload.get("source_type") == "excel":
+        await handle_excel_pipeline(context)
+        return
     from app.core.database import async_session
     from app.features.pipeline_coordinator_entry import run_pipeline
     from app.features.pipeline_orchestrator import (
@@ -173,6 +179,12 @@ async def handle_batch_image(context: LegacyTaskContext) -> None:
     subject_id = payload.get("subject_id")
     options = payload.get("options", {})
     concurrency = payload.get("concurrency", 2)
+    source_seqs = payload.get("source_seqs") or list(range(1, len(staging_ids) + 1))
+    source_files = payload.get("source_files") or [
+        f"image_{index + 1}.png" for index in range(len(staging_ids))
+    ]
+    if len(source_seqs) != len(staging_ids) or len(source_files) != len(staging_ids):
+        raise ValueError("Batch image source metadata length mismatch")
     sources: list[batch_svc.BatchImageSource] = []
     for index, staging_id in enumerate(staging_ids):
         if not staging_id:
@@ -185,8 +197,8 @@ async def handle_batch_image(context: LegacyTaskContext) -> None:
         work_path = await context.resolve_staging(staging_id)
         sources.append(
             batch_svc.BatchImageSource(
-                seq=index + 1,
-                source_file=f"image_{index + 1}.png",
+                seq=source_seqs[index],
+                source_file=source_files[index],
                 temp_path=work_path,
             )
         )

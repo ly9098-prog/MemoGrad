@@ -33,7 +33,9 @@ async def run_image_handler(state: WorkerTaskState) -> None:
     staging_id = state.payload.get("staging_object_id", "")
     image_path = await state.resolve_owned_staging(staging_id)
     if not image_path:
-        raise FileNotFoundError(f"Staging object {staging_id} not found for image pipeline")
+        raise FileNotFoundError(
+            f"Staging object {staging_id} not found for image pipeline"
+        )
     if state.fence_record_id:
         await state.namespace["_verify_fencing_or_cancel"](
             state.task, state.fence_record_id, state.task_type
@@ -92,6 +94,16 @@ async def run_resume_handler(state: WorkerTaskState) -> None:
 
 
 async def run_admin_resume_handler(state: WorkerTaskState) -> None:
+    if state.payload.get("source_type") == "image":
+        await run_image_handler(state)
+        return
+    if state.payload.get("source_type") == "excel":
+        await run_excel_handler(state)
+        return
+    await _run_document_resume_handler(state)
+
+
+async def _run_document_resume_handler(state: WorkerTaskState) -> None:
     from app.core.database import async_session
     from app.features.pipeline_coordinator_entry import run_pipeline
     from app.features.pipeline_orchestrator import (
