@@ -111,7 +111,7 @@
 <view class="force-panel-head"><text>力度</text><button class="force-panel-close" catchtap="closeForcePanel" aria-label="关闭力度设置">×</button></view>
 <view class="force-row" wx:for="{{forceControls}}" wx:key="key">
 <view class="force-row-meta"><text>{{item.label}}</text><text class="force-value">{{item.valueText}}</text></view>
-<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchanging="changeForce" activeColor="#55C89B" backgroundColor="#D8EEE6" block-color="#FFFFFF" block-size="20" />
+<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchanging="changeForce" bindchange="changeForce" aria-label="{{item.label}}" activeColor="#55C89B" backgroundColor="#D8EEE6" block-color="#FFFFFF" block-size="20" />
 </view>
 <button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">恢复默认力度</button>
 </view>

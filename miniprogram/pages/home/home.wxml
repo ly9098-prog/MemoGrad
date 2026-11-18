@@ -4,7 +4,7 @@
   <view class="home-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="home-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="brand-lockup">
-        <image class="brand-mark brand-mark-image" src="/assets/icons/brand-logo.png" mode="aspectFit" aria-label="MemoGrad" />
+        <image class="brand-mark brand-mark-image" src="/assets/icons/brand-logo.png" mode="aspectFit" aria-hidden="true" />
         <view class="brand-copy">
           <text class="brand-name">MEMOGRAD</text>
           <text class="brand-caption">STUDY DESK</text>

@@ -370,6 +370,8 @@ this._pageVisible = false
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
 clearTimeout(this._inertiaTimer)
+clearTimeout(this._forceTimer)
+this._forceTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -401,6 +403,8 @@ this._unloaded = true
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
 clearTimeout(this._inertiaTimer)
+clearTimeout(this._forceTimer)
+this._forceTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -1895,7 +1899,7 @@ this.setData({ forceControls: this.forceControlData() })
 clearTimeout(this._forceTimer)
 this._forceTimer = setTimeout(() => {
 this._forceTimer = null
-if (!this._unloaded && this.data.subject) this.applyView(false, false)
+if (!this._unloaded && this._pageVisible !== false && this.data.subject) this.applyView(false, false)
 }, 120)
 },
 resetForces() {

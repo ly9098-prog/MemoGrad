@@ -5310,7 +5310,7 @@ page {
 .editorial-date,
 .section-kicker,
 .route-eyebrow {
-  color: #76968B;
+  color: #507568;
 }
 
 .editorial-subtitle,
@@ -5425,7 +5425,7 @@ page {
 }
 
 .focus-guest-hint {
-  color: #76968B;
+  color: #507568;
 }
 
 .progress-head {
@@ -5441,7 +5441,7 @@ page {
 .progress-label,
 .progress-head-sub {
   display: block;
-  color: #648276;
+  color: #507568;
   font-size: 21rpx;
   line-height: 1.4;
 }
@@ -5495,7 +5495,7 @@ page {
 
 .focus-ring-label {
   margin-top: 10rpx;
-  color: #76968B;
+  color: #507568;
   font-size: 18rpx;
   line-height: 1.2;
 }
@@ -5558,7 +5558,7 @@ page {
 }
 
 .metric-label {
-  color: #76968B;
+  color: #507568;
   font-size: 19rpx;
 }
 
@@ -5645,7 +5645,7 @@ page {
 }
 
 .mastery-card-tech .mastery-score.is-empty {
-  color: #9AB5A9;
+  color: #5D7A6E;
 }
 
 .mastery-track-tech,
@@ -5671,7 +5671,7 @@ page {
 .mastery-foot-tech,
 .mastery-foot-tech .mastery-status,
 .mastery-sample-copy {
-  color: #76968B;
+  color: #507568;
 }
 
 .mastery-card-pressed {
