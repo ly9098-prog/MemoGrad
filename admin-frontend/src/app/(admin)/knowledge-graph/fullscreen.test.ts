@@ -1,6 +1,5 @@
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Button } from "@/components/ui/button";
 import KnowledgeGraphWorkspace from "./graph-workspace";
 
 type Element = ReactElement<Record<string, unknown>>;
@@ -60,7 +59,7 @@ describe("knowledge graph fullscreen", () => {
     state.refs[1].current = { requestFullscreen };
     const fullscreenButton = find(
       tree,
-      (element) => element.type === Button && element.props["aria-label"] === "全屏",
+      (element) => element.props["aria-label"] === "全屏",
     )!;
 
     await (fullscreenButton.props.onClick as () => Promise<void>)();
@@ -74,7 +73,7 @@ describe("knowledge graph fullscreen", () => {
     const tree = renderWorkspace();
     const fullscreenButton = find(
       tree,
-      (element) => element.type === Button && element.props["aria-label"] === "全屏",
+      (element) => element.props["aria-label"] === "全屏",
     )!;
 
     await (fullscreenButton.props.onClick as () => Promise<void>)();

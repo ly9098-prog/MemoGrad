@@ -5,6 +5,9 @@ import {
   edgeStrength,
   collapseEdgesByPair,
   nodeRadius,
+  graphNodeRadius,
+  clusterRingAnchors,
+  wheelZoomFactor,
   estimatedLabelWidth,
   relationLabel,
   escapeHtml,
@@ -74,6 +77,93 @@ describe("nodeRadius", () => {
     const r1 = nodeRadius(makeNode({ degree: 1 }));
     const r2 = nodeRadius(makeNode({ degree: 16 }));
     expect(r2).toBeGreaterThan(r1);
+  });
+});
+
+describe("graphNodeRadius", () => {
+  it("keeps leaf nodes compact", () => {
+    expect(graphNodeRadius(makeNode({ degree: 1 }))).toBeLessThan(6);
+  });
+  it("renders hierarchy parents larger than equally connected leaves", () => {
+    const leaf = graphNodeRadius(makeNode({ degree: 4 }));
+    const parent = graphNodeRadius(makeNode({ degree: 4 }), { childCount: 3 });
+    expect(parent).toBeGreaterThan(leaf * 1.35);
+  });
+  it("gives overview topics an additional visual boost", () => {
+    const regular = graphNodeRadius(makeNode({ degree: 20 }), { childCount: 2 });
+    const topic = graphNodeRadius(makeNode({ degree: 20 }), { childCount: 2, isTopic: true });
+    expect(topic).toBeGreaterThan(regular);
+  });
+  it("caps very large hubs", () => {
+    expect(
+      graphNodeRadius(makeNode({ degree: 1000 }), { childCount: 1000, isTopic: true }),
+    ).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("clusterRingAnchors", () => {
+  it("returns no anchors without clusters", () => {
+    expect(clusterRingAnchors([], 0).size).toBe(0);
+  });
+  it("centers a single cluster", () => {
+    const anchors = clusterRingAnchors([{ key: 7, count: 12 }], 12);
+    expect(anchors.get(7)).toEqual({ x: 0, y: 0 });
+  });
+  it("places two clusters on a horizontal axis", () => {
+    const anchors = clusterRingAnchors(
+      [
+        { key: 0, count: 10 },
+        { key: 1, count: 10 },
+      ],
+      20,
+      1.7,
+    );
+    expect(anchors.get(0)?.y).toBe(0);
+    expect(anchors.get(1)?.y).toBe(0);
+    expect(anchors.get(0)?.x ?? 0).toBeLessThan(0);
+    expect(anchors.get(1)?.x ?? 0).toBeGreaterThan(0);
+  });
+  it("stretches wide viewports horizontally", () => {
+    const clusters = [0, 1, 2, 3, 4].map((key) => ({ key, count: 10 }));
+    const square = clusterRingAnchors(clusters, 50, 1);
+    const wide = clusterRingAnchors(clusters, 50, 2.4);
+    const spreadX = (anchors: Map<number, { x: number; y: number }>) =>
+      Math.max(...[...anchors.values()].map((anchor) => Math.abs(anchor.x)));
+    const spreadY = (anchors: Map<number, { x: number; y: number }>) =>
+      Math.max(...[...anchors.values()].map((anchor) => Math.abs(anchor.y)));
+    expect(spreadX(wide)).toBeGreaterThan(spreadX(square));
+    expect(spreadY(wide)).toBeLessThan(spreadY(square));
+  });
+  it("gives larger clusters more room", () => {
+    const anchors = clusterRingAnchors(
+      [
+        { key: 0, count: 30 },
+        { key: 1, count: 4 },
+      ],
+      34,
+      1.7,
+    );
+    const distance = (key: number) => {
+      const anchor = anchors.get(key);
+      return Math.hypot(anchor?.x ?? 0, anchor?.y ?? 0);
+    };
+    expect(distance(0)).toBeGreaterThan(distance(1));
+  });
+});
+
+describe("wheelZoomFactor", () => {
+  it("zooms in for upward wheel motion", () => {
+    expect(wheelZoomFactor(-100)).toBeGreaterThan(1);
+  });
+  it("zooms out for downward wheel motion", () => {
+    expect(wheelZoomFactor(100)).toBeLessThan(1);
+  });
+  it("normalizes line-mode wheel deltas", () => {
+    expect(wheelZoomFactor(3, 1)).toBeCloseTo(wheelZoomFactor(48, 0));
+  });
+  it("limits a single wheel step", () => {
+    expect(wheelZoomFactor(100000)).toBe(0.84);
+    expect(wheelZoomFactor(-100000)).toBe(1.19);
   });
 });
 

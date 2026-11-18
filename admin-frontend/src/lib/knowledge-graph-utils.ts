@@ -21,7 +21,7 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function edgeStrength(edge: KnowledgeGraphEdge): number {
+export function edgeStrength(edge: Pick<KnowledgeGraphEdge, "weight" | "confidence">): number {
   const normalizedWeight = clamp(edge.weight / 10, 0, 1);
   return edge.confidence * 0.76 + normalizedWeight * 0.24;
 }
@@ -38,6 +38,78 @@ export function collapseEdgesByPair(edges: KnowledgeGraphEdge[]): KnowledgeGraph
 
 export function nodeRadius(node: KnowledgeGraphNode): number {
   return clamp(16 + Math.sqrt(Math.max(0, node.degree)) * 2.05, 18, 28);
+}
+
+export function graphNodeRadius(
+  node: Pick<KnowledgeGraphNode, "degree">,
+  options: { childCount?: number; isTopic?: boolean } = {},
+): number {
+  const degree = Math.max(0, node.degree || 0);
+  const childCount = Math.max(0, options.childCount ?? 0);
+  const degreeBoost = Math.sqrt(degree) * 1.28;
+  const parentBoost = childCount > 0 ? 1.8 + Math.sqrt(childCount) * 1.55 : 0;
+  const topicBoost = options.isTopic ? 2.1 : 0;
+  return clamp(4.1 + degreeBoost + parentBoost + topicBoost, 4.1, 20);
+}
+
+export type ClusterAnchor = { x: number; y: number };
+
+/**
+ * Lay topic clusters out on a ring so the overview reads as separate
+ * communities instead of one central tangle. Bigger clusters get a slightly
+ * larger radius, which keeps dense communities from colliding with neighbours.
+ */
+export function clusterRingAnchors(
+  clusters: Array<{ key: number; count: number }>,
+  totalNodes: number,
+  aspect = 1,
+): Map<number, ClusterAnchor> {
+  const anchors = new Map<number, ClusterAnchor>();
+  if (!clusters.length) return anchors;
+  if (clusters.length === 1) {
+    anchors.set(clusters[0].key, { x: 0, y: 0 });
+    return anchors;
+  }
+
+  const maxCount = Math.max(1, ...clusters.map((cluster) => cluster.count));
+  const ring = 120 + Math.sqrt(Math.max(1, totalNodes)) * 26;
+  const safeAspect = clamp(aspect, 0.8, 2.8);
+  const radiusX = ring * Math.sqrt(safeAspect);
+  const radiusY = ring / Math.sqrt(safeAspect);
+  if (clusters.length === 2) {
+    const scaleFor = (count: number) => 0.72 + 0.5 * (count / maxCount);
+    anchors.set(clusters[0].key, {
+      x: -radiusX * 0.62 * scaleFor(clusters[0].count),
+      y: 0,
+    });
+    anchors.set(clusters[1].key, {
+      x: radiusX * 0.62 * scaleFor(clusters[1].count),
+      y: 0,
+    });
+    return anchors;
+  }
+
+  clusters.forEach((cluster, index) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / clusters.length;
+    const scale = 0.72 + 0.5 * (cluster.count / maxCount);
+    anchors.set(cluster.key, {
+      x: Math.cos(angle) * radiusX * scale,
+      y: Math.sin(angle) * radiusY * scale,
+    });
+  });
+  return anchors;
+}
+
+export function wheelZoomFactor(
+  deltaY: number,
+  deltaMode = 0,
+  viewportHeight = 800,
+  ctrlKey = false,
+): number {
+  const modeScale = deltaMode === 1 ? 16 : deltaMode === 2 ? Math.max(1, viewportHeight) : 1;
+  const normalizedDelta = clamp(deltaY * modeScale, -240, 240);
+  const sensitivity = ctrlKey ? 0.0034 : 0.0015;
+  return clamp(Math.exp(-normalizedDelta * sensitivity), 0.84, 1.19);
 }
 
 export function estimatedLabelWidth(node: KnowledgeGraphNode): number {
