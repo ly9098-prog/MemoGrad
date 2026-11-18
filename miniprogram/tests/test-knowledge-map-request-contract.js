@@ -152,6 +152,27 @@ test('subject pending receipts clear only when the direct counter resolves them'
   })
 })
 
+test('subject hide and unload cancel a pending force reflow', async () => {
+  await withPage('subject', async ({ page, timers }) => {
+    page.data.subject = { subject_id: 10, subject_name: '操作系统' }
+    page._forces = { center: 0.52, repel: 10, link: 1, distance: 250 }
+    page.changeForce({ currentTarget: { dataset: { key: 'center' } }, detail: { value: 0.6 } })
+    const hideTimer = [...timers.keys()][0]
+    assert.ok(hideTimer)
+    page.onHide()
+    assert.equal(timers.has(hideTimer), false)
+    assert.equal(page._forceTimer, null)
+
+    page._pageVisible = true
+    page.changeForce({ currentTarget: { dataset: { key: 'repel' } }, detail: { value: 18 } })
+    const unloadTimer = [...timers.keys()][0]
+    assert.ok(unloadTimer)
+    page.onUnload()
+    assert.equal(timers.has(unloadTimer), false)
+    assert.equal(page._forceTimer, null)
+  })
+})
+
 test('detail request shares in-flight and cached results; force bypasses both', async () => {
   await withPage('detail', async ({ page, api, calls }) => {
     const pending = deferred()
