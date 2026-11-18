@@ -14,6 +14,7 @@ Page({
     showDevLogin: false,
     agreed: false,
     entryPending: true,
+    discMotionActive: false,
     navHeight: 88,
     statusBarHeight: 20,
     navContentHeight: 44,
@@ -56,6 +57,7 @@ Page({
 
   onShow() {
     this._pageVisible = true
+    this._safeSetData({ discMotionActive: true })
     if (this._pendingHomeRedirect) {
       this._scheduleHomeRedirect(0)
     }
@@ -63,6 +65,7 @@ Page({
 
   onHide() {
     this._pageVisible = false
+    this._safeSetData({ discMotionActive: false })
     this._clearHomeRedirectTimer()
   },
 

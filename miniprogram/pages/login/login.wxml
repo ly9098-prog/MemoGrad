@@ -7,7 +7,7 @@
     <view class="guest-browse" bindtap="onGuestBrowse" aria-role="button">暂不登录，先浏览体验</view>
   </view>
 </view>
-<view wx:else class="login-root">
+<view wx:else class="login-root {{discMotionActive && !loading ? 'disc-motion-active' : ''}}">
   <view class="memo-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="memo-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="memo-brand-lockup">
@@ -20,12 +20,19 @@
     </view>
   </view>
   <view class="login-page" style="padding-top: {{navHeight}}px;">
-    <view class="ambient-glow glow-top"></view>
-    <view class="ambient-glow glow-bottom"></view>
+    <view class="ambient-glow glow-top" aria-hidden="true"></view>
+    <view class="ambient-glow glow-bottom" aria-hidden="true"></view>
     <view class="login-shell" style="min-height: calc(100vh - {{navHeight}}px);">
       <view class="brand-stage route-enter-page">
-        <view class="glass-disc" aria-hidden="true">
-          <image class="memo-brand-mark hero-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" />
+        <view class="disc-scene" aria-hidden="true">
+          <view class="glass-disc">
+            <view class="disc-water">
+              <view class="water-wave wave-one"></view>
+              <view class="water-wave wave-two"></view>
+              <view class="water-wave wave-three"></view>
+            </view>
+            <image class="memo-brand-mark hero-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" />
+          </view>
         </view>
         <text class="hero-brand-name">MEMOGRAD</text>
         <text class="hero-slogan">今天，从一道题开始</text>

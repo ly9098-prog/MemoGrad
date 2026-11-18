@@ -78,6 +78,24 @@ test('first-time entry reveals consent and login instead of a stuck startup scre
   assert.deepEqual(harness.navigations, [])
 })
 
+test('login water motion follows visibility without starting authentication or navigation', () => {
+  const harness = fixture(undefined, { values: { token: '' }, agreed: false })
+  assert.equal(harness.page.data.discMotionActive, false)
+  harness.page.onShow()
+  assert.equal(harness.page.data.discMotionActive, true)
+  harness.page.onHide()
+  assert.equal(harness.page.data.discMotionActive, false)
+  harness.page.onShow()
+  assert.equal(harness.page.data.discMotionActive, true)
+  assert.equal(harness.resolveCount, 0)
+  assert.deepEqual(harness.navigations, [])
+  harness.page.onUnload()
+  let writes = 0
+  harness.page.setData = () => { writes++ }
+  harness.page.onHide()
+  assert.equal(writes, 0, 'destroyed pages must not receive animation updates')
+})
+
 test('login without a source stack returns to the explicit deep link including its query', async () => {
   const harness = fixture(undefined, { query: {
     redirect: '/subpackages/study/wrong-detail/wrong-detail?id=23&from=share',

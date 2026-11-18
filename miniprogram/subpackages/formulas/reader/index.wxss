@@ -62,7 +62,7 @@ button::after { border: none; }
   justify-content: center;
   gap: 4rpx;
   font-size: 23rpx;
-  font-weight: 950;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -105,13 +105,13 @@ button::after { border: none; }
   align-items: center;
   gap: 14rpx;
   color: #507568;
-  font-size: 19rpx;
-  line-height: 1.4;
+  font-size: 24rpx;
+  line-height: 1.6;
   text-align: center;
 }
 
 .fr-swipe-copy { display: flex; flex-direction: column; align-items: center; gap: 3rpx; flex-shrink: 0; }
-.fr-swipe-sub { color: #507568; font-size: 16rpx; }
+.fr-swipe-sub { color: #507568; font-size: 22rpx; }
 .fr-swipe-line { flex: 1; height: 1rpx; background: #D8EEE6; }
 
 .fr-actions {
@@ -141,7 +141,7 @@ button::after { border: none; }
   gap: 10rpx;
   font-size: 25rpx;
   line-height: 1.2;
-  font-weight: 900;
+  font-weight: 600;
   transition: transform .14s ease, opacity .14s ease;
 }
 
@@ -244,7 +244,7 @@ button::after { border: none; }
   box-sizing: border-box;
 }
 
-.fr-state-title { color: #23483C; font-size: 34rpx; line-height: 1.35; font-weight: 950; }
+.fr-state-title { color: #23483C; font-size: 34rpx; line-height: 1.35; font-weight: 600; }
 .fr-state-desc { margin-top: 10rpx; color: #507568; font-size: 23rpx; line-height: 1.55; }
 
 .fr-skeleton-card {
@@ -283,7 +283,7 @@ button::after { border: none; }
   align-items: center;
   justify-content: center;
   font-size: 52rpx;
-  font-weight: 950;
+  font-weight: 600;
 }
 
 .fr-retry,
@@ -293,7 +293,7 @@ button::after { border: none; }
   min-height: 84rpx;
   border-radius: 25rpx;
   font-size: 26rpx;
-  font-weight: 900;
+  font-weight: 600;
 }
 .fr-retry { margin-top: 32rpx; background: #7ED8B5; color: #23483C; }
 .fr-back-link { margin-top: 12rpx; background: #EAF9F4; color: #507568; }
