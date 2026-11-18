@@ -8,9 +8,17 @@ interface ToggleProps {
   disabled?: boolean;
   size?: "sm" | "md";
   color?: string;
+  ariaLabel?: string;
 }
 
-export function Toggle({ checked, onChange, disabled, size = "md", color }: ToggleProps) {
+export function Toggle({
+  checked,
+  onChange,
+  disabled,
+  size = "md",
+  color,
+  ariaLabel,
+}: ToggleProps) {
   const height = size === "sm" ? 5 : 6;
   const width = size === "sm" ? 9 : 11;
 
@@ -19,6 +27,7 @@ export function Toggle({ checked, onChange, disabled, size = "md", color }: Togg
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       onClick={onChange}
       disabled={disabled}
       className={cn(

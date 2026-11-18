@@ -1,20 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  Ban,
-  Power,
-  Save,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+import { Ban } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Toggle } from "@/components/ui/toggle";
 import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
 import { apiRequest, toQuery } from "@/lib/api/client";
@@ -26,6 +17,7 @@ import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overvi
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
 import { VectorConfigSection } from "./components/vector-config-section";
+import { SystemSettingsSection } from "./components/system-settings";
 import { resolveAiModels, computeUsageRate } from "@/lib/ai-model-resolver";
 
 type Tab = "overview" | "models" | "ocr" | "completion" | "vector" | "system";
@@ -56,13 +48,35 @@ function AISettingsContent() {
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(
+    new Set([activeTab]),
+  );
 
-  function showToast(msg: string) {
+  const renderedTabs = useMemo(() => {
+    const next = new Set(visitedTabs);
+    next.add(activeTab);
+    return next;
+  }, [activeTab, visitedTabs]);
+
+  const markTabVisited = (tab: Tab) => {
+    setVisitedTabs((current) => {
+      if (current.has(tab)) return current;
+      const next = new Set(current);
+      next.add(tab);
+      return next;
+    });
+  };
+
+  function showToast(msg: string, isError = false) {
     const el = document.createElement("div");
-    el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
-    el.innerHTML = `<svg class="-mt-0.5 mr-1.5 inline-block h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${msg}`;
+    el.className =
+      "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-card px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in " +
+      (isError ? "border-destructive/30 text-destructive" : "border-success/30 text-success");
+    el.setAttribute("role", isError ? "alert" : "status");
+    el.setAttribute("aria-live", isError ? "assertive" : "polite");
+    el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
+    window.setTimeout(() => el.remove(), 2500);
   }
 
   const settings = useQuery({
@@ -116,14 +130,19 @@ function AISettingsContent() {
       queryClient.setQueryData(["ai-settings"], data);
       showToast("AI 解析设置已保存");
     },
-    onError: (error) => showToast(getErrorMessage(error)),
+    onError: (error) => showToast(getErrorMessage(error), true),
   });
 
   const parsedLimit = Number(monthlyLimit);
   const hasChanges = current
     ? enabled !== current.ai_parse_enabled || parsedLimit !== current.monthly_call_limit
     : false;
-  const canSave = hasChanges && Number.isInteger(parsedLimit) && parsedLimit >= 0 && !updateMutation.isPending;
+  const canSave =
+    hasChanges &&
+    monthlyLimit.trim() !== "" &&
+    Number.isInteger(parsedLimit) &&
+    parsedLimit >= 0 &&
+    !updateMutation.isPending;
 
   const save = () => {
     if (!current || !canSave) return;
@@ -143,7 +162,7 @@ function AISettingsContent() {
   }
 
   return (
-    <ManagementPage className="space-y-4">
+    <ManagementPage className="space-y-4 pb-0">
       <ManagementPageHeader
         title="AI 解析设置"
         description="管理模型目录、能力绑定与 OCR / 向量解析配置。"
@@ -175,6 +194,7 @@ function AISettingsContent() {
               key={tab.key}
               href={`/ai-settings?${params.toString()}`}
               scroll={false}
+              onClick={() => markTabVisited(tab.key)}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative -mb-px px-0 pb-3 pt-1 text-[12.5px] transition-colors focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#3e7c96]",
@@ -195,143 +215,85 @@ function AISettingsContent() {
         })}
       </nav>
 
-      {activeTab === "models" ? (
+      {activeTab === "models" && (
         <div className="animate-rise-in">
           <ModelWorkbench />
         </div>
-      ) : (
+      )}
+
+      {activeTab === "overview" && (
         <div className="admin-panel overflow-hidden rounded-2xl animate-rise-in">
           <div className="p-5">
-            {activeTab === "overview" && (
-              <div className="animate-rise-in">
-                <DashboardAiOverview
-                  data={stats.data}
-                  loading={stats.isLoading}
-                  error={stats.isError}
-                />
-              </div>
-            )}
-
-            {activeTab === "ocr" && (
-              <div className="animate-rise-in">
-                {configs.isError && (
-                  <p className="mb-4 rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
-                    {getErrorMessage(configs.error)}
-                  </p>
-                )}
-                <OcrAccordion configs={configs.data} loading={configs.isLoading} modelName={resolvedModels.ocr} />
-              </div>
-            )}
-
-            {activeTab === "completion" && (
-              <div className="animate-rise-in">
-                {configs.isError && (
-                  <p className="mb-4 rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
-                    {getErrorMessage(configs.error)}
-                  </p>
-                )}
-                <AiCompletionPreview configs={configs.data} loading={configs.isLoading} modelName={resolvedModels.completion} />
-              </div>
-            )}
-
-            {activeTab === "vector" && (
-              <div className="animate-rise-in">
-                <VectorConfigSection />
-              </div>
-            )}
-
-            {activeTab === "system" && (
-              <div className="space-y-4 animate-rise-in">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-[#3e7c96]" />
-                  <span className="text-sm font-semibold text-[#3e7c96]">
-                    全局 AI 解析开关与月度调用额度
-                  </span>
-                </div>
-
-                {settings.isError && (
-                  <p className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-sm text-destructive">
-                    {getErrorMessage(settings.error)}
-                  </p>
-                )}
-
-                <div className="flex items-start gap-2.5 rounded-lg border border-warning/25 bg-warning-light px-3 py-2.5">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning-foreground" />
-                  <p className="text-[11px] leading-5 text-muted-foreground">
-                    全局关闭后所有管理员都不能新建 AI 解析任务，super_admin 也受影响；月度额度为全局 API
-                    调用量，super_admin 不受额度限制。
-                  </p>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted p-4">
-                    <div className="flex items-start gap-2.5">
-                      <Power
-                        className="mt-0.5 h-4 w-4"
-                        style={{ color: enabled ? "var(--success)" : "var(--muted-foreground)" }}
-                      />
-                      <div>
-                        <span className="text-sm font-semibold text-foreground">全局 AI 解析</span>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground/70">关闭后拒绝创建新任务</p>
-                      </div>
-                    </div>
-                    <Toggle
-                      checked={enabled}
-                      onChange={() => setEnabled(!enabled)}
-                      disabled={!current || updateMutation.isPending}
-                    />
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-muted p-4">
-                    <span className="text-sm font-semibold text-foreground">月度 API 调用额度</span>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground/70">0 = 不限制；仅限制非 super_admin</p>
-                    <div className="relative mt-2">
-                      <input
-                        className="h-9 w-full rounded-lg border border-border bg-card pl-3 pr-10 text-sm outline-none transition-colors focus:border-primary"
-                        min={0}
-                        step={1}
-                        type="number"
-                        value={monthlyLimit}
-                        onChange={(e) => setMonthlyLimit(e.target.value)}
-                        disabled={!current || updateMutation.isPending}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70">次</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-border/60 bg-card/70 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold text-foreground">本月使用进度</span>
-                    </div>
-                    <span className="text-sm tabular-nums text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {current?.current_usage.call_count.toLocaleString("zh-CN") ?? 0}
-                      </span>
-                      {" / "}
-                      {current?.monthly_call_limit
-                        ? current.monthly_call_limit.toLocaleString("zh-CN")
-                        : "不限"}
-                      <span className="ml-2">{usageRate}%</span>
-                    </span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-accent">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary to-accent-foreground transition-all duration-700"
-                      style={{ width: `${usageRate}%` }}
-                    />
-                  </div>
-                </div>
-
-                <Button disabled={!canSave} onClick={() => setConfirmOpen(true)}>
-                  <Save className="h-4 w-4" />
-                  保存设置
-                </Button>
-              </div>
-            )}
+            <div className="animate-rise-in">
+              <DashboardAiOverview
+                data={stats.data}
+                loading={stats.isLoading}
+                error={stats.isError}
+              />
+            </div>
           </div>
+        </div>
+      )}
+
+      {renderedTabs.has("ocr") && (
+        <div
+          hidden={activeTab !== "ocr"}
+          inert={activeTab !== "ocr" ? true : undefined}
+          className={activeTab === "ocr" ? "animate-rise-in" : undefined}
+        >
+          <OcrAccordion
+            configs={configs.data}
+            loading={configs.isLoading}
+            modelName={resolvedModels.ocr}
+            error={configs.isError ? getErrorMessage(configs.error) : null}
+          />
+        </div>
+      )}
+
+      {renderedTabs.has("completion") && (
+        <div
+          hidden={activeTab !== "completion"}
+          inert={activeTab !== "completion" ? true : undefined}
+          className={activeTab === "completion" ? "animate-rise-in" : undefined}
+        >
+          <AiCompletionPreview
+            configs={configs.data}
+            loading={configs.isLoading}
+            modelName={resolvedModels.completion}
+            error={configs.isError ? getErrorMessage(configs.error) : null}
+          />
+        </div>
+      )}
+
+      {renderedTabs.has("vector") && (
+        <div
+          hidden={activeTab !== "vector"}
+          inert={activeTab !== "vector" ? true : undefined}
+          className={activeTab === "vector" ? "animate-rise-in" : undefined}
+        >
+          <VectorConfigSection />
+        </div>
+      )}
+
+      {renderedTabs.has("system") && (
+        <div
+          hidden={activeTab !== "system"}
+          inert={activeTab !== "system" ? true : undefined}
+          className={activeTab === "system" ? "animate-rise-in" : undefined}
+        >
+          <SystemSettingsSection
+            current={current}
+            loading={settings.isLoading}
+            error={settings.isError ? getErrorMessage(settings.error) : null}
+            enabled={enabled}
+            monthlyLimit={monthlyLimit}
+            onEnabledChange={setEnabled}
+            onMonthlyLimitChange={setMonthlyLimit}
+            canSave={canSave}
+            onSave={() => setConfirmOpen(true)}
+            isPending={updateMutation.isPending}
+            usageRate={usageRate}
+          />
         </div>
       )}
 

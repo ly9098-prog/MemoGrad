@@ -377,26 +377,6 @@
   outline-offset: 3px;
 }
 
-.error {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  border: 1px solid rgb(255 160 177 / 22%);
-  border-radius: 9px;
-  padding: 11px 12px;
-  background: rgb(245 83 118 / 9%);
-  color: var(--login-error);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.error svg {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-}
-
 .surface .submit {
   display: flex;
   align-items: center;
@@ -459,6 +439,16 @@
 .cardFooter svg {
   width: 13px;
   height: 13px;
+}
+
+.cardFooter[data-error] {
+  border-top-color: rgb(255 160 177 / 22%);
+  background: rgb(245 83 118 / 9%);
+  color: var(--login-error);
+}
+
+.cardFooter[data-error] svg {
+  flex-shrink: 0;
 }
 
 .support {

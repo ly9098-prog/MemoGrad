@@ -116,11 +116,6 @@ function LoginForm() {
                     </button>
                   </div>
                 </div>
-                {error ? (
-                  <div id="login-error" role="alert" className={styles.error}>
-                    <AlertCircle aria-hidden="true" /><span>{error}</span>
-                  </div>
-                ) : null}
                 <button type="submit" className={styles.submit} disabled={loading} aria-busy={loading}>
                   {loading ? (
                     <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在校验</span></>
@@ -129,7 +124,19 @@ function LoginForm() {
                   )}
                 </button>
               </form>
-              <div className={styles.cardFooter}><ShieldCheck aria-hidden="true" /><p>仅限授权管理员访问</p></div>
+              <div
+                id={hasError ? "login-error" : undefined}
+                role={hasError ? "alert" : undefined}
+                aria-live={hasError ? "assertive" : undefined}
+                className={styles.cardFooter}
+                data-error={hasError || undefined}
+              >
+                {hasError ? (
+                  <><AlertCircle aria-hidden="true" /><p>{error}</p></>
+                ) : (
+                  <><ShieldCheck aria-hidden="true" /><p>仅限授权管理员访问</p></>
+                )}
+              </div>
             </section>
           </div>
           <p className={styles.support}>需要访问权限？<a href="mailto:{{SECRET_d8zo1uvg}}">联系管理员</a></p>

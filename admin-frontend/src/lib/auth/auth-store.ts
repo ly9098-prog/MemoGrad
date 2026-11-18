@@ -36,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async login(username, password) {
     const data = await apiRequest<LoginResponse>("/auth/login", {
       method: "POST",
+      skipRefresh: true,
       body: JSON.stringify({ username, password }),
     });
     set({

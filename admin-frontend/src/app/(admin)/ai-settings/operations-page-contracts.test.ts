@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, Suspense, type ReactElement } from "react";
 import AISettingsPage from "./page";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ModelWorkbench } from "./components/model-workbench";
 import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overview";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
+import {
+  SystemSettingsSection,
+  isQuotaExhausted,
+} from "./components/system-settings";
 import ExperimentsPage from "../recommendation/experiments/page";
 import MetricsPage from "../recommendation/metrics/page";
 import ReportsPage from "../recommendation/reports/page";
@@ -108,13 +111,21 @@ beforeEach(() => {
   h.queries = []; h.mutations = []; h.data = {}; h.refetches = [];
   h.search = ""; h.roleName = "super_admin"; h.mutationPending = false; h.mutates = [];
   h.request.mockReset().mockResolvedValue({});
+  vi.stubGlobal("window", globalThis);
   vi.stubGlobal("document", {
-    createElement: () => ({ remove: vi.fn() }),
+    createElement: () => ({ remove: vi.fn(), setAttribute: vi.fn() }),
     body: { appendChild: vi.fn() },
   });
 });
 
 describe("AI configuration request ownership", () => {
+  it("treats usage equal to the monthly limit as exhausted", () => {
+    expect(isQuotaExhausted(99, 100)).toBe(false);
+    expect(isQuotaExhausted(100, 100)).toBe(true);
+    expect(isQuotaExhausted(101, 100)).toBe(true);
+    expect(isQuotaExhausted(100, 0)).toBe(false);
+  });
+
   it("keeps settings hydration, statistics and model registration", async () => {
     renderAiSettings();
     const settings = { ai_parse_enabled: false, monthly_call_limit: 42 };
@@ -163,7 +174,7 @@ describe("AI configuration request ownership", () => {
     { tab: "ocr", component: OcrAccordion },
     { tab: "completion", component: AiCompletionPreview },
     { tab: "vector", component: VectorConfigSection },
-    { tab: "system", component: Button },
+    { tab: "system", component: SystemSettingsSection },
   ])("opens the existing $tab pane from its shareable URL", ({ tab, component }) => {
     h.search = `tab=${tab}&source=workbench`;
     const tree = renderAiSettings();
@@ -178,7 +189,7 @@ describe("AI configuration request ownership", () => {
       h.search = `tab=${tab}`;
       h.index = 0; h.setters = [];
       expect(selectedSettingsLink(renderAiSettings())?.props.href).toBe(`/ai-settings?tab=${tab}`);
-      expect(h.setters).toHaveLength(3);
+      expect(h.setters).toHaveLength(4);
       expect(h.setters.every((setter) => setter.mock.calls.length === 0)).toBe(true);
     }
   });
@@ -197,9 +208,9 @@ describe("AI configuration request ownership", () => {
       ai_parse_enabled: true, monthly_call_limit: 100, current_usage: { call_count: 10 },
     };
     const tree = renderAiSettings();
-    const saveButton = find(tree, (element) => element.type === Button)!;
-    expect(saveButton.props.disabled).toBe(false);
-    (saveButton.props.onClick as () => void)();
+    const section = find(tree, (element) => element.type === SystemSettingsSection)!;
+    expect(section.props.canSave).toBe(true);
+    (section.props.onSave as () => void)();
     expect(h.setters[2]).toHaveBeenCalledExactlyOnceWith(true);
     expect(h.mutates[0]).not.toHaveBeenCalled();
     const dialog = find(tree, (element) => element.type === ConfirmDialog)!;
@@ -210,6 +221,7 @@ describe("AI configuration request ownership", () => {
   });
 
   it.each([
+    { limit: "", pending: false },
     { limit: "-1", pending: false },
     { limit: "1.5", pending: false },
     { limit: "invalid", pending: false },
@@ -222,7 +234,9 @@ describe("AI configuration request ownership", () => {
       ai_parse_enabled: true, monthly_call_limit: 100, current_usage: { call_count: 10 },
     };
     const tree = renderAiSettings();
-    expect(find(tree, (element) => element.type === Button)?.props.disabled).toBe(true);
+    expect(
+      find(tree, (element) => element.type === SystemSettingsSection)?.props.canSave,
+    ).toBe(false);
     (find(tree, (element) => element.type === ConfirmDialog)!.props.onConfirm as () => void)();
     expect(h.mutates[0]).not.toHaveBeenCalled();
   });

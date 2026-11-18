@@ -1,389 +1,451 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { FileText, Braces, Filter, Rows3, Save, Brain, WandSparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Check, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
-import { Toggle } from "@/components/ui/toggle";
 import type { AdminAiConfigsPatchRequest, AdminAiConfigsResponse } from "@/lib/api/types";
+import { LineEditor, Section } from "./editorial-settings";
+import styles from "./editorial-settings.module.css";
 
-function showToast(msg: string) {
-  const el = document.createElement("div");
-  el.className = "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
-  el.innerHTML = `<svg class="-mt-0.5 mr-1.5 inline-block h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>${msg}`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2500);
+type Configs = Record<string, string | number | boolean>;
+
+const STRATEGIES = [
+  {
+    key: "ocr_strategy_math_formula",
+    shortLabel: "公式修复",
+    label: "数学公式修复",
+    desc: "LaTeX 符号与上下标",
+  },
+  {
+    key: "ocr_strategy_punctuation",
+    shortLabel: "标点校正",
+    label: "标点符号校正",
+    desc: "统一中英文标点",
+  },
+  {
+    key: "ocr_strategy_digit_letter",
+    shortLabel: "混淆修复",
+    label: "数字与字母混淆修复",
+    desc: "O/0、I/1 等易混字符",
+  },
+  {
+    key: "ocr_strategy_space_newline",
+    shortLabel: "断行合并",
+    label: "空格与换行处理",
+    desc: "合并错误断行",
+  },
+] as const;
+
+const STRUCTURE_ITEMS = [
+  {
+    key: "ocr_structure_question_type",
+    label: "题型识别",
+    desc: "单选 / 多选 / 判断 / 填空",
+  },
+  {
+    key: "ocr_structure_options",
+    label: "选项提取",
+    desc: "A. B. C. D. 格式识别",
+  },
+  {
+    key: "ocr_structure_answer",
+    label: "答案匹配",
+    desc: "答案关键字定位",
+  },
+  {
+    key: "ocr_structure_analysis",
+    label: "解析分离",
+    desc: "解析文本与题干分离",
+  },
+] as const;
+
+interface OcrDraft {
+  prompt: string;
+  strategy: Record<string, boolean>;
+  structure: Record<string, boolean>;
+  filterChars: string;
+  filterTokens: string;
+  sensitive: boolean;
 }
 
-interface TabItem {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  color: string;
-  content: (configs: Record<string, string | number | boolean>) => React.ReactNode;
+const EMPTY_DRAFT: OcrDraft = {
+  prompt: "",
+  strategy: Object.fromEntries(STRATEGIES.map((item) => [item.key, false])),
+  structure: Object.fromEntries(STRUCTURE_ITEMS.map((item) => [item.key, false])),
+  filterChars: "2000",
+  filterTokens: "4096",
+  sensitive: false,
+};
+
+function truthy(value: string | number | boolean | undefined) {
+  return value === true || value === "true" || value === 1 || value === "1";
 }
 
-const items: TabItem[] = [
-  {
-    id: "prompt",
-    label: "Prompt",
-    icon: FileText,
-    color: "#5b7b9a",
-    content: (configs) => <PromptPanel configs={configs} />,
-  },
-  {
-    id: "strategy",
-    label: "纠错策略",
-    icon: Braces,
-    color: "#6b9b6b",
-    content: (configs) => <StrategyPanel configs={configs} />,
-  },
-  {
-    id: "structure",
-    label: "结构修复",
-    icon: Rows3,
-    color: "#c49a6b",
-    content: (configs) => <StructurePanel configs={configs} />,
-  },
-  {
-    id: "filter",
-    label: "文本过滤",
-    icon: Filter,
-    color: "#9a7aba",
-    content: (configs) => <FilterPanel configs={configs} />,
-  },
-];
-
-function PromptPanel({ configs }: { configs: Record<string, string | number | boolean> }) {
-  const queryClient = useQueryClient();
-  const savedPrompt = String(configs["ocr_correction_prompt"] ?? "");
-  const [prompt, setPrompt] = useState(savedPrompt);
-  const prevSavedRef = useRef(savedPrompt);
-
-  useEffect(() => {
-    if (prevSavedRef.current !== savedPrompt) {
-      prevSavedRef.current = savedPrompt;
-      setPrompt(savedPrompt);
-    }
-  }, [savedPrompt]);
-
-  const mutation = useMutation({
-    mutationFn: (data: AdminAiConfigsPatchRequest) =>
-      apiRequest<AdminAiConfigsResponse>("/ai-configs", { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
-      showToast("Prompt 已保存");
-    },
-  });
-
-  const hasChanges = prompt !== savedPrompt;
-
-  return (
-    <div className="space-y-4 animate-rise-in">
-      <div>
-        <label className="block text-sm font-semibold text-foreground">OCR 纠错 Prompt</label>
-        <p className="mt-0.5 text-xs text-muted-foreground/70">自定义 OCR 纠错提示词，修改后需要点击保存</p>
-        <div className="relative mt-2">
-          <textarea
-            className="h-80 w-full resize-y rounded-xl border border-border bg-card p-3 text-sm outline-none transition-colors focus:border-primary"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <WandSparkles className="absolute right-4 top-3 h-5 w-5 text-muted-foreground/70" />
-        </div>
-      </div>
-      {hasChanges && (
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => mutation.mutate({ configs: { ocr_correction_prompt: prompt } })}
-            disabled={mutation.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-foreground bg-primary px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-foreground disabled:opacity-50"
-          >
-            <Save className="h-3.5 w-3.5" />
-            {mutation.isPending ? "保存中..." : "保存 Prompt"}
-          </button>
-          <button
-            onClick={() => setPrompt(savedPrompt)}
-            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground"
-          >
-            取消
-          </button>
-        </div>
-      )}
-      {mutation.isError && (
-        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
-      )}
-    </div>
-  );
-}
-
-function StrategyPanel({ configs }: { configs: Record<string, string | number | boolean> }) {
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: (data: AdminAiConfigsPatchRequest) =>
-      apiRequest<AdminAiConfigsResponse>("/ai-configs", { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
-      showToast("纠错策略已更新");
-    },
-  });
-
-  const toggle = (key: string) => {
-    mutation.mutate({ configs: { [key]: !configs[key] } });
+function readDraft(configs: Configs): OcrDraft {
+  return {
+    prompt: String(configs.ocr_correction_prompt ?? ""),
+    strategy: Object.fromEntries(
+      STRATEGIES.map((item) => [item.key, truthy(configs[item.key])]),
+    ),
+    structure: Object.fromEntries(
+      STRUCTURE_ITEMS.map((item) => [item.key, truthy(configs[item.key])]),
+    ),
+    filterChars: String(configs.ocr_filter_max_chars ?? EMPTY_DRAFT.filterChars),
+    filterTokens: String(configs.ocr_filter_max_tokens ?? EMPTY_DRAFT.filterTokens),
+    sensitive: truthy(configs.ocr_filter_sensitive),
   };
-
-  const toggles = [
-    { key: "ocr_strategy_math_formula", label: "数学公式修复", desc: "识别并修正 LaTeX 公式中的 OCR 错误" },
-    { key: "ocr_strategy_punctuation", label: "标点符号校正", desc: "统一中英文标点符号格式" },
-    { key: "ocr_strategy_digit_letter", label: "数字与字母混淆修复", desc: "区分易混淆字符如 O/0、l/1" },
-    { key: "ocr_strategy_space_newline", label: "空格与换行处理", desc: "智能合并错误断行和多余空格" },
-  ];
-
-  return (
-    <div className="space-y-2 animate-rise-in">
-      {toggles.map((item) => (
-        <label
-          key={item.key}
-          className={cn(
-            "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
-            Boolean(configs[item.key])
-              ? "border-success/25 bg-success-light"
-              : "border-border/60 bg-card/60",
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: Boolean(configs[item.key]) ? "var(--success)" : "var(--border)" }}
-            />
-            <div>
-              <span className="text-sm font-medium text-foreground">{item.label}</span>
-              <p className="text-xs text-muted-foreground/70">{item.desc}</p>
-            </div>
-          </div>
-          <Toggle checked={Boolean(configs[item.key])} onChange={() => toggle(item.key)} disabled={mutation.isPending} />
-        </label>
-      ))}
-      {mutation.isError && (
-        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
-      )}
-    </div>
-  );
 }
 
-function FilterPanel({ configs }: { configs: Record<string, string | number | boolean> }) {
-  const queryClient = useQueryClient();
-  const [local, setLocal] = useState<Record<string, string | number | boolean>>({});
-  const [dirty, setDirty] = useState(false);
-
-  const mutation = useMutation({
-    mutationFn: (data: AdminAiConfigsPatchRequest) =>
-      apiRequest<AdminAiConfigsResponse>("/ai-configs", { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
-      setDirty(false);
-      showToast("过滤设置已保存");
-    },
-  });
-
-  const fields = [
-    { key: "ocr_filter_max_chars", label: "单题最大字符数", desc: "超过此长度的题目将被截断", type: "number" as const },
-    { key: "ocr_filter_max_tokens", label: "单次最大 Token 数", desc: "单次 AI 调用的 Token 上限", type: "number" as const },
-  ];
-
-  const updateField = (key: string, value: string) => {
-    setLocal((prev) => ({ ...prev, [key]: value }));
-    setDirty(true);
-  };
-
-  const saveFilter = () => { mutation.mutate({ configs: { ...local } }); };
-
-  const getValue = (key: string) => {
-    if (dirty && key in local) return local[key];
-    return configs[key] ?? "";
-  };
-
-  return (
-    <div className="space-y-4 animate-rise-in">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map((f) => (
-          <label key={f.key} className="block rounded-xl border border-border/60 bg-muted p-4">
-            <span className="text-sm font-semibold text-foreground">{f.label}</span>
-            <p className="mt-0.5 text-xs text-muted-foreground/70">{f.desc}</p>
-            <input
-              type={f.type}
-              value={String(getValue(f.key))}
-              onChange={(e) => updateField(f.key, e.target.value)}
-              disabled={mutation.isPending}
-              className="mt-2 h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary disabled:opacity-50"
-            />
-          </label>
-        ))}
-      </div>
-      <label className={cn(
-        "flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors",
-        Boolean(configs["ocr_filter_sensitive"])
-          ? "border-[#9a7aba]/25 bg-[#9a7aba]/10"
-          : "border-border/60 bg-card/60",
-      )}>
-        <div>
-          <span className="text-sm font-medium text-foreground">启用敏感内容过滤</span>
-          <p className="text-xs text-muted-foreground/70">自动过滤 OCR 结果中的敏感内容</p>
-        </div>
-        <Toggle
-          checked={Boolean(configs["ocr_filter_sensitive"])}
-          onChange={() => mutation.mutate({ configs: { ocr_filter_sensitive: !configs["ocr_filter_sensitive"] } })}
-          disabled={mutation.isPending}
-          color="#9a7aba"
-        />
-      </label>
-      {dirty && (
-        <div className="flex items-center gap-3">
-          <button
-            onClick={saveFilter}
-            disabled={mutation.isPending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-accent-foreground bg-primary px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-accent-foreground disabled:opacity-50"
-          >
-            <Save className="h-3.5 w-3.5" />
-            保存过滤设置
-          </button>
-          <button
-            onClick={() => { setLocal({}); setDirty(false); }}
-            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground"
-          >
-            取消
-          </button>
-        </div>
-      )}
-      {mutation.isError && (
-        <p className="text-xs text-destructive">{getErrorMessage(mutation.error)}</p>
-      )}
-    </div>
-  );
+function isNonNegativeInteger(value: string) {
+  if (!value.trim()) return false;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0;
 }
 
-function StructurePanel({ configs }: { configs: Record<string, string | number | boolean> }) {
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: (data: AdminAiConfigsPatchRequest) =>
-      apiRequest<AdminAiConfigsResponse>("/ai-configs", { method: "PATCH", body: JSON.stringify(data) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
-      showToast("结构修复规则已更新");
-    },
-  });
-
-  const structureItems = [
-    { key: "ocr_structure_question_type", label: "题型识别", value: "单选题 / 多选题 / 判断题 / 填空题", color: "#5b7b9a" },
-    { key: "ocr_structure_options", label: "选项提取", value: "A. B. C. D. 格式识别", color: "#6b9b6b" },
-    { key: "ocr_structure_answer", label: "答案匹配", value: "答案关键字定位", color: "#c49a6b" },
-    { key: "ocr_structure_analysis", label: "解析分离", value: "解析文本与题干分离", color: "#9a7aba" },
-  ];
-
-  return (
-    <div className="space-y-4 animate-rise-in">
-      <p className="text-sm text-muted-foreground">
-        当 OCR 识别结果出现结构错乱时，以下规则将被应用来自动修复题目格式。
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {structureItems.map((item) => (
-          <label
-            key={item.key}
-            className={cn(
-              "flex cursor-pointer items-center justify-between gap-2 rounded-xl border p-3 transition-colors",
-              Boolean(configs[item.key])
-                ? "border-current/20"
-                : "border-border/60 bg-card/60",
-            )}
-            style={Boolean(configs[item.key]) ? { borderColor: `${item.color}30`, backgroundColor: `${item.color}08` } : undefined}
-          >
-            <div>
-              <p className="text-xs font-semibold" style={{ color: item.color }}>{item.label}</p>
-              <p className="mt-0.5 text-sm text-foreground">{item.value}</p>
-            </div>
-            <Toggle
-              checked={Boolean(configs[item.key])}
-              onChange={() => mutation.mutate({ configs: { [item.key]: !configs[item.key] } })}
-              disabled={mutation.isPending}
-              size="sm"
-              color={item.color}
-            />
-          </label>
-        ))}
-      </div>
-      {mutation.isError && (
-        <p className="text-xs text-destructive">保存失败，请稍后重试。</p>
-      )}
-    </div>
-  );
+function showToast(message: string) {
+  const element = document.createElement("div");
+  element.className =
+    "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border border-success/30 bg-card px-5 py-3 text-sm font-semibold text-success shadow-[var(--shadow-card)] animate-rise-in";
+  element.setAttribute("role", "status");
+  element.setAttribute("aria-live", "polite");
+  element.textContent = message;
+  document.body.appendChild(element);
+  window.setTimeout(() => element.remove(), 2500);
 }
 
-export function OcrAccordion({ configs, loading, modelName }: {
-  configs?: Record<string, string | number | boolean> | null;
+export function OcrAccordion({
+  configs,
+  loading,
+  modelName,
+  error,
+}: {
+  configs?: Configs | null;
   loading?: boolean;
   modelName?: string | null;
+  error?: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<string>("prompt");
-  const data = configs ?? {};
-  const activeItem = items.find((i) => i.id === activeTab)!;
+  const queryClient = useQueryClient();
+  const savedDraft = useMemo(() => readDraft(configs ?? {}), [configs]);
+  const [draft, setDraft] = useState<OcrDraft>(savedDraft);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!configs || loading || initializedRef.current) return;
+    initializedRef.current = true;
+    setDraft(savedDraft);
+  }, [configs, loading, savedDraft]);
+
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
+    [draft, savedDraft],
+  );
+  const promptChanged = draft.prompt !== savedDraft.prompt;
+  const filterValid =
+    isNonNegativeInteger(draft.filterChars) &&
+    isNonNegativeInteger(draft.filterTokens);
+  const enabledCount = STRATEGIES.filter(
+    (item) => draft.strategy[item.key],
+  ).length;
+  const promptLineCount = Math.max(8, draft.prompt.split("\n").length);
+
+  const mutation = useMutation({
+    mutationFn: (data: AdminAiConfigsPatchRequest) =>
+      apiRequest<AdminAiConfigsResponse>("/ai-configs", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
+      showToast("OCR 配置已保存");
+    },
+  });
+
+  const buildPatch = () => {
+    const patch: Configs = {};
+
+    if (draft.prompt !== savedDraft.prompt) {
+      patch.ocr_correction_prompt = draft.prompt;
+    }
+    for (const item of STRATEGIES) {
+      if (draft.strategy[item.key] !== savedDraft.strategy[item.key]) {
+        patch[item.key] = draft.strategy[item.key];
+      }
+    }
+    for (const item of STRUCTURE_ITEMS) {
+      if (draft.structure[item.key] !== savedDraft.structure[item.key]) {
+        patch[item.key] = draft.structure[item.key];
+      }
+    }
+    if (draft.filterChars !== savedDraft.filterChars) {
+      patch.ocr_filter_max_chars = Number(draft.filterChars);
+    }
+    if (draft.filterTokens !== savedDraft.filterTokens) {
+      patch.ocr_filter_max_tokens = Number(draft.filterTokens);
+    }
+    if (draft.sensitive !== savedDraft.sensitive) {
+      patch.ocr_filter_sensitive = draft.sensitive;
+    }
+
+    return patch;
+  };
+
+  const canSave = dirty && filterValid;
+  const handleSave = () => {
+    if (!canSave || mutation.isPending) return;
+    const patch = buildPatch();
+    if (Object.keys(patch).length === 0) return;
+    mutation.mutate({ configs: patch });
+  };
+
+  const updateStrategy = (key: string) => {
+    setDraft((current) => ({
+      ...current,
+      strategy: { ...current.strategy, [key]: !current.strategy[key] },
+    }));
+  };
+
+  const updateStructure = (key: string) => {
+    setDraft((current) => ({
+      ...current,
+      structure: { ...current.structure, [key]: !current.structure[key] },
+    }));
+  };
+
+  const aside = (
+    <span className={styles.statusText} data-on={Boolean(modelName)}>
+      <span
+        className={styles.statusDot}
+        data-on={Boolean(modelName) ? "true" : "false"}
+      />
+      {modelName || "未绑定 OCR 模型"}
+    </span>
+  );
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)]">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-        <div>
-          <h3 className="font-display text-xl font-bold text-foreground">OCR 纠错配置</h3>
-          <p className="mt-0.5 text-sm text-muted-foreground">管理 OCR 识别结果的纠错策略和处理规则</p>
-        </div>
-        {modelName && (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-muted-foreground">
-            <Brain className="h-3.5 w-3.5" />
-            {modelName}
-          </span>
-        )}
-      </div>
+    <Section
+      eyebrow="03 / OCR"
+      title="纠错配置"
+      lead="先还原公式与结构，再让题目进入题库。"
+      aside={aside}
+    >
+      {error ? <p className={styles.noticeError}>{error}</p> : null}
 
-      {/* Tab bar */}
-      <div className="flex border-b border-border/60 bg-muted/30">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 py-3 text-xs font-medium transition-all",
-                active
-                  ? "font-semibold"
-                  : "text-muted-foreground/70 hover:text-muted-foreground",
-              )}
-              style={{
-                color: active ? item.color : undefined,
-                borderBottom: active ? `2px solid ${item.color}` : "2px solid transparent",
-              }}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab content */}
-      <div className="p-5">
-        {loading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-20 w-full rounded bg-border" />
-            <div className="h-10 w-2/3 rounded bg-border" />
+      <div className={styles.scopeBand}>
+        {STRATEGIES.map((item, index) => (
+          <div key={item.key} className={styles.scopeCell}>
+            <span className={styles.scopeIndex}>
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <div className={styles.scopeCellCopy}>
+              <div className={styles.scopeLabelLine}>
+                <span className={styles.scopeLabel}>{item.shortLabel}</span>
+                <span
+                  className={styles.statusDot}
+                  data-on={draft.strategy[item.key] ? "true" : "false"}
+                />
+              </div>
+            </div>
           </div>
-        ) : (
-          activeItem.content(data)
-        )}
+        ))}
       </div>
-    </div>
+
+      {loading ? (
+        <div className={styles.loadingBlock} aria-label="正在加载 OCR 配置">
+          {Array.from({ length: 5 }, (_, index) => (
+            <span
+              key={index}
+              className={styles.loadingLine}
+              style={{ width: `${88 - index * 8}%` }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className={`${styles.split} ${styles.splitOcr}`}>
+          <div className={styles.pane}>
+            <div className={styles.paneHeader}>
+              <h3 className={styles.paneTitle}>校正提示词</h3>
+              <span className={styles.paneMeta}>
+                {draft.prompt.length.toLocaleString("zh-CN")} 字符 ·{" "}
+                {promptChanged ? "未保存" : "已保存"}
+              </span>
+            </div>
+            <LineEditor
+              ariaLabel="OCR 校正提示词"
+              value={draft.prompt}
+              onChange={(prompt) =>
+                setDraft((current) => ({ ...current, prompt }))
+              }
+              minLines={8}
+              height={330}
+              placeholder="输入 OCR 纠错提示词…"
+              footer={
+                <>
+                  <span>Prompt 修改后需手动保存</span>
+                  <span>{promptLineCount} 行</span>
+                </>
+              }
+            />
+          </div>
+
+          <div className={styles.pane}>
+            <div className={styles.paneHeader}>
+              <h3 className={styles.paneTitle}>纠错策略</h3>
+              <span className={styles.paneMeta}>{enabledCount} 项启用</span>
+            </div>
+            <div className={styles.toggleList}>
+              {STRATEGIES.map((item) => (
+                <div key={item.key} className={styles.toggleRow}>
+                  <div className={styles.toggleCopy}>
+                    <span className={styles.toggleLabel}>{item.label}</span>
+                    <span className={styles.toggleDesc}>{item.desc}</span>
+                  </div>
+                  <div className={styles.toggleControl}>
+                    <Toggle
+                      ariaLabel={item.label}
+                      checked={draft.strategy[item.key]}
+                      onChange={() => updateStrategy(item.key)}
+                      disabled={mutation.isPending}
+                      color="#3e7c96"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.subSection}>
+              <div className={styles.subSectionHeader}>
+                <h3 className={styles.subSectionTitle}>结构修复</h3>
+                <span className={styles.subSectionMeta}>
+                  {STRUCTURE_ITEMS.filter((item) => draft.structure[item.key]).length}{" "}
+                  / 4 类规则
+                </span>
+              </div>
+              <div className={styles.structureGrid}>
+                {STRUCTURE_ITEMS.map((item) => (
+                  <div key={item.key} className={styles.structureItem}>
+                    <div className={styles.structureLabel}>
+                      <span
+                        className={styles.checkDot}
+                        data-on={draft.structure[item.key] ? "true" : "false"}
+                      >
+                        <Check size={12} strokeWidth={2.2} />
+                      </span>
+                      <span>
+                        {item.label}
+                        <span className={styles.structureValue}>{item.desc}</span>
+                      </span>
+                    </div>
+                    <Toggle
+                      ariaLabel={item.label}
+                      checked={draft.structure[item.key]}
+                      onChange={() => updateStructure(item.key)}
+                      disabled={mutation.isPending}
+                      size="sm"
+                      color="#4f9b82"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.subSection}>
+              <div className={styles.subSectionHeader}>
+                <h3 className={styles.subSectionTitle}>文本过滤</h3>
+                <span className={styles.subSectionMeta}>单题 / 单次</span>
+              </div>
+              <div className={styles.filterGrid}>
+                <label className={styles.filterField}>
+                  <span className={styles.filterLabel}>单题最大字符数</span>
+                  <input
+                    className={styles.filterInput}
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={draft.filterChars}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        filterChars: event.target.value,
+                      }))
+                    }
+                    disabled={mutation.isPending}
+                  />
+                </label>
+                <label className={styles.filterField}>
+                  <span className={styles.filterLabel}>单次最大 Token</span>
+                  <input
+                    className={styles.filterInput}
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={draft.filterTokens}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        filterTokens: event.target.value,
+                      }))
+                    }
+                    disabled={mutation.isPending}
+                  />
+                </label>
+              </div>
+              <div className={styles.inlineToggle}>
+                <div>
+                  <span className={styles.inlineToggleLabel}>敏感内容过滤</span>
+                  <p className={styles.inlineToggleHint}>
+                    自动过滤 OCR 结果中的敏感内容
+                  </p>
+                </div>
+                <Toggle
+                  ariaLabel="敏感内容过滤"
+                  checked={draft.sensitive}
+                  onChange={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      sensitive: !current.sensitive,
+                    }))
+                  }
+                  disabled={mutation.isPending}
+                  size="sm"
+                  color="#4f9b82"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mutation.isError ? (
+        <p className={styles.noticeError}>{getErrorMessage(mutation.error)}</p>
+      ) : null}
+
+      <div className={styles.footerBar}>
+        <span className={styles.footerNote}>所有更改需手动保存</span>
+        <div className={styles.footerActions}>
+          <button
+            className={styles.textButton}
+            type="button"
+            disabled={!dirty || mutation.isPending}
+            onClick={() => setDraft(savedDraft)}
+          >
+            放弃更改
+          </button>
+          <Button
+            className={styles.primaryButton}
+            disabled={!canSave || mutation.isPending || !filterValid}
+            onClick={handleSave}
+            type="button"
+            variant="primary"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {mutation.isPending ? "保存中…" : "保存配置"}
+          </Button>
+        </div>
+      </div>
+    </Section>
   );
 }

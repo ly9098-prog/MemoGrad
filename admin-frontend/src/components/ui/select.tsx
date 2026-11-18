@@ -20,6 +20,7 @@ export function Select({
   className,
   optionClassName,
   color,
+  portalContainer,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -29,6 +30,7 @@ export function Select({
   className?: string;
   optionClassName?: string;
   color?: string;
+  portalContainer?: HTMLElement | null;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -126,6 +128,7 @@ export function Select({
           triggerRef={ref}
           color={color}
           optionClassName={optionClassName}
+          portalContainer={portalContainer}
           value={value}
           onChange={(v) => { onChange(v); setOpen(false); }}
           options={options}
@@ -140,6 +143,7 @@ function PortalDropdown({
   triggerRef,
   color,
   optionClassName,
+  portalContainer,
   value,
   onChange,
   options,
@@ -148,6 +152,7 @@ function PortalDropdown({
   triggerRef: React.RefObject<HTMLDivElement | null>;
   color?: string;
   optionClassName?: string;
+  portalContainer?: HTMLElement | null;
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
@@ -256,6 +261,6 @@ function PortalDropdown({
         })
       )}
     </div>,
-    document.body,
+    portalContainer ?? document.body,
   );
 }

@@ -7,6 +7,7 @@ import {
   nodeRadius,
   estimatedLabelWidth,
   relationLabel,
+  escapeHtml,
   relationColor,
   difficultyText,
 } from "./knowledge-graph-utils";
@@ -88,6 +89,17 @@ describe("estimatedLabelWidth", () => {
 describe("relationLabel", () => {
   it("returns label for known type", () => { expect(relationLabel("prerequisite")).toBe("前置"); });
   it("returns type for unknown type", () => { expect(relationLabel("unknown")).toBe("unknown"); });
+});
+
+describe("escapeHtml", () => {
+  it("escapes every HTML metacharacter", () => {
+    expect(escapeHtml(`<img src=x onerror="alert('x')">&`)).toBe(
+      "&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;&amp;",
+    );
+  });
+  it("leaves ordinary text unchanged", () => {
+    expect(escapeHtml("数据结构 · 12 条关系")).toBe("数据结构 · 12 条关系");
+  });
 });
 
 describe("relationColor", () => {

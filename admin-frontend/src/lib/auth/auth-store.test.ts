@@ -48,6 +48,21 @@ function mockSuccessfulRotation() {
 }
 
 describe("auth store — API token synchronization", () => {
+  it("does not refresh or clear the session when login credentials are rejected", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ detail: "Unauthorized" }, { status: 401 }),
+    );
+
+    await expect(useAuthStore.getState().login("admin", "wrong")).rejects.toMatchObject({
+      status: 401,
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/auth\/login$/);
+    expect(useAuthStore.getState().accessToken).toBe(EXPIRED_TOKEN);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+  });
+
   it.each(["json", "blob"] as const)(
     "reuses the rotated token for subsequent %s and JSON requests",
     async (kind) => {
