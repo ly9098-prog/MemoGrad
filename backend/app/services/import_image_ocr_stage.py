@@ -20,6 +20,9 @@ class ImageOcrStageRequest:
     build_diagnostics: Callable[[str, str], dict]
     build_blocks: Callable[..., list[dict]]
     set_status: Callable[..., Awaitable[dict]]
+    run_ocr_with_fallback: (
+        Callable[[bytes, Callable[[dict], Awaitable[None]]], Awaitable[dict]] | None
+    ) = None
 
 
 @dataclass(slots=True)
@@ -45,7 +48,34 @@ async def run_image_ocr_stage(request: ImageOcrStageRequest) -> ImageOcrStageRes
         diagnostics={"ocr_runtime": runtime_diagnostics},
         stages={"upload": {"status": "completed"}, "ocr": {"status": "running"}},
     )
-    ocr_result = await request.run_ocr(request.image_bytes)
+    if request.run_ocr_with_fallback is not None:
+
+        async def notify_fallback(event: dict) -> None:
+            runtime = request.build_runtime_diagnostics()
+            runtime.update(
+                {
+                    "active_backend": "local_process",
+                    "fallback_from": event.get("fallback_from"),
+                    "fallback_reason": event.get("fallback_reason"),
+                    "fallback_state": "running",
+                }
+            )
+            await request.set_status(
+                request.pipeline_id,
+                status="ocr_running",
+                diagnostics={"ocr_runtime": runtime},
+                stages={
+                    "upload": {"status": "completed"},
+                    "ocr": {"status": "running", "backend": "local_process"},
+                },
+            )
+
+        ocr_result = await request.run_ocr_with_fallback(
+            request.image_bytes,
+            notify_fallback,
+        )
+    else:
+        ocr_result = await request.run_ocr(request.image_bytes)
     raw_ocr_text = str(ocr_result.get("text") or "")
     cleaned_text = request.clean_text(raw_ocr_text)
     blocks = request.build_blocks(
@@ -57,7 +87,8 @@ async def run_image_ocr_stage(request: ImageOcrStageRequest) -> ImageOcrStageRes
     diagnostics.update(
         {
             "execution_backend": ocr_result.get(
-                "execution_backend", runtime_diagnostics.get("execution_backend"),
+                "execution_backend",
+                runtime_diagnostics.get("execution_backend"),
             ),
             "fallback_from": ocr_result.get("fallback_from"),
             "box_count": len(blocks[0].get("boxes") or []),

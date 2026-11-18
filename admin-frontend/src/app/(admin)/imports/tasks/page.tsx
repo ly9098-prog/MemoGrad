@@ -33,7 +33,9 @@ import { importSubjectOptions } from "../hooks/use-import-subject-options";
 import { ImportContentDialog } from "../components/import-content-dialog";
 import { ImportImagePreview } from "../components/import-image-preview";
 import { ImportFailurePanel } from "../components/import-failure-panel";
+import { OcrBackendMotion } from "../components/ocr-backend-motion";
 import { importErrorMessage } from "@/lib/imports/import-messages";
+import { resolveOcrBackendState } from "@/lib/imports/ocr-backend-state";
 
 function renderJson(value: unknown) {
   if (value === undefined || value === null || value === "") return "—";
@@ -198,6 +200,11 @@ export default function ImportTasksPage() {
   const importModeLabel = IMPORT_MODES.find((mode) => mode.value === importMode)?.label || "自动检测";
 
   const parsePct = status ? isSuccessfulPipeline(status.status) ? 100 : parseProgressPercent(status.ocr_progress) : 0;
+  const ocrBackendState = resolveOcrBackendState({
+    stats: status?.stats,
+    diagnostics: status?.diagnostics,
+    running: isPipelineRunning,
+  });
   const pageRange = status?.page_range ?? upload?.page_range;
   const selectedPages = pageRange?.selected_page_count ?? (submitted?.file?.type.startsWith("image/") ? 1 : 0);
   const pageCount = selectedPages || pageRange?.total_pages || 0;
@@ -671,7 +678,10 @@ export default function ImportTasksPage() {
                       <ScanLine className="h-3 w-3" aria-hidden="true" />
                       {pageRangeLabel}
                     </span>
-                    <span className="v2-hud-chip">OCR {status.ocr_progress || "0%"}</span>
+                    <OcrBackendMotion
+                      state={ocrBackendState}
+                      progress={status.ocr_progress ? `OCR ${status.ocr_progress}` : undefined}
+                    />
                   </div>
 
                   <div className="v2-paper-wrap">

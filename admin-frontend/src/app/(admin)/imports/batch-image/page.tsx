@@ -34,7 +34,9 @@ import { importSubjectOptions } from "../hooks/use-import-subject-options";
 import { ImportContentDialog } from "../components/import-content-dialog";
 import { ImportImagePreview } from "../components/import-image-preview";
 import { ImportFailurePanel } from "../components/import-failure-panel";
+import { OcrBackendMotion } from "../components/ocr-backend-motion";
 import { importErrorMessage } from "@/lib/imports/import-messages";
+import { resolveOcrBackendState } from "@/lib/imports/ocr-backend-state";
 import { apiRequest } from "@/lib/api/client";
 import type { BatchImageJobStatusResponse } from "@/lib/api/types";
 
@@ -319,6 +321,10 @@ export default function BatchImagePage() {
               if ("status" in item) {
                 const task = item as ImageTask;
                 const meta = taskMeta(task);
+                const ocrBackendState = resolveOcrBackendState({
+                  traceMessages: task.traceEvents.map((event) => event.message),
+                  running: task.status === "processing",
+                });
                 return (
                   <article key={`${task.seq}-${task.file.name}-${task.file.size}-${task.file.lastModified}`} className="v2-tile" data-tone={meta.tone}>
                     <div className="v2-thumb">
@@ -340,7 +346,11 @@ export default function BatchImagePage() {
                       </div>
                       <div className="v2-tile-state">
                         <span className="v2-chip" data-tone={meta.tone}>{meta.label}</span>
-                        <span className="v2-tile-note" title={meta.note}>{meta.note}</span>
+                        {ocrBackendState.phase === "fallback" || meta.tone === "ocr" ? (
+                          <OcrBackendMotion state={ocrBackendState} compact />
+                        ) : (
+                          <span className="v2-tile-note" title={meta.note}>{meta.note}</span>
+                        )}
                       </div>
                       {task.status === "succeeded" && snapshot?.items.find((entry) => batchImageItemKey(entry) === task.id)?.review_batch_id ? <button type="button" className="v2-textlink v2-tile-result" onClick={() => setContentBatch(snapshot.items.find((entry) => batchImageItemKey(entry) === task.id)!.review_batch_id)}><Eye className="h-4 w-4" aria-hidden="true" />查看 {task.questionCount} 道题目</button> : null}
                       {task.status === "failed" && phase === "done" && snapshot?.items.find((entry) => batchImageItemKey(entry) === task.id)?.id ? <button type="button" className="v2-textlink v2-tile-result" onClick={() => void batch.retry({ retryItemId: snapshot.items.find((entry) => batchImageItemKey(entry) === task.id)!.id })}><RefreshCw className="h-4 w-4" aria-hidden="true" />重新上传此图</button> : null}

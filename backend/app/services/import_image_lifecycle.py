@@ -47,6 +47,9 @@ class ImageLifecycleRequest:
     log_event: Callable[..., None]
     classify_result: Callable[[dict, str], str | None]
     capture_exception: Callable[..., None] = capture_exception
+    run_ocr_with_fallback: (
+        Callable[[bytes, Callable[[dict], Awaitable[None]]], Awaitable[dict]] | None
+    ) = None
 
 
 async def run_image_import_lifecycle(request: ImageLifecycleRequest) -> None:
@@ -67,6 +70,7 @@ async def run_image_import_lifecycle(request: ImageLifecycleRequest) -> None:
                 clean_text=request.clean_text,
                 build_runtime_diagnostics=request.build_runtime_diagnostics,
                 run_ocr=request.run_ocr,
+                run_ocr_with_fallback=request.run_ocr_with_fallback,
                 build_diagnostics=request.build_diagnostics,
                 build_blocks=request.build_blocks,
                 set_status=request.set_status,

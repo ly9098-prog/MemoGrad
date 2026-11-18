@@ -95,6 +95,34 @@ async def test_ocr_stage_reports_actual_cpu_backend_after_fallback():
 
 
 @pytest.mark.asyncio
+async def test_ocr_stage_publishes_live_cpu_fallback_state():
+    async def run_with_fallback(_image_bytes, notify):
+        await notify({
+            "backend": "local_process",
+            "fallback_from": "paddlex_http",
+            "fallback_reason": "ocr.remote_connect_error",
+        })
+        return {
+            "text": "CPU text",
+            "execution_backend": "local_process",
+            "fallback_from": "paddlex_http",
+        }
+
+    request = ocr_stage_request(run_ocr_with_fallback=run_with_fallback)
+    await run_image_ocr_stage(request)
+
+    fallback_call = next(
+        call for call in request.set_status.await_args_list
+        if call.kwargs.get("diagnostics", {}).get("ocr_runtime", {}).get("fallback_state")
+        == "running"
+    )
+    runtime = fallback_call.kwargs["diagnostics"]["ocr_runtime"]
+    assert runtime["active_backend"] == "local_process"
+    assert runtime["fallback_reason"] == "ocr.remote_connect_error"
+    assert fallback_call.kwargs["stages"]["ocr"]["backend"] == "local_process"
+
+
+@pytest.mark.asyncio
 async def test_ocr_stage_publishes_status_with_pipeline_id():
     request = ocr_stage_request()
 
@@ -247,6 +275,7 @@ async def test_prepared_ocr_reads_bytes_sets_tags_and_delegates(monkeypatch, tmp
         "build_diagnostics": stage.build_diagnostics,
         "build_blocks": stage.build_blocks,
         "set_status": stage.set_status,
+        "run_ocr_with_fallback": None,
     }
     assert fields["image_bytes"] == b"image-bytes"
 

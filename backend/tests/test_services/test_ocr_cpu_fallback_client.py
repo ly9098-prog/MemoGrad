@@ -141,6 +141,33 @@ async def test_connection_failure_uses_cpu_once_and_preserves_input(ports, exc_t
 
 
 @pytest.mark.asyncio
+async def test_connection_failure_notifies_before_cpu_work_starts(ports):
+    events = []
+
+    def unavailable(request):
+        raise httpx.ConnectError("stopped", request=request)
+
+    async def notify(event):
+        events.append((event, ports[0].recognize.await_count if ports else 0))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(unavailable)) as http:
+        client = create_ocr_worker_client(config(), http_client=http)
+        result = await client.recognize_batch(
+            [(3, b"image")],
+            options={"_ocr_fallback_notify": notify},
+        )
+        assert result[0].status == "success"
+        assert events == [({
+            "backend": "local_process",
+            "fallback_from": "paddlex_http",
+            "fallback_reason": "ocr.remote_connect_error",
+            "page_index": 3,
+        }, 0)]
+        assert ports[0].recognize.await_count == 1
+        await client.shutdown()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "outcome",
     [httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout, 401, 403, 429, 500, 503],

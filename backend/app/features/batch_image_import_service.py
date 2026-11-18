@@ -869,7 +869,24 @@ async def _run_single_image(
 
         runtime_cfg = get_runtime_config()
         configured_backend = runtime_cfg.execution_backend
-        ocr_result = await _run_ocr_via_configured_backend(content)
+
+        async def notify_ocr_fallback(event: dict) -> None:
+            await _update_item_with_trace(
+                item_id,
+                job_id,
+                fields={},
+                trace=_TraceData(
+                    step="ocr",
+                    status="running",
+                    message="httpx 未连接，正在使用 local CPU",
+                    item_seq=seq,
+                ),
+            )
+
+        ocr_result = await _run_ocr_via_configured_backend(
+            content,
+            on_fallback=notify_ocr_fallback,
+        )
         raw_ocr_text = str(ocr_result.get("text") or "")
         skip_ocr_correction = False
 
@@ -933,7 +950,12 @@ async def _run_single_image(
         trace=_TraceData(
             step="ocr",
             status="success",
-            message=f"OCR 识别完成 ({ocr_duration}ms, {len(cleaned_text)}字)",
+            message=(
+                "OCR 识别完成 · local CPU"
+                if ocr_result.get("execution_backend") == "local_process"
+                else "OCR 识别完成"
+            )
+            + f" ({ocr_duration}ms, {len(cleaned_text)}字)",
             duration_ms=ocr_duration,
             item_seq=seq,
         ),

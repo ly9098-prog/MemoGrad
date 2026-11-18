@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -74,6 +75,23 @@ class CpuFallbackOcrWorkerClient:
         mode: str = "boxes",
         options: dict | None = None,
     ) -> WorkerResult:
+        return await self._recognize(
+            image_bytes,
+            page_index,
+            mode=mode,
+            options=options,
+            fallback_notifier=None,
+        )
+
+    async def _recognize(
+        self,
+        image_bytes: bytes,
+        page_index: int,
+        *,
+        mode: str,
+        options: dict | None,
+        fallback_notifier: Callable[[dict], Awaitable[None]] | None,
+    ) -> WorkerResult:
         if self._closed:
             return self._failure(page_index, "SHUTDOWN", "OCR client is shut down")
         started = time.monotonic()
@@ -99,6 +117,7 @@ class CpuFallbackOcrWorkerClient:
             options,
             remaining,
             remote.stable_error_code,
+            fallback_notifier,
         )
 
     async def _recognize_cpu(
@@ -109,8 +128,21 @@ class CpuFallbackOcrWorkerClient:
         options: dict | None,
         remaining: float,
         reason: str | None,
+        fallback_notifier: Callable[[dict], Awaitable[None]] | None,
     ) -> WorkerResult:
         self._fallback_count += 1
+        if fallback_notifier is not None:
+            try:
+                await fallback_notifier(
+                    {
+                        "backend": "local_process",
+                        "fallback_from": "paddlex_http",
+                        "fallback_reason": reason,
+                        "page_index": page_index,
+                    }
+                )
+            except Exception as exc:
+                logger.warning("OCR fallback notifier failed: %s", type(exc).__name__)
         logger.warning(
             "Remote OCR connection unavailable; using local PaddleOCR CPU: page=%s code=%s",
             page_index,
@@ -150,6 +182,17 @@ class CpuFallbackOcrWorkerClient:
         options: dict | None = None,
     ) -> list[WorkerResult]:
         """Bound running coroutines as well as the underlying CPU worker queue."""
+        call_options = dict(options or {})
+        fallback_notifier = call_options.pop("_ocr_fallback_notify", None)
+        notified = False
+
+        async def notify_once(event: dict) -> None:
+            nonlocal notified
+            if notified or fallback_notifier is None:
+                return
+            notified = True
+            await fallback_notifier(event)
+
         resolved: list[WorkerResult | None] = [None] * len(images)
         next_pos = 0
 
@@ -160,8 +203,12 @@ class CpuFallbackOcrWorkerClient:
                 next_pos += 1
                 idx, image = images[pos]
                 try:
-                    resolved[pos] = await self.recognize(
-                        image, idx, mode=mode, options=options
+                    resolved[pos] = await self._recognize(
+                        image,
+                        idx,
+                        mode=mode,
+                        options=call_options,
+                        fallback_notifier=notify_once,
                     )
                 except asyncio.CancelledError:
                     raise

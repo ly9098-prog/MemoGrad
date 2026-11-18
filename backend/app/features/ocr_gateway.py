@@ -224,6 +224,7 @@ class OCRGateway:
         self,
         images: list[tuple[int, bytes]],
         *,
+        options: dict | None = None,
         requirements: RequiredOCRCapabilities | None = None,
         trace_id: str = "",
     ) -> list[WorkerResult]:
@@ -282,7 +283,7 @@ class OCRGateway:
                 for idx, _ in images
             ]
 
-        return await worker_client.recognize_batch(images)
+        return await worker_client.recognize_batch(images, options=options)
 
     async def shutdown(
         self,
