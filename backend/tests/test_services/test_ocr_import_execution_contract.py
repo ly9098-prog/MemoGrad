@@ -270,6 +270,36 @@ async def test_gateway_backend_returns_result_without_writing_worker_client(ocr_
 
 
 @pytest.mark.asyncio
+async def test_local_process_gateway_never_receives_an_unserializable_fallback_callback(
+    ocr_ports,
+):
+    result = {"text": "本地识别文本", "lines": []}
+    calls = []
+
+    class Gateway:
+        is_gateway = True
+
+        async def recognize_pages(self, pages, **kwargs):
+            calls.append((pages, kwargs))
+            return [WorkerResult(status="success", result=result)]
+
+    async def notify(_event):
+        return None
+
+    ocr_ports.cfg = make_config(execution_backend="local_process")
+    ocr_ports.gateway = Gateway()
+
+    assert (
+        await pipeline._run_ocr_via_configured_backend(
+            b"image-bytes",
+            on_fallback=notify,
+        )
+        is result
+    )
+    assert calls == [([(1, b"image-bytes")], {})]
+
+
+@pytest.mark.asyncio
 async def test_non_gateway_object_falls_back_to_owned_worker_client(ocr_ports):
     result = {"text": "worker 文本"}
     ocr_ports.cfg = make_config()

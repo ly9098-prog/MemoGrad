@@ -308,14 +308,19 @@ async def _run_ocr_via_configured_backend(
     gateway = get_gateway()
     worker_client = None
     owns_worker_client = False
+    fallback_options = (
+        {"_ocr_fallback_notify": on_fallback}
+        if on_fallback is not None and cfg.execution_backend == "paddlex_http"
+        else None
+    )
     try:
         if gateway is not None and gateway.is_gateway:
-            if on_fallback is None:
+            if fallback_options is None:
                 results = await gateway.recognize_pages([(1, image_bytes)])
             else:
                 results = await gateway.recognize_pages(
                     [(1, image_bytes)],
-                    options={"_ocr_fallback_notify": on_fallback},
+                    options=fallback_options,
                 )
         else:
             worker_client = create_ocr_worker_client(cfg)
@@ -324,12 +329,12 @@ async def _run_ocr_via_configured_backend(
                     f"OCR worker unavailable: execution_backend={cfg.execution_backend}"
                 )
             owns_worker_client = True
-            if on_fallback is None:
+            if fallback_options is None:
                 results = await worker_client.recognize_batch([(1, image_bytes)])
             else:
                 results = await worker_client.recognize_batch(
                     [(1, image_bytes)],
-                    options={"_ocr_fallback_notify": on_fallback},
+                    options=fallback_options,
                 )
 
         return _validate_ocr_backend_result(_select_ocr_backend_result(results))

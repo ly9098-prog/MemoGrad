@@ -32,6 +32,9 @@ const PROVIDER_ICONS: Record<string, string> = {
 
 export function getAiProviderIcon(provider: string): string | null {
   const normalized = provider.trim().toLowerCase();
+  if (normalized.replaceAll("_", "-").startsWith("paddle")) {
+    return PROVIDER_ICONS.paddleocr;
+  }
   return PROVIDER_ICONS[normalized] ?? PROVIDER_ICONS[normalized.replaceAll("_", "-")] ?? null;
 }
 

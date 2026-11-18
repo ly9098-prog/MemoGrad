@@ -95,6 +95,8 @@ describe("AI overview data accuracy", () => {
       "lmstudio",
       "vllm",
       "paddle",
+      "paddle-ocr",
+      "paddleoce",
     ]) {
       expect(getAiProviderIcon(provider)).toMatch(/^\/model-icons\//);
     }

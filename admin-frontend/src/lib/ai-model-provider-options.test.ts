@@ -55,6 +55,8 @@ describe("buildAiProviderOptions", () => {
     ["moonshot", "kimi"],
     ["paddle", "paddleocr"],
     ["paddleocr_vl", "paddleocr"],
+    ["paddle-ocr-vl", "paddleocr"],
+    ["paddleoce-vl", "paddleocr"],
   ])("groups %s under one vendor instead of a model variant", (alias, vendor) => {
     const options = buildAiProviderOptions([alias], alias);
     const vendorOptions = options.filter(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import {
@@ -76,7 +76,7 @@ const FILTERS: { value: FilterKind; label: string }[] = [
 
 function isPaddleOcrProvider(provider: string) {
   const normalized = provider.toLowerCase().replace(/_/g, "-");
-  return normalized === "paddle" || normalized.startsWith("paddleocr");
+  return normalized.startsWith("paddle");
 }
 
 function configuredFeatures(model: Pick<AdminAiModelConfig, "features" | "feature">): string[] {
@@ -230,6 +230,8 @@ export function ModelWorkbench() {
   const [filter, setFilter] = useState<FilterKind>("all");
   const [showAdd, setShowAdd] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminAiModelConfig | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [pendingSelectId, setPendingSelectId] = useState<number | null>(null);
 
   const modelsQuery = useQuery({
     queryKey: ["ai-models"],
@@ -245,11 +247,20 @@ export function ModelWorkbench() {
     onSuccess: (result) => {
       queryClient.setQueryData<AdminAiModelConfig[]>(["ai-models"], (old) => {
         if (!old) return [result];
-        return old.map((model) => (model.id === result.id ? { ...result } : model));
+        return old.map((model) =>
+          model.id === result.id
+            ? { ...result }
+            : result.is_default
+              ? { ...model, is_default: false }
+              : model,
+        );
       });
       showToast("模型配置已保存");
     },
-    onError: () => queryClient.invalidateQueries({ queryKey: ["ai-models"] }),
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["ai-models"] });
+      showToast(getErrorMessage(error), "error");
+    },
   });
 
   const createMutation = useMutation({
@@ -270,8 +281,10 @@ export function ModelWorkbench() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-models"] });
       setSelectedId(null);
+      setEditorDirty(false);
       showToast("模型已删除");
     },
+    onError: (error) => showToast(getErrorMessage(error), "error"),
   });
 
   const modelList = useMemo(() => {
@@ -321,7 +334,15 @@ export function ModelWorkbench() {
   const handleDelete = () => {
     if (!deleteTarget) return;
     deleteMutation.mutate(deleteTarget.id);
-    setDeleteTarget(null);
+  };
+
+  const selectModel = (modelId: number) => {
+    if (modelId === selectedModel?.id) return;
+    if (editorDirty) {
+      setPendingSelectId(modelId);
+      return;
+    }
+    setSelectedId(modelId);
   };
 
   const totalCount = modelList.length;
@@ -352,7 +373,13 @@ export function ModelWorkbench() {
               >
                 <RefreshCw className={cn("h-3.5 w-3.5", modelsQuery.isFetching && "animate-spin")} />
               </button>
-              <button type="button" className={styles.addAction} onClick={() => setShowAdd(true)}>
+              <button
+                type="button"
+                className={styles.addAction}
+                onClick={() => setShowAdd(true)}
+                disabled={editorDirty}
+                title={editorDirty ? "请先保存当前修改" : undefined}
+              >
                 <Plus className="h-3.5 w-3.5" />
                 添加
               </button>
@@ -419,7 +446,7 @@ export function ModelWorkbench() {
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => setSelectedId(model.id)}
+                    onClick={() => selectModel(model.id)}
                     className={cn(
                       styles.modelRow,
                       isSelected && styles.modelRowSelected,
@@ -483,10 +510,10 @@ export function ModelWorkbench() {
                 selectedModel.provider,
               )}
               saving={patchMutation.isPending}
+              onDirtyChange={setEditorDirty}
               onSave={handleSave}
               onSetDefault={() => handleSetDefault(selectedModel)}
               onDelete={() => setDeleteTarget(selectedModel)}
-              onError={(message) => showToast(message, "error")}
             />
           ) : (
             <div className={styles.emptyDetail}>
@@ -524,6 +551,19 @@ export function ModelWorkbench() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
+      <ConfirmDialog
+        open={pendingSelectId !== null}
+        title="切换模型并放弃未保存修改？"
+        description="当前模型的连接信息或能力绑定尚未保存，切换后会丢失这些修改。"
+        confirmText="放弃并切换"
+        danger
+        onCancel={() => setPendingSelectId(null)}
+        onConfirm={() => {
+          setEditorDirty(false);
+          setSelectedId(pendingSelectId);
+          setPendingSelectId(null);
+        }}
+      />
     </div>
   );
 }
@@ -555,34 +595,38 @@ function ModelEditor({
   models,
   providerOptions,
   saving,
+  onDirtyChange,
   onSave,
   onSetDefault,
   onDelete,
-  onError,
 }: {
   model: AdminAiModelConfig;
   models: AdminAiModelConfig[];
   providerOptions: ReturnType<typeof buildAiProviderOptions>;
   saving: boolean;
+  onDirtyChange: (dirty: boolean) => void;
   onSave: (id: number, data: AdminAiModelConfigPatchRequest) => Promise<AdminAiModelConfig>;
   onSetDefault: () => void;
   onDelete: () => void;
-  onError: (message: string) => void;
 }) {
   const [draft, setDraft] = useState<ModelDraft>(() => modelToDraft(model));
   const [showApiKey, setShowApiKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const testRequestRef = useRef(0);
   const [testResult, setTestResult] = useState<ModelTestConnectionResponse | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const kind = getModelKind(model);
   const effectiveFeatures = featuresForKind(kind, draft.features);
   const conflicts = findFeatureConflicts(effectiveFeatures, models, model.id, draft.isEnabled);
+  const providerKindConflict =
+    isPaddleOcrProvider(draft.provider) && kind !== "ocr_job";
   const valid =
     Boolean(draft.displayName.trim()) &&
     Boolean(draft.name.trim()) &&
     Boolean(draft.provider.trim()) &&
-    isValidBaseUrl(draft.apiBaseUrl);
+    isValidBaseUrl(draft.apiBaseUrl) &&
+    !providerKindConflict;
   const dirty =
     draft.displayName.trim() !== model.display_name ||
     draft.name.trim() !== model.name ||
@@ -591,25 +635,36 @@ function ModelEditor({
     draft.features.join("|") !== configuredFeatures(model).join("|") ||
     draft.isEnabled !== model.is_enabled ||
     Boolean(draft.apiKey.trim());
-  const canSave = dirty && valid && conflicts.length === 0 && !saving;
+  const canSave = dirty && valid && conflicts.length === 0 && !saving && !testing;
+
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
 
   const updateDraft = (patch: Partial<ModelDraft>) => {
+    testRequestRef.current += 1;
+    setTesting(false);
     setDraft((current) => ({ ...current, ...patch }));
     setSaveError(null);
     setTestResult(null);
   };
 
   const reset = () => {
+    testRequestRef.current += 1;
+    setTesting(false);
     setDraft(modelToDraft(model));
     setSaveError(null);
     setTestResult(null);
   };
 
   const testConnection = async () => {
+    if (testing) return;
     if (!isValidBaseUrl(draft.apiBaseUrl) || !draft.name.trim()) {
       setSaveError("先填写完整的 Base URL 与模型 ID，再测试连接");
       return;
     }
+    const requestId = testRequestRef.current + 1;
+    testRequestRef.current = requestId;
     setTesting(true);
     setSaveError(null);
     setTestResult(null);
@@ -626,8 +681,10 @@ function ModelEditor({
         method: "POST",
         body: JSON.stringify(payload),
       });
+      if (requestId !== testRequestRef.current) return;
       setTestResult(result);
     } catch (error) {
+      if (requestId !== testRequestRef.current) return;
       const message = getErrorMessage(error);
       setTestResult({
         success: false,
@@ -637,7 +694,7 @@ function ModelEditor({
       });
       setSaveError(message);
     } finally {
-      setTesting(false);
+      if (requestId === testRequestRef.current) setTesting(false);
     }
   };
 
@@ -656,11 +713,11 @@ function ModelEditor({
         ...(draft.apiKey.trim() ? { api_key: draft.apiKey.trim() } : {}),
       };
       await onSave(model.id, payload);
+      onDirtyChange(false);
       setDraft((current) => ({ ...current, apiKey: "" }));
     } catch (error) {
       const message = getErrorMessage(error);
       setSaveError(message);
-      onError(message);
     }
   };
 
@@ -706,15 +763,17 @@ function ModelEditor({
               <h2>{model.display_name}</h2>
               {model.is_default ? <span className={styles.defaultBadge}>默认模型</span> : null}
             </div>
-            <p>
-              {model.provider} · {adapterLabel(model.provider)} · {kindLabel(kind)}
-            </p>
+            <div className={styles.detailSubline}>
+              <p>
+                {model.provider} · {adapterLabel(model.provider)} · {kindLabel(kind)}
+              </p>
+              <span className={styles.connectionState} data-tone={statusTone}>
+                <i />
+                <span className={styles.connectionLabel}>{statusText}</span>
+              </span>
+            </div>
           </div>
           <div className={styles.detailHeaderActions}>
-            <span className={styles.connectionState} data-tone={statusTone}>
-              <i />
-              {statusText}
-            </span>
             <button
               type="button"
               className={styles.dangerIcon}
@@ -927,6 +986,12 @@ function ModelEditor({
               </span>
             </div>
           ) : null}
+          {providerKindConflict ? (
+            <div className={styles.conflictNotice}>
+              <CircleAlert className="h-3.5 w-3.5" />
+              <span>PaddleOCR 只能用于 OCR Job 类型，请恢复原服务商或创建 OCR 模型。</span>
+            </div>
+          ) : null}
         </section>
 
         <section className={styles.section}>
@@ -970,7 +1035,8 @@ function ModelEditor({
                   type="button"
                   className={styles.textAction}
                   onClick={onSetDefault}
-                  disabled={saving}
+                  disabled={saving || dirty}
+                  title={dirty ? "请先保存当前修改" : undefined}
                 >
                   设为默认
                 </button>
@@ -1026,14 +1092,33 @@ function AddModelDialog({
   const [showApiKey, setShowApiKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const frame = window.requestAnimationFrame(() => {
+      modalRef.current
+        ?.querySelector<HTMLInputElement>("input")
+        ?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      previous?.focus();
+    };
+  }, []);
 
   const effectiveFeatures = featuresForKind(kind, features);
   const conflicts = findFeatureConflicts(effectiveFeatures, existingModels, -1, true);
+  const providerKindConflict =
+    isPaddleOcrProvider(provider) && kind !== "ocr_job";
   const valid =
     Boolean(displayName.trim()) &&
     Boolean(name.trim()) &&
     Boolean(provider.trim()) &&
-    isValidBaseUrl(apiBaseUrl);
+    isValidBaseUrl(apiBaseUrl) &&
+    !providerKindConflict;
 
   const submit = async () => {
     if (!valid || conflicts.length > 0) return;
@@ -1063,15 +1148,48 @@ function AddModelDialog({
     );
   };
 
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !submitting) {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(
+      modalRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => element.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !submitting) onClose();
     }}>
-      <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="add-model-title">
+      <div
+        ref={modalRef}
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-model-title"
+        aria-describedby="add-model-description"
+        tabIndex={-1}
+        onKeyDown={handleDialogKeyDown}
+      >
         <header className={styles.modalHeader}>
           <div>
             <h2 id="add-model-title">添加模型</h2>
-            <p>先建立模型连接，保存后再绑定能力。</p>
+            <p id="add-model-description">先建立模型连接，保存后再绑定能力。</p>
           </div>
           <button type="button" className={styles.modalClose} onClick={onClose} disabled={submitting} aria-label="关闭">
             <X className="h-4 w-4" />
@@ -1089,6 +1207,7 @@ function AddModelDialog({
                 onClick={() => {
                   setKind(item);
                   setFeatures(item === "embedding" ? ["embedding"] : item === "ocr_job" ? ["vision"] : []);
+                  setProvider(item === "ocr_job" ? "paddleocr" : "openai");
                 }}
               >
                 {kindLabel(item)}
@@ -1176,6 +1295,12 @@ function AddModelDialog({
             <div className={styles.conflictNotice}>
               <CircleAlert className="h-3.5 w-3.5" />
               <span>所选能力已被启用模型占用，请先调整对方映射。</span>
+            </div>
+          ) : null}
+          {providerKindConflict ? (
+            <div className={styles.conflictNotice}>
+              <CircleAlert className="h-3.5 w-3.5" />
+              <span>PaddleOCR 只能用于 OCR Job 类型，请恢复原服务商或创建 OCR 模型。</span>
             </div>
           ) : null}
         </div>

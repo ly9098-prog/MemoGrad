@@ -42,6 +42,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
 
 export function canonicalAiProvider(provider: string): string {
   const normalized = provider.trim().toLowerCase().replaceAll("_", "-");
+  if (normalized.startsWith("paddle")) return "paddleocr";
   return PROVIDER_ALIASES[normalized] ?? normalized;
 }
 
