@@ -1,5 +1,5 @@
 /**
- * Home four-subject mastery fallback.
+ * Home four-subject mastery and question statistics stay separate.
  *
  * The extracted growth-context builder must receive the study-plan response
  * and keep the dashboard subject statistics available to the mastery cards.
@@ -14,6 +14,7 @@ const { test } = require('node:test')
 const HOME_PAGE = path.resolve(__dirname, '../pages/home/home.js')
 const HOME_UTILS = path.resolve(__dirname, '../pages/home/utils')
 const growthAnimation = require('../pages/home/utils/growth-animation')
+const { buildSubjectMastery } = require('../pages/home/utils/growth-mastery')
 
 const SUBJECT_STATS = [
   {
@@ -172,10 +173,10 @@ const PLAN = {
   },
 }
 
-function assertRealMastery(subjectMastery) {
+function assertQuestionStatsWithoutInventedMastery(subjectMastery) {
   assert.deepEqual(
     subjectMastery.map((item) => item.scoreText),
-    ['21%', '0%', '50%', '0%'],
+    ['--', '--', '--', '--'],
   )
   assert.deepEqual(
     subjectMastery.map((item) => item.questionStatText),
@@ -183,11 +184,13 @@ function assertRealMastery(subjectMastery) {
   )
   assert.deepEqual(
     subjectMastery.map((item) => item.hasData),
-    [true, true, true, true],
+    [false, false, false, false],
   )
+  assert.ok(subjectMastery.every(item => item.statusText === '样本积累中'))
+  assert.deepEqual(subjectMastery.map(item => item.sampleText), ['已练 14 题', '已练 1 题', '已练 2 题', '已练 1 题'])
 }
 
-test('successful growth data publishes real subject mastery and plan state', async () => {
+test('successful growth data keeps question statistics without using accuracy as mastery', async () => {
   await withHomePage(async ({ page }) => {
     const calls = []
     installRoutes(page, {
@@ -207,7 +210,7 @@ test('successful growth data publishes real subject mastery and plan state', asy
 
     await page.loadGrowthSnapshot(1)
 
-    assertRealMastery(page.data.subjectMastery)
+    assertQuestionStatsWithoutInventedMastery(page.data.subjectMastery)
     assert.equal(page.data.studyPlanConfigured, true)
     assert.equal(page.data.planDaysRemaining, 49)
     assert.equal(page.data.planPhaseLabel, '强化阶段')
@@ -233,8 +236,63 @@ test('growth snapshot builder forwards plan into the display projection', async 
     assert.equal(snapshot.planDaysRemaining, 49)
     assert.equal(snapshot.planTodayText, '今日 20 / 60 分钟')
     assert.equal(snapshot.planWeeklyText, '本周 3 / 5 天')
-    assertRealMastery(snapshot.subjectMastery)
+    assertQuestionStatsWithoutInventedMastery(snapshot.subjectMastery)
   })
+})
+
+test('four mastery levels use reliable Hub scores with the reference subject icons', () => {
+  const scores = [28, 58, 78, 91]
+  const statuses = ['weak', 'developing', 'good', 'mastered']
+  const result = buildSubjectMastery({
+    hubSubjectMastery: SUBJECT_STATS.map((item, index) => ({
+      ...item, mastery_score: scores[index], status: statuses[index],
+      confidence: 0.8, data_available: true, attempt_count: 40,
+    })),
+    dashboardSubjectStats: SUBJECT_STATS,
+  })
+  assert.deepEqual(result.map(item => item.scoreText), ['28%', '58%', '78%', '91%'])
+  assert.deepEqual(result.map(item => item.statusText), ['需要强化', '持续巩固', '较为稳定', '掌握稳固'])
+  assert.ok(result.every(item => item.iconSrc.startsWith('/assets/icons/home-mastery/') && item.iconSrc.endsWith('.svg')))
+  assert.ok(result.every(item => item.statusIconSrc.endsWith('.svg')))
+  assert.equal(result[0].sampleText, '已练 14 题', 'Hub observations never replace the actual question count')
+})
+
+test('insufficient samples, unknown scores and unavailable Hub never become zero percent', () => {
+  const entries = [
+    { ...SUBJECT_STATS[0], mastery_score: 96, status: 'insufficient', confidence: 0.1, attempt_count: 1 },
+    { ...SUBJECT_STATS[1], mastery_score: null, confidence: 0.5, attempt_count: 5 },
+    { ...SUBJECT_STATS[2], mastery_score: 90, confidence: Infinity, attempt_count: 5 },
+  ]
+  const result = buildSubjectMastery({ hubSubjectMastery: entries, dashboardSubjectStats: SUBJECT_STATS })
+  assert.deepEqual(result.map(item => item.scoreText), ['--', '--', '--', '--'])
+  assert.deepEqual(result.map(item => item.statusText), ['样本积累中', '样本积累中', '样本积累中', '评估暂不可用'])
+  assert.ok(result.every(item => !item.hasData && item.barWidth === 0))
+  const empty = buildSubjectMastery()
+  assert.ok(empty.every(item => item.statusText === '开始积累' && item.sampleText === '暂无练习记录'))
+})
+
+test('one answer linked to several points is still displayed as one practiced question', () => {
+  const result = buildSubjectMastery({
+    hubSubjectMastery: [{ ...SUBJECT_STATS[0], mastery_score: 78, confidence: 0.6, attempt_count: 9 }],
+    dashboardSubjectStats: [{ ...SUBJECT_STATS[0], total_questions: 1, correct_count: 1 }],
+  })
+  assert.equal(result[0].attemptCount, 1)
+  assert.equal(result[0].questionStatText, '1/1 题')
+  assert.equal(result[0].sampleText, '已练 1 题')
+})
+
+test('status boundaries use the raw score and respect the server status before display rounding', () => {
+  for (const [score, statusText] of [[39.9, '需要强化'], [69.9, '持续巩固'], [84.96, '较为稳定'], [85, '掌握稳固']]) {
+    const [item] = buildSubjectMastery({
+      hubSubjectMastery: [{ ...SUBJECT_STATS[0], mastery_score: score, confidence: 0.8, attempt_count: 8 }],
+    })
+    assert.equal(item.statusText, statusText)
+    assert.equal(item.sampleText, '已有知识点评估', 'missing question stats are not inferred from observations')
+  }
+  const [rounded] = buildSubjectMastery({
+    hubSubjectMastery: [{ ...SUBJECT_STATS[0], mastery_score: 85, status: 'good', confidence: 0.8 }],
+  })
+  assert.equal(rounded.statusText, '较为稳定')
 })
 
 test('stale growth responses are ignored', async () => {

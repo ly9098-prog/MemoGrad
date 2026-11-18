@@ -118,3 +118,13 @@
 /* Code retains a readable dark surface; line numbers use mint, not neon lime. */ .runner-reference .runner-code-wrapper{background:#23483C;border-color:#3A6F5B}
 .runner-reference .runner-code-no{color:#B7EBD9;opacity:1}
 .runner-reference .runner-code-text{color:#F3FCF9}
+/* Match Home's calm mint surface without shrinking native touch targets. */
+.runner-reference .runner-back-btn{width:88rpx;height:88rpx;margin-left:-22rpx}
+.runner-reference .runner-sheet-trigger{width:88rpx;min-width:88rpx;height:88rpx;background:transparent}
+.runner-reference .runner-number-row{flex-wrap:wrap;row-gap:16rpx}
+.runner-reference .runner-number-total,.runner-reference .runner-number-divider{color:#507568}
+.runner-reference .runner-number-current{color:#2F8064}
+.runner-reference .runner-subject{overflow-wrap:anywhere}
+.runner-reference .runner-option-indicator{flex-shrink:0}
+.runner-reference .runner-option-text{min-width:0;overflow-wrap:anywhere}
+.runner-reference .runner-sheet-close{min-width:88rpx;min-height:88rpx}

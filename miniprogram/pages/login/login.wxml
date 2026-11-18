@@ -11,11 +11,7 @@
   <view class="memo-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="memo-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="memo-brand-lockup">
-        <view class="memo-brand-mark">
-          <view class="memo-brand-line line-one"></view>
-          <view class="memo-brand-line line-two"></view>
-          <view class="memo-brand-dot"></view>
-        </view>
+        <image class="memo-brand-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" aria-hidden="true" />
         <view class="memo-brand-copy">
           <text class="memo-brand-name">MEMOGRAD</text>
           <text class="memo-brand-caption">STUDY DESK</text>
@@ -23,149 +19,47 @@
       </view>
     </view>
   </view>
-
   <view class="login-page" style="padding-top: {{navHeight}}px;">
-    <view class="ambient-grid"></view>
-    <view class="ambient-glow glow-one"></view>
-    <view class="ambient-glow glow-two"></view>
-
-    <view class="login-shell">
+    <view class="ambient-glow glow-top"></view>
+    <view class="ambient-glow glow-bottom"></view>
+    <view class="login-shell" style="min-height: calc(100vh - {{navHeight}}px);">
       <view class="brand-stage route-enter-page">
-        <view class="hero-brand-card">
-          <view class="hero-grid"></view>
-          <view class="hero-glow"></view>
-          <view class="hero-chart" aria-hidden="true">
-            <view class="chart-line chart-line-a"></view>
-            <view class="chart-line chart-line-b"></view>
-            <view class="chart-line chart-line-c"></view>
-            <view class="chart-node node-a"></view>
-            <view class="chart-node node-b"></view>
-            <view class="chart-node node-c"></view>
-            <view class="chart-node node-d active"></view>
-          </view>
-
-          <view class="hero-content">
-            <view class="hero-topline">
-              <text class="hero-label">考研错题成长助手</text>
-              <text class="hero-status">AI REVIEW</text>
-            </view>
-            <text class="hero-brand-name">MemoGrad</text>
-            <text class="hero-slogan">每天进步一点点</text>
-            <text class="hero-desc">让错题成为成长的阶梯</text>
-            <view class="hero-note-row">
-              <view class="hero-note-dot"></view>
-              <text class="hero-note-text">同步错题、复习计划与学习进度</text>
-            </view>
-          </view>
-
-          <view class="growth-illustration" aria-label="学习成长插画">
-            <view class="book-stack book-back"></view>
-            <view class="book-stack book-front"></view>
-            <view class="growth-card mini-card-one">
-              <text class="mini-card-value">LV</text>
-              <text class="mini-card-label">成长</text>
-            </view>
-            <view class="growth-card mini-card-two">
-              <text class="mini-card-value">+1</text>
-              <text class="mini-card-label">复习</text>
-            </view>
-            <view class="growth-sprout">
-              <view class="sprout-stem"></view>
-              <view class="sprout-leaf leaf-left"></view>
-              <view class="sprout-leaf leaf-right"></view>
-            </view>
-          </view>
+        <view class="glass-disc" aria-hidden="true">
+          <image class="memo-brand-mark hero-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" />
         </view>
-
-        <view class="insight-row">
-          <view class="insight-card">
-            <text class="insight-num">SRS</text>
-            <text class="insight-label">间隔复习</text>
-          </view>
-          <view class="insight-card middle">
-            <text class="insight-num">AI</text>
-            <text class="insight-label">解析辅助</text>
-          </view>
-          <view class="insight-card">
-            <text class="insight-num">3科</text>
-            <text class="insight-label">考研场景</text>
-          </view>
-        </view>
+        <text class="hero-brand-name">MEMOGRAD</text>
+        <text class="hero-slogan">今天，从一道题开始</text>
+        <text class="hero-subline">408 刷题 · 错题复盘</text>
       </view>
-
       <view class="login-panel route-enter-page delay-one">
-        <view class="panel-header">
-          <text class="panel-label">WECHAT SYNC</text>
-          <text class="panel-title">开启你的学习成长档案</text>
-          <text class="panel-desc">用微信身份保存错题、复习计划和连续学习记录</text>
-        </view>
-
-        <button class="wechat-login-btn" hover-class="{{loading ? 'none' : 'wechat-login-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onWechatLogin" loading="{{loading}}" disabled="{{loading}}">
-          <text class="wechat-login-text">微信一键登录</text>
-          <view class="login-arrow">↗</view>
+        <button class="wechat-login-btn" hover-class="{{loading ? 'none' : 'wechat-login-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onWechatLogin" loading="{{loading}}" disabled="{{loading}}" aria-busy="{{loading}}">
+          <text class="wechat-login-title">{{loading ? '正在登录…' : '微信一键登录'}}</text>
+          <text class="wechat-login-subtitle">同步错题、复习计划与打卡</text>
         </button>
-
+        <view wx:if="{{error}}" class="error-msg" aria-role="alert">{{error}}</view>
         <view class="agreement-box">
-          <checkbox-group bindchange="onAgreementChange">
+          <checkbox-group class="agreement-group" bindchange="onAgreementChange">
             <label class="agreement-check">
-              <checkbox value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#173426" />
-              <text class="agreement-text">我已阅读并同意以下协议</text>
+              <checkbox class="agreement-native" value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#3A6F5B" aria-label="我已阅读并同意用户协议、隐私政策与AI免责声明" />
+              <view class="agreement-indicator {{agreed ? 'is-checked' : ''}}" aria-hidden="true"></view>
+              <text class="agreement-text">我已阅读并同意</text>
             </label>
           </checkbox-group>
           <view class="agreement-links">
-            <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《用户协议》</text>
-            <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《隐私政策》</text>
-            <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《AI免责声明》</text>
+            <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《用户协议》</text>
+            <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《隐私政策》</text>
+            <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《AI 免责声明》</text>
           </view>
         </view>
-
         <view class="guest-browse" bindtap="onGuestBrowse" hover-class="guest-browse-pressed" aria-role="button" aria-label="暂不登录，先浏览体验">
           <text>暂不登录，先浏览体验</text>
         </view>
-
         <view wx:if="{{showDevLogin}}" class="dev-entry" hover-class="dev-entry-pressed" hover-start-time="20" hover-stay-time="80" bindtap="onDevLogin">
           <text class="dev-text">开发者模式</text>
           <text class="dev-arrow">→</text>
         </view>
-
-        <view wx:if="{{error}}" class="error-msg">{{error}}</view>
       </view>
-
-      <view class="value-panel route-enter-page delay-two">
-        <view class="value-panel-head">
-          <text class="value-eyebrow">STUDY SYSTEM</text>
-          <text class="value-caption">让每次练习都沉淀为长期进步</text>
-        </view>
-
-        <view class="value-list">
-          <view class="value-item">
-            <view class="value-marker"><text>01</text></view>
-            <view class="value-copy">
-              <text class="value-title">间隔复习</text>
-              <text class="value-desc">根据记忆规律安排复习节奏</text>
-            </view>
-          </view>
-
-          <view class="value-item">
-            <view class="value-marker"><text>02</text></view>
-            <view class="value-copy">
-              <text class="value-title">AI 错题</text>
-              <text class="value-desc">辅助整理题目并定位薄弱环节</text>
-            </view>
-          </view>
-
-          <view class="value-item">
-            <view class="value-marker"><text>03</text></view>
-            <view class="value-copy">
-              <text class="value-title">学习档案</text>
-              <text class="value-desc">持续记录复习进度与成长轨迹</text>
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <view class="footer route-enter-page delay-three">
-        <text class="footer-text">学习数据用于错题记录与智能刷题服务</text>
+      <view class="footer route-enter-page delay-two">
         <text class="footer-text">ICP备案号：桂ICP备2026003057号-2X</text>
       </view>
     </view>

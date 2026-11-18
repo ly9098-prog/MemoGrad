@@ -3,42 +3,54 @@
   <view
     class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}"
     bindtap="toggleCardFlip"
-    catchtouchstart="onFormulaTouchStart"
-    catchtouchend="onFormulaTouchEnd"
-    catchtouchcancel="onFormulaTouchEnd"
+    bindtouchstart="onCardTouchStart"
+    bindtouchmove="onCardTouchMove"
+    bindtouchend="onCardTouchEnd"
+    bindtouchcancel="onCardTouchCancel"
     role="button"
     aria-label="{{isFlipped ? '返回公式卡封面' : '翻面查看公式与记忆提示'}}"
     aria-expanded="{{isFlipped}}"
   >
     <view class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-      <view class="fc-header">
-        <text class="fc-kicker">MEMORY NOTE · {{card.studyCardTypeLabel || '速记'}}</text>
-        <rich-text
-          class="fc-title fc-title-rich"
-          nodes="{{content.titleNodes}}"
-          user-select="{{true}}"
-        />
-        <view class="fc-tags"><text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
-          <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:key="id">{{tag.name}}</text>
+      <view class="fc-face-label"><view class="fc-face-dot"></view><text>回想核心内容</text></view>
+      <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{false}}"
+        bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
+        <view class="fc-header">
+          <rich-text
+            class="fc-title fc-title-rich"
+            nodes="{{content.titleNodes}}"
+            user-select="{{true}}"
+          />
+          <view class="fc-tags"><text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
+            <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:for-item="tag" wx:key="id">{{tag.name}}</text>
+          </view>
         </view>
-      </view>
-      <view class="fc-flip-hint" aria-hidden="true">点击翻面查看公式与记忆提示</view>
+      </scroll-view>
+      <view class="fc-flip-hint"><view class="fc-flip-icon" aria-hidden="true"></view><text>点击翻面查看公式与记忆提示</text></view>
     </view>
     <view class="fc-flip-face fc-flip-back" aria-hidden="{{!isFlipped}}">
       <view class="fc-section-heading">
         <view>
-          <text class="fc-section-kicker">MEMORY BACK</text>
           <text class="fc-section-title">公式与记忆提示</text>
         </view>
-        <view class="fc-core-mark">Σ</view>
       </view>
+      <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{false}}"
+        catchtap="containFormulaReading"
+        catchtouchstart="onFormulaTouchStart" catchtouchend="onFormulaTouchEnd" catchtouchcancel="onFormulaTouchEnd">
       <view class="fc-flip-back-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
         <text class="fc-flip-back-label">核心公式</text>
         <view class="fc-formula-list">
-          <view class="fc-formula-row" wx:for="{{formulaBlocks}}" wx:for-item="block" wx:key="_key">
-            <view class="fc-reading-line {{block.hasWideRows ? 'is-long' : ''}}">
-              <rich-text class="fc-formula-rich" nodes="{{block.readingRows[0].lineItems[0].mathNodes}}" user-select="{{true}}" />
+          <view class="fc-flip-formula-group" wx:for="{{formulaBlocks}}" wx:for-item="block" wx:key="_key">
+            <rich-text class="fc-flip-block-label" wx:if="{{block.labelNodes.length}}" nodes="{{block.labelNodes}}" />
+            <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
+              <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
+                scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}">
+                <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
+                  <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
+                </view>
+              </scroll-view>
             </view>
+            <text class="fc-row-scroll-hint" wx:if="{{block.hasWideRows}}">超宽公式可左右滑动</text>
           </view>
         </view>
       </view>
@@ -50,7 +62,13 @@
         <text class="fc-flip-back-label">记忆提示</text>
         <rich-text class="fc-rich-text" nodes="{{content.summaryNodes}}" user-select="{{true}}" />
       </view>
-      <view class="fc-flip-hint" aria-hidden="true">再次点击翻回正面</view>
+      <view class="fc-flip-back-section" wx:if="{{!formulaBlocks.length && !content.summaryNodes.length && content.conditionsNodes.length}}">
+        <text class="fc-flip-back-label">适用条件</text>
+        <rich-text class="fc-rich-text" nodes="{{content.conditionsNodes}}" user-select="{{true}}" />
+      </view>
+      <text class="fc-flip-empty" wx:if="{{!formulaBlocks.length && !content.summaryNodes.length && !content.symbolNotesNodes.length && !content.conditionsNodes.length}}">这张卡暂无补充提示，可继续查看下方内容。</text>
+      </scroll-view>
+      <view class="fc-flip-hint fc-flip-return" catchtap="toggleCardFlip" aria-role="button" aria-label="翻回公式卡正面"><view class="fc-flip-icon" aria-hidden="true"></view><text>翻回正面</text></view>
     </view>
   </view>
   </view>
@@ -60,7 +78,6 @@
   <view class="fc-formula-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
     <view class="fc-section-heading compact">
       <view>
-        <text class="fc-section-kicker">CORE FORMULA</text>
         <text class="fc-section-title">核心公式</text>
       </view>
       <view class="fc-core-mark">Σ</view>

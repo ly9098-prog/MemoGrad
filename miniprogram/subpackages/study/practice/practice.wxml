@@ -13,7 +13,6 @@
   />
 <view class="submit-loading-mask" wx:if="{{submitting}}" catchtap="noop">
 <view class="submit-loading-card">
-<text class="submit-loading-kicker">SMART REVIEW</text>
 <loading-lottie size="large" theme="brand" enable-lottie="{{false}}" />
 <text class="submit-loading-title">正在批改答案</text>
 <text class="submit-loading-desc">正在生成成绩与复盘建议，请稍候</text>
@@ -23,17 +22,15 @@
 <view class="setup route-enter-task" wx:if="{{entryResolved && !started && !launchingPreset}}">
 <premium-nav title="刷题" variant="mint" bind:back="goBack" />
 <view class="setup-error-card" wx:if="{{errorText}}">
-<text class="setup-error-icon">⚠</text>
+<text class="setup-error-icon line-icon icon-exclamation" aria-hidden="true"></text>
 <text class="setup-error-text">{{errorText}}</text>
 <button class="setup-error-retry" bindtap="startPractice">{{guestMode ? '重新加载科目' : '重试'}}</button>
 </view>
 <view class="setup-content" wx:if="{{!errorText}}">
 <view class="guest-notice" wx:if="{{guestNotice}}">{{guestNotice}}</view>
 <view class="practice-hero">
-<view class="hero-grid hero-grid-a"></view>
-<view class="hero-grid hero-grid-b"></view>
 <view class="hero-head">
-<text class="hero-eyebrow">PRACTICE 01</text>
+<text class="hero-eyebrow">本组练习</text>
 <view class="hero-subject-action" hover-class="soft-pressed" bindtap="openSubjectSheet">
 <text class="hero-subject">{{selectedSubjectName || '选择科目'}}</text>
 <text class="hero-subject-arrow line-icon icon-chevron-right" aria-hidden="true"></text>
@@ -45,20 +42,15 @@
 <text class="hero-number">{{countDisplay}}</text>
 <text class="hero-number-unit">题</text>
 </view>
-<text class="hero-metric-label">QUESTIONS / 本组题量</text>
+<text class="hero-metric-label">本组题量</text>
 </view>
 <view class="hero-metric-divider"></view>
 <view class="hero-metric">
 <view class="hero-number-line hero-number-line-small">
 <text class="hero-number hero-number-small">{{estimatedMinutes}}</text>
-<text class="hero-number-unit">MIN</text>
+<text class="hero-number-unit">分钟</text>
 </view>
 <text class="hero-metric-label">预计完成时间</text>
-</view>
-<view class="metric-wave">
-<view class="wave-line wave-1"></view>
-<view class="wave-line wave-2"></view>
-<view class="wave-line wave-3"></view>
 </view>
 </view>
 <button
@@ -82,7 +74,6 @@
 <view class="panel-heading">
 <view>
 <text class="panel-title">练习设置</text>
-<text class="panel-kicker">CONTROL PANEL</text>
 </view>
 <view class="panel-collapse" hover-class="soft-pressed" bindtap="toggleSettings">
 <text>收起</text><text class="panel-collapse-arrow line-icon icon-chevron-down up" aria-hidden="true"></text>
@@ -145,7 +136,6 @@
 <view class="recent-section" wx:if="{{!guestMode && recentSubjects && recentSubjects.length > 0}}">
 <view class="section-heading-row">
 <view>
-<text class="surface-kicker">RECENT SUBJECTS</text>
 <text class="surface-title">最近使用科目</text>
 </view>
 <view class="surface-action" hover-class="soft-pressed" bindtap="openSubjectSheet">
@@ -204,7 +194,6 @@
 <view class="sheet-header">
 <view>
 <text class="sheet-title">选择科目</text>
-<text class="sheet-kicker">SELECT SUBJECT</text>
 </view>
 <view class="sheet-close" hover-class="soft-pressed" catchtap="closeSubjectSheet"><text class="line-icon icon-close"></text></view>
 </view>

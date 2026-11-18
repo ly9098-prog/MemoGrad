@@ -301,7 +301,7 @@ async function main() {
   assert.ok(result.includes('跳过') && result.includes('全部答对'), 'empty result distinguishes skipped and all-correct attempts')
   assert.ok(fs.existsSync(path.join(root, 'assets/images/wrong-book-empty.png')))
   const home = read('pages/home/home.wxml')
-  assert.ok(home.includes('TODAY’S NOTE') || home.includes("TODAY'S NOTE"))
+  assert.ok(home.includes('今日寄语'))
   assert.ok(home.includes('{{dailyBoostText}}'))
   assert.ok(!home.includes('growth-note-line'))
   const recent = read('subpackages/study/practice/practice.wxml')

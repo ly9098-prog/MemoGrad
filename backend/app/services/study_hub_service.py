@@ -26,6 +26,7 @@ from app.models.question_knowledge_point import QuestionKnowledgePoint
 from app.models.user_knowledge_state import UserKnowledgeState
 from app.models.user_question_difficulty_state import UserQuestionDifficultyState
 from app.services import adaptive_learning_service, review_scheduler
+from app.services.mastery_service import get_mastery_label
 
 WEAK_TASK_COUNT = 8
 HARD_TASK_COUNT = 5
@@ -139,22 +140,33 @@ async def _fetch_subject_mastery_rows(
     user_id: int,
     core_ids: list[int],
 ) -> dict[int, object]:
+    # V3 derives confidence from attempts. Older rows received a zero migration
+    # default and may not have been answered again; repair that projection only.
+    evidence_confidence = case(
+        (UserKnowledgeState.confidence > 0, UserKnowledgeState.confidence),
+        else_=case(
+            (UserKnowledgeState.attempt_count >= 10, 1.0),
+            else_=UserKnowledgeState.attempt_count / 10.0,
+        ),
+    )
     rows = await db.execute(
         select(
-            UserKnowledgeState.subject_id,
+            KnowledgePoint.subject_id,
             func.avg(UserKnowledgeState.mastery_score),
-            func.avg(UserKnowledgeState.confidence),
+            func.avg(evidence_confidence),
             func.coalesce(func.sum(UserKnowledgeState.attempt_count), 0),
             func.coalesce(func.sum(UserKnowledgeState.correct_count), 0),
             func.coalesce(func.sum(UserKnowledgeState.wrong_count), 0),
             func.count(UserKnowledgeState.id),
         )
+        .join(KnowledgePoint, KnowledgePoint.id == UserKnowledgeState.knowledge_point_id)
         .where(
             UserKnowledgeState.user_id == user_id,
-            UserKnowledgeState.subject_id.in_(core_ids),
+            KnowledgePoint.subject_id.in_(core_ids),
+            KnowledgePoint.is_active.is_(True),
             UserKnowledgeState.attempt_count > 0,
         )
-        .group_by(UserKnowledgeState.subject_id)
+        .group_by(KnowledgePoint.subject_id)
     )
     return {int(row[0]): row for row in rows.all()}
 
@@ -166,6 +178,8 @@ def _subject_mastery_entry(subject: Subject, row) -> dict:
             "subject_code": str(subject.code),
             "subject_name": str(subject.name),
             "data_available": False,
+            "status": "no_data",
+            "observed_point_count": 0,
             "mastery_score": None,
             "confidence": 0.0,
             "attempt_count": 0,
@@ -173,13 +187,23 @@ def _subject_mastery_entry(subject: Subject, row) -> dict:
         }
     attempts = int(row[3] or 0)
     correct = int(row[4] or 0)
+    raw_score = float(row[1]) if row[1] is not None and attempts > 0 else None
+    raw_confidence = min(1.0, max(0.0, float(row[2] or 0.0)))
+    confidence = round(raw_confidence, 3)
+    status = "no_data" if attempts <= 0 else "insufficient"
+    if raw_score is not None and raw_confidence >= 0.3:
+        label = get_mastery_label(raw_score, raw_confidence)
+        status = "developing" if label == "normal" else label
+    score = round(raw_score, 1) if raw_score is not None and status != "insufficient" else None
     return {
         "subject_id": int(subject.id),
         "subject_code": str(subject.code),
         "subject_name": str(subject.name),
         "data_available": bool(row[6] and attempts > 0),
-        "mastery_score": round(float(row[1] or 0.0), 1),
-        "confidence": round(float(row[2] or 0.0), 3),
+        "status": status,
+        "observed_point_count": int(row[6] or 0),
+        "mastery_score": score,
+        "confidence": confidence,
         "attempt_count": attempts,
         "accuracy": round(correct / attempts, 4) if attempts > 0 else None,
     }

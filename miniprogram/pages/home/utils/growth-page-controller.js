@@ -2,7 +2,6 @@ const api = require('../../../utils/api')
 const storage = require('../../../utils/storage')
 const growthAnimation = require('./growth-animation')
 const numberReveal = require('../../../utils/number-reveal')
-const masteryRadar = require('./mastery-radar')
 const growthClient = require('./growth-client')
 const growthSnapshot = require('./growth-snapshot')
 const auth = require('../../../utils/auth')
@@ -186,7 +185,6 @@ const growthPageMethods = {
       },
       durations: numberReveal.DEFAULT_DURATIONS,
     })
-    masteryRadar.start(this)
   },
 
   _animateNumbersTick(from, to, durations, startTime) {
@@ -254,7 +252,6 @@ const growthPageMethods = {
 function clearGrowthLifecycleTimers(page) {
   growthAnimation.clear(page)
   numberReveal.finish(page)
-  masteryRadar.clear(page)
 }
 
 module.exports = {

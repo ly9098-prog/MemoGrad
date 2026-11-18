@@ -62,24 +62,27 @@ async def test_subject_mastery_query_keeps_aggregate_shape():
     await hub._build_subject_mastery(db, 7, SUBJECTS)
     text = sql(0, db)
     for fragment in (
-        "SELECT user_knowledge_states.subject_id",
+        "SELECT knowledge_points.subject_id",
         "avg(user_knowledge_states.mastery_score)",
-        "avg(user_knowledge_states.confidence)",
+        "avg(CASE WHEN (user_knowledge_states.confidence > ",
+        "JOIN knowledge_points ON knowledge_points.id = user_knowledge_states.knowledge_point_id",
         "coalesce(sum(user_knowledge_states.attempt_count), ",
         "coalesce(sum(user_knowledge_states.correct_count), ",
         "coalesce(sum(user_knowledge_states.wrong_count), ",
         "count(user_knowledge_states.id)",
         "user_knowledge_states.user_id = ",
-        "user_knowledge_states.subject_id IN (",
+        "knowledge_points.subject_id IN (",
+        "knowledge_points.is_active IS true",
         "user_knowledge_states.attempt_count > ",
-        "GROUP BY user_knowledge_states.subject_id",
+        "GROUP BY knowledge_points.subject_id",
     ):
         assert fragment in text, fragment
     assert "ORDER BY" not in text
     params = db.statements[0].compile().params
     assert params["user_id_1"] == 7
     assert params["subject_id_1"] == [3, 4]
-    assert params["attempt_count_1"] == 0
+    where_params = db.statements[0].whereclause.compile().params
+    assert where_params["attempt_count_1"] == 0
 
 
 @pytest.mark.asyncio
@@ -99,13 +102,16 @@ async def test_subject_mastery_projects_present_and_zero_attempt_rows():
         "subject_code": "data_structure",
         "subject_name": "数据结构",
         "data_available": True,
+        "status": "developing",
+        "observed_point_count": 5,
         "mastery_score": 41.2,
         "confidence": 0.5,
         "attempt_count": 8,
         "accuracy": 0.75,
     }
     assert rows[1]["data_available"] is False
-    assert rows[1]["mastery_score"] == 0.0
+    assert rows[1]["mastery_score"] is None
+    assert rows[1]["status"] == "no_data"
     assert rows[1]["confidence"] == 0.0
     assert rows[1]["attempt_count"] == 0
     assert rows[1]["accuracy"] is None
@@ -121,6 +127,8 @@ async def test_subject_mastery_falls_back_to_empty_payload_and_coerces_keys():
         "subject_code": "operating_system",
         "subject_name": "操作系统",
         "data_available": False,
+        "status": "no_data",
+        "observed_point_count": 0,
         "mastery_score": None,
         "confidence": 0.0,
         "attempt_count": 0,
@@ -128,7 +136,7 @@ async def test_subject_mastery_falls_back_to_empty_payload_and_coerces_keys():
     }
     assert rows[1]["subject_id"] == 3
     assert rows[1]["data_available"] is False
-    assert rows[1]["mastery_score"] == 0.0
+    assert rows[1]["mastery_score"] is None
     assert rows[1]["confidence"] == 0.0
     assert rows[1]["attempt_count"] == 0
     assert rows[1]["accuracy"] is None

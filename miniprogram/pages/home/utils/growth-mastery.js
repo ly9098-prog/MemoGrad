@@ -34,10 +34,10 @@ function getMasteryIconClass(name, code) {
 
 function getMasteryIconSrc(iconClass) {
   const icons = {
-    data: '/assets/icons/home-mastery/data-structure.png',
-    chip: '/assets/icons/home-mastery/computer-organization.png',
-    code: '/assets/icons/home-mastery/operating-system.png',
-    network: '/assets/icons/home-mastery/computer-network.png',
+    data: '/assets/icons/home-mastery/data-structure.svg',
+    chip: '/assets/icons/home-mastery/computer-organization.svg',
+    code: '/assets/icons/home-mastery/operating-system.svg',
+    network: '/assets/icons/home-mastery/computer-network.svg',
   }
   return icons[String(iconClass || '')] || ''
 }
@@ -72,37 +72,39 @@ function indexSubjectMastery(list) {
 
 function resolveSubjectMastery(values) {
   const {
-    hubItem,
     statsItem,
     hubHasData,
     statsHasData,
-    hubAttempts,
     statsAttempts,
     hubScoreNumber,
-    statsAccuracy,
   } = values
-  let score = 0
-  let attemptCount = 0
-  let correctCount = 0
-  let hasData = false
-  if (hubHasData) {
-    hasData = true
-    score = Math.max(0, Math.min(100, Math.round(hubScoreNumber)))
-    attemptCount = hubAttempts || statsAttempts
-    const hubAccuracy = Number(hubItem && hubItem.accuracy)
-    if (attemptCount > 0 && Number.isFinite(hubAccuracy)) {
-      correctCount = Math.max(0, Math.min(attemptCount, Math.round(attemptCount * hubAccuracy)))
-    } else if (statsItem && statsAttempts === attemptCount) {
-      correctCount = Math.max(0, Math.min(attemptCount, toNonNegativeInt(statsItem.correct_count)))
-    }
-  } else if (statsHasData) {
-    // Study Hub has no score yet; preserve the real dashboard practice fallback.
-    hasData = true
-    score = Math.max(0, Math.min(100, Math.round(statsAccuracy * 100)))
-    attemptCount = statsAttempts
-    correctCount = Math.max(0, Math.min(attemptCount, toNonNegativeInt(statsItem.correct_count)))
-  }
+  const hasData = hubHasData
+  const score = hasData ? Math.max(0, Math.min(100, Math.round(hubScoreNumber))) : 0
+  // Dashboard counts answers; Hub counts knowledge-point observations. A
+  // question can update several points, so these counts must never be mixed.
+  const attemptCount = statsHasData ? statsAttempts : 0
+  const correctCount = statsHasData
+    ? Math.max(0, Math.min(attemptCount, toNonNegativeInt(statsItem.correct_count))) : 0
   return { score, attemptCount, correctCount, hasData }
+}
+
+function masteryStatus(hasData, hubItem, hasAttempts) {
+  const status = String(hubItem && hubItem.status || '')
+  if (!hasData && status !== 'insufficient') {
+    return { statusText: hasAttempts ? (hubItem ? '样本积累中' : '评估暂不可用') : '开始积累', statusIconSrc: '' }
+  }
+  const confidence = hubItem && hubItem.confidence != null ? Number(hubItem.confidence) : NaN
+  const icons = '/assets/icons/home-mastery/'
+  if (status === 'insufficient' || !Number.isFinite(confidence) || confidence < 0.3) {
+    return { statusText: '样本积累中', statusIconSrc: `${icons}status-observing.svg` }
+  }
+  const rawScore = Number(hubItem && hubItem.mastery_score)
+  const code = ['weak', 'developing', 'good', 'mastered'].includes(status) ? status
+    : (rawScore < 40 ? 'weak' : rawScore < 70 ? 'developing' : rawScore < 85 ? 'good' : 'mastered')
+  if (code === 'weak') return { statusText: '需要强化', statusIconSrc: `${icons}status-weak.svg` }
+  if (code === 'developing') return { statusText: '持续巩固', statusIconSrc: `${icons}status-good.svg` }
+  if (code === 'good') return { statusText: '较为稳定', statusIconSrc: `${icons}status-good.svg` }
+  return { statusText: '掌握稳固', statusIconSrc: `${icons}status-mastered.svg` }
 }
 
 function buildSubjectMasteryItem(meta, index, hubByKey, statsByKey) {
@@ -112,22 +114,21 @@ function buildSubjectMasteryItem(meta, index, hubByKey, statsByKey) {
   const statsAttempts = toNonNegativeInt(statsItem && statsItem.total_questions)
   const rawHubScore = hubItem && hubItem.mastery_score
   const hubScoreNumber = rawHubScore == null ? NaN : Number(rawHubScore)
+  const hubConfidence = hubItem && hubItem.confidence != null ? Number(hubItem.confidence) : NaN
   const hubHasData = !!(
     hubItem &&
     Number.isFinite(hubScoreNumber) &&
-    (hubItem.data_available !== false || hubAttempts > 0)
+    hubItem.data_available !== false &&
+    hubItem.status !== 'insufficient' &&
+    Number.isFinite(hubConfidence) && hubConfidence >= 0.3
   )
-  const statsAccuracy = Number(statsItem && statsItem.accuracy)
-  const statsHasData = !!(statsItem && statsAttempts > 0 && Number.isFinite(statsAccuracy))
+  const statsHasData = !!(statsItem && statsAttempts > 0)
   const mastery = resolveSubjectMastery({
-    hubItem,
     statsItem,
     hubHasData,
     statsHasData,
-    hubAttempts,
     statsAttempts,
     hubScoreNumber,
-    statsAccuracy,
   })
   const sourceItem = hubItem || statsItem || {}
   const subjectName = String(sourceItem.subject_name || meta.name)
@@ -149,8 +150,9 @@ function buildSubjectMasteryItem(meta, index, hubByKey, statsByKey) {
     barWidth: hasData ? score : 0,
     attemptCount,
     correctCount,
-    questionStatText: hasData ? `${correctCount}/${attemptCount} 题` : '0/0 题',
-    statusText: hasData ? (score >= 85 ? '已掌握' : '掌握不足') : '数据不足',
+    questionStatText: statsHasData ? `${correctCount}/${attemptCount} 题` : '暂无题量统计',
+    sampleText: attemptCount > 0 ? `已练 ${attemptCount} 题` : (hubAttempts > 0 ? '已有知识点评估' : '暂无练习记录'),
+    ...masteryStatus(hasData, hubItem, statsAttempts > 0 || hubAttempts > 0),
   }
 }
 
