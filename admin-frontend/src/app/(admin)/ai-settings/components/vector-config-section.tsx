@@ -9,7 +9,7 @@ import {
   Save,
   Wifi,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { apiRequest } from "@/lib/api/client";
@@ -20,7 +20,7 @@ import type {
   VectorConfig,
   VectorConfigPatchRequest,
 } from "@/lib/api/types";
-import { Section } from "./editorial-settings";
+import { Section, useUnsavedChangesWarning } from "./editorial-settings";
 import styles from "./editorial-settings.module.css";
 
 function hasEmbeddingCapability(model: AdminAiModelConfig) {
@@ -41,10 +41,35 @@ function showToast(message: string, isError = false) {
   window.setTimeout(() => element.remove(), 2500);
 }
 
+export function isVectorConfigValid(values: {
+  dim: number;
+  timeout: number;
+  batchSize: number;
+  topK: number;
+  threshold: number;
+  ttl: number;
+}) {
+  const integerInRange = (value: number, min: number, max: number) =>
+    Number.isInteger(value) && value >= min && value <= max;
+  return (
+    integerInRange(values.dim, 1, 8192) &&
+    integerInRange(values.timeout, 1, 300) &&
+    integerInRange(values.batchSize, 1, 256) &&
+    integerInRange(values.topK, 1, 10000) &&
+    Number.isFinite(values.threshold) &&
+    values.threshold >= 0 &&
+    values.threshold <= 1 &&
+    integerInRange(values.ttl, 0, 86400)
+  );
+}
+
 export function VectorConfigSection() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<VectorConfigPatchRequest>({});
   const [testResult, setTestResult] = useState<EmbeddingTestResponse | null>(null);
+  const testRequestRef = useRef(0);
+  const dirty = Object.keys(form).length > 0;
+  useUnsavedChangesWarning(dirty);
 
   const config = useQuery({
     queryKey: ["vector-config"],
@@ -102,27 +127,41 @@ export function VectorConfigSection() {
     [models.data, selectedModelId],
   );
 
+  const invalidateTestResult = useCallback(() => {
+    testRequestRef.current += 1;
+    setTestResult(null);
+  }, []);
+
   const testMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedModelId) throw new Error("请先选择 Embedding 模型");
+    mutationFn: (variables: {
+      requestId: number;
+      modelConfigId: number;
+      dim: number;
+      timeout: number;
+    }) => {
+      if (!variables.modelConfigId) throw new Error("请先选择 Embedding 模型");
       return apiRequest<EmbeddingTestResponse>("/vector-config/test-embedding", {
         method: "POST",
         body: JSON.stringify({
-          model_config_id: selectedModelId,
-          dim: form.embedding_dim ?? c?.embedding_dim ?? 1024,
-          timeout: form.embedding_timeout ?? c?.embedding_timeout ?? 30,
+          model_config_id: variables.modelConfigId,
+          dim: variables.dim,
+          timeout: variables.timeout,
         }),
       });
     },
-    onSuccess: (data) => setTestResult(data),
-    onError: (error) =>
+    onSuccess: (data, variables) => {
+      if (variables.requestId === testRequestRef.current) setTestResult(data);
+    },
+    onError: (error, variables) => {
+      if (variables.requestId !== testRequestRef.current) return;
       setTestResult({
         success: false,
         status: "network_error",
         message: getErrorMessage(error),
         latency_ms: 0,
         returned_dim: null,
-      }),
+      });
+    },
   });
 
   if (config.isLoading || models.isLoading) {
@@ -151,7 +190,6 @@ export function VectorConfigSection() {
     );
   }
 
-  const dirty = Object.keys(form).length > 0;
   const isEnabled = form.vector_enabled ?? c.vector_enabled;
   const selectedInvalid = Boolean(
     selectedModel &&
@@ -165,20 +203,14 @@ export function VectorConfigSection() {
     form.vector_similarity_threshold ?? c.vector_similarity_threshold;
   const configuredTtl = form.vector_cache_ttl_sec ?? c.vector_cache_ttl_sec;
 
-  const formValid =
-    Number.isFinite(configuredDim) &&
-    configuredDim >= 1 &&
-    Number.isFinite(configuredTimeout) &&
-    configuredTimeout >= 1 &&
-    Number.isFinite(configuredBatchSize) &&
-    configuredBatchSize >= 1 &&
-    Number.isFinite(configuredTopK) &&
-    configuredTopK >= 1 &&
-    Number.isFinite(configuredThreshold) &&
-    configuredThreshold >= 0 &&
-    configuredThreshold <= 1 &&
-    Number.isFinite(configuredTtl) &&
-    configuredTtl >= 0;
+  const formValid = isVectorConfigValid({
+    dim: configuredDim,
+    timeout: configuredTimeout,
+    batchSize: configuredBatchSize,
+    topK: configuredTopK,
+    threshold: configuredThreshold,
+    ttl: configuredTtl,
+  });
 
   const connectionLabel = !selectedModel
     ? "未选择"
@@ -260,7 +292,7 @@ export function VectorConfigSection() {
                   "embedding_model_config_id",
                   event.target.value ? Number(event.target.value) : null,
                 );
-                setTestResult(null);
+                invalidateTestResult();
               }}
               value={selectedModelId ?? ""}
             >
@@ -300,7 +332,7 @@ export function VectorConfigSection() {
               min={1}
               onChange={(event) => {
                 set("embedding_dim", Number(event.target.value));
-                setTestResult(null);
+                invalidateTestResult();
               }}
               type="number"
               value={configuredDim}
@@ -517,11 +549,13 @@ export function VectorConfigSection() {
               <span className={styles.miniFieldLabel}>请求超时（秒）</span>
               <input
                 className={styles.miniFieldInput}
+                disabled={saveMutation.isPending}
                 max={300}
                 min={1}
-                onChange={(event) =>
-                  set("embedding_timeout", Number(event.target.value))
-                }
+                onChange={(event) => {
+                  set("embedding_timeout", Number(event.target.value));
+                  invalidateTestResult();
+                }}
                 type="number"
                 value={configuredTimeout}
               />
@@ -530,6 +564,7 @@ export function VectorConfigSection() {
               <span className={styles.miniFieldLabel}>批量大小</span>
               <input
                 className={styles.miniFieldInput}
+                disabled={saveMutation.isPending}
                 max={256}
                 min={1}
                 onChange={(event) =>
@@ -546,13 +581,22 @@ export function VectorConfigSection() {
               className={styles.outlineButton}
               disabled={
                 testMutation.isPending ||
+                  saveMutation.isPending ||
                 !selectedModelId ||
                 !selectedModel?.api_configured ||
                 selectedInvalid
               }
               onClick={() => {
+                if (!selectedModelId) return;
+                const requestId = testRequestRef.current + 1;
+                testRequestRef.current = requestId;
                 setTestResult(null);
-                testMutation.mutate();
+                testMutation.mutate({
+                  requestId,
+                  modelConfigId: selectedModelId,
+                  dim: form.embedding_dim ?? c?.embedding_dim ?? 1024,
+                  timeout: form.embedding_timeout ?? c?.embedding_timeout ?? 30,
+                });
               }}
               type="button"
             >

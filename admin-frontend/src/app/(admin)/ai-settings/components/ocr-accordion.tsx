@@ -8,7 +8,12 @@ import { Toggle } from "@/components/ui/toggle";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { AdminAiConfigsPatchRequest, AdminAiConfigsResponse } from "@/lib/api/types";
-import { LineEditor, Section } from "./editorial-settings";
+import {
+  LineEditor,
+  MAX_PROMPT_LENGTH,
+  Section,
+  useUnsavedChangesWarning,
+} from "./editorial-settings";
 import styles from "./editorial-settings.module.css";
 
 type Configs = Record<string, string | number | boolean>;
@@ -143,7 +148,9 @@ export function OcrAccordion({
     () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
     [draft, savedDraft],
   );
+  useUnsavedChangesWarning(dirty);
   const promptChanged = draft.prompt !== savedDraft.prompt;
+  const promptTooLong = draft.prompt.length > MAX_PROMPT_LENGTH;
   const filterValid =
     isNonNegativeInteger(draft.filterChars) &&
     isNonNegativeInteger(draft.filterTokens);
@@ -193,7 +200,7 @@ export function OcrAccordion({
     return patch;
   };
 
-  const canSave = dirty && filterValid;
+  const canSave = dirty && filterValid && !promptTooLong;
   const handleSave = () => {
     if (!canSave || mutation.isPending) return;
     const patch = buildPatch();
@@ -224,6 +231,21 @@ export function OcrAccordion({
       {modelName || "未绑定 OCR 模型"}
     </span>
   );
+
+  if (error || (!loading && !configs)) {
+    return (
+      <Section
+        eyebrow="03 / OCR"
+        title="纠错配置"
+        lead="先还原公式与结构，再让题目进入题库。"
+        aside={aside}
+      >
+        <p className={styles.noticeError}>
+          {error || "OCR 配置尚未加载，暂时不能编辑。"}
+        </p>
+      </Section>
+    );
+  }
 
   return (
     <Section
@@ -281,14 +303,23 @@ export function OcrAccordion({
               }
               minLines={8}
               height={330}
+              maxLength={MAX_PROMPT_LENGTH}
               placeholder="输入 OCR 纠错提示词…"
               footer={
                 <>
                   <span>Prompt 修改后需手动保存</span>
-                  <span>{promptLineCount} 行</span>
+                  <span>
+                    {promptLineCount} 行 · {draft.prompt.length.toLocaleString("zh-CN")} /{" "}
+                    {MAX_PROMPT_LENGTH.toLocaleString("zh-CN")} 字符
+                  </span>
                 </>
               }
             />
+            {promptTooLong ? (
+              <p className={styles.noticeError}>
+                提示词不能超过 {MAX_PROMPT_LENGTH.toLocaleString("zh-CN")} 字符。
+              </p>
+            ) : null}
           </div>
 
           <div className={styles.pane}>

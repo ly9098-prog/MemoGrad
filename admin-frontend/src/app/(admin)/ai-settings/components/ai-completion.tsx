@@ -11,7 +11,13 @@ import type {
   AdminAiConfigsPatchRequest,
   AdminAiConfigsResponse,
 } from "@/lib/api/types";
-import { LineEditor, ScopeCheck, Section } from "./editorial-settings";
+import {
+  LineEditor,
+  MAX_PROMPT_LENGTH,
+  ScopeCheck,
+  Section,
+  useUnsavedChangesWarning,
+} from "./editorial-settings";
 import styles from "./editorial-settings.module.css";
 
 type Configs = Record<string, string | number | boolean>;
@@ -133,6 +139,7 @@ export function AiCompletionPreview({
 
   const enabledCount = COMPLETION_SCOPES.filter((item) => scopes[item.key]).length;
   const promptChanged = prompt !== savedPrompt;
+  const promptTooLong = prompt.length > MAX_PROMPT_LENGTH;
   const savedScopes = readScopes(data);
   const scopesChanged = COMPLETION_SCOPES.some(
     (item) => scopes[item.key] !== savedScopes[item.key],
@@ -140,6 +147,7 @@ export function AiCompletionPreview({
   const repairChanged =
     repairStructure !== truthy(data.completion_repair_structure);
   const dirty = promptChanged || scopesChanged || repairChanged;
+  useUnsavedChangesWarning(dirty);
   const promptLineCount = Math.max(4, prompt.split("\n").length);
 
   const toggleScope = (key: string) => {
@@ -159,7 +167,7 @@ export function AiCompletionPreview({
   };
 
   const saveChanges = () => {
-    if (!dirty || saveMutation.isPending) return;
+    if (!dirty || promptTooLong || saveMutation.isPending) return;
     const patch = buildCompletionPatch({
       prompt,
       savedPrompt,
@@ -182,6 +190,21 @@ export function AiCompletionPreview({
       {modelName || "未绑定补全模型"}
     </span>
   );
+
+  if (error || (!loading && !configs)) {
+    return (
+      <Section
+        eyebrow="04 / 补全"
+        title="补全校准台"
+        lead="让缺失的题干、选项与答案回到同一条逻辑链。"
+        aside={aside}
+      >
+        <p className={styles.noticeError}>
+          {error || "补全配置尚未加载，暂时不能编辑。"}
+        </p>
+      </Section>
+    );
+  }
 
   return (
     <Section
@@ -237,14 +260,23 @@ export function AiCompletionPreview({
               onChange={setPrompt}
               minLines={4}
               height={220}
+              maxLength={MAX_PROMPT_LENGTH}
               placeholder="输入补全提示词…"
               footer={
                 <>
                   <span>Prompt 修改后需手动保存</span>
-                  <span>{prompt.length.toLocaleString("zh-CN")} 字符</span>
+                  <span>
+                    {prompt.length.toLocaleString("zh-CN")} /{" "}
+                    {MAX_PROMPT_LENGTH.toLocaleString("zh-CN")} 字符
+                  </span>
                 </>
               }
             />
+            {promptTooLong ? (
+              <p className={styles.noticeError}>
+                提示词不能超过 {MAX_PROMPT_LENGTH.toLocaleString("zh-CN")} 字符。
+              </p>
+            ) : null}
 
             <div className={styles.inlineToggle}>
               <div>
@@ -345,7 +377,7 @@ export function AiCompletionPreview({
           </button>
           <Button
             className={styles.primaryButton}
-            disabled={!dirty || saveMutation.isPending}
+            disabled={!dirty || promptTooLong || saveMutation.isPending}
             onClick={saveChanges}
             type="button"
             variant="primary"

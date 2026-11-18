@@ -173,6 +173,12 @@ async def update_configs(
     current_admin=Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    configs = await patch_configs(db, data.configs, current_admin)
+    try:
+        configs = await patch_configs(db, data.configs, current_admin)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     await db.commit()
     return AdminAiConfigsResponse(configs=configs)

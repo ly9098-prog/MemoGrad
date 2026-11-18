@@ -15,7 +15,10 @@ import MetricsPage from "../recommendation/metrics/page";
 import ReportsPage from "../recommendation/reports/page";
 import StrategiesPage from "../recommendation/strategies/page";
 import SystemTasksPage from "../system/tasks/page";
-import { VectorConfigSection } from "./components/vector-config-section";
+import {
+  isVectorConfigValid,
+  VectorConfigSection,
+} from "./components/vector-config-section";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -126,13 +129,13 @@ describe("AI configuration request ownership", () => {
     expect(isQuotaExhausted(100, 0)).toBe(false);
   });
 
-  it("keeps settings hydration, statistics and model registration", async () => {
+  it("keeps settings reads pure and still loads statistics and model registration", async () => {
     renderAiSettings();
     const settings = { ai_parse_enabled: false, monthly_call_limit: 42 };
     h.request.mockResolvedValue(settings);
-    await h.queries[0].queryFn();
-    expect(h.setters[0]).toHaveBeenCalledWith("42");
-    expect(h.setters[1]).toHaveBeenCalledWith(false);
+    await expect(h.queries[0].queryFn()).resolves.toEqual(settings);
+    expect(h.setters[0]).not.toHaveBeenCalled();
+    expect(h.setters[1]).not.toHaveBeenCalled();
     await h.queries[1].queryFn();
     await h.queries[2].queryFn();
     await h.queries[3].queryFn();
@@ -244,7 +247,12 @@ describe("AI configuration request ownership", () => {
   it("tests the selected embedding ID and draft dimensions without sending provider credentials", async () => {
     h.states = [{ embedding_model_config_id: 7, embedding_dim: 256, embedding_timeout: 9 }];
     VectorConfigSection();
-    await h.mutations[1].mutationFn();
+    await h.mutations[1].mutationFn({
+      requestId: 1,
+      modelConfigId: 7,
+      dim: 256,
+      timeout: 9,
+    } as never);
     expect(h.request).toHaveBeenCalledWith("/vector-config/test-embedding", {
       method: "POST", body: JSON.stringify({ model_config_id: 7, dim: 256, timeout: 9 }),
     });
@@ -252,8 +260,34 @@ describe("AI configuration request ownership", () => {
 
   it("rejects an absent embedding selection before issuing a connection test", () => {
     VectorConfigSection();
-    expect(() => h.mutations[1].mutationFn()).toThrow();
+    expect(() =>
+      h.mutations[1].mutationFn({
+        requestId: 1,
+        modelConfigId: 0,
+        dim: 1024,
+        timeout: 30,
+      } as never),
+    ).toThrow();
     expect(h.request).not.toHaveBeenCalled();
+  });
+
+  it("mirrors every backend vector bound before enabling save", () => {
+    const valid = {
+      dim: 1024,
+      timeout: 30,
+      batchSize: 16,
+      topK: 100,
+      threshold: 0.15,
+      ttl: 300,
+    };
+    expect(isVectorConfigValid(valid)).toBe(true);
+    expect(isVectorConfigValid({ ...valid, dim: 1.5 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, dim: 8193 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, timeout: 301 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, batchSize: 0 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, topK: 10001 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, threshold: 1.01 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, ttl: -1 })).toBe(false);
   });
 
   it("clears vector drafts and stale test results only on successful save", async () => {

@@ -4,9 +4,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
 from app.api.v1 import admin_ai_config
-from app.schemas.admin_ai_config import AdminAiModelConfigPatchRequest
+from app.schemas.admin_ai_config import (
+    AdminAiConfigsPatchRequest,
+    AdminAiModelConfigPatchRequest,
+)
 from app.services.ai import analysis_admin_health
 
 
@@ -73,3 +77,25 @@ async def test_post_commit_probe_failure_does_not_fail_model_update(
     db.commit.assert_awaited_once()
     db.rollback.assert_not_awaited()
     assert "ai.analysis.admin_probe_failed model_config_id=11" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_config_update_maps_prompt_length_error_to_422(monkeypatch):
+    db = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    monkeypatch.setattr(
+        admin_ai_config,
+        "patch_configs",
+        AsyncMock(side_effect=ValueError("提示词长度不能超过 5000 字符")),
+    )
+
+    with pytest.raises(HTTPException) as caught:
+        await admin_ai_config.update_configs(
+            AdminAiConfigsPatchRequest(configs={"completion_prompt": "x"}),
+            None,
+            object(),
+            db,
+        )
+
+    assert caught.value.status_code == 422
+    assert caught.value.detail == "提示词长度不能超过 5000 字符"
+    db.commit.assert_not_awaited()

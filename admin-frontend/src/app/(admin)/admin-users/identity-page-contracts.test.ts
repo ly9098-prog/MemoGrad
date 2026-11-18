@@ -121,7 +121,7 @@ describe("login and shell ownership", () => {
     h.login.mockRejectedValue(new Error("private provider detail"));
     await renderLogin()({ preventDefault: vi.fn() });
     expect(h.replace).not.toHaveBeenCalled();
-    expect(h.setters[2]).toHaveBeenLastCalledWith("用户名或密码错误");
+    expect(h.setters[2]).toHaveBeenLastCalledWith("登录失败，请稍后重试");
     expect(h.setters[3]).toHaveBeenLastCalledWith(false);
   });
 

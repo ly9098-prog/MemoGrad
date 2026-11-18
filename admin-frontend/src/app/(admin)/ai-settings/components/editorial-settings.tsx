@@ -1,10 +1,24 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode, UIEvent } from "react";
 import { cn } from "@/lib/utils";
 import styles from "./editorial-settings.module.css";
+
+export const MAX_PROMPT_LENGTH = 5000;
+
+export function useUnsavedChangesWarning(dirty: boolean) {
+  useEffect(() => {
+    if (!dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+}
 
 export function Section({
   eyebrow,
@@ -43,6 +57,7 @@ export function LineEditor({
   minLines = 4,
   height = 320,
   disabled = false,
+  maxLength,
   placeholder,
   ariaLabel,
   footer,
@@ -52,6 +67,7 @@ export function LineEditor({
   minLines?: number;
   height?: number;
   disabled?: boolean;
+  maxLength?: number;
   placeholder?: string;
   ariaLabel: string;
   footer?: ReactNode;
@@ -80,6 +96,7 @@ export function LineEditor({
           aria-label={ariaLabel}
           className={styles.editorInput}
           disabled={disabled}
+          maxLength={maxLength}
           onChange={(event) => onChange(event.target.value)}
           onScroll={handleScroll}
           placeholder={placeholder}

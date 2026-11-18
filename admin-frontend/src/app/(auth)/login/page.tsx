@@ -5,6 +5,7 @@ import { type FormEvent, type PointerEvent, Suspense, useState } from "react";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import { AdminFooter } from "@/components/layout/admin-footer";
 import { Input } from "@/components/ui/input";
+import { ApiError } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
 import { safeInternalRedirect } from "@/lib/safe-redirect";
 import styles from "./login.module.css";
@@ -28,6 +29,16 @@ function resetCardTilt(event: PointerEvent<HTMLDivElement>) {
   event.currentTarget.style.removeProperty("--login-pointer-y");
 }
 
+export function loginErrorMessage(error: unknown) {
+  if (error instanceof TypeError) return "网络异常，请检查连接后重试";
+  if (!(error instanceof ApiError)) return "登录失败，请稍后重试";
+  if (error.status === 401) return "用户名或密码错误";
+  if (error.status === 403) return "当前账号无权访问管理后台";
+  if (error.status === 429) return "尝试次数过多，请稍后再试";
+  if (error.status >= 500) return "服务暂时不可用，请稍后再试";
+  return error.message || "登录失败，请稍后重试";
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,8 +58,8 @@ function LoginForm() {
     try {
       await login(username, password);
       router.replace(safeInternalRedirect(searchParams.get("next")));
-    } catch {
-      setError("用户名或密码错误");
+    } catch (error) {
+      setError(loginErrorMessage(error));
     } finally {
       setLoading(false);
     }

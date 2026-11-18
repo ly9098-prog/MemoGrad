@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,7 @@ function AISettingsContent() {
   const queryClient = useQueryClient();
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [enabled, setEnabled] = useState(true);
+  const settingsEditedRef = useRef(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(
     new Set([activeTab]),
@@ -82,13 +83,15 @@ function AISettingsContent() {
   const settings = useQuery({
     queryKey: ["ai-settings"],
     enabled: isSuperAdmin,
-    queryFn: async () => {
-      const data = await apiRequest<AISettings>("/ai-settings");
-      setEnabled(data.ai_parse_enabled);
-      setMonthlyLimit(String(data.monthly_call_limit));
-      return data;
-    },
+    queryFn: () => apiRequest<AISettings>("/ai-settings"),
   });
+
+  useEffect(() => {
+    const data = settings.data;
+    if (!data || settingsEditedRef.current) return;
+    setEnabled(data.ai_parse_enabled);
+    setMonthlyLimit(String(data.monthly_call_limit));
+  }, [settings.data]);
 
   const stats = useQuery({
     queryKey: ["ai-settings", "stats"],
@@ -127,6 +130,7 @@ function AISettingsContent() {
       setConfirmOpen(false);
       setEnabled(data.ai_parse_enabled);
       setMonthlyLimit(String(data.monthly_call_limit));
+      settingsEditedRef.current = false;
       queryClient.setQueryData(["ai-settings"], data);
       showToast("AI 解析设置已保存");
     },
@@ -287,8 +291,14 @@ function AISettingsContent() {
             error={settings.isError ? getErrorMessage(settings.error) : null}
             enabled={enabled}
             monthlyLimit={monthlyLimit}
-            onEnabledChange={setEnabled}
-            onMonthlyLimitChange={setMonthlyLimit}
+            onEnabledChange={(value) => {
+              setEnabled(value);
+              settingsEditedRef.current = true;
+            }}
+            onMonthlyLimitChange={(value) => {
+              setMonthlyLimit(value);
+              settingsEditedRef.current = true;
+            }}
             canSave={canSave}
             onSave={() => setConfirmOpen(true)}
             isPending={updateMutation.isPending}
