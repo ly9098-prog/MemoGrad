@@ -246,28 +246,39 @@ page {
   line-height: 1.4;
 }
 
-/* One consent block: a native check target beside two compact lines of text. */
+/* Keep consent on one central axis, with document links outside the check label. */
 .agreement-box {
   width: 100%;
-  max-width: 650rpx;
-  margin: 20rpx auto 0;
+  margin: 12rpx auto 0;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.6;
 }
-.agreement-group { display: flex; flex: 0 0 88rpx; }
-.agreement-check { position: relative; display: flex; width: 88rpx; min-height: 88rpx; justify-content: center; align-items: flex-start; }
+.agreement-group { display: flex; }
+.agreement-check {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  padding: 0 20rpx;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
 .agreement-native {
   position: absolute;
-  left: 0;
-  width: 88rpx;
-  height: 88rpx;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
 }
 .agreement-indicator {
   box-sizing: border-box;
+  flex-shrink: 0;
   width: 28rpx;
   height: 28rpx;
-  margin-top: 12rpx;
   border: 2rpx solid #748B7D;
   border-radius: 8rpx;
   background: #FFFFFF;
@@ -283,33 +294,27 @@ page {
   border-bottom: 3rpx solid #FFFFFF;
   transform: rotate(-45deg);
 }
-.agreement-copy { flex: 1; min-width: 0; }
-.agreement-text {
-  display: inline-flex;
-  align-items: center;
-  min-height: 48rpx;
-  color: #617268;
-  font-size: 24rpx;
-  line-height: 1.6;
-}
+.agreement-text { color: #617268; }
 .agreement-links {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-wrap: wrap;
-  column-gap: 8rpx;
+  max-width: 100%;
+  column-gap: 16rpx;
 }
 .agreement-link {
   display: inline-flex;
-  min-height: 64rpx;
+  min-height: 32px;
   align-items: center;
   color: #415D4D;
-  font-size: 24rpx;
-  font-weight: 500;
-  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 5rpx;
+  text-decoration-color: rgba(65, 93, 77, .32);
   white-space: nowrap;
 }
+.agreement-separator { color: #748B7D; }
 .agreement-link-pressed { opacity: .58; }
 
 .guest-browse {
@@ -325,6 +330,8 @@ page {
 }
 .guest-browse-pressed { opacity: .6; }
 .login-panel > .guest-browse { margin-top: 24rpx; }
+.guest-hint { color: #617268; }
+.guest-action { color: #305F48; font-weight: 500; }
 
 .dev-entry {
   margin-top: 12rpx;
@@ -352,7 +359,7 @@ page {
 }
 
 .footer {
-  margin-top: 24rpx;
+  margin-top: 40rpx;
   text-align: center;
 }
 .footer-text {

@@ -49,19 +49,20 @@
             <label class="agreement-check">
               <checkbox id="login-agreement" class="agreement-native" value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#3A6F5B" aria-label="我已阅读并同意用户协议、隐私政策与AI免责声明" />
               <view class="agreement-indicator {{agreed ? 'is-checked' : ''}}" aria-hidden="true"></view>
+              <text class="agreement-text">我已阅读并同意</text>
             </label>
           </checkbox-group>
-          <view class="agreement-copy">
-            <label class="agreement-text" for="login-agreement">我已阅读并同意</label>
-            <view class="agreement-links">
-              <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《用户协议》</text>
-              <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《隐私政策》</text>
-              <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">《AI 免责声明》</text>
-            </view>
+          <view class="agreement-links">
+            <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">用户协议</text>
+            <text class="agreement-separator" aria-hidden="true">·</text>
+            <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">隐私政策</text>
+            <text class="agreement-separator" aria-hidden="true">·</text>
+            <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">AI 免责声明</text>
           </view>
         </view>
         <view class="guest-browse" bindtap="onGuestBrowse" hover-class="guest-browse-pressed" aria-role="button" aria-label="暂不登录，先浏览体验">
-          <text>暂不登录，先浏览体验</text>
+          <text class="guest-hint">暂不登录，</text>
+          <text class="guest-action">先浏览体验</text>
         </view>
         <view wx:if="{{showDevLogin}}" class="dev-entry" hover-class="dev-entry-pressed" hover-start-time="20" hover-stay-time="80" bindtap="onDevLogin">
           <text class="dev-text">开发者模式</text>
@@ -69,7 +70,7 @@
         </view>
       </view>
       <view class="footer route-enter-page delay-two">
-        <text class="footer-text">ICP备案号：桂ICP备2026003057号-2X</text>
+        <text class="footer-text">桂ICP备2026003057号-2X</text>
       </view>
     </view>
   </view>
