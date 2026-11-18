@@ -223,9 +223,12 @@ class PaddleXHttpOcrWorkerClient:
         config: OcrRuntimeConfig,
         *,
         http_client: httpx.AsyncClient | None = None,
+        connection_fallback_enabled: bool = False,
     ) -> None:
         self._config = config
         self._closed = False
+        self._connection_fallback_enabled = connection_fallback_enabled
+        self._circuit_connection_failure = False
         self._fingerprint = _compute_engine_fingerprint(config)
         self._semaphore = asyncio.Semaphore(config.remote_max_concurrency)
         self._batch_concurrency = max(1, int(config.remote_max_concurrency))
@@ -353,6 +356,7 @@ class PaddleXHttpOcrWorkerClient:
                     f"OCR circuit breaker open "
                     f"(failures={self._circuit_failures}, "
                     f"recovery in {max(0.0, self._circuit_recovery_timeout - (time.time() - self._circuit_last_failure)):.0f}s)",
+                    remote_unavailable=self._circuit_connection_failure,
                 )
             half_open_probe = True
 
@@ -463,7 +467,9 @@ class PaddleXHttpOcrWorkerClient:
         else:
             self._metrics["failed"] += 1
             if backend_attempted:
-                await self._record_failure()
+                await self._record_failure(
+                    remote_unavailable=bool((result.result or {}).get("remote_unavailable"))
+                )
             elif half_open_probe:
                 await self._abandon_half_open_probe()
 
@@ -607,11 +613,12 @@ class PaddleXHttpOcrWorkerClient:
             self._circuit_last_success = time.time()
             if self._circuit_state == "half-open":
                 self._circuit_state = "closed"
+                self._circuit_connection_failure = False
                 self._half_open_probe_in_flight = False
                 logger.info("OCR circuit closed — remote endpoint recovered")
                 self._metrics["circuit_state"] = "closed"
 
-    async def _record_failure(self) -> None:
+    async def _record_failure(self, *, remote_unavailable: bool = False) -> None:
         """Record an OCR failure — may trip circuit breaker.
 
         Thread-safe: guarded by ``_circuit_lock``.
@@ -625,6 +632,7 @@ class PaddleXHttpOcrWorkerClient:
             # Half-open → probe failure → immediately re-open
             if self._circuit_state == "half-open":
                 self._circuit_state = "open"
+                self._circuit_connection_failure = remote_unavailable
                 self._half_open_probe_in_flight = False
                 self._metrics["circuit_state"] = "open"
                 logger.warning(
@@ -639,6 +647,9 @@ class PaddleXHttpOcrWorkerClient:
                 self._half_open_probe_in_flight = False
                 self._metrics["circuit_state"] = "open"
                 if not was_open:
+                    # The reason belongs to this open interval. A late success
+                    # from an already-admitted request must not erase it.
+                    self._circuit_connection_failure = remote_unavailable
                     self._circuit_total_trips += 1
                     self._metrics["circuit_breaker_trips"] = self._circuit_total_trips
                     logger.warning(
@@ -767,6 +778,18 @@ class PaddleXHttpOcrWorkerClient:
                     last_error_code = e.error_code
                 elif last_status and _is_retryable_status(last_status):
                     last_error_code = STABLE_ERROR_CODES["REMOTE_HTTP_ERROR"]
+                # Connect failures happen before inference was accepted. In the
+                # local profile, recover immediately instead of retrying a stopped
+                # service. Read/write/pool timeouts retain normal retry semantics.
+                if self._connection_fallback_enabled and isinstance(
+                    last_exc, (httpx.ConnectError, httpx.ConnectTimeout),
+                ):
+                    return self._make_error(
+                        page_index,
+                        last_error_code,
+                        _remote_failure_detail(last_exc, self._config),
+                        remote_unavailable=True,
+                    )
                 delay = _compute_backoff(attempt, retry_after=e.retry_after)
                 # Cap delay at remaining deadline
                 remaining = deadline - time.monotonic()
@@ -1086,6 +1109,8 @@ class PaddleXHttpOcrWorkerClient:
         page_index: int,
         stable_error_code: str,
         error_message: str,
+        *,
+        remote_unavailable: bool = False,
     ) -> WorkerResult:
         self._metrics["last_error_code"] = stable_error_code
         return WorkerResult(
@@ -1102,6 +1127,7 @@ class PaddleXHttpOcrWorkerClient:
                 "coordinate_space": "image",
                 "engine_fingerprint": self._fingerprint,
                 "failed": True,
+                "remote_unavailable": remote_unavailable,
                 "error": error_message[:1000],
             },
             stable_error_code=stable_error_code,

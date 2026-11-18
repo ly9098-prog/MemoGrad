@@ -5,7 +5,6 @@ the existing database, cleanup, status and resource reservation behavior here.
 """
 
 import hashlib
-import io
 import logging
 import os
 
@@ -308,7 +307,8 @@ async def _run_ocr_via_configured_backend(image_bytes: bytes) -> dict:
     This helper uses the application OCR Gateway when available.  For tooling
     or tests where the lifespan Gateway has not been created yet, it creates a
     short-lived worker client from the same runtime config.  Importantly, a
-    configured ``paddlex_http`` backend never falls back to local CPU OCR.
+    configured ``paddlex_http`` backend uses CPU recovery only in the explicit
+    local-import profile when the remote service cannot be connected to.
 
     Returns the standard ``WorkerResult.result`` mapping so callers can retain
     OCR boxes/geometry instead of reducing the first OCR pass to plain text.

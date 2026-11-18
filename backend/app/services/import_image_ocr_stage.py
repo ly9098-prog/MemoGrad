@@ -56,7 +56,10 @@ async def run_image_ocr_stage(request: ImageOcrStageRequest) -> ImageOcrStageRes
     diagnostics = request.build_diagnostics(raw_ocr_text, cleaned_text)
     diagnostics.update(
         {
-            "execution_backend": runtime_diagnostics.get("execution_backend"),
+            "execution_backend": ocr_result.get(
+                "execution_backend", runtime_diagnostics.get("execution_backend"),
+            ),
+            "fallback_from": ocr_result.get("fallback_from"),
             "box_count": len(blocks[0].get("boxes") or []),
             "engine_fingerprint": ocr_result.get("engine_fingerprint", ""),
         }

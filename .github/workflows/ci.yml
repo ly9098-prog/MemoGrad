@@ -454,6 +454,7 @@ jobs:
             tests/test_services/test_import_recovery_boundaries.py \
             tests/test_services/test_public_pipeline_resume_service.py \
             tests/test_services/test_admin_import_history_service.py \
+            tests/test_services/test_ocr_cpu_fallback_client.py \
             tests/test_features/test_pipeline_status_chunk_progress.py \
             tests/test_features/test_pipeline_e2e.py \
             tests/architecture/test_pipeline_stage_completion_boundaries.py \

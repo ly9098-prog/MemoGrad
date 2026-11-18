@@ -879,7 +879,7 @@ async def _run_single_image(
         "【OCR-1】OCR 原始结果 | file=%s mode=%s backend=%s %s",
         source_file,
         ocr_mode,
-        configured_backend,
+        ocr_result.get("execution_backend", configured_backend),
         safe_text_preview(raw_ocr_text),
     )
 

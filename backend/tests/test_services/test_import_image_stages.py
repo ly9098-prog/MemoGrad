@@ -83,6 +83,18 @@ def ocr_stage_request(**overrides):
 
 
 @pytest.mark.asyncio
+async def test_ocr_stage_reports_actual_cpu_backend_after_fallback():
+    request = ocr_stage_request(run_ocr=AsyncMock(return_value={
+        "text": "CPU text", "execution_backend": "local_process",
+        "fallback_from": "paddlex_http", "engine_fingerprint": "cpu-v1",
+    }))
+    result = await run_image_ocr_stage(request)
+    assert result.diagnostics["execution_backend"] == "local_process"
+    assert result.diagnostics["fallback_from"] == "paddlex_http"
+    assert result.diagnostics["engine_fingerprint"] == "cpu-v1"
+
+
+@pytest.mark.asyncio
 async def test_ocr_stage_publishes_status_with_pipeline_id():
     request = ocr_stage_request()
 
