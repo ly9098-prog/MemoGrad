@@ -35,7 +35,6 @@ import {
   useState,
 } from "react";
 import type { MutableRefObject } from "react";
-import { forceCollide, forceX, forceY } from "d3-force";
 import type { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -49,12 +48,13 @@ import type {
 import {
   RELATIONS,
   buildDonutStops,
-  clusterRingAnchors,
   computeDonutTotal,
   difficultyText,
   edgeStrength,
   escapeHtml,
   graphNodeRadius,
+  GRAPH_MIN_ZOOM,
+  GRAPH_MAX_ZOOM,
   relationColor,
   relationLabel,
   selectDefaultSubject,
@@ -67,6 +67,17 @@ import {
   graphExportFilename,
   type GraphExportFormat,
 } from "@/lib/knowledge-graph-export";
+import {
+  DEFAULT_GRAPH_FORCES,
+  GRAPH_ALPHA_DECAY,
+  GRAPH_VELOCITY_DECAY,
+} from "@/lib/knowledge-graph-physics";
+import {
+  graphFocusLinkColor,
+  graphUnrelatedFocus,
+  sampleGraphFocus,
+  type GraphFocusLayer,
+} from "@/lib/knowledge-graph-focus";
 import type { KgLinkPayload, KgNodePayload, SmoothZoomControl } from "./force-canvas";
 
 const ForceCanvas = dynamic(() => import("./force-canvas"), {
@@ -77,12 +88,7 @@ const ForceCanvas = dynamic(() => import("./force-canvas"), {
 const CLUSTER_COLORS = ["#24688F", "#147A83", "#6F5D8B", "#B07A35", "#A7596D"];
 const NEUTRAL_COLOR = "#7C93A5";
 const FIT_PADDING = 56;
-const DEFAULT_FORCE = {
-  center: 0.52,
-  charge: 10,
-  link: 1,
-  distance: 250,
-};
+const DEFAULT_FORCE = DEFAULT_GRAPH_FORCES;
 const DEFAULT_APPEARANCE = {
   arrows: false,
   textFade: true,
@@ -118,7 +124,39 @@ type NeighborEntry = {
   maxConfidence: number;
 };
 
+type LabelSprite = { canvas: HTMLCanvasElement; width: number; height: number; textWidth: number };
+
+function createLabelSprite(text: string, focused: boolean): LabelSprite {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  const fontSize = focused ? 11.5 : 10;
+  const font = `${focused ? 600 : 500} ${fontSize}px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
+  ctx.font = font;
+  const textWidth = ctx.measureText(text).width;
+  const width = Math.ceil(textWidth + 6);
+  const height = Math.ceil(fontSize * 1.25 + 6);
+  const density = 2;
+  canvas.width = Math.ceil(width * density);
+  canvas.height = Math.ceil(height * density);
+  ctx.scale(density, density);
+  ctx.font = font;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = "rgba(247, 250, 252, 0.96)";
+  ctx.strokeText(text, width / 2, height / 2);
+  ctx.fillStyle = focused ? "#0F3A52" : "#173342";
+  ctx.fillText(text, width / 2, height / 2);
+  return { canvas, width, height, textWidth };
+}
+
 type SettingsSection = "filter" | "colors" | "appearance" | "forces";
+const SETTINGS_SECTIONS: Array<{ key: SettingsSection; label: string }> = [
+  { key: "filter", label: "筛选" },
+  { key: "colors", label: "颜色组" },
+  { key: "appearance", label: "外观" },
+  { key: "forces", label: "力度" },
+];
 
 function clusterStorageKey(cluster: Pick<Cluster, "topicId">) {
   return cluster.topicId == null ? "orphan" : `topic:${cluster.topicId}`;
@@ -287,12 +325,13 @@ function RangeControl({
         type="range"
         aria-label={label}
         className="kg-range"
+        aria-valuetext={display}
         min={min}
         max={max}
         step={step}
         value={value}
         style={{
-          background: `linear-gradient(90deg, #25638a 0%, #7fd3f0 ${ratio}%, #d5e1eb ${ratio}%, #d5e1eb 100%)`,
+          backgroundImage: `linear-gradient(90deg, #25638a ${ratio}%, #d5e1eb ${ratio}%)`,
         }}
         onChange={(event) => onChange(Number(event.target.value))}
       />
@@ -310,6 +349,8 @@ export default function KnowledgeGraphWorkspace() {
   const [centerId, setCenterId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [focusLayers, setFocusLayers] = useState<GraphFocusLayer[]>([]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SettingsSection>("filter");
@@ -331,15 +372,14 @@ export default function KnowledgeGraphWorkspace() {
   const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const lastClickRef = useRef<{ id: number; at: number } | null>(null);
+  const draggingIdRef = useRef<number | null>(null);
   const pendingViewRef = useRef<{ mode: "fit" | "focus"; focusId: number | null } | null>(null);
   const settingsCloseRef = useRef<HTMLButtonElement | null>(null);
   const lastSettingsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const hoverClearTimerRef = useRef<number | null>(null);
+  const focusLayersRef = useRef<GraphFocusLayer[]>([]);
   const zoomFrameRef = useRef<number | null>(null);
-  const labelMetricsRef = useRef(new Map<string, number>());
+  const labelSpritesRef = useRef(new Map<string, LabelSprite>());
   const hasFittedRef = useRef(false);
-  const lastFitDataRef = useRef<KnowledgeGraphResponse | null>(null);
-  const initialFitDoneRef = useRef(false);
 
   const subjects = useQuery({
     queryKey: ["knowledge-graph", "subjects"],
@@ -375,8 +415,6 @@ export default function KnowledgeGraphWorkspace() {
           knowledge_point_id: centerId ?? undefined,
           search: searchTerm || undefined,
           depth: Number(depth),
-          // 120 is the backend's visualisation ceiling; a local view keeps the
-          // neighbourhood readable instead of re-fitting the entire subject.
           max_nodes: centerId != null || searchTerm ? 56 : 120,
         })}`,
       ),
@@ -400,12 +438,6 @@ export default function KnowledgeGraphWorkspace() {
     const visibleEdges = payload.edges.filter(
       (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
     );
-    const childCounts = new Map<number, number>();
-    for (const edge of visibleEdges) {
-      if (edge.relation_type !== "parent") continue;
-      childCounts.set(edge.source, (childCounts.get(edge.source) ?? 0) + 1);
-    }
-
     const { clusters, assignments } = buildClusters(
       visibleNodes,
       visibleEdges,
@@ -414,11 +446,10 @@ export default function KnowledgeGraphWorkspace() {
 
     const nodes: KgNodePayload[] = visibleNodes.map((node) => {
       const cluster = clusters.find((item) => item.key === assignments.get(node.id));
-      const childCount = childCounts.get(node.id) ?? 0;
       const isTopic = cluster?.topicId === node.id;
       return {
         ...node,
-        radius: graphNodeRadius(node, { childCount, isTopic }),
+        radius: graphNodeRadius(node),
         color: cluster?.color ?? NEUTRAL_COLOR,
         clusterId: cluster?.key ?? -1,
         clusterKey: cluster ? clusterStorageKey(cluster) : "orphan",
@@ -457,55 +488,16 @@ export default function KnowledgeGraphWorkspace() {
 
   useEffect(() => {
     const payload = graph.data;
-    if (!payload) return;
+    if (!payload || graph.isPlaceholderData) {
+      pendingViewRef.current = null;
+      return;
+    }
+    hasFittedRef.current = false;
     pendingViewRef.current = {
       mode: centerId != null || Boolean(searchTerm) ? "focus" : "fit",
       focusId: payload.focus_id,
     };
-  }, [graph.data, centerId, searchTerm]);
-
-  useEffect(() => {
-    if (!graph.data || size.width <= 0 || size.height <= 0) return;
-    if (lastFitDataRef.current === graph.data) return;
-    lastFitDataRef.current = graph.data;
-    hasFittedRef.current = false;
-    if (initialFitDoneRef.current) return;
-    let frame = 0;
-    let attempts = 0;
-    const fitWhenReady = () => {
-      const fg = graphRef.current;
-      const canvas = canvasWrapRef.current?.querySelector("canvas");
-      const bbox = fg?.getGraphBbox();
-      const hasViewport = Boolean(canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0);
-      const hasBounds = Boolean(
-        bbox
-          && Number.isFinite(bbox.x[0])
-          && Number.isFinite(bbox.x[1])
-          && Number.isFinite(bbox.y[0])
-          && Number.isFinite(bbox.y[1])
-          && bbox.x[1] - bbox.x[0] > 1
-          && bbox.y[1] - bbox.y[0] > 1,
-      );
-      if (!fg || !hasViewport || !hasBounds) {
-        if (attempts < 60) {
-          attempts += 1;
-          frame = window.requestAnimationFrame(fitWhenReady);
-        } else {
-          setViewReady(true);
-        }
-        return;
-      }
-      if (pendingViewRef.current?.mode === "fit") {
-        fg.zoomToFit(0, FIT_PADDING);
-        hasFittedRef.current = true;
-        pendingViewRef.current = null;
-        initialFitDoneRef.current = true;
-      }
-      setViewReady(true);
-    };
-    frame = window.requestAnimationFrame(fitWhenReady);
-    return () => window.cancelAnimationFrame(frame);
-  }, [graph.data, size.height, size.width]);
+  }, [graph.data, graph.isPlaceholderData, graphData, centerId, searchTerm]);
 
   useEffect(() => {
     const element = canvasWrapRef.current;
@@ -520,65 +512,6 @@ export default function KnowledgeGraphWorkspace() {
   }, []);
 
   useEffect(() => {
-    const fg = graphRef.current;
-    if (!fg) return;
-
-    const charge = fg.d3Force("charge") as unknown as
-      | { strength?: (value: number) => void }
-      | undefined;
-    const densityScale = Math.max(1, Math.sqrt(graphData.nodes.length) / 7);
-    charge?.strength?.(-force.charge * 10 * densityScale);
-
-    const viewportAspect = size.height > 0 ? size.width / size.height : 1.6;
-    const anchors = clusterRingAnchors(
-      graphData.clusters,
-      graphData.nodes.length,
-      viewportAspect * 1.35,
-    );
-    const link = fg.d3Force("link") as unknown as
-      | {
-          distance?: (value: number | ((link: unknown) => number)) => void;
-          strength?: (value: number | ((link: unknown) => number)) => void;
-        }
-      | undefined;
-    link?.distance?.((rawLink) => {
-      const edge = rawLink as KgLinkPayload;
-      const source = graphData.nodeById.get(endpointId(edge.source) ?? -1);
-      const target = graphData.nodeById.get(endpointId(edge.target) ?? -1);
-      const sameCluster = source && target ? source.clusterId === target.clusterId : true;
-      return Math.max(70, force.distance * (sameCluster ? 0.36 : 1.35));
-    });
-    link?.strength?.((rawLink) => {
-      const edge = rawLink as KgLinkPayload;
-      const sourceId = endpointId(edge.source);
-      const targetId = endpointId(edge.target);
-      const source = sourceId == null ? undefined : graphData.nodeById.get(sourceId);
-      const target = targetId == null ? undefined : graphData.nodeById.get(targetId);
-      const sameCluster = source && target ? source.clusterId === target.clusterId : true;
-      const sharedDegree = Math.min(source?.degree ?? 1, target?.degree ?? 1);
-      const scale = sameCluster ? 0.8 : 0.18;
-      return (force.link * scale) / Math.sqrt(Math.max(1, sharedDegree));
-    });
-
-    const collision = forceCollide<KgNodePayload>()
-      .radius((node) => Math.max(10, node.radius * appearance.nodeScale + 14))
-      .strength(0.9)
-      .iterations(2);
-
-    const anchorStrength = force.center * 0.5;
-    fg.d3Force(
-      "x",
-      forceX<KgNodePayload>((node) => anchors.get(node.clusterId)?.x ?? 0).strength(anchorStrength),
-    );
-    fg.d3Force(
-      "y",
-      forceY<KgNodePayload>((node) => anchors.get(node.clusterId)?.y ?? 0).strength(anchorStrength),
-    );
-    fg.d3Force("collision", collision as never);
-    fg.d3ReheatSimulation();
-  }, [appearance.nodeScale, force, graphData, size.height, size.width]);
-
-  useEffect(() => {
     const handler = () => {
       const active = document.fullscreenElement === workspaceRef.current;
       setIsFullscreen(active);
@@ -590,10 +523,6 @@ export default function KnowledgeGraphWorkspace() {
 
   useEffect(
     () => () => {
-      if (hoverClearTimerRef.current != null) {
-        window.clearTimeout(hoverClearTimerRef.current);
-        hoverClearTimerRef.current = null;
-      }
       if (zoomFrameRef.current != null) {
         window.cancelAnimationFrame(zoomFrameRef.current);
         zoomFrameRef.current = null;
@@ -647,7 +576,9 @@ export default function KnowledgeGraphWorkspace() {
 
   useEffect(() => {
     if (!graph.data) return;
-    labelMetricsRef.current.clear();
+    labelSpritesRef.current.clear();
+    draggingIdRef.current = null;
+    setDraggingId(null);
     setSelectedId((current) =>
       current != null && !graphData.nodeById.has(current) ? null : current,
     );
@@ -691,29 +622,62 @@ export default function KnowledgeGraphWorkspace() {
       .sort((a, b) => b.maxConfidence - a.maxConfidence || b.node.degree - a.node.degree);
   }, [graphData.links, graphData.nodeById, selectedId]);
 
-  const focusId = hoveredId ?? selectedId;
-  const focusSet = useMemo(() => {
+  const focusId = draggingId ?? hoveredId ?? selectedId;
+  const focusImmediate = draggingId != null || hoveredId == null;
+  const labelOrder = useMemo(() => [...graphData.nodes].sort((left, right) =>
+    Number(right.id === focusId) - Number(left.id === focusId) || right.degree - left.degree,
+  ), [graphData.nodes, focusId]);
+  const activeNeighbors = useMemo(() => {
     if (focusId == null) return null;
-    const set = new Set<number>([focusId]);
+    const neighbors = new Set<number>([focusId]);
     for (const edge of graphData.links) {
       const sourceId = endpointId(edge.source);
       const targetId = endpointId(edge.target);
-      if (sourceId === focusId && targetId != null) set.add(targetId);
-      else if (targetId === focusId && sourceId != null) set.add(sourceId);
+      if (sourceId === focusId && targetId != null) neighbors.add(targetId);
+      else if (targetId === focusId && sourceId != null) neighbors.add(sourceId);
     }
-    return set;
+    return neighbors;
   }, [focusId, graphData.links]);
+  const focusNeighborhoods = useMemo(() => focusLayers.map((layer) => {
+    const neighbors = new Set<number>([layer.id]);
+    for (const edge of graphData.links) {
+      const sourceId = endpointId(edge.source);
+      const targetId = endpointId(edge.target);
+      if (sourceId === layer.id && targetId != null) neighbors.add(targetId);
+      else if (targetId === layer.id && sourceId != null) neighbors.add(sourceId);
+    }
+    return { ...layer, neighbors };
+  }), [focusLayers, graphData.links]);
+
+  useEffect(() => {
+    const previous = focusLayersRef.current;
+    if (focusId == null && previous.length === 0) return;
+    const startedAt = performance.now();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    const step = (now: number) => {
+      const elapsed = reducedMotion ? 1000 : now - startedAt;
+      const layers = sampleGraphFocus(previous, focusId, elapsed, focusImmediate);
+      focusLayersRef.current = layers;
+      setFocusLayers(layers);
+      if (layers.some((layer) => layer.id !== focusId || layer.strength < 1)) {
+        frame = window.requestAnimationFrame(step);
+      }
+    };
+    frame = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusId, focusImmediate]);
+
+  function unrelatedFocus(id: number) {
+    return graphUnrelatedFocus(id, focusNeighborhoods, activeNeighbors);
+  }
 
   function fitView() {
-    smoothZoomControlRef.current?.cancel();
-    graphRef.current?.zoomToFit(460, FIT_PADDING);
+    smoothZoomControlRef.current?.fit(FIT_PADDING);
   }
 
   function changeZoom(factor: number) {
-    smoothZoomControlRef.current?.cancel();
-    const fg = graphRef.current;
-    if (!fg) return;
-    fg.zoom(Math.min(4, Math.max(0.2, fg.zoom() * factor)), 220);
+    smoothZoomControlRef.current?.zoomBy(factor);
   }
 
   function focusNode(id: number) {
@@ -729,6 +693,7 @@ export default function KnowledgeGraphWorkspace() {
     smoothZoomControlRef.current?.cancel();
     setCenterId(null);
     setSelectedId(null);
+    setHoveredId(null);
     setSearchDraft("");
     setSearchTerm("");
   }
@@ -743,7 +708,7 @@ export default function KnowledgeGraphWorkspace() {
     setAppearance(DEFAULT_APPEARANCE);
     setColorOverrides({});
     pendingViewRef.current = { mode: "fit", focusId: null };
-    window.requestAnimationFrame(() => graphRef.current?.zoomToFit(460, FIT_PADDING));
+    window.requestAnimationFrame(() => smoothZoomControlRef.current?.fit(FIT_PADDING));
   }
 
   function handleNodeClick(node: NodeObject<KgNodePayload>) {
@@ -759,19 +724,24 @@ export default function KnowledgeGraphWorkspace() {
   }
 
   function handleNodeHover(node: NodeObject<KgNodePayload> | null) {
-    if (hoverClearTimerRef.current != null) {
-      window.clearTimeout(hoverClearTimerRef.current);
-      hoverClearTimerRef.current = null;
-    }
-    if (node) {
-      const id = Number(node.id);
-      setHoveredId((current) => (current === id ? current : id));
-      return;
-    }
-    hoverClearTimerRef.current = window.setTimeout(() => {
-      hoverClearTimerRef.current = null;
-      setHoveredId(null);
-    }, 110);
+    if (draggingIdRef.current != null) return;
+    const id = node ? Number(node.id) : null;
+    setHoveredId((current) => current === id ? current : id);
+  }
+
+  function handleNodeDrag(node: NodeObject<KgNodePayload>) {
+    if (draggingIdRef.current === Number(node.id)) return;
+    draggingIdRef.current = Number(node.id);
+    setDraggingId(Number(node.id));
+    setHoveredId(null);
+    graphRef.current?.d3ReheatSimulation();
+  }
+
+  function handleNodeDragEnd() {
+    draggingIdRef.current = null;
+    setDraggingId(null);
+    setHoveredId(null);
+    graphRef.current?.d3ReheatSimulation();
   }
 
   function handleZoomEnd(transform: { k: number }) {
@@ -786,21 +756,26 @@ export default function KnowledgeGraphWorkspace() {
     });
   }
 
-  function handleEngineStop() {
-    smoothZoomControlRef.current?.cancel();
+  function handlePendingView() {
     const pending = pendingViewRef.current;
     if (!pending) return;
-    pendingViewRef.current = null;
     const fg = graphRef.current;
     if (!fg) return;
+    smoothZoomControlRef.current?.cancel();
+    pendingViewRef.current = null;
 
     if (pending.mode === "focus" && pending.focusId != null) {
       const target = graphData.nodes.find((node) => node.id === pending.focusId) as
         | (KgNodePayload & { x?: number; y?: number })
         | undefined;
       if (target?.x != null && target?.y != null) {
-        fg.centerAt(target.x, target.y, 280);
-        fg.zoom(1.55, 280);
+        const control = smoothZoomControlRef.current;
+        if (control) control.focus(target.x, target.y, 1.55);
+        else {
+          fg.centerAt(target.x, target.y);
+          fg.zoom(1.55);
+        }
+        setViewReady(true);
         return;
       }
     }
@@ -809,6 +784,7 @@ export default function KnowledgeGraphWorkspace() {
       fg.zoomToFit(0, FIT_PADDING);
       hasFittedRef.current = true;
     }
+    setViewReady(true);
   }
 
   function paintNode(
@@ -822,34 +798,21 @@ export default function KnowledgeGraphWorkspace() {
     const radius = nodeDisplayRadius(node);
     const nodeColor = effectiveNodeColor(node, colorOverrides);
     const isFocusNode = focusId === id;
-    const inFocus = focusSet ? focusSet.has(id) : true;
-    const alpha = focusSet && appearance.dimNeighbors ? (inFocus ? 1 : 0.14) : 1;
+    const alpha = appearance.dimNeighbors ? 1 - 0.86 * unrelatedFocus(id) : 1;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-
-    if (isFocusNode) {
-      ctx.shadowColor = "rgba(127, 211, 240, 0.55)";
-      ctx.shadowBlur = 22 / globalScale;
-    }
 
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fillStyle = nodeColor;
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     if (isFocusNode) {
       ctx.beginPath();
-      ctx.arc(x, y, radius + 4.5 / globalScale, 0, Math.PI * 2);
-      ctx.strokeStyle = "#7FD3F0";
-      ctx.lineWidth = 2.6 / globalScale;
-      ctx.stroke();
-    } else if (hoveredId === id) {
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 2.5 / globalScale, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-      ctx.lineWidth = 1.2 / globalScale;
+      ctx.arc(x, y, radius + 3 / globalScale, 0, Math.PI * 2);
+      ctx.strokeStyle = nodeColor;
+      ctx.lineWidth = 1.4 / globalScale;
       ctx.stroke();
     }
 
@@ -859,33 +822,25 @@ export default function KnowledgeGraphWorkspace() {
   function nodeDisplayRadius(node: NodeObject<KgNodePayload>) {
     return Math.max(
       2.4,
-      node.radius * appearance.nodeScale * (focusId === Number(node.id) ? 1.12 : 1),
+      node.radius * appearance.nodeScale,
     );
   }
 
   function paintLabels(ctx: CanvasRenderingContext2D, globalScale: number) {
     const labelVisible = appearance.textFade
       ? Math.max(
-          0.34,
+          0.55,
           Math.min(1, globalScale / Math.max(0.001, appearance.textFadeThreshold)),
         )
       : 1;
-    const ordered = [...graphData.nodes].sort((left, right) => {
-      const leftFocus = Number(left.id === focusId);
-      const rightFocus = Number(right.id === focusId);
-      return rightFocus - leftFocus || right.degree - left.degree;
-    });
     type LabelRect = { left: number; right: number; top: number; bottom: number };
     const labels: Array<{
       label: string;
       x: number;
       y: number;
-      fontSize: number;
       alpha: number;
       isFocusNode: boolean;
     }> = [];
-    const fontFor = (isFocusNode: boolean, fontSize: number) =>
-      `${isFocusNode ? 700 : 600} ${fontSize}px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
     const pad = 2 / globalScale;
     const cellSize = Math.max(1, 40 / globalScale);
     const grid = new Map<string, LabelRect[]>();
@@ -942,30 +897,27 @@ export default function KnowledgeGraphWorkspace() {
       }
       return sum;
     };
-    const metrics = labelMetricsRef.current;
-    if (metrics.size > 1500) metrics.clear();
-    const measureScreenWidth = (text: string, screenFontSize: number, weight: number) => {
-      const key = `${weight}:${screenFontSize}:${text}`;
-      const cached = metrics.get(key);
+    const sprites = labelSpritesRef.current;
+    if (sprites.size > 1500) sprites.clear();
+    const spriteFor = (text: string, focused: boolean) => {
+      const key = `${focused}:${text}`;
+      const cached = sprites.get(key);
       if (cached != null) return cached;
-      ctx.save();
-      ctx.font = fontFor(weight === 700, screenFontSize);
-      const measured = ctx.measureText(text).width;
-      ctx.restore();
-      metrics.set(key, measured);
-      return measured;
+      const sprite = createLabelSprite(text, focused);
+      sprites.set(key, sprite);
+      return sprite;
     };
 
-    for (const node of ordered) {
+    for (const node of labelOrder) {
       const id = Number(node.id);
       const x = node.x ?? 0;
       const y = node.y ?? 0;
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
       const isFocusNode = focusId === id;
-      const inFocus = focusSet ? focusSet.has(id) : true;
-      const alpha = isFocusNode ? 1 : focusSet && !inFocus ? 0.2 : labelVisible;
-      const fontSize = (isFocusNode ? 12 : 10.5) / globalScale;
+      const alpha = isFocusNode ? 1 : labelVisible *
+        (appearance.dimNeighbors ? 1 - 0.8 * unrelatedFocus(id) : 1);
+      const fontSize = (isFocusNode ? 11.5 : 10) / globalScale;
       const radius = nodeDisplayRadius(node);
       const gap = 5 / globalScale;
       const height = fontSize * 1.25;
@@ -977,7 +929,7 @@ export default function KnowledgeGraphWorkspace() {
 
       for (const variant of variants) {
         const variantWidth =
-          measureScreenWidth(variant, isFocusNode ? 12 : 10.5, isFocusNode ? 700 : 600) /
+          spriteFor(variant, isFocusNode).textWidth /
           globalScale;
         const candidate = {
           left: x - variantWidth / 2,
@@ -1007,10 +959,11 @@ export default function KnowledgeGraphWorkspace() {
       });
       labels.push({
         label,
-        x: best.left,
+        x,
         y: best.top + height / 2,
-        fontSize,
-        alpha: alpha * (bestRatio > 0.85 ? 0.55 : 1),
+        alpha:
+          alpha *
+          (bestRatio > 0.85 ? 0.42 : bestRatio > 0.6 ? 0.65 : bestRatio > 0.35 ? 0.82 : 1),
         isFocusNode,
       });
     }
@@ -1018,14 +971,14 @@ export default function KnowledgeGraphWorkspace() {
     for (const item of labels.reverse()) {
       ctx.save();
       ctx.globalAlpha = item.alpha;
-      ctx.font = `${item.isFocusNode ? 700 : 600} ${item.fontSize}px "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 2.6 / globalScale;
-      ctx.strokeStyle = "rgba(247, 250, 252, 0.96)";
-      ctx.strokeText(item.label, item.x, item.y);
-      ctx.fillStyle = item.isFocusNode ? "#0F3A52" : "#173342";
-      ctx.fillText(item.label, item.x, item.y);
+      const sprite = spriteFor(item.label, item.isFocusNode);
+      ctx.drawImage(
+        sprite.canvas,
+        item.x - sprite.width / (2 * globalScale),
+        item.y - sprite.height / (2 * globalScale),
+        sprite.width / globalScale,
+        sprite.height / globalScale,
+      );
       ctx.restore();
     }
   }
@@ -1269,6 +1222,8 @@ export default function KnowledgeGraphWorkspace() {
             <ForceCanvas
               graphRef={graphRef as MutableRefObject<ForceGraphMethods<KgNodePayload, KgLinkPayload> | undefined>}
               zoomControlRef={smoothZoomControlRef}
+              forceSettings={force}
+              nodeScale={appearance.nodeScale}
               graphData={forceGraphData}
               width={size.width}
               height={size.height}
@@ -1297,16 +1252,19 @@ export default function KnowledgeGraphWorkspace() {
               linkTarget="target"
               linkCurvature={0}
               linkColor={(link) => {
-                const payload = link as unknown as KgLinkPayload;
                 const sourceId = endpointId(link.source);
                 const targetId = endpointId(link.target);
                 const sourceNode =
                   sourceId == null ? undefined : graphData.nodeById.get(sourceId);
-                const active =
-                  focusId != null && (sourceId === focusId || targetId === focusId);
                 const baseColor = effectiveNodeColor(sourceNode, colorOverrides);
-                if (focusId == null) return rgba(baseColor, 0.17);
-                return active ? rgba(payload.relationColor, 0.98) : rgba(baseColor, 0.055);
+                let active = 0;
+                let inactive = 0;
+                for (const layer of focusLayers) {
+                  if (sourceId === layer.id || targetId === layer.id) active += layer.strength;
+                  else inactive += layer.strength;
+                }
+                if (sourceId === focusId || targetId === focusId) inactive = 0;
+                return graphFocusLinkColor(baseColor, baseColor, active, inactive, appearance.dimNeighbors);
               }}
               linkWidth={() => 0.72 * appearance.linkWidth}
               linkLabel={(link) => {
@@ -1327,21 +1285,24 @@ export default function KnowledgeGraphWorkspace() {
               linkLineDash={(link) =>
                 (link as unknown as KgLinkPayload).source_type === "inferred" ? [5, 4] : null
               }
-              d3AlphaDecay={0.022}
-              d3VelocityDecay={0.3}
+              d3AlphaDecay={GRAPH_ALPHA_DECAY}
+              d3VelocityDecay={GRAPH_VELOCITY_DECAY}
               d3AlphaMin={0.001}
-              warmupTicks={240}
-              cooldownTicks={50}
-              minZoom={0.2}
-              maxZoom={4}
+              warmupTicks={120}
+              cooldownTicks={280}
               enableNodeDrag
               enableZoomInteraction={(event) => event.type !== "wheel"}
+              minZoom={GRAPH_MIN_ZOOM}
+              maxZoom={GRAPH_MAX_ZOOM}
               enablePanInteraction
               showPointerCursor
               onNodeClick={handleNodeClick}
               onNodeHover={handleNodeHover}
+              onNodeDrag={handleNodeDrag}
+              onNodeDragEnd={handleNodeDragEnd}
               onBackgroundClick={() => setSelectedId(null)}
-              onEngineStop={handleEngineStop}
+              onEngineTick={handlePendingView}
+              onEngineStop={handlePendingView}
               onZoomEnd={handleZoomEnd}
             />
           )}
@@ -1499,10 +1460,11 @@ export default function KnowledgeGraphWorkspace() {
               onClick={() => changeZoom(1.25)}
               title="放大"
               aria-label="放大图谱"
+              disabled={zoomLevel >= GRAPH_MAX_ZOOM - 0.001}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
-            <div className="kg-zoom-level" aria-live="polite">
+            <div className="kg-zoom-level" aria-live="polite" aria-label={`缩放 ${Math.round(zoomLevel * 100)}%`}>
               {Math.round(zoomLevel * 100)}%
             </div>
             <button
@@ -1511,6 +1473,7 @@ export default function KnowledgeGraphWorkspace() {
               onClick={() => changeZoom(0.8)}
               title="缩小"
               aria-label="缩小图谱"
+              disabled={zoomLevel <= GRAPH_MIN_ZOOM + 0.001}
             >
               <Minus className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
@@ -1532,7 +1495,11 @@ export default function KnowledgeGraphWorkspace() {
               title={isFullscreen ? "退出全屏" : "全屏"}
               aria-label={isFullscreen ? "退出全屏" : "全屏"}
             >
-              <Maximize2 className="h-3.5 w-3.5" />
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
             </button>
           </div>
         </div>
@@ -1627,7 +1594,7 @@ export default function KnowledgeGraphWorkspace() {
             <div className="kg-settings-head">
               <div>
                 <h2>图谱设置</h2>
-                <p>调整会即时作用于画布</p>
+                <p>改动即时生效</p>
               </div>
               <div className="kg-settings-actions">
                 <button
@@ -1635,7 +1602,7 @@ export default function KnowledgeGraphWorkspace() {
                   className="kg-text-btn"
                   onClick={restoreViewDefaults}
                 >
-                  恢复默认设置
+                  恢复默认
                 </button>
                 <button
                   ref={settingsCloseRef}
@@ -1649,8 +1616,21 @@ export default function KnowledgeGraphWorkspace() {
               </div>
             </div>
 
+            <nav className="kg-settings-nav" aria-label="设置分类">
+              {SETTINGS_SECTIONS.map((section) => (
+                <button
+                  key={section.key}
+                  type="button"
+                  aria-pressed={activeSection === section.key}
+                  onClick={() => setActiveSection(section.key)}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </nav>
+
             <div className="kg-settings-body">
-              <section className="kg-section" data-kg-section="filter" data-lit={activeSection === "filter"}>
+              <section className="kg-section" data-kg-section="filter" hidden={activeSection !== "filter"}>
                 <div className="kg-section-head">
                   <h3><SlidersHorizontal />筛选</h3>
                   <button
@@ -1664,13 +1644,12 @@ export default function KnowledgeGraphWorkspace() {
                       setHoveredId(null);
                     }}
                   >
-                    清除筛选
+                    清除
                   </button>
                 </div>
                 <div className="kg-field">
                   <div>
                     <div className="kg-field-label">关系类型</div>
-                    <div className="kg-field-hint">只保留一种语义关系时，图谱会自动重新取景</div>
                   </div>
                   <Select
                     value={relationType}
@@ -1686,7 +1665,7 @@ export default function KnowledgeGraphWorkspace() {
                 <div className="kg-field">
                   <div>
                     <div className="kg-field-label">展开深度</div>
-                    <div className="kg-field-hint">双击节点进入局部图谱后生效</div>
+                    <div className="kg-field-hint">双击节点后生效</div>
                   </div>
                   <Select
                     value={depth}
@@ -1702,7 +1681,6 @@ export default function KnowledgeGraphWorkspace() {
                 <div className="kg-field">
                   <div>
                     <div className="kg-field-label">弱化非相邻节点</div>
-                    <div className="kg-field-hint">聚焦时仅保留选中节点与一跳邻居</div>
                   </div>
                   <Toggle
                     checked={appearance.dimNeighbors}
@@ -1713,7 +1691,6 @@ export default function KnowledgeGraphWorkspace() {
                 <div className="kg-field">
                   <div>
                     <div className="kg-field-label">显示孤立节点</div>
-                    <div className="kg-field-hint">关闭后隐藏没有任何关系的知识点</div>
                   </div>
                   <Toggle
                     checked={showOrphans}
@@ -1723,7 +1700,7 @@ export default function KnowledgeGraphWorkspace() {
                 </div>
               </section>
 
-              <section className="kg-section" data-kg-section="colors" data-lit={activeSection === "colors"}>
+              <section className="kg-section" data-kg-section="colors" hidden={activeSection !== "colors"}>
                 <div className="kg-section-head">
                   <h3><Palette />颜色组</h3>
                   {Object.keys(colorOverrides).length > 0 ? (
@@ -1761,7 +1738,7 @@ export default function KnowledgeGraphWorkspace() {
                 </div>
               </section>
 
-              <section className="kg-section" data-kg-section="appearance" data-lit={activeSection === "appearance"}>
+              <section className="kg-section" data-kg-section="appearance" hidden={activeSection !== "appearance"}>
                 <div className="kg-section-head">
                   <h3><Type />外观</h3>
                   <button
@@ -1769,13 +1746,12 @@ export default function KnowledgeGraphWorkspace() {
                     className="kg-text-btn"
                     onClick={() => setAppearance(DEFAULT_APPEARANCE)}
                   >
-                    恢复默认
+                    重置
                   </button>
                 </div>
                 <div className="kg-field">
                   <div>
                     <div className="kg-field-label">显示箭头</div>
-                    <div className="kg-field-hint">关闭时使用无向直线</div>
                   </div>
                   <Toggle
                     checked={appearance.arrows}
@@ -1785,19 +1761,22 @@ export default function KnowledgeGraphWorkspace() {
                 </div>
                 <div className="kg-field">
                   <div>
-                    <div className="kg-field-label">文本淡出</div>
-                    <div className="kg-field-hint">
-                      缩放到阈值以下时淡化全部节点标签
-                    </div>
+                    <div className="kg-field-label">节点文本</div>
                   </div>
-                  <Toggle
-                    checked={appearance.textFade}
-                    onChange={(value) => setAppearance((current) => ({ ...current, textFade: value }))}
-                    label="文本淡出"
+                  <Select
+                    value={appearance.textFade ? "zoom" : "always"}
+                    onChange={(value) => setAppearance((current) => ({ ...current, textFade: value === "zoom" }))}
+                    options={[
+                      { value: "zoom", label: "随缩放淡化" },
+                      { value: "always", label: "始终显示" },
+                    ]}
+                    className="kg-select-compact"
+                    portalContainer={portalContainer}
                   />
                 </div>
-                <RangeControl
-                  label="文本淡出阈值"
+                <p className="kg-section-help">文本固定显示在节点下方，悬浮查看完整名称。</p>
+                {appearance.textFade && <RangeControl
+                  label="文本淡化起点"
                   value={appearance.textFadeThreshold}
                   min={0.3}
                   max={1}
@@ -1809,26 +1788,16 @@ export default function KnowledgeGraphWorkspace() {
                       textFadeThreshold: value,
                     }))
                   }
+                />}
+                <RangeControl
+                  label="节点大小"
+                  value={appearance.nodeScale}
+                  min={0.6}
+                  max={1.6}
+                  step={0.05}
+                  display={`${Math.round(appearance.nodeScale * 100)}%`}
+                  onChange={(value) => setAppearance((current) => ({ ...current, nodeScale: value }))}
                 />
-                <div className="kg-range-row">
-                  <div className="kg-range-meta">
-                    <span>节点大小</span>
-                    <em>{Math.round(appearance.nodeScale * 100)}%</em>
-                  </div>
-                  <input
-                    type="range"
-                    aria-label="节点大小"
-                    className="kg-range"
-                    min={0.6}
-                    max={1.6}
-                    step={0.05}
-                    value={appearance.nodeScale}
-                    style={{ background: "linear-gradient(90deg, #25638a 0%, #7fd3f0 55%, #d5e1eb 55%, #d5e1eb 100%)" }}
-                    onChange={(event) =>
-                      setAppearance((current) => ({ ...current, nodeScale: Number(event.target.value) }))
-                    }
-                  />
-                </div>
                 <RangeControl
                   label="连线粗细"
                   value={appearance.linkWidth}
@@ -1842,7 +1811,7 @@ export default function KnowledgeGraphWorkspace() {
                 />
               </section>
 
-              <section className="kg-section" data-kg-section="forces" data-lit={activeSection === "forces"}>
+              <section className="kg-section" data-kg-section="forces" hidden={activeSection !== "forces"}>
                 <div className="kg-section-head">
                   <h3><Gauge />力度</h3>
                   <button
@@ -1850,11 +1819,11 @@ export default function KnowledgeGraphWorkspace() {
                     className="kg-text-btn"
                     onClick={() => setForce(DEFAULT_FORCE)}
                   >
-                    恢复默认
+                    重置
                   </button>
                 </div>
                 <RangeControl
-                  label="图谱向心力"
+                  label="向心力"
                   value={force.center}
                   min={0}
                   max={1}
@@ -1863,7 +1832,7 @@ export default function KnowledgeGraphWorkspace() {
                   onChange={(value) => setForce((current) => ({ ...current, center: value }))}
                 />
                 <RangeControl
-                  label="节点间的排斥力"
+                  label="节点斥力"
                   value={force.charge}
                   min={1}
                   max={30}
@@ -1872,7 +1841,7 @@ export default function KnowledgeGraphWorkspace() {
                   onChange={(value) => setForce((current) => ({ ...current, charge: value }))}
                 />
                 <RangeControl
-                  label="相连节点间的吸引力"
+                  label="连线吸力"
                   value={force.link}
                   min={0}
                   max={2}
@@ -1881,7 +1850,7 @@ export default function KnowledgeGraphWorkspace() {
                   onChange={(value) => setForce((current) => ({ ...current, link: value }))}
                 />
                 <RangeControl
-                  label="连线长度"
+                  label="连线距离"
                   value={force.distance}
                   min={80}
                   max={400}
@@ -1889,11 +1858,8 @@ export default function KnowledgeGraphWorkspace() {
                   display={String(force.distance)}
                   onChange={(value) => setForce((current) => ({ ...current, distance: value }))}
                 />
+                <p className="kg-section-help">增大连线距离可展开图谱；拖动节点可牵动相邻节点。</p>
               </section>
-
-              <div className="kg-settings-note">
-                拖动滑块即时生效；右上角可恢复全部默认值。
-              </div>
             </div>
           </aside>
         )}

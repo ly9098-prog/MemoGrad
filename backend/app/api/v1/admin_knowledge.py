@@ -244,6 +244,8 @@ async def get_knowledge_graph(
         ]
         topic_ids.extend(roots)
 
+    chapter_root_ids = frozenset(topic_ids)
+
     def overview_rank(kp_id: int) -> tuple[int, int, int, int]:
         return (
             -len(parent_children.get(kp_id, set())),
@@ -417,6 +419,7 @@ async def get_knowledge_graph(
                 "out_degree": outgoing_counts[kp.id],
                 "degree": all_degree[kp.id],
                 "relation_counts": dict(relation_breakdown),
+                "is_chapter_root": kp.id in chapter_root_ids,
             }
         )
 

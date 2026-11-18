@@ -26,78 +26,26 @@ export function edgeStrength(edge: Pick<KnowledgeGraphEdge, "weight" | "confiden
   return edge.confidence * 0.76 + normalizedWeight * 0.24;
 }
 
-export function collapseEdgesByPair(edges: KnowledgeGraphEdge[]): KnowledgeGraphEdge[] {
-  const byPair = new Map<string, KnowledgeGraphEdge>();
-  for (const edge of edges) {
-    const key = edge.source < edge.target ? `${edge.source}:${edge.target}` : `${edge.target}:${edge.source}`;
-    const current = byPair.get(key);
-    if (!current || edgeStrength(edge) > edgeStrength(current)) byPair.set(key, edge);
-  }
-  return [...byPair.values()];
-}
-
-export function nodeRadius(node: KnowledgeGraphNode): number {
-  return clamp(16 + Math.sqrt(Math.max(0, node.degree)) * 2.05, 18, 28);
-}
-
 export function graphNodeRadius(
-  node: Pick<KnowledgeGraphNode, "degree">,
-  options: { childCount?: number; isTopic?: boolean } = {},
+  node: Pick<KnowledgeGraphNode, "is_chapter_root">,
 ): number {
-  const degree = Math.max(0, node.degree || 0);
-  const childCount = Math.max(0, options.childCount ?? 0);
-  const degreeBoost = Math.sqrt(degree) * 1.28;
-  const parentBoost = childCount > 0 ? 1.8 + Math.sqrt(childCount) * 1.55 : 0;
-  const topicBoost = options.isTopic ? 2.1 : 0;
-  return clamp(4.1 + degreeBoost + parentBoost + topicBoost, 4.1, 20);
+  return node.is_chapter_root ? 18 : 10;
 }
 
-export type ClusterAnchor = { x: number; y: number };
+export const GRAPH_MIN_ZOOM = 0.04;
+export const GRAPH_MAX_ZOOM = 4;
 
-/**
- * Lay topic clusters out on a ring so the overview reads as separate
- * communities instead of one central tangle. Bigger clusters get a slightly
- * larger radius, which keeps dense communities from colliding with neighbours.
- */
-export function clusterRingAnchors(
-  clusters: Array<{ key: number; count: number }>,
-  totalNodes: number,
-  aspect = 1,
-): Map<number, ClusterAnchor> {
-  const anchors = new Map<number, ClusterAnchor>();
-  if (!clusters.length) return anchors;
-  if (clusters.length === 1) {
-    anchors.set(clusters[0].key, { x: 0, y: 0 });
-    return anchors;
-  }
+export function graphZoomTarget(current: number, pending: number | undefined, factor: number): number {
+  const reversing = pending != null && (factor - 1) * (pending - current) < 0;
+  const start = pending == null || reversing ? current : pending;
+  return clamp(start * factor, GRAPH_MIN_ZOOM, GRAPH_MAX_ZOOM);
+}
 
-  const maxCount = Math.max(1, ...clusters.map((cluster) => cluster.count));
-  const ring = 120 + Math.sqrt(Math.max(1, totalNodes)) * 26;
-  const safeAspect = clamp(aspect, 0.8, 2.8);
-  const radiusX = ring * Math.sqrt(safeAspect);
-  const radiusY = ring / Math.sqrt(safeAspect);
-  if (clusters.length === 2) {
-    const scaleFor = (count: number) => 0.72 + 0.5 * (count / maxCount);
-    anchors.set(clusters[0].key, {
-      x: -radiusX * 0.62 * scaleFor(clusters[0].count),
-      y: 0,
-    });
-    anchors.set(clusters[1].key, {
-      x: radiusX * 0.62 * scaleFor(clusters[1].count),
-      y: 0,
-    });
-    return anchors;
-  }
-
-  clusters.forEach((cluster, index) => {
-    const angle = -Math.PI / 2 + (2 * Math.PI * index) / clusters.length;
-    const scale = 0.72 + 0.5 * (cluster.count / maxCount);
-    anchors.set(cluster.key, {
-      x: Math.cos(angle) * radiusX * scale,
-      y: Math.sin(angle) * radiusY * scale,
-    });
-  });
-  return anchors;
+export function advanceGraphZoom(current: number, target: number, elapsed: number): number {
+  const remaining = Math.log(target / current);
+  if (Math.abs(remaining) < 0.0005) return target;
+  const progress = 1 - Math.exp(-Math.max(0, elapsed) / 65);
+  return current * Math.exp(remaining * progress);
 }
 
 export function wheelZoomFactor(
@@ -110,11 +58,6 @@ export function wheelZoomFactor(
   const normalizedDelta = clamp(deltaY * modeScale, -240, 240);
   const sensitivity = ctrlKey ? 0.0034 : 0.0015;
   return clamp(Math.exp(-normalizedDelta * sensitivity), 0.84, 1.19);
-}
-
-export function estimatedLabelWidth(node: KnowledgeGraphNode): number {
-  const text = shortName(node.name, 11);
-  return clamp(text.length * 10.8 + 18, 54, 154);
 }
 
 export function relationLabel(type: string): string {

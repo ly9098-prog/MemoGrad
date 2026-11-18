@@ -3,12 +3,11 @@ import {
   shortName,
   clamp,
   edgeStrength,
-  collapseEdgesByPair,
-  nodeRadius,
   graphNodeRadius,
-  clusterRingAnchors,
+  advanceGraphZoom,
+  graphZoomTarget,
+  GRAPH_MIN_ZOOM,
   wheelZoomFactor,
-  estimatedLabelWidth,
   relationLabel,
   escapeHtml,
   relationColor,
@@ -20,7 +19,7 @@ function makeEdge(overrides: Partial<KnowledgeGraphEdge>): KnowledgeGraphEdge {
   return { id: 1, source: 1, target: 2, type: "prerequisite", weight: 5, confidence: 0.8, ...overrides } as KnowledgeGraphEdge;
 }
 function makeNode(overrides: Partial<KnowledgeGraphNode>): KnowledgeGraphNode {
-  return { id: 1, name: "Test", degree: 3, level: 1, subject_id: 1, ...overrides } as KnowledgeGraphNode;
+  return { id: 1, name: "Test", degree: 3, is_chapter_root: false, subject_id: 1, ...overrides } as KnowledgeGraphNode;
 }
 
 describe("shortName", () => {
@@ -46,108 +45,56 @@ describe("edgeStrength", () => {
   });
 });
 
-describe("collapseEdgesByPair", () => {
-  it("keeps strongest edge per pair", () => {
-    const edges = [
-      makeEdge({ id: 1, source: 1, target: 2, confidence: 0.5, weight: 3 }),
-      makeEdge({ id: 2, source: 2, target: 1, confidence: 0.9, weight: 8 }),
-    ];
-    const result = collapseEdgesByPair(edges);
-    expect(result.length).toBe(1);
-    expect(result[0].id).toBe(2);
-  });
-  it("preserves different pairs", () => {
-    const edges = [
-      makeEdge({ id: 1, source: 1, target: 2 }),
-      makeEdge({ id: 2, source: 1, target: 3 }),
-    ];
-    expect(collapseEdgesByPair(edges).length).toBe(2);
-  });
-  it("handles empty array", () => { expect(collapseEdgesByPair([])).toEqual([]); });
-});
-
-describe("nodeRadius", () => {
-  it("clamps to minimum 18", () => {
-    expect(nodeRadius(makeNode({ degree: 0 }))).toBeGreaterThanOrEqual(18);
-  });
-  it("clamps to maximum 28", () => {
-    expect(nodeRadius(makeNode({ degree: 1000 }))).toBeLessThanOrEqual(28);
-  });
-  it("scales with degree", () => {
-    const r1 = nodeRadius(makeNode({ degree: 1 }));
-    const r2 = nodeRadius(makeNode({ degree: 16 }));
-    expect(r2).toBeGreaterThan(r1);
-  });
-});
-
 describe("graphNodeRadius", () => {
-  it("keeps leaf nodes compact", () => {
-    expect(graphNodeRadius(makeNode({ degree: 1 }))).toBeLessThan(6);
+  it("uses exactly two sizes regardless of degree", () => {
+    const radii = [0, 1, 4, 20, 1000].flatMap((degree) =>
+      [false, true].map((is_chapter_root) => graphNodeRadius(makeNode({ degree, is_chapter_root }))),
+    );
+    expect(new Set(radii).size).toBe(2);
+    expect(graphNodeRadius(makeNode({ is_chapter_root: true })))
+      .toBeGreaterThan(graphNodeRadius(makeNode({ degree: 1000 })));
   });
-  it("renders hierarchy parents larger than equally connected leaves", () => {
-    const leaf = graphNodeRadius(makeNode({ degree: 4 }));
-    const parent = graphNodeRadius(makeNode({ degree: 4 }), { childCount: 3 });
-    expect(parent).toBeGreaterThan(leaf * 1.35);
-  });
-  it("gives overview topics an additional visual boost", () => {
-    const regular = graphNodeRadius(makeNode({ degree: 20 }), { childCount: 2 });
-    const topic = graphNodeRadius(makeNode({ degree: 20 }), { childCount: 2, isTopic: true });
-    expect(topic).toBeGreaterThan(regular);
-  });
-  it("caps very large hubs", () => {
-    expect(
-      graphNodeRadius(makeNode({ degree: 1000 }), { childCount: 1000, isTopic: true }),
-    ).toBeLessThanOrEqual(20);
+  it("does not promote nodes when an older server omits chapter metadata", () => {
+    expect(graphNodeRadius(makeNode({ degree: 1000, is_chapter_root: undefined })))
+      .toBe(graphNodeRadius(makeNode({ degree: 0 })));
   });
 });
 
-describe("clusterRingAnchors", () => {
-  it("returns no anchors without clusters", () => {
-    expect(clusterRingAnchors([], 0).size).toBe(0);
+describe("advanceGraphZoom", () => {
+  it("converges smoothly instead of jumping to a wheel target", () => {
+    const next = advanceGraphZoom(1, 1.2, 1000 / 60);
+    expect(next).toBeGreaterThan(1);
+    expect(next).toBeLessThan(1.2);
+    expect(advanceGraphZoom(1.2, 1, 1000 / 60)).toBeGreaterThan(1);
   });
-  it("centers a single cluster", () => {
-    const anchors = clusterRingAnchors([{ key: 7, count: 12 }], 12);
-    expect(anchors.get(7)).toEqual({ x: 0, y: 0 });
-  });
-  it("places two clusters on a horizontal axis", () => {
-    const anchors = clusterRingAnchors(
-      [
-        { key: 0, count: 10 },
-        { key: 1, count: 10 },
-      ],
-      20,
-      1.7,
+  it("moves the same distance at 60Hz and 120Hz over the same time", () => {
+    const sample = (frames: number) => Array.from({ length: frames }).reduce<number>(
+      (current) => advanceGraphZoom(current, 2, 200 / frames), 1,
     );
-    expect(anchors.get(0)?.y).toBe(0);
-    expect(anchors.get(1)?.y).toBe(0);
-    expect(anchors.get(0)?.x ?? 0).toBeLessThan(0);
-    expect(anchors.get(1)?.x ?? 0).toBeGreaterThan(0);
+    expect(sample(12)).toBeCloseTo(sample(24), 10);
   });
-  it("stretches wide viewports horizontally", () => {
-    const clusters = [0, 1, 2, 3, 4].map((key) => ({ key, count: 10 }));
-    const square = clusterRingAnchors(clusters, 50, 1);
-    const wide = clusterRingAnchors(clusters, 50, 2.4);
-    const spreadX = (anchors: Map<number, { x: number; y: number }>) =>
-      Math.max(...[...anchors.values()].map((anchor) => Math.abs(anchor.x)));
-    const spreadY = (anchors: Map<number, { x: number; y: number }>) =>
-      Math.max(...[...anchors.values()].map((anchor) => Math.abs(anchor.y)));
-    expect(spreadX(wide)).toBeGreaterThan(spreadX(square));
-    expect(spreadY(wide)).toBeLessThan(spreadY(square));
+  it("can reverse direction immediately and settles exactly", () => {
+    const halfway = advanceGraphZoom(1, 2, 80);
+    expect(advanceGraphZoom(halfway, 0.5, 16)).toBeLessThan(halfway);
+    expect(advanceGraphZoom(1, 2, 0)).toBe(1);
+    expect(advanceGraphZoom(1.9999, 2, 16)).toBe(2);
   });
-  it("gives larger clusters more room", () => {
-    const anchors = clusterRingAnchors(
-      [
-        { key: 0, count: 30 },
-        { key: 1, count: 4 },
-      ],
-      34,
-      1.7,
-    );
-    const distance = (key: number) => {
-      const anchor = anchors.get(key);
-      return Math.hypot(anchor?.x ?? 0, anchor?.y ?? 0);
-    };
-    expect(distance(0)).toBeGreaterThan(distance(1));
+});
+
+describe("graph zoom input sequences", () => {
+  it("accumulates pending detents that keep moving in the same direction", () => {
+    expect(graphZoomTarget(1.1, 1.25, 1.25)).toBeCloseTo(1.25 ** 2);
+  });
+  it("reverses from the visible scale instead of an unfinished wheel or button target", () => {
+    const zoomingIn = 1.2993;
+    const zoomOutTarget = graphZoomTarget(zoomingIn, 2.5, 0.84);
+    expect(advanceGraphZoom(zoomingIn, zoomOutTarget, 16)).toBeLessThan(zoomingIn);
+    const zoomingOut = 0.8;
+    const zoomInTarget = graphZoomTarget(zoomingOut, 0.4, 1.19);
+    expect(advanceGraphZoom(zoomingOut, zoomInTarget, 16)).toBeGreaterThan(zoomingOut);
+  });
+  it("cancels the old inward target when reversal is clamped at the minimum", () => {
+    expect(graphZoomTarget(GRAPH_MIN_ZOOM, 0.1, 0.8)).toBe(GRAPH_MIN_ZOOM);
   });
 });
 
@@ -164,15 +111,6 @@ describe("wheelZoomFactor", () => {
   it("limits a single wheel step", () => {
     expect(wheelZoomFactor(100000)).toBe(0.84);
     expect(wheelZoomFactor(-100000)).toBe(1.19);
-  });
-});
-
-describe("estimatedLabelWidth", () => {
-  it("clamps to minimum 54", () => {
-    expect(estimatedLabelWidth(makeNode({ name: "A" }))).toBeGreaterThanOrEqual(54);
-  });
-  it("clamps to maximum 154", () => {
-    expect(estimatedLabelWidth(makeNode({ name: "非常长的知识点名称超过限制" }))).toBeLessThanOrEqual(154);
   });
 });
 

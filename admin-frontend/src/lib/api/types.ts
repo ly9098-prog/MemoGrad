@@ -1166,6 +1166,7 @@ export type KnowledgeGraphNode = {
   out_degree: number;
   degree: number;
   relation_counts: Record<string, number>;
+  is_chapter_root?: boolean;
 };
 
 export type KnowledgeGraphEdge = {
