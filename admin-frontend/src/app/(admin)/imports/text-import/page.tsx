@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowRight,
   AlertTriangle,
+  ArrowRight,
   Braces,
   Check,
   CheckCircle2,
@@ -17,18 +18,21 @@ import {
   Loader2,
   RotateCcw,
   Trash2,
+  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/status-badge";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { MathFormula } from "@/components/ui/math-formula";
 import { QuestionContentRenderer } from "@/components/question-content-renderer";
 import { apiRequest } from "@/lib/api/client";
-import { ImportMetric, ImportPanelHeader, ImportWorkspaceHeader } from "../components/import-workspace";
-import { ImportToast } from "../components/import-toast";
-import { getQuestionTypeLabel, QUESTION_TYPE_OPTIONS, canonicalizeQuestionType, formatUnknownType } from "@/lib/question-types";
+import {
+  canonicalizeQuestionType,
+  formatUnknownType,
+  getQuestionTypeLabel,
+  QUESTION_TYPE_OPTIONS,
+} from "@/lib/question-types";
 import { inspectLatexImportText, normalizeLatexImportDelimiters } from "@/lib/latex-import";
-import { validateEditStructure, buildEditFormLatexText } from "@/lib/text-import-validation-utils";
+import { buildEditFormLatexText, validateEditStructure } from "@/lib/text-import-validation-utils";
+import { formatImportIssue, importErrorMessage } from "@/lib/imports/import-messages";
 
 type ParsedOption = { key: string; text: string };
 
@@ -74,6 +78,8 @@ type ImportResponse = {
   duplicates_filtered: number;
 };
 
+type SubjectOption = { id: number; code: string; name: string };
+
 function renderAnswer(answer: string | string[] | boolean | null) {
   if (answer === null || answer === undefined || answer === "") return "—";
   if (typeof answer === "boolean") return answer ? "正确" : "错误";
@@ -81,25 +87,11 @@ function renderAnswer(answer: string | string[] | boolean | null) {
   return String(answer);
 }
 
-function typeLabel(t: string | null) {
-  return getQuestionTypeLabel(t);
+function typeLabel(type: string | null) {
+  return getQuestionTypeLabel(type);
 }
 
-const PARSE_ISSUE_LABELS: Record<string, string> = {
-  stem_empty: "题干为空",
-  answer_empty: "答案为空",
-  options_empty: "未识别到选项",
-  options_too_few: "选项数量偏少",
-  subject_empty: "科目未指定",
-  subject_unspecified: "科目未指定，可在审核阶段补充",
-};
-
-function formatParseIssue(message: string) {
-  if (PARSE_ISSUE_LABELS[message]) return PARSE_ISSUE_LABELS[message];
-  const missingOption = message.match(/^missing_option_([A-H])$/i);
-  if (missingOption) return `缺少 ${missingOption[1].toUpperCase()} 选项`;
-  return message;
-}
+const formatParseIssue = formatImportIssue;
 
 function parseEditableOptions(value: string): ParsedOption[] {
   const lines = value.replace(/\r\n?/g, "\n").split("\n");
@@ -161,11 +153,10 @@ function RenderedAnswer({ answer }: { answer: string | string[] | boolean | null
 function ImportTextPreview({ text }: { text: string }) {
   if (!text.trim()) {
     return (
-      <div className="grid min-h-[430px] place-items-center rounded-xl border border-dashed border-border bg-card/40 px-6 text-center">
+      <div className="v2-text-preview v2-text-preview--empty">
         <div>
-          <Eye className="mx-auto h-5 w-5 text-muted-foreground/70" aria-hidden="true" />
-          <p className="mt-2 text-sm font-semibold text-foreground">暂无可预览内容</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground/70">输入题目后，这里会按 KaTeX 与代码保护规则预览最终阅读效果。</p>
+          <Eye className="h-5 w-5" aria-hidden="true" />
+          <p>暂无可预览内容</p>
         </div>
       </div>
     );
@@ -173,7 +164,7 @@ function ImportTextPreview({ text }: { text: string }) {
 
   const parts = text.replace(/\r\n?/g, "\n").split("```");
   return (
-    <div className="min-h-[430px] overflow-auto rounded-xl border border-border bg-card/80 p-4 text-sm leading-7 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+    <div className="v2-text-preview">
       {parts.map((part, index) => {
         if (index % 2 === 1) {
           const newline = part.indexOf("\n");
@@ -183,17 +174,15 @@ function ImportTextPreview({ text }: { text: string }) {
             : part;
           const language = code === part ? "" : maybeLanguage;
           return (
-            <figure key={`code-${index}`} className="my-3 overflow-hidden rounded-xl border border-border bg-muted/60 first:mt-0 last:mb-0">
-              {language ? (
-                <figcaption className="border-b border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">{language}</figcaption>
-              ) : null}
-              <pre className="max-w-full overflow-x-auto px-3 py-3 font-mono text-[12px] leading-6 text-foreground [tab-size:2]"><code>{code}</code></pre>
+            <figure key={`code-${index}`} className="v2-text-codeblock">
+              {language ? <figcaption className="v2-text-codecaption">{language}</figcaption> : null}
+              <pre className="v2-text-pre"><code>{code}</code></pre>
             </figure>
           );
         }
         if (!part) return null;
         return (
-          <div key={`text-${index}`} className="whitespace-pre-wrap break-words">
+          <div key={`text-${index}`} className="v2-text-preview-text">
             <MathFormula text={part} />
           </div>
         );
@@ -231,30 +220,35 @@ function LatexRulesPanel({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <section id="latex-import-rules" className="mb-3 overflow-hidden rounded-xl border border-primary/20 bg-accent/50 import-details-body">
-      <div className="flex items-start justify-between gap-4 border-b border-primary/15 px-4 py-3">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <Braces className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
+    <section id="latex-import-rules" className="v2-text-rules">
+      <header className="v2-text-rules-head">
+        <div className="v2-text-rules-intro">
+          <div className="v2-text-rules-title">
+            <Braces className="h-4 w-4" aria-hidden="true" />
             LaTeX 导入规则
           </div>
-          <p className="mt-1 max-w-[62ch] text-[11px] leading-5 text-muted-foreground/70">
-            导入标准为行内 <code className="font-mono text-muted-foreground">$...$</code>、块级 <code className="font-mono text-muted-foreground">$$...$$</code>；兼容 <code className="font-mono">\(...\)</code> / <code className="font-mono">\[...\]</code>，解析时会机械标准化，不改写公式内容。
+          <p>
+            行内使用 <code>$...$</code>，块级使用 <code>$$...$$</code>；兼容{" "}
+            <code>\(...\)</code> / <code>\[...\]</code>，解析时会机械标准化，不改写公式内容。
           </p>
         </div>
-        <button type="button" onClick={onClose} className="h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-muted-foreground import-interactive hover:bg-card/75" aria-label="收起 LaTeX 规则">
+        <button type="button" onClick={onClose} className="v2-text-link" aria-label="收起 LaTeX 规则">
           收起
         </button>
-      </div>
-      <div className="grid gap-px bg-primary/10 sm:grid-cols-2">
+      </header>
+      <div className="v2-text-rules-grid">
         {rules.map((rule) => (
-          <div key={rule.title} className="bg-card/90 p-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold text-foreground">{rule.title}</p>
-              {rule.preview ? <span className="max-w-[55%] truncate text-[11px] text-accent-foreground"><MathFormula text={rule.preview} /></span> : <Code2 className="h-3.5 w-3.5 text-muted-foreground/70" aria-hidden="true" />}
+          <div key={rule.title} className="v2-text-rule-card">
+            <div className="v2-text-rule-card-head">
+              <span>{rule.title}</span>
+              {rule.preview ? (
+                <span className="v2-text-rule-preview"><MathFormula text={rule.preview} /></span>
+              ) : (
+                <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
             </div>
-            <code className="mt-2 block overflow-x-auto whitespace-pre rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-[10px] leading-5 text-muted-foreground">{rule.source}</code>
-            <p className="mt-2 text-[11px] leading-5 text-muted-foreground/70">{rule.detail}</p>
+            <code className="v2-text-rule-code">{rule.source}</code>
+            <p>{rule.detail}</p>
           </div>
         ))}
       </div>
@@ -275,53 +269,45 @@ function LatexInspectionPanel({
 }) {
   const hasErrors = inspection.errorCount > 0;
   const hasWarnings = inspection.warningCount > 0;
+  const tone = hasErrors ? "bad" : hasWarnings ? "warn" : "ok";
   const stateLabel = hasErrors ? `${inspection.errorCount} 个错误` : hasWarnings ? `${inspection.warningCount} 个建议` : "检查通过";
-  const stateClass = hasErrors
-    ? "border-destructive/30 bg-destructive-light text-destructive"
-    : hasWarnings
-      ? "border-warning/30 bg-warning-light text-warning-foreground"
-      : "border-success/25 bg-success-light text-success";
   const StateIcon = hasErrors ? AlertTriangle : hasWarnings ? Info : Check;
 
   return (
-    <div className={`mt-3 overflow-hidden rounded-xl border ${stateClass}`}>
+    <div className="v2-text-precheck" data-tone={tone}>
       <button
         type="button"
         onClick={onToggle}
-        className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left import-interactive hover:bg-card/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className="v2-text-precheck-btn"
         aria-expanded={expanded}
         aria-controls="latex-import-inspection"
       >
-        <StateIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-            <span className="font-semibold">LaTeX 预检 · {stateLabel}</span>
-            <span className="text-muted-foreground/70">
-              行内 {inspection.inlineCount} · 块级 {inspection.blockCount} · 代码块 {inspection.codeFenceCount}
-            </span>
-          </div>
-        </div>
-        <ChevronDown className={`h-4 w-4 shrink-0 import-chevron ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+        <StateIcon className="h-4 w-4" aria-hidden="true" />
+        <span className="v2-text-precheck-main">
+          <strong>LaTeX 预检 · {stateLabel}</strong>
+          <span>行内 {inspection.inlineCount} · 块级 {inspection.blockCount} · 代码块 {inspection.codeFenceCount}</span>
+        </span>
+        <ChevronDown className={`v2-text-chevron ${expanded ? "is-open" : ""}`} aria-hidden="true" />
       </button>
 
       {expanded ? (
-        <div id="latex-import-inspection" className="border-t border-primary/10 bg-card/40 px-3.5 py-3 import-details-body">
+        <div id="latex-import-inspection" className="v2-text-precheck-body">
           {inspection.issues.length === 0 ? (
-            <div className="flex items-start gap-2 text-[11px] leading-5">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <div className="v2-text-precheck-ok">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
               <p>定界符、花括号与代码围栏未发现结构问题。解析仍会执行服务端题目结构校验。</p>
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className="v2-text-issue-list">
               {inspection.issues.map((issue) => {
                 const Icon = issue.severity === "error" ? AlertTriangle : issue.severity === "warning" ? Info : CheckCircle2;
                 const content = (
                   <>
-                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="font-semibold">{issue.title}</span>
-                      {issue.line ? <span className="ml-1.5 font-mono text-[10px] opacity-70">L{issue.line}</span> : null}
-                      <span className="mt-0.5 block leading-5 opacity-80">{issue.detail}</span>
+                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>
+                      <strong>{issue.title}</strong>
+                      {issue.line ? <em>L{issue.line}</em> : null}
+                      <small>{issue.detail}</small>
                     </span>
                   </>
                 );
@@ -331,13 +317,13 @@ function LatexInspectionPanel({
                     key={issue.id}
                     type="button"
                     onClick={() => onIssueClick(issue.line)}
-                    className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-[11px] import-interactive hover:bg-card/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="v2-text-issue"
                     title={`跳转到第 ${issue.line} 行`}
                   >
                     {content}
                   </button>
                 ) : (
-                  <div key={issue.id} className="flex min-h-11 items-start gap-2 rounded-lg px-2 py-2 text-[11px]">{content}</div>
+                  <div key={issue.id} className="v2-text-issue">{content}</div>
                 );
               })}
             </div>
@@ -348,17 +334,28 @@ function LatexInspectionPanel({
   );
 }
 
+function resolveSubjectLabel(question: ParsedQuestion, subjects: SubjectOption[]) {
+  if (question.subject_id) {
+    return subjects.find((subject) => subject.id === question.subject_id)?.name || `#${question.subject_id}`;
+  }
+  if (question.subject) {
+    return subjects.find((subject) => subject.code === question.subject)?.name || question.subject;
+  }
+  return null;
+}
+
 export default function TextImportPage() {
   const queryClient = useQueryClient();
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const editSectionRef = useRef<HTMLElement>(null);
+  const lineGutterRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
   const [inputMode, setInputMode] = useState<"source" | "preview">("source");
   const [rulesOpen, setRulesOpen] = useState(false);
   const [issuesOpen, setIssuesOpen] = useState(false);
-  const [subjectOptions, setSubjectOptions] = useState<Array<{id: number; code: string; name: string}>>([]);
+  const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([]);
   useEffect(() => {
-    apiRequest<Array<{id: number; code: string; name: string; path: string; level: number}>>("/imports/subject-options")
+    apiRequest<Array<SubjectOption & { path: string; level: number }>>("/imports/subject-options")
       .then(setSubjectOptions)
       .catch(() => {});
   }, []);
@@ -368,6 +365,12 @@ export default function TextImportPage() {
   const [optionDraft, setOptionDraft] = useState("");
   const [importStatus, setImportStatus] = useState<ImportResponse | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [acceptedBlocks, setAcceptedBlocks] = useState<Map<number, "ok" | "duplicate">>(() => new Map());
+  const [resultView, setResultView] = useState<"all" | "issues">("all");
+  const [defaultSubjectId, setDefaultSubjectId] = useState("");
+  const revisionRef = useRef(0);
+  const parseRequestRef = useRef<AbortController | null>(null);
+  const importRequestRef = useRef<AbortController | null>(null);
 
   const charCount = text.length;
   const latexInspection = useMemo(() => inspectLatexImportText(text), [text]);
@@ -381,6 +384,36 @@ export default function TextImportPage() {
     return validateEditStructure(editForm);
   }, [editForm]);
 
+  const lineCount = Math.max(14, text.replace(/\r\n?/g, "\n").split("\n").length);
+  const pendingQuestions = parseResult?.questions.filter(
+    (question) => question.is_valid && !acceptedBlocks.has(question.block_index),
+  ) ?? [];
+  const hasValidQuestions = pendingQuestions.length > 0;
+  const firstInvalidIndex = parseResult?.questions.findIndex(
+    (question) => question.errors.length > 0 || question.warnings.length > 0,
+  ) ?? -1;
+  const firstInvalidQuestion = firstInvalidIndex >= 0 ? parseResult?.questions[firstInvalidIndex] : undefined;
+  const issueQuestions = parseResult?.questions.filter((question) => !question.is_valid || question.errors.length > 0 || question.warnings.length > 0).length ?? 0;
+  const warningLines = parseResult
+    ? [
+        ...parseResult.warnings,
+        ...(firstInvalidQuestion
+          ? [formatParseIssue(firstInvalidQuestion.errors[0] ?? firstInvalidQuestion.warnings[0])]
+          : []),
+      ]
+    : [];
+  const inspectionTone = latexInspection.errorCount > 0 ? "bad" : latexInspection.warningCount > 0 ? "warn" : "ok";
+  const InspectionIcon = latexInspection.errorCount > 0
+    ? AlertTriangle
+    : latexInspection.warningCount > 0
+      ? Info
+      : Check;
+  const inspectionLabel = latexInspection.errorCount > 0
+    ? `${latexInspection.errorCount} 个错误`
+    : latexInspection.warningCount > 0
+      ? `${latexInspection.warningCount} 个建议`
+      : "检查通过";
+
   const resetParsedState = () => {
     setParseResult(null);
     setImportStatus(null);
@@ -388,9 +421,14 @@ export default function TextImportPage() {
     setEditForm(null);
     setOptionDraft("");
     setGlobalError(null);
+    setAcceptedBlocks(new Map());
   };
 
   const updateSourceText = (next: string) => {
+    if (importRequestRef.current) return;
+    revisionRef.current += 1;
+    parseRequestRef.current?.abort();
+    parseRequestRef.current = null;
     setText(next);
     resetParsedState();
   };
@@ -445,7 +483,7 @@ export default function TextImportPage() {
       const end = start + (lines[safeLine - 1]?.length ?? 0);
       textarea.focus();
       textarea.setSelectionRange(start, end);
-      const lineHeight = Number.parseFloat(window.getComputedStyle(textarea).lineHeight) || 24;
+      const lineHeight = Number.parseFloat(window.getComputedStyle(textarea).lineHeight) || 28;
       textarea.scrollTop = Math.max(0, (safeLine - 3) * lineHeight);
     });
   };
@@ -469,50 +507,85 @@ export default function TextImportPage() {
     return () => cancelAnimationFrame(frame);
   }, [editingIndex]);
 
+  useEffect(() => () => {
+    revisionRef.current += 1;
+    parseRequestRef.current?.abort();
+    importRequestRef.current?.abort();
+  }, []);
+
   const parseMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: ({ source, signal, subjectId }: { source: string; revision: number; signal: AbortSignal; subjectId?: number | null }) =>
       apiRequest<ParseResponse>("/imports/text-parse", {
         method: "POST",
-        body: JSON.stringify({ text, subject_id: null }),
+        body: JSON.stringify({ text: source, subject_id: subjectId ?? null }),
+        signal,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, request) => {
+      if (request.revision !== revisionRef.current || request.signal.aborted) return;
       setParseResult(data);
       setImportStatus(null);
       setGlobalError(null);
+      setAcceptedBlocks(new Map());
     },
-    onError: (err) => {
-      setGlobalError(err instanceof Error ? err.message : "解析请求失败");
+    onError: (err, request) => {
+      if (request.revision !== revisionRef.current || request.signal.aborted) return;
+      setGlobalError(importErrorMessage(err));
+    },
+    onSettled: (_data, _error, request) => {
+      if (parseRequestRef.current?.signal === request.signal) parseRequestRef.current = null;
     },
   });
 
   const importMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: ({ questions, signal }: { questions: ParsedQuestion[]; revision: number; signal: AbortSignal }) =>
       apiRequest<ImportResponse>("/imports/text-import", {
         method: "POST",
         body: JSON.stringify({
           subject_id: null,
-          questions: parseResult?.questions.filter((q) => q.is_valid) ?? [],
+          questions,
         }),
+        signal,
       }),
-    onSuccess: (data) => {
-      setImportStatus(data);
+    onSuccess: (data, request) => {
+      if (request.revision !== revisionRef.current || request.signal.aborted) return;
+      // The API numbers items by position within this filtered submission.
+      const items = data.items.flatMap((item) => {
+        const original = request.questions[item.block_index];
+        return original ? [{ ...item, block_index: original.block_index }] : [];
+      });
+      setImportStatus({ ...data, items });
+      setAcceptedBlocks((previous) => {
+        const next = new Map(previous);
+        for (const item of items) {
+          if (item.status === "ok" || item.status === "duplicate") next.set(item.block_index, item.status);
+        }
+        return next;
+      });
+      setGlobalError(null);
       queryClient.invalidateQueries({ queryKey: ["import-review-queue"] });
     },
-    onError: (err) => {
-      setGlobalError(err instanceof Error ? err.message : "导入请求失败");
+    onError: (err, request) => {
+      if (request.revision !== revisionRef.current || request.signal.aborted) return;
+      setGlobalError(importErrorMessage(err));
+    },
+    onSettled: (_data, _error, request) => {
+      if (importRequestRef.current?.signal === request.signal) importRequestRef.current = null;
     },
   });
 
   const handleParse = () => {
+    if (parseRequestRef.current || importRequestRef.current) return;
     if (!text.trim()) {
       setGlobalError("请输入题目文本");
       return;
     }
-    parseMutation.mutate();
+    const controller = new AbortController();
+    parseRequestRef.current = controller;
+    parseMutation.mutate({ source: text, revision: ++revisionRef.current, signal: controller.signal, subjectId: defaultSubjectId ? Number(defaultSubjectId) : null });
   };
 
   const handleDelete = (index: number) => {
-    if (!parseResult) return;
+    if (!parseResult || importRequestRef.current || acceptedBlocks.has(parseResult.questions[index].block_index)) return;
     const next = parseResult.questions.filter((_, i) => i !== index);
     setParseResult({
       ...parseResult,
@@ -530,19 +603,19 @@ export default function TextImportPage() {
   };
 
   const startEdit = (index: number) => {
-    if (!parseResult) return;
+    if (!parseResult || importRequestRef.current || acceptedBlocks.has(parseResult.questions[index].block_index)) return;
     setEditingIndex(index);
-    const q = parseResult.questions[index];
+    const question = parseResult.questions[index];
     setEditForm({
-      ...q,
-      options: q.options.map((o) => ({ ...o })),
-      knowledge_points: [...(q.knowledge_points || [])],
+      ...question,
+      options: question.options.map((option) => ({ ...option })),
+      knowledge_points: [...(question.knowledge_points || [])],
     });
-    setOptionDraft(q.options.map((option) => `${option.key}. ${option.text}`).join("\n"));
+    setOptionDraft(question.options.map((option) => `${option.key}. ${option.text}`).join("\n"));
   };
 
   const saveEdit = () => {
-    if (!parseResult || editingIndex === null || !editForm || editStructureIssues.length > 0) return;
+    if (!parseResult || editingIndex === null || !editForm || editStructureIssues.length > 0 || importRequestRef.current) return;
     const next = [...parseResult.questions];
     next[editingIndex] = {
       ...editForm,
@@ -563,415 +636,586 @@ export default function TextImportPage() {
   };
 
   const handleImport = () => {
-    if (!parseResult || parseResult.valid_count === 0) return;
-    importMutation.mutate();
+    if (!hasValidQuestions || parseRequestRef.current || importRequestRef.current || editingIndex !== null) return;
+    const controller = new AbortController();
+    importRequestRef.current = controller;
+    importMutation.mutate({ questions: pendingQuestions, revision: revisionRef.current, signal: controller.signal });
   };
 
-  const hasValidQuestions = (parseResult?.valid_count ?? 0) > 0;
+  const scrollToFirstIssue = () => {
+    if (firstInvalidIndex < 0) return;
+    document.getElementById("v2-text-first-issue")?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  };
 
   return (
-    <div className="space-y-6 pb-4">
-      <ImportWorkspaceHeader
-        icon={FileText}
-        title="文本导入"
-        description="粘贴结构化或自然语言题目，先解析结构与 LaTeX，再送入审核队列。科目可留空，选项支持常见网页复制格式。"
-        meta={
-          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-            科目可后补
-          </div>
-        }
-      />
+    <div className="imports-v2 v2-text-page">
+      <header className="v2-text-head">
+        <h1 className="v2-text-title">文本导入</h1>
+      </header>
 
-      <ImportToast
-        message={globalError ? `操作未完成：${globalError}` : null}
-        tone="error"
-        onDismiss={() => setGlobalError(null)}
-      />
+      {globalError ? (
+        <div className="v2-text-alert" role="alert">
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          <span><strong>操作未完成</strong> · {globalError}</span>
+          <button type="button" onClick={() => setGlobalError(null)} aria-label="关闭错误提示">
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
-      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
-        <div className="grid min-h-[620px] xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
-          <div className="min-w-0 border-b border-border/60 xl:border-b-0 xl:border-r">
-            <ImportPanelHeader
-              title="原始文本"
-              description="先预检 LaTeX / 代码，再识别题干、选项与答案；支持 A. 内容，也支持 A 与内容分两行。"
-              trailing={
-                <div className="text-right font-mono text-[10px] tabular-nums text-muted-foreground/70">
-                  <div>{charCount.toLocaleString()} 字</div>
-                  <div className="mt-0.5">公式 {latexInspection.formulaCount}</div>
-                </div>
-              }
-            />
-            <div className="flex h-[calc(100%-4rem)] min-h-[555px] flex-col p-4 sm:p-5">
-              <div className="mb-3 flex flex-col gap-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="inline-flex items-center rounded-xl border border-border bg-muted p-1" role="tablist" aria-label="文本输入模式">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={inputMode === "source"}
-                      onClick={() => setInputMode("source")}
-                      className={`h-11 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${inputMode === "source" ? "bg-card text-foreground shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-muted-foreground/70 hover:text-muted-foreground"}`}
-                    >
-                      输入
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={inputMode === "preview"}
-                      onClick={() => setInputMode("preview")}
-                      className={`flex h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${inputMode === "preview" ? "bg-card text-foreground shadow-[0_1px_4px_rgba(37,52,65,0.09)]" : "text-muted-foreground/70 hover:text-muted-foreground"}`}
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                      预览
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setRulesOpen((open) => !open)}
-                    className={`flex h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rulesOpen ? "border-primary/30 bg-accent text-accent-foreground" : "border-border bg-card/60 text-muted-foreground hover:bg-card"}`}
-                    aria-expanded={rulesOpen}
-                    aria-controls="latex-import-rules"
-                  >
-                    <Braces className="h-3.5 w-3.5" aria-hidden="true" />
-                    LaTeX 规则
-                  </button>
-                </div>
-
-                {inputMode === "source" ? (
-                  <div className="flex flex-wrap items-center gap-1.5" aria-label="文本快速格式化工具">
-                    <button type="button" onClick={() => wrapSelection("inline")} className="h-11 rounded-lg border border-border/60 bg-card/60 px-3 font-mono text-[11px] font-semibold text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本包裹为行内公式">
-                      $ · $ <span className="ml-1 font-sans font-normal text-muted-foreground/70">行内</span>
-                    </button>
-                    <button type="button" onClick={() => wrapSelection("block")} className="h-11 rounded-lg border border-border/60 bg-card/60 px-3 font-mono text-[11px] font-semibold text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本包裹为块级公式">
-                      $$ · $$ <span className="ml-1 font-sans font-normal text-muted-foreground/70">块级</span>
-                    </button>
-                    <button type="button" onClick={() => wrapSelection("code")} className="flex h-11 items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 text-[11px] font-medium text-muted-foreground import-interactive hover:border-border hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="将选中文本放入代码围栏">
-                      <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      代码块
-                    </button>
-                    {latexInspection.alternateDelimiterCount > 0 ? (
-                      <button type="button" onClick={handleNormalizeDelimiters} className="ml-auto flex h-11 items-center gap-1.5 rounded-lg border border-primary/25 bg-accent px-3 text-[11px] font-medium text-accent-foreground import-interactive hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                        标准化 {latexInspection.alternateDelimiterCount} 处定界符
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              {rulesOpen ? <LatexRulesPanel onClose={() => setRulesOpen(false)} /> : null}
-
-              {inputMode === "source" ? (
-                <>
-                  <label htmlFor="question-import-text" className="sr-only">题目文本</label>
-                  <textarea
-                    ref={textAreaRef}
-                    id="question-import-text"
-                    className="min-h-[430px] flex-1 resize-y rounded-xl border border-border bg-muted/60 px-4 py-3.5 font-mono text-[13px] leading-6 text-foreground outline-none transition-[border-color,background-color,box-shadow] duration-150 placeholder:text-muted-foreground/70 focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15"
-                    placeholder={TEXT_IMPORT_SAMPLE}
-                    value={text}
-                    spellCheck={false}
-                    onKeyDown={(event) => {
-                      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                        event.preventDefault();
-                        handleParse();
-                      }
-                    }}
-                    onChange={(e) => updateSourceText(e.target.value)}
-                  />
-                </>
-              ) : (
-                <div className="flex-1 import-panel-swap" role="tabpanel" aria-label="题目渲染预览">
-                  <ImportTextPreview text={text} />
-                </div>
-              )}
-
-              <LatexInspectionPanel
-                inspection={latexInspection}
-                expanded={issuesOpen}
-                onToggle={() => setIssuesOpen((open) => !open)}
-                onIssueClick={focusSourceLine}
-              />
-
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs leading-5 text-muted-foreground/70">
-                  <p>支持带/不带括号的结构标签；选项可写 “A. 内容”，也可写成 “A” 后换行输入内容。</p>
-                  <p className="mt-0.5 font-mono text-[10px]">⌘ / Ctrl + Enter · 解析文本</p>
-                </div>
-                <Button
-                  className="h-11 min-w-32 import-interactive group"
-                  onClick={handleParse}
-                  disabled={parseMutation.isPending || !text.trim()}
-                >
-                  {parseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden="true" />}
-                  {parseMutation.isPending ? "解析中" : "解析文本"}
-                </Button>
+      <div className="v2-text-layout" data-state={parseResult ? "parsed" : "idle"}>
+        <section className="v2-text-editor" aria-labelledby="v2-text-editor-title">
+          <header className="v2-text-card-head">
+            <div>
+              <div className="v2-text-card-title-wrap flex items-center gap-2" style={{ color: "var(--v2-ink3)" }}>
+                <FileText className="h-4 w-4" aria-hidden="true" />
+                <h2 id="v2-text-editor-title" className="v2-text-card-title">原始文本</h2>
               </div>
             </div>
-          </div>
+            <div className="v2-text-head-tools">
+              <div className="v2-text-tabs" role="group" aria-label="文本输入模式">
+                <button
+                  type="button"
+                  aria-pressed={inputMode === "source"}
+                  onClick={() => setInputMode("source")}
+                  className="v2-text-tab"
+                  data-active={inputMode === "source"}
+                >
+                  输入
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={inputMode === "preview"}
+                  onClick={() => setInputMode("preview")}
+                  className="v2-text-tab"
+                  data-active={inputMode === "preview"}
+                >
+                  <Eye className="h-3 w-3" aria-hidden="true" />
+                  预览
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRulesOpen((open) => !open)}
+                className="v2-text-rule-btn"
+                aria-expanded={rulesOpen}
+                aria-controls="latex-import-rules"
+              >
+                <Braces className="h-3.5 w-3.5" aria-hidden="true" />
+                LaTeX 规则
+              </button>
+            </div>
+          </header>
 
-          <div className="min-w-0 bg-card/30">
-            {parseResult ? (
-              <div className="flex min-h-[620px] flex-col import-panel-swap">
-                <ImportPanelHeader
-                  title="解析结果"
-                  description="先处理结构错误再确认导入；科目未指定只提示，不阻塞进入审核队列。"
-                  trailing={
-                    <Button
-                      className="h-11"
-                      disabled={!hasValidQuestions || importMutation.isPending}
-                      onClick={handleImport}
-                    >
-                      {importMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-                      {importMutation.isPending ? "导入中" : "确认导入"}
-                    </Button>
-                  }
+          <div className="v2-text-card-body">
+            <div className="v2-text-toolbar" aria-label="文本快速格式化工具">
+              <button type="button" onClick={() => wrapSelection("inline")} className="v2-text-tool" title="将选中文本包裹为行内公式">
+                <span className="v2-text-tool-code">$ · $</span> 行内
+              </button>
+              <button type="button" onClick={() => wrapSelection("block")} className="v2-text-tool" title="将选中文本包裹为块级公式">
+                <span className="v2-text-tool-code">$$ · $$</span> 块级
+              </button>
+              <button type="button" onClick={() => wrapSelection("code")} className="v2-text-tool" title="将选中文本放入代码围栏">
+                <Code2 className="h-3.5 w-3.5" aria-hidden="true" /> 代码块
+              </button>
+              {latexInspection.alternateDelimiterCount > 0 ? (
+                <button type="button" onClick={handleNormalizeDelimiters} className="v2-text-normalize">
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  标准化 {latexInspection.alternateDelimiterCount} 处定界符
+                </button>
+              ) : null}
+            </div>
+
+            {rulesOpen ? <LatexRulesPanel onClose={() => setRulesOpen(false)} /> : null}
+
+            {inputMode === "source" ? (
+              <div className="v2-text-paper-wrap">
+                <div ref={lineGutterRef} className="v2-text-gutter" aria-hidden="true">
+                  {Array.from({ length: lineCount }, (_, index) => (
+                    <span key={index} className="v2-text-line-no">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  ))}
+                </div>
+                <label htmlFor="question-import-text" className="sr-only">题目文本</label>
+                <textarea
+                  ref={textAreaRef}
+                  id="question-import-text"
+                  className="v2-text-input"
+                  placeholder={TEXT_IMPORT_SAMPLE}
+                  value={text}
+                  spellCheck={false}
+                  readOnly={importMutation.isPending}
+                  onScroll={(event) => {
+                    if (lineGutterRef.current) lineGutterRef.current.scrollTop = event.currentTarget.scrollTop;
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      handleParse();
+                    }
+                  }}
+                  onChange={(event) => updateSourceText(event.target.value)}
                 />
-
-                <div className="grid grid-cols-3 divide-x divide-border/60 border-b border-border/60 bg-card/55" aria-live="polite">
-                  <ImportMetric label="识别题目" value={parseResult.raw_count} />
-                  <ImportMetric label="有效" value={parseResult.valid_count} tone="success" />
-                  <ImportMetric label="需处理" value={Math.max(0, parseResult.raw_count - parseResult.valid_count)} tone={parseResult.raw_count - parseResult.valid_count > 0 ? "danger" : "neutral"} />
-                </div>
-
-                {parseResult.warnings.length > 0 ? (
-                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-warning/35 bg-warning-light px-3.5 py-3 text-xs leading-5 text-foreground sm:mx-5 import-feedback-in">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <div className="space-y-1">
-                      {parseResult.warnings.map((w, i) => <p key={i}>{w}</p>)}
-                    </div>
-                  </div>
-                ) : null}
-
-                {importStatus ? (
-                  <div role="status" className="mx-4 mt-4 flex items-start gap-2.5 rounded-xl border border-success/30 bg-success-light px-3.5 py-3 text-xs leading-5 text-success sm:mx-5 import-feedback-in">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="font-semibold">导入完成 · 批次 {importStatus.batch_id}</p>
-                      <p className="mt-0.5">
-                        成功 {importStatus.succeeded} 题
-                        {importStatus.duplicates_filtered > 0 ? ` · 过滤重复 ${importStatus.duplicates_filtered} 题` : ""}
-                        {importStatus.failed > 0 ? ` · 失败 ${importStatus.failed} 题` : ""}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="min-h-0 flex-1 p-4 sm:p-5">
-                  <div className="max-h-[440px] overflow-y-auto rounded-xl border border-border/60 bg-card/65">
-                    {parseResult.questions.map((q, index) => (
-                      <article key={index} className="group border-b border-border/60 px-4 py-3.5 last:border-b-0 hover:bg-primary/[0.04] import-list-item import-interactive" style={{ animationDelay: `${Math.min(index, 8) * 28}ms` }}>
-                        <div className="flex items-start gap-3">
-                          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${q.is_valid ? "bg-success" : "bg-destructive"}`} aria-hidden="true" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="text-xs font-semibold text-foreground">题目 {index + 1}</span>
-                              <StatusBadge tone={q.is_valid ? "success" : "danger"}>{q.is_valid ? "有效" : "无效"}</StatusBadge>
-                              <span className="text-[11px] text-muted-foreground/70">{typeLabel(q.question_type)}</span>
-                              {q.subject_id || q.subject ? (
-                                <span className="rounded-full border border-primary/20 bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground" title={q.subject_id ? "已指定科目" : "自动识别的科目，可在审核时调整"}>
-                                  {q.subject_id
-                                    ? (subjectOptions.find((s) => s.id === q.subject_id)?.name || `#${q.subject_id}`)
-                                    : (subjectOptions.find((s) => s.code === q.subject)?.name || q.subject)}
-                                </span>
-                              ) : (
-                                <span className="rounded-full border border-dashed border-border bg-card/55 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/70" title="科目可在审核阶段补充">科目待补</span>
-                              )}
-                            </div>
-                            <div className="mt-2 max-h-28 overflow-hidden text-sm leading-6 text-muted-foreground">
-                              <QuestionContentRenderer content={q.stem} fallbackText={q.stem} preserveCodeText />
-                            </div>
-
-                            {q.options.length > 0 ? (
-                              <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                                {q.options.slice(0, 4).map((opt) => (
-                                  <div key={opt.key} className="flex min-w-0 items-baseline gap-1 text-[11px] text-muted-foreground/70">
-                                    <span className="shrink-0 font-semibold text-muted-foreground">{opt.key}.</span>
-                                    <span className="min-w-0 truncate"><MathFormula text={opt.text} /></span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : q.question_type === "single_choice" || q.question_type === "multiple_choice" ? (
-                              <button type="button" onClick={() => startEdit(index)} className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-lg border border-dashed border-warning/40 bg-warning-light px-3 py-2 text-left text-[11px] text-foreground import-interactive hover:border-warning/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <span><strong className="font-semibold">未识别到选项</strong> · 点击编辑补充或检查选项分隔格式</span>
-                              </button>
-                            ) : null}
-
-                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/70">
-                              <span className="inline-flex items-baseline gap-1">答案 <strong className="font-semibold text-muted-foreground"><RenderedAnswer answer={q.answer} /></strong></span>
-                              {q.analysis ? <span>含解析</span> : null}
-                              {q.warnings.length > 0 ? <span className="text-foreground">{q.warnings.length} 条警告</span> : null}
-                              {q.errors.length > 0 ? <span className="text-destructive">{q.errors.length} 个错误</span> : null}
-                            </div>
-
-                            {q.errors.length > 0 || q.warnings.length > 0 ? (
-                              <details className="mt-2 rounded-lg border border-border/60 bg-card/40 px-2.5 py-1.5 text-[11px] text-muted-foreground open:pb-2.5">
-                                <summary className="flex min-h-11 cursor-pointer select-none items-center py-1.5 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                  查看解析异常
-                                </summary>
-                                <div className="space-y-1.5 border-t border-border/60 pt-2 import-details-body">
-                                  {q.errors.map((message, issueIndex) => (
-                                    <p key={`e-${issueIndex}`} className="flex gap-1.5 leading-5 text-destructive"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{formatParseIssue(message)}</p>
-                                  ))}
-                                  {q.warnings.map((message, issueIndex) => (
-                                    <p key={`w-${issueIndex}`} className="flex gap-1.5 leading-5"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{formatParseIssue(message)}</p>
-                                  ))}
-                                </div>
-                              </details>
-                            ) : null}
-                          </div>
-
-                          <div className="flex shrink-0 gap-1">
-                            <Button variant="ghost" className="h-11 w-11 p-0 import-interactive" aria-label={`编辑题目 ${index + 1}`} title="编辑题目" onClick={() => startEdit(index)}>
-                              <Edit3 className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                            <Button variant="ghost" className="h-11 w-11 p-0 import-interactive" aria-label={`删除题目 ${index + 1}`} title="删除题目" onClick={() => handleDelete(index)}>
-                              <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
-                            </Button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {editingIndex !== null && editForm ? (
-                    <section ref={editSectionRef} className="mt-4 scroll-mt-5 overflow-hidden rounded-xl border border-primary/30 bg-card import-panel-swap">
-                      <ImportPanelHeader
-                        title={`编辑题目 ${editingIndex + 1}`}
-                        description="按最终渲染效果检查题干、选项、公式与代码；科目为可选项，不参与结构有效性判断。"
-                        trailing={
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-medium sm:inline-flex ${editLatexInspection.errorCount > 0 ? "border-destructive/25 bg-destructive-light text-destructive" : editLatexInspection.warningCount > 0 ? "border-warning/30 bg-warning-light text-warning-foreground" : "border-success/25 bg-success-light text-success"}`}>
-                              公式 {editLatexInspection.formulaCount} · {editLatexInspection.errorCount + editLatexInspection.warningCount > 0 ? `风险 ${editLatexInspection.errorCount + editLatexInspection.warningCount}` : "通过"}
-                            </span>
-                            <Button variant="ghost" className="h-11 import-interactive" onClick={() => { setEditingIndex(null); setEditForm(null); setOptionDraft(""); }}>取消</Button>
-                            <Button className="h-11 import-interactive" onClick={saveEdit} disabled={editStructureIssues.length > 0} title={editStructureIssues.length > 0 ? editStructureIssues.join("；") : "保存修改"}><CheckCircle2 className="h-4 w-4" aria-hidden="true" />保存</Button>
-                          </div>
-                        }
-                      />
-                      <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
-                        <label className="space-y-1.5">
-                          <span className="flex items-center justify-between gap-2 text-xs font-semibold text-muted-foreground">
-                            <span>科目 <span className="font-normal text-muted-foreground/70">（可选）</span></span>
-                            {!editForm.subject_id ? <span className="text-[10px] font-normal text-muted-foreground/70">审核时可补</span> : null}
-                          </span>
-                          <select className="h-11 w-full rounded-xl border border-border bg-muted px-3 text-sm text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.subject_id ?? ""} onChange={(e) => setEditForm({ ...editForm, subject_id: e.target.value ? Number(e.target.value) : null })}>
-                            <option value="">未指定 · 不阻塞导入</option>
-                            {subjectOptions.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-                          </select>
-                        </label>
-                        <div className="space-y-1.5">
-                          <span className="text-xs font-semibold text-muted-foreground">题型</span>
-                          <CustomSelect
-                            value={editForm.question_type ?? ""}
-                            onChange={(v) => setEditForm({ ...editForm, question_type: v || null })}
-                            options={canonicalizeQuestionType(editForm.question_type) || !editForm.question_type
-                              ? QUESTION_TYPE_OPTIONS
-                              : [...QUESTION_TYPE_OPTIONS, { value: editForm.question_type!, label: formatUnknownType(editForm.question_type!), disabled: true }]}
-                            placeholder="选择题型"
-                            clearable={false}
-                          />
-                        </div>
-                        <label className="space-y-1.5 sm:col-span-2">
-                          <span className="text-xs font-semibold text-muted-foreground">题干</span>
-                          <textarea className="min-h-24 w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.stem} onChange={(e) => setEditForm({ ...editForm, stem: e.target.value })} />
-                        </label>
-                        <label className="space-y-1.5 sm:col-span-2">
-                          <span className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold text-muted-foreground">
-                            <span>选项 <span className="font-normal text-muted-foreground/70">支持 “A. 内容” 或 “A ↵ 内容”</span></span>
-                            <span className={`text-[10px] font-normal ${editForm.options.length >= 4 ? "text-success" : "text-muted-foreground/70"}`}>已识别 {editForm.options.length} 项</span>
-                          </span>
-                          <textarea className="min-h-28 w-full rounded-xl border border-border bg-muted px-3 py-2.5 font-mono text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={optionDraft} onChange={(e) => { const nextDraft = e.target.value; setOptionDraft(nextDraft); setEditForm({ ...editForm, options: parseEditableOptions(nextDraft) }); }} />
-                        </label>
-                        <label className="space-y-1.5">
-                          <span className="text-xs font-semibold text-muted-foreground">答案</span>
-                          <input className="h-11 w-full rounded-xl border border-border bg-muted px-3 text-sm text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={typeof editForm.answer === "boolean" ? (editForm.answer ? "正确" : "错误") : Array.isArray(editForm.answer) ? editForm.answer.join(",") : String(editForm.answer ?? "")} onChange={(e) => setEditForm({ ...editForm, answer: e.target.value })} />
-                        </label>
-                        <label className="space-y-1.5 sm:col-span-2">
-                          <span className="text-xs font-semibold text-muted-foreground">解析</span>
-                          <textarea className="min-h-24 w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-ring/15" value={editForm.analysis ?? ""} onChange={(e) => setEditForm({ ...editForm, analysis: e.target.value })} />
-                        </label>
-
-                        {editStructureIssues.length > 0 ? (
-                          <div role="status" className="sm:col-span-2 flex items-start gap-2.5 rounded-xl border border-warning/35 bg-warning-light px-3.5 py-3 text-[11px] leading-5 text-foreground import-feedback-in">
-                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            <div>
-                              <p className="font-semibold">保存前还需处理 {editStructureIssues.length} 项结构问题</p>
-                              <p className="mt-0.5 text-muted-foreground/70">{editStructureIssues.join(" · ")}</p>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        <section className="sm:col-span-2 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                          <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 px-3.5 py-2">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                              <Eye className="h-3.5 w-3.5 text-accent-foreground" aria-hidden="true" />
-                              最终渲染预览
-                            </div>
-                            <span className="text-[10px] text-muted-foreground/70">与题库阅读侧使用同一渲染规则</span>
-                          </div>
-                          <div className="space-y-4 p-3.5 text-sm leading-7 text-muted-foreground import-panel-swap">
-                            <div>
-                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">题干</p>
-                              <QuestionContentRenderer content={editForm.stem} fallbackText={editForm.stem} preserveCodeText />
-                            </div>
-                            {editForm.options.length > 0 ? (
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {editForm.options.map((option) => (
-                                  <div key={option.key} className="flex min-w-0 gap-2 rounded-lg border border-border/60 bg-card/60 px-2.5 py-2 text-xs leading-6">
-                                    <span className="font-semibold text-accent-foreground">{option.key}.</span>
-                                    <span className="min-w-0"><MathFormula text={option.text} /></span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                            <div className="grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-[0.34fr_0.66fr]">
-                              <div>
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">答案</p>
-                                <div className="text-xs font-semibold text-muted-foreground"><RenderedAnswer answer={editForm.answer} /></div>
-                              </div>
-                              <div>
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">解析</p>
-                                <div className="whitespace-pre-wrap text-xs leading-6">{editForm.analysis ? <MathFormula text={editForm.analysis} /> : <span className="italic text-muted-foreground/70">无解析</span>}</div>
-                              </div>
-                            </div>
-                            {editLatexInspection.issues.length > 0 ? (
-                              <div className="rounded-lg border border-warning/30 bg-warning-light px-3 py-2 text-[11px] leading-5 text-foreground">
-                                <span className="font-semibold">LaTeX 预检：</span>
-                                {editLatexInspection.errorCount > 0 ? `${editLatexInspection.errorCount} 个结构错误` : `${editLatexInspection.warningCount} 个格式建议`}
-                                <span className="ml-1 text-muted-foreground/70">· 保存前建议核对公式定界符与括号。</span>
-                              </div>
-                            ) : null}
-                          </div>
-                        </section>
-                      </div>
-                    </section>
-                  ) : null}
-                </div>
               </div>
             ) : (
-              <div className="flex min-h-[620px] flex-col import-panel-swap">
-                <ImportPanelHeader title="解析结果" description="结果将在这里按有效性、题型与异常信息分组呈现。" />
-                <div className="flex flex-1 items-center justify-center px-6 py-14">
-                  <div className="max-w-sm text-center import-panel-swap">
-                    <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop">
-                      <FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
-                    </div>
-                    <p className="mt-4 text-sm font-semibold text-foreground">等待解析内容</p>
-                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">粘贴题目后先用左侧预览与 LaTeX 预检确认格式，再执行解析。完成后可逐题编辑、删除；科目可留空，结构通过即可进入审核。</p>
-                    <div className="mt-5 grid grid-cols-3 divide-x divide-border/60 border-y border-border/60 py-2.5 text-[11px] text-muted-foreground">
-                      <span>预检</span><span>解析</span><span>入库</span>
-                    </div>
-                  </div>
-                </div>
+              <div role="region" aria-label="题目渲染预览">
+                <ImportTextPreview text={text} />
               </div>
             )}
+
+            {latexInspection.issues.length > 0 ? <LatexInspectionPanel
+              inspection={latexInspection}
+              expanded={issuesOpen}
+              onToggle={() => setIssuesOpen((open) => !open)}
+              onIssueClick={focusSourceLine}
+            /> : null}
+
+            <footer className="v2-text-editor-foot">
+              <div className="v2-text-stats">
+                {charCount.toLocaleString()} 字 · 公式 {latexInspection.formulaCount} · 代码块 {latexInspection.codeFenceCount}
+              </div>
+              <div className="v2-text-foot-actions">
+                {!text ? <button type="button" className="v2-text-link" onClick={() => updateSourceText(TEXT_IMPORT_SAMPLE)}>填入示例</button> : null}
+                <button type="button" className="v2-text-link" onClick={() => updateSourceText("")} disabled={!text || importMutation.isPending}>
+                  清空
+                </button>
+                {parseResult ? (
+                  <button
+                    type="button"
+                    className="v2-text-link"
+                    onClick={handleParse}
+                    disabled={parseMutation.isPending || importMutation.isPending || !text.trim()}
+                  >
+                    重新解析
+                  </button>
+                ) : (
+                  <span className="v2-text-keyhint">
+                    <kbd>Ctrl</kbd><kbd>Enter</kbd> 解析
+                  </span>
+                )}
+              </div>
+            </footer>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {parseResult ? (
+          <aside className="v2-text-results" aria-labelledby="v2-text-results-title">
+            <header className="v2-text-results-head">
+              <h2 id="v2-text-results-title" className="v2-text-results-title">解析结果</h2>
+            </header>
+
+            <div className="v2-text-metrics" aria-live="polite">
+              <div className="v2-text-metric">
+                <strong className="v2-text-metric-val">{parseResult.raw_count}</strong>
+                <span className="v2-text-metric-label">识别题目</span>
+              </div>
+              <div className="v2-text-metric">
+                <strong className="v2-text-metric-val">{parseResult.valid_count}</strong>
+                <span className="v2-text-metric-label">有效</span>
+              </div>
+              <div className="v2-text-metric">
+                <strong
+                  className="v2-text-metric-val"
+                  data-tone={Math.max(0, parseResult.raw_count - parseResult.valid_count) > 0 ? "warn" : "neutral"}
+                >
+                  {Math.max(0, parseResult.raw_count - parseResult.valid_count)}
+                </strong>
+                <span className="v2-text-metric-label">需处理</span>
+              </div>
+            </div>
+
+            <div className="v2-text-resulttools" role="group" aria-label="解析结果筛选">
+              <button type="button" aria-pressed={resultView === "all"} onClick={() => setResultView("all")}>全部 {parseResult.questions.length}</button>
+              <button type="button" aria-pressed={resultView === "issues"} onClick={() => setResultView("issues")}>需处理 {issueQuestions}</button>
+            </div>
+
+            {warningLines.length > 0 ? (
+              <div className="v2-text-warnbar" role="status">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                <div className="v2-text-warn-lines">
+                  {warningLines.slice(0, 2).map((message, index) => (
+                    <p key={index}>{formatParseIssue(message)}</p>
+                  ))}
+                  {warningLines.length > 2 ? <p>另有 {warningLines.length - 2} 项异常</p> : null}
+                </div>
+                {firstInvalidIndex >= 0 ? (
+                  <button type="button" className="v2-text-warn-link" onClick={scrollToFirstIssue}>
+                    查看异常
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="v2-text-question-list">
+              {parseResult.questions.length === 0 ? (
+                <div className="v2-text-results-empty">
+                  <p>没有识别到题目</p>
+                  <span>检查结构标签、选项分隔和公式定界符后重新解析。</span>
+                </div>
+              ) : null}
+
+              {resultView === "issues" && issueQuestions === 0 ? <div className="v2-text-results-empty"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /><p>全部题目已通过检查</p></div> : null}
+              {parseResult.questions.map((question, index) => {
+                if (resultView === "issues" && question.is_valid && question.errors.length === 0 && question.warnings.length === 0) return null;
+                const accepted = acceptedBlocks.has(question.block_index);
+                const duplicate = acceptedBlocks.get(question.block_index) === "duplicate";
+                const importFailure = importStatus?.items.find((item) => item.block_index === question.block_index && item.status === "fail");
+                const subjectLabel = resolveSubjectLabel(question, subjectOptions);
+                const issueCount = question.errors.length + question.warnings.length;
+                const firstIssue = question.errors[0] ?? question.warnings[0] ?? null;
+                const extraIssueCount = Math.max(0, issueCount - 1);
+                const missingOptions = question.options.length === 0
+                  && (question.question_type === "single_choice" || question.question_type === "multiple_choice");
+
+                return (
+                  <article
+                    key={question.block_index}
+                    id={index === firstInvalidIndex ? "v2-text-first-issue" : undefined}
+                    className="v2-text-question"
+                  >
+                    <div className="v2-text-index" aria-hidden="true">
+                      <span className="v2-text-index-no">{String(index + 1).padStart(2, "0")}</span>
+                    </div>
+                    <div className="v2-text-q-main">
+                      <div className="v2-text-q-head">
+                        <span className="v2-text-status-dot" data-tone={question.is_valid ? "ok" : "warn"} />
+                        <span className="v2-text-q-state" data-tone={question.is_valid ? "ok" : "warn"}>
+                          {duplicate ? "重复已跳过" : accepted ? "已暂存" : question.is_valid ? "有效" : "需处理"}
+                        </span>
+                        <span className="v2-text-q-meta">{typeLabel(question.question_type)}</span>
+                        <span className="v2-text-q-sep">·</span>
+                        <span className={subjectLabel ? "v2-text-q-meta" : "v2-text-q-meta v2-text-q-meta--warn"}>
+                          {subjectLabel || "科目待补"}
+                        </span>
+                      </div>
+
+                      <div className="v2-text-q-actions">
+                        <button type="button" disabled={accepted || importMutation.isPending} onClick={() => startEdit(index)} aria-label={`编辑题目 ${index + 1}`} title={duplicate ? "题库中已存在，已跳过本次导入" : accepted ? "已暂存，可前往审核队列编辑" : "编辑题目"}>
+                          <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                        <button type="button" disabled={accepted || importMutation.isPending} onClick={() => handleDelete(index)} aria-label={`删除题目 ${index + 1}`} title={duplicate ? "题库中已存在，已跳过本次导入" : accepted ? "已暂存，可前往审核队列处理" : "删除题目"}>
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </div>
+
+                      <div className="v2-text-q-stem">
+                        <QuestionContentRenderer content={question.stem} fallbackText={question.stem} preserveCodeText />
+                      </div>
+                      {importFailure ? <p className="v2-text-import-failure" role="status">暂存失败：{importErrorMessage(importFailure.error)}</p> : null}
+
+                      {question.options.length > 0 ? (
+                        <div className="v2-text-q-options">
+                          {question.options.map((option) => (
+                            <div key={option.key} className="v2-text-option">
+                              <span>{option.key}.</span>
+                              <span><MathFormula text={option.text} /></span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : missingOptions ? (
+                        <button type="button" onClick={() => startEdit(index)} className="v2-text-missing-options">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span><strong>未识别到选项</strong> · 点击编辑补充或检查选项分隔格式</span>
+                        </button>
+                      ) : null}
+
+                      <div className="v2-text-q-foot">
+                        <span>答案 <strong><RenderedAnswer answer={question.answer} /></strong></span>
+                        {question.analysis ? <span>含解析</span> : null}
+                        {question.warnings.length > 0 ? <span>{question.warnings.length} 条警告</span> : null}
+                      </div>
+
+                      {issueCount > 0 && firstIssue ? (
+                        <details className="v2-text-q-issues">
+                          <summary>
+                            <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>{formatParseIssue(firstIssue)}</span>
+                            {extraIssueCount > 0 ? <span>+{extraIssueCount}</span> : null}
+                            <em>查看</em>
+                          </summary>
+                          <div className="v2-text-q-issues-body">
+                            {question.errors.map((message, issueIndex) => (
+                              <p key={`e-${issueIndex}`} className="is-error">
+                                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                                {formatParseIssue(message)}
+                              </p>
+                            ))}
+                            {question.warnings.map((message, issueIndex) => (
+                              <p key={`w-${issueIndex}`}>
+                                <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                                {formatParseIssue(message)}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+
+              {editingIndex !== null && editForm ? (
+                <section ref={editSectionRef} className="v2-text-edit">
+                  <header className="v2-text-edit-head">
+                    <div>
+                      <h3 className="v2-text-edit-title">编辑题目 {editingIndex + 1}</h3>
+                    </div>
+                    <div className="v2-text-edit-actions">
+                      <span className="v2-text-edit-status" data-tone={editLatexInspection.errorCount > 0 ? "bad" : editLatexInspection.warningCount > 0 ? "warn" : "ok"}>
+                        公式 {editLatexInspection.formulaCount} · {editLatexInspection.errorCount + editLatexInspection.warningCount > 0 ? `风险 ${editLatexInspection.errorCount + editLatexInspection.warningCount}` : "通过"}
+                      </span>
+                      <button
+                        type="button"
+                        className="v2-text-secondary"
+                        onClick={() => {
+                          setEditingIndex(null);
+                          setEditForm(null);
+                          setOptionDraft("");
+                        }}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        className="v2-text-save"
+                        onClick={saveEdit}
+                        disabled={editStructureIssues.length > 0}
+                        title={editStructureIssues.length > 0 ? editStructureIssues.join("；") : "保存修改"}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        保存
+                      </button>
+                    </div>
+                  </header>
+
+                  <div className="v2-text-edit-grid">
+                    <div className="v2-text-field">
+                      <span>科目 <em>可选</em></span>
+                      <CustomSelect
+                        className="v2-text-select"
+                        aria-label="题目科目"
+                        clearable={false}
+                        value={String(editForm.subject_id ?? "")}
+                        onChange={(value) => setEditForm({
+                          ...editForm,
+                          subject_id: value ? Number(value) : null,
+                        })}
+                        options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
+                      />
+                    </div>
+                    <div className="v2-text-field">
+                      <span>题型</span>
+                      <CustomSelect
+                        className="v2-text-custom-select"
+                        aria-label="题型"
+                        value={editForm.question_type ?? ""}
+                        onChange={(value) => setEditForm({ ...editForm, question_type: value || null })}
+                        options={canonicalizeQuestionType(editForm.question_type) || !editForm.question_type
+                          ? QUESTION_TYPE_OPTIONS
+                          : [...QUESTION_TYPE_OPTIONS, { value: editForm.question_type!, label: formatUnknownType(editForm.question_type!), disabled: true }]}
+                        placeholder="选择题型"
+                        clearable={false}
+                      />
+                    </div>
+
+                    <label className="v2-text-field v2-text-field--full">
+                      <span>题干</span>
+                      <textarea
+                        className="v2-text-textarea"
+                        value={editForm.stem}
+                        onChange={(event) => setEditForm({ ...editForm, stem: event.target.value })}
+                      />
+                    </label>
+
+                    <label className="v2-text-field v2-text-field--full">
+                      <span>
+                        选项 <em>支持 “A. 内容” 或 “A ↵ 内容”</em>
+                        <b data-tone={editForm.options.length >= 4 ? "ok" : "muted"}>已识别 {editForm.options.length} 项</b>
+                      </span>
+                      <textarea
+                        className="v2-text-textarea v2-text-textarea--mono"
+                        value={optionDraft}
+                        onChange={(event) => {
+                          const nextDraft = event.target.value;
+                          setOptionDraft(nextDraft);
+                          setEditForm({ ...editForm, options: parseEditableOptions(nextDraft) });
+                        }}
+                      />
+                    </label>
+
+                    <label className="v2-text-field">
+                      <span>答案</span>
+                      <input
+                        className="v2-text-input-sm"
+                        value={typeof editForm.answer === "boolean"
+                          ? (editForm.answer ? "正确" : "错误")
+                          : Array.isArray(editForm.answer)
+                            ? editForm.answer.join(",")
+                            : String(editForm.answer ?? "")}
+                        onChange={(event) => setEditForm({ ...editForm, answer: event.target.value })}
+                      />
+                    </label>
+
+                    <label className="v2-text-field v2-text-field--full">
+                      <span>解析</span>
+                      <textarea
+                        className="v2-text-textarea"
+                        value={editForm.analysis ?? ""}
+                        onChange={(event) => setEditForm({ ...editForm, analysis: event.target.value })}
+                      />
+                    </label>
+
+                    {editStructureIssues.length > 0 ? (
+                      <div className="v2-text-edit-issues" role="status">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                        <div>
+                          <strong>保存前还需处理 {editStructureIssues.length} 项结构问题</strong>
+                          <p>{editStructureIssues.join(" · ")}</p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <section className="v2-text-edit-preview">
+                      <header>
+                        <div><Eye className="h-3.5 w-3.5" aria-hidden="true" />最终渲染预览</div>
+                        <span>与题库阅读侧使用同一渲染规则</span>
+                      </header>
+                      <div className="v2-text-edit-preview-body">
+                        <div>
+                          <p className="v2-text-preview-label">题干</p>
+                          <QuestionContentRenderer content={editForm.stem} fallbackText={editForm.stem} preserveCodeText />
+                        </div>
+                        {editForm.options.length > 0 ? (
+                          <div className="v2-text-edit-options">
+                            {editForm.options.map((option) => (
+                              <div key={option.key}>
+                                <span>{option.key}.</span>
+                                <span><MathFormula text={option.text} /></span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="v2-text-edit-meta">
+                          <div>
+                            <p className="v2-text-preview-label">答案</p>
+                            <strong><RenderedAnswer answer={editForm.answer} /></strong>
+                          </div>
+                          <div>
+                            <p className="v2-text-preview-label">解析</p>
+                            <span>{editForm.analysis ? <MathFormula text={editForm.analysis} /> : "无解析"}</span>
+                          </div>
+                        </div>
+                        {editLatexInspection.issues.length > 0 ? (
+                          <div className="v2-text-edit-latex">
+                            <strong>LaTeX 预检：</strong>
+                            {editLatexInspection.errorCount > 0
+                              ? `${editLatexInspection.errorCount} 个结构错误`
+                              : `${editLatexInspection.warningCount} 个格式建议`}
+                            <span> · 保存前建议核对公式定界符与括号。</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </section>
+                  </div>
+                </section>
+              ) : null}
+            </div>
+
+            <footer className="v2-text-importbar">
+              <div className="v2-text-import-summary">
+                {importStatus ? (
+                  <>
+                    <strong>{importStatus.failed > 0 ? "部分题目未能暂存" : importStatus.succeeded > 0 ? "已暂存到审核队列" : "已过滤重复题目"}</strong>
+                    <span>成功 {importStatus.succeeded} 题</span>
+                    {importStatus.duplicates_filtered > 0 ? <span>过滤重复 {importStatus.duplicates_filtered} 题</span> : null}
+                    {importStatus.failed > 0 ? <span className="is-bad">失败 {importStatus.failed} 题</span> : null}
+                    <span className="v2-text-batch">批次 {importStatus.batch_id}</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>{hasValidQuestions ? `${pendingQuestions.length} 题可导入` : "暂无可导入题目"}</strong>
+                    {Math.max(0, parseResult.raw_count - parseResult.valid_count) > 0 ? (
+                      <span className="is-warn">{Math.max(0, parseResult.raw_count - parseResult.valid_count)} 题待处理</span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+              {importStatus && !hasValidQuestions ? (
+                <Link href={`/imports/review?batch_id=${encodeURIComponent(importStatus.batch_id)}`} className="v2-text-cta">
+                  查看审核队列 <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="v2-text-cta"
+                  onClick={handleImport}
+                  disabled={!hasValidQuestions || importMutation.isPending || parseMutation.isPending || editingIndex !== null}
+                >
+                  {importMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                    : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+                  {importMutation.isPending ? "导入中" : importStatus ? `继续导入 ${pendingQuestions.length} 题` : "确认导入"}
+                  {!importMutation.isPending ? <ArrowRight className="h-4 w-4" aria-hidden="true" /> : null}
+                </button>
+              )}
+            </footer>
+          </aside>
+        ) : (
+          <aside className="v2-text-inspector" aria-labelledby="v2-text-inspector-title">
+            <header className="v2-text-insp-head">
+              <h2 id="v2-text-inspector-title" className="v2-text-card-title">解析与校对</h2>
+            </header>
+
+            <div className="v2-text-insp-body">
+              <section className="v2-text-section">
+                <div className="v2-text-section-head">
+                  <span className="v2-text-label">目标科目</span>
+                </div>
+                <CustomSelect value={defaultSubjectId} onChange={setDefaultSubjectId} options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]} aria-label="解析科目" disabled={parseMutation.isPending || importMutation.isPending} clearable={false} />
+              </section>
+
+              <section className="v2-text-section">
+                <div className="v2-text-section-head">
+                  <span className="v2-text-label">LaTeX 预检</span>
+                  <button type="button" className="v2-text-link" onClick={() => setIssuesOpen((open) => !open)}>
+                    {issuesOpen ? "收起" : "查看"}
+                  </button>
+                </div>
+                <div className="v2-text-statusline" data-tone={inspectionTone}>
+                  <InspectionIcon className="h-4 w-4" aria-hidden="true" />
+                  <div>
+                    <strong>{inspectionLabel}</strong>
+                    <p>行内 {latexInspection.inlineCount} · 块级 {latexInspection.blockCount} · 代码块 {latexInspection.codeFenceCount}</p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="v2-text-empty">
+                <FileText className="h-7 w-7" aria-hidden="true" />
+                <p>等待解析结果</p>
+              </div>
+            </div>
+
+            <footer className="v2-text-insp-foot">
+              <button
+                type="button"
+                className="v2-text-cta"
+                onClick={handleParse}
+                disabled={parseMutation.isPending || importMutation.isPending || !text.trim()}
+              >
+                {parseMutation.isPending
+                  ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+                {parseMutation.isPending ? "解析中" : "解析文本"}
+              </button>
+            </footer>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

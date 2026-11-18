@@ -1,740 +1,515 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type DragEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, ClipboardCheck, Images, RefreshCw, UploadCloud, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { apiRequest, getApiAccessToken, toQuery } from "@/lib/api/client";
-import { connectSSE } from "@/lib/api/sse";
-import type { BatchImageJobStatusResponse, BatchImageUploadResponse, BatchImageReparseResponse, TraceEvent } from "@/lib/api/types";
+import { useEffect, useEffectEvent, useId, useRef, useState, type DragEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useStore } from "zustand";
+import {
+  ArrowRight,
+  ClipboardCheck,
+  Eye,
+  Maximize2,
+  History,
+  Images,
+  Plus,
+  RefreshCw,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import {
   MAX_FILES,
-  DEFAULT_CONCURRENCY,
   dedupeFiles,
   taskProgress,
   computeBatchStats,
 } from "@/lib/batch-image-utils";
 import { AiModelConfigBanner } from "@/components/ai-model-config-banner";
-import { useImportConfig } from "../hooks/useImportConfig";
-import { OcrModeSelector } from "../components/ocr-mode-selector";
-import { ImportMetric, ImportPanelHeader, ImportProgressBar, ImportWorkspaceHeader } from "../components/import-workspace";
+import { useOcrImportSession } from "@/components/layout/ocr-import-session-provider";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { isImportBusy } from "@/lib/imports/import-run";
+import { batchImageItemKey, batchImageTasks, type ImageTask } from "@/lib/imports/ocr-import-session";
+import { ImportFileThumb } from "../components/import-file-thumb";
 import { ImportToast } from "../components/import-toast";
+import { importSubjectOptions } from "../hooks/use-import-subject-options";
+import { ImportContentDialog } from "../components/import-content-dialog";
+import { ImportImagePreview } from "../components/import-image-preview";
+import { ImportFailurePanel } from "../components/import-failure-panel";
+import { importErrorMessage } from "@/lib/imports/import-messages";
+import { apiRequest } from "@/lib/api/client";
+import type { BatchImageJobStatusResponse } from "@/lib/api/types";
 
 const ACCEPT = ".jpg,.jpeg,.png,.webp";
-// ── Types ────────────────────────────────────────────────────
-
-type QueuePhase = "idle" | "uploading" | "polling" | "done";
-
-type MessageInfo = {
-  text: string;
-  type: "success" | "error" | "info";
-};
-
-type ImageTask = {
-  id: string;            // `img_${ts}_${seq}`
-  seq: number;
-  batchId: string;
-  imageId: string;
-  requestId: string;
-  file: File;
-  status: "pending" | "uploading" | "processing" | "succeeded" | "failed";
-  jobId: string | null;
-  jobStatus: BatchImageJobStatusResponse | null;
-  traceEvents: TraceEvent[];
-  questionCount: number;
-  errorMessage: string | null;
-  startedAt: number;
-  finishedAt: number | null;
-};
 
 // ── Helpers ───────────────────────────────────────────────────
+
+function formatBytes(bytes: number) {
+  if (bytes <= 0) return "0 MB";
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatTaskSize(file: File) {
+  return formatBytes(file.size);
+}
+
+type TileTone = "ok" | "ocr" | "warn" | "wait" | "bad";
+
+function taskMeta(task: ImageTask): {
+  tone: TileTone;
+  label: string;
+  note: string;
+  pct: string;
+  progressTone: "ok" | "accent" | "warn" | "bad";
+} {
+  if (task.status === "failed") {
+    return {
+      tone: "bad",
+      label: "失败",
+      note: importErrorMessage(task.errorMessage),
+      pct: "失败",
+      progressTone: "bad",
+    };
+  }
+  if (task.status === "succeeded") {
+    return {
+      tone: "ok",
+      label: "识别完成",
+      note: `${task.questionCount} 题`,
+      pct: "100%",
+      progressTone: "ok",
+    };
+  }
+  if (task.status === "processing") {
+    const lastTrace = task.traceEvents[task.traceEvents.length - 1]?.message;
+    return {
+      tone: "ocr",
+      label: "OCR 识别中",
+      note: task.questionCount > 0 ? `已切 ${task.questionCount} 题` : lastTrace || "处理中",
+      pct: "处理中",
+      progressTone: "accent",
+    };
+  }
+  if (task.status === "uploading") {
+    return {
+      tone: "warn",
+      label: "上传中",
+      note: formatTaskSize(task.file),
+      pct: "…",
+      progressTone: "warn",
+    };
+  }
+  return {
+    tone: "wait",
+    label: "待识别",
+    note: formatTaskSize(task.file),
+    pct: "排队",
+    progressTone: "accent",
+  };
+}
 
 // ── Component ─────────────────────────────────────────────────
 
 export default function BatchImagePage() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [subjectId, setSubjectId] = useState("");
-  const [subjectOptions, setSubjectOptions] = useState<Array<{id: number; code: string; name: string}>>([]);
-  useEffect(() => {
-    apiRequest<Array<{id: number; code: string; name: string; path: string; level: number}>>("/imports/subject-options")
-      .then(setSubjectOptions)
-      .catch(() => {});
-  }, []);
-  const [concurrency, setConcurrency] = useState(DEFAULT_CONCURRENCY);
-  const [message, setMessage] = useState<MessageInfo | null>(null);
-  const { ocrMode, setOcrMode } = useImportConfig();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeParam = searchParams.get("retry_job");
+  const resumeTarget = resumeParam && /^[a-zA-Z0-9_-]{1,128}$/.test(resumeParam) ? resumeParam : null;
+  const { batch } = useOcrImportSession();
+  const { draft, phase, upload, snapshot, notice, uploadError, statusError } = useStore(batch.store);
+  const { files, subjectId, concurrency, ocrMode } = draft;
+  const { data: subjectOptions = [] } = useQuery(importSubjectOptions);
   const [dragActive, setDragActive] = useState(false);
   const fileInputId = useId();
-  const queryClient = useQueryClient();
-
-  // Queue state
-  const [imageTasks, setImageTasks] = useState<ImageTask[]>([]);
-  const [queuePhase, setQueuePhase] = useState<QueuePhase>("idle");
-  const [selectOpen, setSelectOpen] = useState(false);
-  const selectRef = useRef<HTMLDivElement>(null);
-  const [subjectSelectOpen, setSubjectSelectOpen] = useState(false);
-  const subjectSelectRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  // ── SSE streaming (replaces per-image polling) ────────────
-
-  const abortSourcesRef = useRef<Map<string, () => void>>(new Map());
-  const pollTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
-  const doneRef = useRef(false); // guard: completion message shown once
-
-  // Always tear down long-lived requests when leaving the page. This avoids
-  // stale SSE/watchdog callbacks updating an unmounted batch-import screen.
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-      for (const [, close] of abortSourcesRef.current) close();
-      abortSourcesRef.current.clear();
-      for (const [, timer] of pollTimersRef.current) clearInterval(timer);
-      pollTimersRef.current.clear();
-    };
-  }, []);
-
-  // Watch for all-tasks-done to show summary + invalidate review queue
-  useEffect(() => {
-    if (doneRef.current || imageTasks.length === 0) return;
-    const done = imageTasks.every(
-      (t) => t.status === "succeeded" || t.status === "failed",
-    );
-    if (!done) return;
-    doneRef.current = true;
-
-    const succeeded = imageTasks.filter((t) => t.status === "succeeded").length;
-    const failed = imageTasks.filter((t) => t.status === "failed").length;
-    const totalQ = imageTasks.reduce((s, t) => s + t.questionCount, 0);
-    setQueuePhase("done");
-    setMessage({
-      text: `导入完成：共 ${imageTasks.length} 张，成功 ${succeeded} 张（${totalQ} 道题）${failed > 0 ? `，失败 ${failed} 张` : ""}`,
-      type: failed > 0 && succeeded === 0 ? "error" : "success",
-    });
-    queryClient.invalidateQueries({ queryKey: ["import-review-queue"] });
-  }, [imageTasks, queryClient]);
-
-  // ── Queue Processing ────────────────────────────────────────
-
-  const startQueue = useCallback(async () => {
-    if (files.length === 0) {
-      setMessage({ text: "请先选择要导入的图片", type: "error" });
-      return;
-    }
-
-    const filesToProcess = [...files];
-    const maxConc = Math.max(1, Math.min(4, Number(concurrency) || 2));
-    const batchId = `batch_${Date.now()}`;
-    const requestId = `req_${batchId}`;
-    const now = Date.now();
-    doneRef.current = false;
-
-    setFiles([]);
-    const initialTasks: ImageTask[] = filesToProcess.map((file, idx) => ({
-      id: `img_${now}_${idx + 1}`,
-      seq: idx + 1,
-      batchId,
-      imageId: `img_${batchId}_${idx + 1}`,
-      requestId,
-      file,
-      status: "uploading",
-      jobId: null,
-      jobStatus: null,
-      traceEvents: [],
-      questionCount: 0,
-      errorMessage: null,
-      startedAt: Date.now(),
-      finishedAt: null,
-    }));
-
-    setImageTasks(initialTasks);
-    setQueuePhase("uploading");
-    setMessage(null);
-
-    const abortCtrl = new AbortController();
-    abortRef.current = abortCtrl;
-    const isCurrentRun = () => abortRef.current === abortCtrl && !abortCtrl.signal.aborted;
-
-    try {
-      // The backend endpoint is already a true batch API.  Submit all images in
-      // one request so its semaphore/concurrency control, merge logic and one
-      // SSE stream can be used.  The previous frontend created one backend job
-      // per image, which multiplied queue/SSE overhead and defeated batch merge.
-      const formData = new FormData();
-      for (const file of filesToProcess) formData.append("files", file);
-
-      const qs = toQuery({
-        subject_id: subjectId ? Number(subjectId) : undefined,
-        concurrency: maxConc,
-        enable_ai_repair: true,
-        confidence_threshold: "0.6",
-        batch_fast_mode: true,
-        ocr_mode: ocrMode,
-        batch_id: batchId,
-        request_id: requestId,
-      });
-
-      const result = await apiRequest<BatchImageUploadResponse>(
-        `/imports/batch-image/upload${qs}`,
-        { method: "POST", body: formData, signal: abortCtrl.signal },
-      );
-      if (!isCurrentRun()) return;
-
-      setQueuePhase("polling");
-      setMessage({
-        text: `全部 ${filesToProcess.length} 张图片已提交，正在识别中...`,
-        type: "info",
-      });
-      setImageTasks((prev) =>
-        prev.map((task) => ({ ...task, status: "pending" as const, jobId: result.job_id })),
-      );
-
-      let terminal = false;
-      const syncJobStatus = async () => {
-        if (terminal || !isCurrentRun()) return;
-        try {
-          const status = await apiRequest<BatchImageJobStatusResponse>(
-            `/imports/batch-image/${result.job_id}`,
-            { signal: abortCtrl.signal },
-          );
-          if (!isCurrentRun()) return;
-
-          const itemsBySeq = new Map(status.items.map((item) => [item.seq, item]));
-          setImageTasks((prev) =>
-            !isCurrentRun() ? prev : prev.map((task) => {
-              const item = itemsBySeq.get(task.seq);
-              if (!item) return { ...task, jobStatus: status };
-              const nextStatus: ImageTask["status"] =
-                item.status === "succeeded" ? "succeeded"
-                  : item.status === "failed" ? "failed"
-                    : item.status === "processing" ? "processing"
-                      : "pending";
-              return {
-                ...task,
-                status: nextStatus,
-                jobStatus: status,
-                questionCount: item.question_count || 0,
-                errorMessage: item.error_message,
-                finishedAt:
-                  nextStatus === "succeeded" || nextStatus === "failed"
-                    ? (task.finishedAt || Date.now())
-                    : null,
-              };
-            }),
-          );
-
-          if (["completed", "completed_with_warnings", "failed"].includes(status.status)) {
-            terminal = true;
-            const timer = pollTimersRef.current.get(result.job_id);
-            if (timer) clearInterval(timer);
-            pollTimersRef.current.delete(result.job_id);
-            abortSourcesRef.current.get(result.job_id)?.();
-            abortSourcesRef.current.delete(result.job_id);
-          }
-        } catch {
-          // SSE remains primary; watchdog polling is intentionally best-effort.
-        }
-      };
-
-      const seenSeqs = new Set<number>();
-      const stream = connectSSE(
-        `/imports/batch-image/${result.job_id}/stream`,
-        getApiAccessToken(),
-        {
-          onTrace: (event) => {
-            if (terminal || !isCurrentRun()) return;
-            if (seenSeqs.has(event.seq)) return;
-            seenSeqs.add(event.seq);
-            if (!event.item_seq) return;
-            setImageTasks((prev) =>
-              !isCurrentRun() ? prev : prev.map((task) =>
-                task.seq === event.item_seq
-                  ? {
-                      ...task,
-                      status: task.status === "pending" ? "processing" : task.status,
-                      traceEvents: [...task.traceEvents, event],
-                    }
-                  : task,
-              ),
-            );
-          },
-          onDone: () => { void syncJobStatus(); },
-          onError: () => { void syncJobStatus(); },
-        },
-      );
-      abortSourcesRef.current.set(result.job_id, stream.close);
-
-      // Safety watchdog: backend DB is the source of truth.  This prevents a
-      // Redis/SSE disconnect from leaving the page forever at “识别中 / 0%”.
-      await syncJobStatus();
-      if (!terminal && isCurrentRun()) {
-        const timer = setInterval(() => { void syncJobStatus(); }, 2500);
-        pollTimersRef.current.set(result.job_id, timer);
-      }
-    } catch (err: unknown) {
-      if (!isCurrentRun()) return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setImageTasks((prev) =>
-        prev.map((task) => ({
-          ...task,
-          status: "failed" as const,
-          errorMessage: msg,
-          finishedAt: Date.now(),
-        })),
-      );
-      setQueuePhase("done");
-      setMessage({ text: msg, type: "error" });
-    }
-  }, [files, subjectId, concurrency, ocrMode]);
-
-  const resetQueue = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    // Close all SSE connections + watchdog polling timers
-    for (const [, close] of abortSourcesRef.current) close();
-    abortSourcesRef.current.clear();
-    for (const [, timer] of pollTimersRef.current) clearInterval(timer);
-    pollTimersRef.current.clear();
-    doneRef.current = false;
-    setImageTasks([]);
-    setQueuePhase("idle");
-    setMessage(null);
-  }, []);
-
-  // ── Reparse mutation ─────────────────────────────────────────
-
-  const reparseMutation = useMutation({
-    mutationFn: (itemId: number) =>
-      apiRequest<BatchImageReparseResponse>(`/imports/batch-image/items/${itemId}/reparse`, {
-        method: "POST",
-      }),
-    onSuccess: (result) => {
-      setMessage({
-        text: result.status === "succeeded"
-          ? `第 ${result.item_id} 项重新解析成功，生成 ${result.question_count} 道题`
-          : `第 ${result.item_id} 项重新解析未成功：${result.error_message || "未知原因"}`,
-        type: result.status === "succeeded" ? "success" : "error",
-      });
-    },
-    onError: (error) => {
-      setMessage({ text: error instanceof Error ? error.message : "重新解析失败，请稍后重试。", type: "error" });
-    },
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [contentBatch, setContentBatch] = useState<string | null>(null);
+  const recoveryTargetRef = useRef<string | null>(null);
+  const awaitingRecoveryFile = Boolean(resumeTarget && resumeTarget !== upload?.result.job_id);
+  const recovery = useQuery({
+    queryKey: ["import-batch-recovery", resumeTarget],
+    queryFn: ({ signal }) => apiRequest<BatchImageJobStatusResponse>(`/imports/batch-image/${encodeURIComponent(resumeTarget!)}`, { signal }),
+    enabled: awaitingRecoveryFile,
+    retry: false,
   });
-  void reparseMutation;
-
-  // ── Click-outside for concurrency dropdown ───────────────────
+  const recoverySnapshot = snapshot?.job_id === resumeTarget ? snapshot : recovery.data;
+  const failedRecoveryItems = recoverySnapshot?.items.filter((item) => item.status === "failed") ?? [];
+  const selectedRecoveryItem = failedRecoveryItems.find((item) => item.id === (draft.retryItemId ?? failedRecoveryItems[0]?.id));
+  const selectedRecoveryItemId = selectedRecoveryItem?.id ?? null;
+  const displayedUpload = resumeTarget && upload && selectedRecoveryItem
+    ? { ...upload, imageIds: files.map(() => batchImageItemKey(selectedRecoveryItem)) } : upload;
+  const imageTasks = batchImageTasks(phase, files, displayedUpload, snapshot, uploadError);
+  const totalImages = snapshot?.total ?? files.length;
+  const stats = computeBatchStats(imageTasks);
+  const succeededCount = snapshot?.succeeded ?? stats.succeededCount;
+  const failedCount = snapshot?.failed ?? stats.failedCount;
+  const progressPct = stats.totalProgress;
+  const totalQuestions = snapshot?.total_questions ?? 0;
+  const isJobActive = isImportBusy(phase);
+  const canEditQueue = phase === "idle";
+  const canChooseRecoveryFile = Boolean(resumeTarget && !isJobActive && selectedRecoveryItem);
+  const canChooseFile = canEditQueue || canChooseRecoveryFile;
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  const failure = uploadError || failedCount > 0 || snapshot?.status === "failed";
+  const retryFailed = () => {
+    if (resumeTarget && !selectedRecoveryItem) return;
+    if (resumeTarget && selectedRecoveryItem) void batch.retry({ resumeJobId: resumeTarget, retryItemId: selectedRecoveryItem.id });
+    else if (upload && !resumeTarget) void batch.retry({ retryItemId: null });
+    else void batch.start();
+  };
+  const phaseText = phase === "done"
+    ? snapshot?.status === "cancelled" ? "已取消" : failedCount > 0 && succeededCount === 0 ? "全部失败" : "已完成"
+    : phase === "uploading" ? "上传中" : phase === "tracking" ? snapshot?.status === "queued" ? "排队中" : "识别中" : "待提交";
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (selectRef.current && !selectRef.current.contains(e.target as Node)) {
-        setSelectOpen(false);
-      }
-      if (subjectSelectRef.current && !subjectSelectRef.current.contains(e.target as Node)) {
-        setSubjectSelectOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setSelectOpen(false);
-        setSubjectSelectOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-
-  // ── Computed aggregate values ────────────────────────────────
-
-  const totalImages = imageTasks.length;
-  const { succeededCount, failedCount, totalQuestions, uploadingCount, processingCount, totalProgress: progressPct } = computeBatchStats(imageTasks);
-  const isJobActive = queuePhase !== "idle";
+    if (!resumeTarget || isJobActive || recoveryTargetRef.current === resumeTarget || upload?.result.job_id === resumeTarget) return;
+    recoveryTargetRef.current = resumeTarget;
+    batch.reset();
+    batch.updateDraft((previous) => ({ ...previous, files: [], resumeJobId: resumeTarget, retryItemId: null }));
+  }, [resumeTarget, isJobActive, upload?.result.job_id, batch]);
 
   // ── Drag / drop / paste ──────────────────────────────────────
 
-  const addFiles = useCallback((incoming: FileList | File[] | null) => {
-    if (!incoming) return;
+  function addFiles(incoming: FileList | File[] | null) {
+    if (!incoming?.length) return;
     const list = Array.from(incoming);
-    if (list.length === 0) return;
-    setFiles((prev) => dedupeFiles(prev, list));
-  }, []);
+    batch.updateDraft((previous) => ({ ...previous, files: resumeTarget ? list.slice(0, 1) : dedupeFiles(previous.files, list), ...(resumeTarget ? { retryItemId: selectedRecoveryItemId } : {}) }));
+  }
 
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const clearFiles = useCallback(() => setFiles([]), []);
+  const pasteFiles = useEffectEvent((event: ClipboardEvent) => {
+    if (canChooseFile) addFiles(event.clipboardData?.files ?? null);
+  });
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
-      if (isJobActive) return;
-      const items = event.clipboardData?.files;
-      if (items && items.length > 0) {
-        addFiles(items);
-        setMessage({ text: `已从剪贴板添加 ${items.length} 张图片`, type: "info" });
-      }
+      pasteFiles(event);
     }
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [addFiles, isJobActive]);
-
-  const onDragOver = useCallback(
-    (event: DragEvent) => {
-      event.preventDefault();
-      if (!isJobActive) setDragActive(true);
-    },
-    [isJobActive],
-  );
-
-  const onDragLeave = useCallback((event: DragEvent) => {
-    event.preventDefault();
-    setDragActive(false);
   }, []);
 
-  const onDrop = useCallback(
-    (event: DragEvent) => {
+  function onDragOver(event: DragEvent) {
+      event.preventDefault();
+      if (canChooseFile) setDragActive(true);
+  }
+
+  function onDragLeave(event: DragEvent) {
+    event.preventDefault();
+    setDragActive(false);
+  }
+
+  function onDrop(event: DragEvent) {
       event.preventDefault();
       setDragActive(false);
-      if (isJobActive) return;
+      if (!canChooseFile) return;
       addFiles(event.dataTransfer?.files ?? null);
-    },
-    [addFiles, isJobActive],
-  );
+  }
 
   // ── Render ───────────────────────────────────────────────────
 
-  const renderStatusBadge = (task: ImageTask) => {
-    const base = "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold";
-    if (task.status === "failed") {
-      return <span className={`${base} border-destructive/25 bg-destructive-light text-destructive`}>失败</span>;
-    }
-    if (task.status === "succeeded") {
-      return <span className={`${base} border-success/25 bg-success-light text-success`}>成功 · {task.questionCount} 题</span>;
-    }
-    if (task.status === "processing") {
-      return (
-        <span className={`${base} border-warning/30 bg-warning-light text-warning-foreground`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-warning import-status-active" aria-hidden="true" />
-          识别中
-        </span>
-      );
-    }
-    if (task.status === "uploading") {
-      return <span className={`${base} border-primary/25 bg-accent text-accent-foreground`}>上传中</span>;
-    }
-    return <span className={`${base} border-border bg-card/70 text-muted-foreground`}>等待中</span>;
-  };
-
-  const concurrencyOptions = [
-    { value: "1", label: "1", tag: "稳定" },
-    { value: "2", label: "2", tag: "推荐" },
-    { value: "3", label: "3", tag: null },
-    { value: "4", label: "4", tag: "上限" },
-  ];
-
-  const phaseLabel = queuePhase === "done"
-    ? failedCount > 0 && succeededCount === 0 ? "全部失败" : "已完成"
-    : queuePhase === "uploading" ? "上传中" : queuePhase === "polling" ? "识别中" : "待提交";
-
-  const phaseTone = queuePhase === "done"
-    ? failedCount > 0 && succeededCount === 0 ? "danger" : "success"
-    : queuePhase === "idle" ? "neutral" : "warning";
+  const concurrencyOptions = ["1", "2", "3", "4"];
 
   return (
-    <div className="space-y-6 pb-4">
-      <ImportWorkspaceHeader
-        icon={Images}
-        title="批量图片导题"
-        description="面向连续截图与扫描题目的批处理工作台。集中配置 OCR、科目与并发数，并在同一视图追踪每张图片的识别状态与事件轨迹。"
-        meta={
-          <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
-            <span className="font-mono tabular-nums">0–{MAX_FILES}</span>
-            <span className="text-muted-foreground/70">张 / 批</span>
-          </div>
-        }
-      />
+    <div className="imports-v2 v2-batch-page">
+      <header className="v2-head">
+        <div className="min-w-0">
+          <h1 className="v2-title">批量图片导题</h1>
+        </div>
+        <div className="v2-head-actions">
+          {upload ? <button type="button" className="v2-btn" onClick={() => setContentBatch(snapshot?.merged_batch_id || snapshot?.items.find((item) => item.review_batch_id)?.review_batch_id || null)} disabled={!snapshot?.merged_batch_id && !snapshot?.items.some((item) => item.review_batch_id)}><Eye className="h-4 w-4" aria-hidden="true" />查看题目</button> : null}
+          <Link className="v2-btn" href="/imports/history?return_to=%2Fimports%2Fbatch-image">
+            <History className="h-3.5 w-3.5" aria-hidden="true" />
+            导入历史
+          </Link>
+          {canChooseFile ? (
+            <button type="button" className="v2-btn" disabled={Boolean(resumeTarget && !selectedRecoveryItem)} onClick={() => fileInputRef.current?.click()}>
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {resumeTarget ? "选择原图" : "添加图片"}
+            </button>
+          ) : null}
+        </div>
+      </header>
 
       <AiModelConfigBanner />
 
       <ImportToast
-        message={message?.text ?? null}
-        tone={message?.type ?? "info"}
-        onDismiss={() => setMessage(null)}
+        message={notice?.tone === "error" ? null : notice?.text ?? null}
+        tone={notice?.tone ?? "info"}
+        onDismiss={() => batch.setNotice(null)}
+      />
+      {failure ? <ImportFailurePanel message={uploadError || snapshot?.error_message || imageTasks.find((task) => task.status === "failed")?.errorMessage} onRetry={retryFailed} disabled={isJobActive || Boolean(resumeTarget && (!selectedRecoveryItem || !files.length))} retryLabel={phase === "uploading" ? "重新上传中" : upload ? "重试下一张" : "重试上传"} /> : null}
+      {resumeTarget ? <div className="v2-resume-context">
+        {awaitingRecoveryFile && recovery.isError ? <p role="alert">{importErrorMessage(recovery.error)}</p> : !recoverySnapshot ? <p role="status">正在读取失败图片</p> : failedRecoveryItems.length ? <div className="v2-batch-field">
+          <label>选择待重传的原图</label><CustomSelect aria-label="待重传图片" placeholder="选择下一张失败图片" value={String(selectedRecoveryItem?.id || "")} options={failedRecoveryItems.map((item) => ({ value: String(item.id), label: item.source_file || `图片 ${item.seq}` }))} onChange={(value) => batch.updateDraft((previous) => ({ ...previous, retryItemId: Number(value), files: [] }))} clearable={false} disabled={isJobActive} />
+        </div> : <p role="status">此批次已无失败图片</p>}
+      </div> : null}
+      <input
+        id={fileInputId}
+        ref={fileInputRef}
+        type="file"
+        multiple={!resumeTarget}
+        accept={ACCEPT}
+        disabled={!canChooseFile}
+        aria-label="选择要导入的图片"
+        className="sr-only"
+        onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
       />
 
-      <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-enter" style={{ animationDelay: "55ms" }}>
-        <ImportPanelHeader
-          title="识别工作台"
-          description="文件选择、识别参数与任务进度保持在一个操作上下文中。"
-          trailing={
-            <span className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
-              phaseTone === "success" && "border-success/25 bg-success-light text-success",
-              phaseTone === "danger" && "border-destructive/25 bg-destructive-light text-destructive",
-              phaseTone === "warning" && "border-warning/30 bg-warning-light text-warning-foreground",
-              phaseTone === "neutral" && "border-border bg-card/70 text-muted-foreground",
-            )}>
-              <span className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                phaseTone === "success" && "bg-success",
-                phaseTone === "danger" && "bg-destructive",
-                phaseTone === "warning" && "import-status-active bg-warning",
-                phaseTone === "neutral" && "bg-muted-foreground/70",
-              )} aria-hidden="true" />
-              {phaseLabel}
+      <div className="v2-batch v2-batch-workspace">
+        <section className="v2-batch-queue" aria-label="图片队列">
+        <div className="v2-toolbar">
+          <div className="v2-count">
+            队列 {totalImages} 张图片
+            <span>
+              {formatBytes(totalBytes)}
+              {imageTasks.length > 0 ? ` · 已完成 ${succeededCount} · 失败 ${failedCount}` : ""}
             </span>
-          }
-        />
-
-        <div className="grid min-h-[590px] lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="flex min-w-0 flex-col gap-5 border-b border-border/60 bg-muted/25 p-4 sm:p-5 lg:border-b-0 lg:border-r">
-            <label htmlFor={fileInputId} className="block">
-              <div
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                className={cn(
-                  "relative flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 py-5 text-center transition-[border-color,background-color,box-shadow] import-interactive",
-                  (dragActive || files.length > 0) && "import-drop-active",
-                  isJobActive
-                    ? "cursor-not-allowed border-border bg-muted opacity-60"
-                    : dragActive || files.length > 0
-                      ? "border-primary bg-accent shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
-                      : "border-border bg-card/60 hover:border-primary hover:bg-card",
-                )}
+          </div>
+          <div className="v2-toolbar-right">
+            {canEditQueue ? (
+              <button
+                type="button"
+                className="v2-tool-link"
+                data-tone="bad"
+                disabled={files.length === 0}
+                onClick={() => batch.updateDraft((previous) => ({ ...previous, files: [] }))}
               >
-                <div className="grid h-11 w-11 place-items-center rounded-xl border border-primary/15 bg-card/80 text-accent-foreground import-drop-icon">
-                  <Images className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
-                </div>
-                <p className="mt-3 text-sm font-semibold text-foreground">{files.length > 0 ? `${files.length} 张图片已就绪` : "添加题目图片"}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground/70">拖拽、粘贴或点击选择 JPG / PNG / WebP</p>
-                <input
-                  id={fileInputId}
-                  type="file"
-                  multiple
-                  accept={ACCEPT}
-                  disabled={isJobActive}
-                  className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                  onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }}
-                />
-              </div>
-            </label>
-
-            {files.length > 0 && queuePhase === "idle" ? (
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-muted-foreground">待上传文件</span>
-                  <button type="button" disabled={isJobActive} onClick={clearFiles} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-muted-foreground/70 import-interactive hover:bg-card hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
-                    清空
-                  </button>
-                </div>
-                <div className="max-h-32 overflow-y-auto rounded-xl border border-border/60 bg-card/55">
-                  {files.map((file, index) => (
-                    <div key={`${file.name}_${file.size}_${index}`} className="flex min-h-11 items-center gap-2 border-b border-border/60 px-3 last:border-b-0 import-list-item" style={{ animationDelay: `${Math.min(index, 8) * 24}ms` }}>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={file.name}>{file.name}</span>
-                      <button
-                        type="button"
-                        disabled={isJobActive}
-                        onClick={() => removeFile(index)}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-muted-foreground/70 import-interactive hover:bg-destructive-light hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
-                        aria-label={`移除 ${file.name}`}
-                        title="移除文件"
-                      >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                清空队列
+              </button>
             ) : null}
-
-            <div className="space-y-4 border-t border-border/60 pt-4">
-              <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground">科目</span>
-                <div className="relative" ref={subjectSelectRef}>
-                  <button
-                    type="button"
-                    disabled={isJobActive}
-                    aria-haspopup="listbox"
-                    aria-expanded={subjectSelectOpen}
-                    onClick={() => setSubjectSelectOpen((prev) => !prev)}
-                    className={cn(
-                      "flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm outline-none transition-[border-color,background-color,box-shadow]",
-                      isJobActive ? "cursor-not-allowed border-border bg-muted opacity-60"
-                        : subjectSelectOpen ? "border-primary bg-card ring-4 ring-ring/15"
-                          : "border-border bg-card/75 hover:border-primary",
-                    )}
-                  >
-                    <span className={cn("truncate", subjectId ? "font-semibold text-foreground" : "text-muted-foreground/70")}>
-                      {subjectId ? (subjectOptions.find((s) => String(s.id) === subjectId)?.name || subjectId) : "选择科目（可选）"}
-                    </span>
-                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 import-chevron", subjectSelectOpen && "rotate-180")} aria-hidden="true" />
-                  </button>
-                  {subjectSelectOpen ? (
-                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 import-popover overflow-y-auto rounded-xl border border-border/60 bg-card p-1 shadow-[var(--shadow-floating)]">
-                      <button type="button" role="option" aria-selected={!subjectId} onClick={() => { setSubjectId(""); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", !subjectId ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
-                        未指定科目
-                        {!subjectId ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                      </button>
-                      {subjectOptions.map((s) => (
-                        <button key={s.id} type="button" role="option" aria-selected={subjectId === String(s.id)} onClick={() => { setSubjectId(String(s.id)); setSubjectSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-xs import-interactive", subjectId === String(s.id) ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
-                          <span className="truncate">{s.name}</span>
-                          {subjectId === String(s.id) ? <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground">并发数</span>
-                <div className="relative" ref={selectRef}>
-                  <button
-                    type="button"
-                    disabled={isJobActive}
-                    aria-haspopup="listbox"
-                    aria-expanded={selectOpen}
-                    onClick={() => setSelectOpen((prev) => !prev)}
-                    className={cn(
-                      "flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 text-sm outline-none transition-[border-color,background-color,box-shadow]",
-                      isJobActive ? "cursor-not-allowed border-border bg-muted opacity-60"
-                        : selectOpen ? "border-primary bg-card ring-4 ring-ring/15"
-                          : "border-border bg-card/75 hover:border-primary",
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <strong className="text-foreground">{concurrency}</strong>
-                      {concurrencyOptions.find((o) => o.value === concurrency)?.tag ? <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">{concurrencyOptions.find((o) => o.value === concurrency)?.tag}</span> : null}
-                    </span>
-                    <ChevronDown className={cn("h-4 w-4 text-muted-foreground/70 import-chevron", selectOpen && "rotate-180")} aria-hidden="true" />
-                  </button>
-                  {selectOpen ? (
-                    <div role="listbox" className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden import-popover rounded-xl border border-border/60 bg-card p-1 shadow-[var(--shadow-floating)]">
-                      {concurrencyOptions.map((opt) => (
-                        <button key={opt.value} type="button" role="option" aria-selected={concurrency === opt.value} onClick={() => { setConcurrency(opt.value); setSelectOpen(false); }} className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-xs import-interactive", concurrency === opt.value ? "bg-accent font-semibold text-accent-foreground" : "text-muted-foreground hover:bg-muted")}>
-                          <span className="flex items-center gap-2"><strong>{opt.label}</strong>{opt.tag ? <span className="text-[10px] text-muted-foreground/70">{opt.tag}</span> : null}</span>
-                          {concurrency === opt.value ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <OcrModeSelector value={ocrMode} onChange={setOcrMode} disabled={isJobActive} />
-            </div>
-
-            <div className="mt-auto border-t border-border/60 pt-4">
-              {queuePhase === "done" ? (
-                <Button onClick={resetQueue} className="h-11 w-full import-interactive" variant="secondary">
-                  <RefreshCw className="h-4 w-4" aria-hidden="true" />重新导入
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  {queuePhase === "uploading" || queuePhase === "polling" ? (
-                    <Button onClick={resetQueue} variant="secondary" className={cn("h-11 shrink-0 import-interactive", queuePhase === "polling" && "w-11 p-0")} aria-label={queuePhase === "uploading" ? "取消上传" : "停止并重置任务"} title={queuePhase === "uploading" ? "取消上传并重置" : "停止并重置"}>
-                      <X className="h-4 w-4" aria-hidden="true" />
-                      {queuePhase === "uploading" ? "取消上传" : null}
-                    </Button>
-                  ) : null}
-                  <Button disabled={files.length === 0 || queuePhase !== "idle"} onClick={() => { if (queuePhase === "idle") startQueue(); }} className="h-11 flex-1 import-interactive group">
-                    <UploadCloud className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 motion-reduce:transform-none" aria-hidden="true" />
-                    {queuePhase === "uploading" ? "上传中" : queuePhase === "polling" ? "识别中" : files.length > 0 ? `开始导入 · ${files.length}` : "开始导入"}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </aside>
-
-          <div className="min-w-0 bg-card/30">
-            {queuePhase === "idle" && imageTasks.length === 0 ? (
-              <div className="flex min-h-[590px] items-center justify-center px-6 py-14 import-panel-swap">
-                <div className="max-w-md text-center">
-                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop">
-                    <UploadCloud className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
-                  </div>
-                  <p className="mt-4 text-sm font-semibold text-foreground">等待批量任务</p>
-                  <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">添加图片并设置识别参数后开始导入。提交后，这里会实时显示总体进度、单图状态与处理轨迹。</p>
-                  <div className="mt-5 grid grid-cols-3 divide-x divide-border/60 border-y border-border/60 py-2.5 text-[11px] text-muted-foreground">
-                    <span>上传</span><span>OCR / AI</span><span>待审核</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 sm:p-5 import-panel-swap">
-                <div className="grid grid-cols-2 divide-x divide-y divide-border/60 overflow-hidden rounded-xl border border-border/60 bg-card/60 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
-                  <ImportMetric label="总图片" value={totalImages} />
-                  <ImportMetric label="上传中" value={uploadingCount} tone={uploadingCount > 0 ? "primary" : "neutral"} />
-                  <ImportMetric label="识别中" value={processingCount} tone={processingCount > 0 ? "warning" : "neutral"} />
-                  <ImportMetric label="成功" value={succeededCount} tone={succeededCount > 0 ? "success" : "neutral"} />
-                  <ImportMetric label="失败" value={failedCount} tone={failedCount > 0 ? "danger" : "neutral"} />
-                  <ImportMetric label="识别题目" value={totalQuestions} tone={totalQuestions > 0 ? "primary" : "neutral"} />
-                </div>
-
-                <div className="mt-5 rounded-xl border border-border/60 bg-card/60 px-4 py-3.5">
-                  <div className="flex items-center justify-between gap-4 text-xs">
-                    <span className="font-semibold text-muted-foreground">总体进度</span>
-                    <span className="font-mono font-semibold tabular-nums text-foreground">{progressPct}%</span>
-                  </div>
-                  <ImportProgressBar
-                    value={progressPct}
-                    label="总体进度"
-                    active={queuePhase === "uploading" || queuePhase === "polling"}
-                    tone={queuePhase === "done" && failedCount === totalImages && totalImages > 0 ? "danger" : queuePhase === "done" ? "success" : "primary"}
-                    className="mt-2.5"
-                  />
-                </div>
-
-                <section className="mt-5 overflow-hidden rounded-xl border border-border/60 bg-card/65">
-                  <ImportPanelHeader title="任务明细" description={`${imageTasks.length} 个图片任务 · 按提交顺序展示`} />
-                  <div className="max-h-[430px] overflow-y-auto">
-                    {imageTasks.map((task) => (
-                      <article key={task.id} className={cn("border-b border-border/60 last:border-b-0 import-list-item import-interactive hover:bg-card/55", task.status === "failed" && "bg-destructive/[0.03]")} style={{ animationDelay: `${Math.min(task.seq - 1, 8) * 26}ms` }}>
-                        <div className="flex min-h-14 items-center gap-3 px-4 py-2.5">
-                          <span className="w-7 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70">#{task.seq}</span>
-                          <div className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-medium text-foreground" title={task.file.name}>{task.file.name}</span>
-                            {(task.status === "uploading" || task.status === "processing" || task.status === "pending") ? (
-                              <ImportProgressBar value={taskProgress(task)} label={`图片 ${task.seq} 处理进度`} active className="mt-1.5 h-1" />
-                            ) : null}
-                          </div>
-                          {renderStatusBadge(task)}
-                        </div>
-                        {task.traceEvents.length > 0 ? (
-                          <div className="border-t border-border/60 bg-muted/25 px-4 py-2.5 import-panel-swap">
-                            <div className="space-y-1.5">
-                              {task.traceEvents.map((ev, idx) => (
-                                <div key={idx} className="grid grid-cols-[52px_10px_minmax(0,1fr)_auto] items-center gap-2 text-[10px] leading-5">
-                                  <span className="truncate font-mono text-muted-foreground/70">{ev.step}</span>
-                                  <span className={cn("h-1.5 w-1.5 rounded-full", ev.status === "success" ? "bg-success" : ev.status === "failed" ? "bg-destructive" : ev.status === "running" ? "import-status-active bg-warning" : "bg-muted-foreground/70")} aria-hidden="true" />
-                                  <span className="min-w-0 truncate text-muted-foreground" title={ev.message}>{ev.message}</span>
-                                  {ev.duration_ms != null && ev.duration_ms > 0 ? <span className="font-mono tabular-nums text-muted-foreground/70">{ev.duration_ms}ms</span> : null}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                </section>
-
-                {queuePhase === "done" && succeededCount > 0 ? (
-                  <div className="mt-4 flex justify-end">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href="/imports/review">
-                      <ClipboardCheck className="h-4 w-4" aria-hidden="true" />前往待审核
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-            )}
           </div>
         </div>
-      </section>
+
+        {canChooseFile && files.length === 0 ? (
+          <label
+            htmlFor={fileInputId}
+            className="v2-empty"
+            data-active={dragActive ? "true" : undefined}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
+            <div className="v2-upload-mark" aria-hidden="true">
+              <Images />
+            </div>
+
+            <div className="v2-empty-title">拖入题目图片</div>
+            <div className="v2-empty-sub">
+              JPG、PNG、WEBP，每张不超过 5 MB
+            </div>
+
+            <div className="v2-sources">
+              <button type="button" className="v2-btn v2-btn-primary" onClick={(event) => { event.preventDefault(); fileInputRef.current?.click(); }}>
+                <Images className="h-3.5 w-3.5" aria-hidden="true" />
+                选择图片
+              </button>
+              <span className="v2-paste-hint">
+                <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                <kbd>Ctrl</kbd> + <kbd>V</kbd>
+              </span>
+            </div>
+
+
+          </label>
+        ) : (
+          <div className="v2-grid" data-active={dragActive ? "true" : undefined} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+            {(imageTasks.length > 0 ? imageTasks : files.map((file, index) => ({
+              id: `queued_${index}_${file.name}`,
+              seq: index + 1,
+              file,
+            }))).map((item) => {
+              if ("status" in item) {
+                const task = item as ImageTask;
+                const meta = taskMeta(task);
+                return (
+                  <article key={`${task.seq}-${task.file.name}-${task.file.size}-${task.file.lastModified}`} className="v2-tile" data-tone={meta.tone}>
+                    <div className="v2-thumb">
+                      <button type="button" className="v2-preview-trigger" onClick={() => setPreviewFile(task.file)} aria-label={`放大预览 ${task.file.name}`}><ImportFileThumb file={task.file} /><span className="v2-preview-cue"><Maximize2 aria-hidden="true" /></span></button>
+                      <div className="v2-thumb-shade" aria-hidden="true" />
+                      <span className="v2-idx">{String(task.seq).padStart(2, "0")}</span>
+                      {task.status === "failed" ? <div className="v2-badveil" aria-hidden="true" /> : null}
+                    </div>
+                    <div className="v2-tile-foot">
+                      <div className="v2-tile-progress">
+                        <i
+                          data-tone={meta.progressTone}
+                          style={{ width: `${taskProgress(task)}%` }}
+                        />
+                      </div>
+                      <div className="v2-tile-row">
+                        <span className="v2-tile-name" title={task.file.name}>{task.file.name}</span>
+                        <span className="v2-tile-pct">{meta.pct}</span>
+                      </div>
+                      <div className="v2-tile-state">
+                        <span className="v2-chip" data-tone={meta.tone}>{meta.label}</span>
+                        <span className="v2-tile-note" title={meta.note}>{meta.note}</span>
+                      </div>
+                      {task.status === "succeeded" && snapshot?.items.find((entry) => batchImageItemKey(entry) === task.id)?.review_batch_id ? <button type="button" className="v2-textlink v2-tile-result" onClick={() => setContentBatch(snapshot.items.find((entry) => batchImageItemKey(entry) === task.id)!.review_batch_id)}><Eye className="h-4 w-4" aria-hidden="true" />查看 {task.questionCount} 道题目</button> : null}
+                      {task.status === "failed" && phase === "done" && snapshot?.items.find((entry) => batchImageItemKey(entry) === task.id)?.id ? <button type="button" className="v2-textlink v2-tile-result" onClick={() => void batch.retry({ retryItemId: snapshot.items.find((entry) => batchImageItemKey(entry) === task.id)!.id })}><RefreshCw className="h-4 w-4" aria-hidden="true" />重新上传此图</button> : null}
+                    </div>
+                  </article>
+                );
+              }
+
+              const file = item.file as File;
+              return (
+                <article key={`${item.seq}-${file.name}-${file.size}-${file.lastModified}`} className="v2-tile" data-tone="wait">
+                  <div className="v2-thumb">
+                    <button type="button" className="v2-preview-trigger" onClick={() => setPreviewFile(file)} aria-label={`放大预览 ${file.name}`}><ImportFileThumb file={file} /><span className="v2-preview-cue"><Maximize2 aria-hidden="true" /></span></button>
+                    <div className="v2-thumb-shade" aria-hidden="true" />
+                    <span className="v2-idx">{String(item.seq).padStart(2, "0")}</span>
+                    <button
+                      type="button"
+                      className="v2-remove"
+                      onClick={() => batch.updateDraft((previous) => ({ ...previous, files: previous.files.filter((_, index) => index !== item.seq - 1) }))}
+                      aria-label={`移除 ${file.name}`}
+                      title="移除图片"
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="v2-tile-foot">
+                    <div className="v2-tile-progress" />
+                    <div className="v2-tile-row">
+                      <span className="v2-tile-name" title={file.name}>{file.name}</span>
+                      <span className="v2-tile-pct">排队</span>
+                    </div>
+                    <div className="v2-tile-state">
+                      <span className="v2-chip" data-tone="wait">待识别</span>
+                      <span className="v2-tile-note">{formatTaskSize(file)}</span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+
+            {canEditQueue && files.length < MAX_FILES && !resumeTarget ? (
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="v2-add-tile">
+                  <span className="v2-add-plus"><Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" /></span>
+                  <span>添加图片</span>
+                </button>
+            ) : null}
+          </div>
+        )}
+
+        </section>
+        <aside className="v2-batch-settings" aria-labelledby="batch-import-settings">
+          <header><h2 id="batch-import-settings">导入设置</h2><span className="v2-chip">{phaseText}</span></header>
+          <div className="v2-batch-settings-body">
+            {resumeTarget ? <p className="v2-group-hint">重传后沿用原任务设置，成功图片保持原结果。</p> : <>
+            <div className="v2-batch-field">
+              <label>目标科目</label>
+              <CustomSelect
+                value={subjectId}
+                onChange={(value) => batch.updateDraft((previous) => ({ ...previous, subjectId: value }))}
+                options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
+                placeholder="未指定科目"
+                aria-label="目标科目"
+                disabled={!canEditQueue}
+                clearable={false}
+              />
+            </div>
+            </>}
+            <div className="v2-batch-field">
+              <label>并发任务</label>
+              <div className="v2-batch-segment" role="group" aria-label="并发数">
+                {concurrencyOptions.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={!canEditQueue || Boolean(resumeTarget)}
+                    aria-pressed={concurrency === value}
+                    onClick={() => batch.updateDraft((previous) => ({ ...previous, concurrency: value }))}
+                    title={`${value} 路 OCR / AI 并发`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="v2-batch-field">
+              <label>识别引擎</label>
+              <div className="v2-batch-segment" role="group" aria-label="OCR 识别方式">
+                <button
+                  type="button"
+                  disabled={!canEditQueue || Boolean(resumeTarget)}
+                  aria-pressed={ocrMode === "local"}
+                  onClick={() => batch.updateDraft((previous) => ({ ...previous, ocrMode: "local" }))}
+                  title="标准模式 · 按 OCR 后端配置，HTTP GPU 优先"
+                >
+                  标准 OCR
+                </button>
+                <button
+                  type="button"
+                  disabled={!canEditQueue || Boolean(resumeTarget)}
+                  aria-pressed={ocrMode === "api"}
+                  onClick={() => batch.updateDraft((previous) => ({ ...previous, ocrMode: "api" }))}
+                  title="API 模式 · PaddleOCR-VL，更快"
+                >
+                  视觉模型
+                </button>
+              </div>
+            </div>
+
+            {upload ? <div className="v2-batch-outcome"><div><span>完成图片</span><strong>{succeededCount + failedCount}<small> / {totalImages}</small></strong></div><div><span>识别题目</span><strong>{totalQuestions}<small> 题</small></strong></div></div> : null}
+          </div>
+
+          <div className="v2-batch-settings-foot">
+            {phase === "done" && totalQuestions > 0 ? (
+              <Link className="v2-textlink" href={snapshot?.merged_batch_id ? `/imports/review?batch_id=${encodeURIComponent(snapshot.merged_batch_id)}` : "/imports/review"}>
+                前往审核 {totalQuestions} 道题
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
+            ) : (
+              <span className="v2-run-note" role="status">
+                {statusError ? "进度连接暂不可用，保留上次状态" : isJobActive ? phaseText : ""}
+              </span>
+            )}
+            <div className="v2-run-cta-row">
+              {phase === "uploading" ? (
+                <button
+                  type="button"
+                  className="v2-btn"
+                  onClick={batch.cancelUpload}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  取消上传
+                </button>
+              ) : null}
+              {phase === "tracking" && statusError ? (
+                <button type="button" className="v2-btn" onClick={batch.refresh}>刷新进度</button>
+              ) : null}
+              {phase === "done" ? (
+                <button type="button" className="v2-btn" onClick={() => { batch.reset(); if (resumeTarget) router.replace("/imports/batch-image", { scroll: false }); }}>
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  新建批次
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="v2-cta"
+                  disabled={files.length === 0 || !canEditQueue || Boolean(resumeTarget && !selectedRecoveryItem)}
+                  onClick={retryFailed}
+                >
+                  <UploadCloud className="h-4 w-4" aria-hidden="true" />
+                  {isJobActive
+                    ? `${phaseText}…`
+                      : files.length > 0
+                        ? resumeTarget ? "重新上传原图" : `开始导入 · ${files.length}`
+                        : "选择图片后开始"}
+                </button>
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div className="sr-only" aria-live="polite">
+        {imageTasks.length > 0
+          ? `共 ${imageTasks.length} 张，已完成 ${succeededCount}，失败 ${failedCount}，总体进度 ${progressPct}%`
+          : ""}
+      </div>
+      <ImportContentDialog open={contentBatch !== null} onOpenChange={(open) => { if (!open) setContentBatch(null); }} batchId={contentBatch} />
+      <ImportImagePreview file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }

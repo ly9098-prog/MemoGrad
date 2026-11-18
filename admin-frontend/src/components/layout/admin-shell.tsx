@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { OcrImportSessionProvider } from "./ocr-import-session-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
@@ -63,6 +64,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const adminId = useAuthStore(({ user }) => user && ("id" in user ? user.id : user.user.id));
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const [mobileNavigationPath, setMobileNavigationPath] = useState<string | null>(null);
   const [isNavigationHovered, setNavigationHovered] = useState(false);
@@ -131,7 +133,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         }`}
         data-focused-editor={isFocusedFormulaEditor ? "true" : undefined}
       >
-        {children}
+        <OcrImportSessionProvider key={adminId}>{children}</OcrImportSessionProvider>
       </main>
       <Dialog
         open={isMobileNavigationOpen}

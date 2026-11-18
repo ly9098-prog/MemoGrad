@@ -181,6 +181,7 @@ export type BatchImageJobStatusResponse = {
   total_questions: number;
   current_seq: number;
   current_file: string;
+  merged_batch_id?: string | null;
   error_message: string | null;
   started_at: string;
   finished_at: string;
@@ -442,11 +443,17 @@ export type BatchResult = {
 // P7-1: Pipeline summary for observability listing
 export type ImportPipelineSummaryItem = {
   pipeline_id: string;
+  run_type?: "pipeline" | "batch_image";
+  job_id?: string;
+  total_images?: number | null;
   source_type: string;
   source_file?: string | null;
   status: string;
   total_pages?: number | null;
   error_message?: string | null;
+  batch_id?: string | null;
+  batch_ids?: string[];
+  question_count?: number | null;
   started_at?: string | null;
   finished_at?: string | null;
   quality_report?: ImportPipelineStatusResponse["quality_report"];
@@ -759,6 +766,10 @@ export type ImportBatchListItem = {
 
 export type ImportBatchDetail = ImportBatchListItem & {
   items: ImportQuestionItem[];
+  page?: number;
+  page_size?: number;
+  total?: number;
+  total_pages?: number;
 };
 
 export type ImportPublishResponse = {
