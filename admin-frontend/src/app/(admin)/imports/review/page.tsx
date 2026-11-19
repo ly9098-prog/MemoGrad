@@ -733,7 +733,7 @@ export default function ImportReviewPage() {
         prev.multiBlank as MultiBlankEditState,
         action,
       );
-      const synced = syncDerivedMultiBlankFields(prev, nextMultiBlank);
+      const synced = syncDerivedMultiBlankFields(nextMultiBlank);
       return {
         ...prev,
         answer: synced.answer,

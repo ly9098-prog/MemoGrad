@@ -338,11 +338,3 @@ export function isTableSegment(value: unknown): boolean {
   const type = String(record.type ?? "").toLowerCase();
   return type === "table" || type === "table_markdown";
 }
-
-export function getTableSegments(content: unknown): StructuredTableSegment[] {
-  const record = asRecord(content);
-  if (!record || !Array.isArray(record.segments)) return [];
-  return record.segments
-    .map(normalizeStructuredTableSegment)
-    .filter((table): table is StructuredTableSegment => Boolean(table));
-}

@@ -46,14 +46,6 @@ const FALLBACK_TYPES: QuestionTypeMetaItem[] = [
   { code: "subjective", label: "问答题", sort_order: 60, capabilities: { has_options: false, answer_mode: "free_text", allows_multi_blank: false, allows_multiple_answers: false } },
 ];
 
-// 兜底标准 code 集合
-const FALLBACK_CODES = new Set(FALLBACK_TYPES.map((t) => t.code));
-
-// code → label（兜底）
-const FALLBACK_LABEL_MAP: Record<string, string> = Object.fromEntries(
-  FALLBACK_TYPES.map((t) => [t.code, t.label]),
-);
-
 // ── React Query Hook ──
 
 /**
@@ -82,42 +74,4 @@ export function useQuestionTypes() {
     // 接口不可用时使用兜底
     placeholderData: FALLBACK_TYPES,
   });
-}
-
-// ── 工具函数（不依赖 React） ──
-
-/**
- * 从列表或兜底中获取题型 label。
- */
-export function getTypeLabel(
-  code: string | null | undefined,
-  types?: QuestionTypeMetaItem[],
-): string {
-  if (!code) return "未知";
-  if (types) {
-    const found = types.find((t) => t.code === code);
-    if (found) return found.label;
-  }
-  return FALLBACK_LABEL_MAP[code] ?? `历史未知题型(${code})`;
-}
-
-/**
- * 判断 code 是否为标准题型。
- */
-export function isCanonicalType(
-  code: string | null | undefined,
-  types?: QuestionTypeMetaItem[],
-): boolean {
-  if (!code) return false;
-  if (types) return types.some((t) => t.code === code);
-  return FALLBACK_CODES.has(code);
-}
-
-/**
- * 将元数据列表转为 SelectOption 数组。
- */
-export function toSelectOptions(
-  types: QuestionTypeMetaItem[],
-): Array<{ value: string; label: string }> {
-  return types.map((t) => ({ value: t.code, label: t.label }));
 }

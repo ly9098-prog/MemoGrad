@@ -7,6 +7,18 @@ import { cn } from "@/lib/utils";
 import styles from "./editorial-settings.module.css";
 
 export const MAX_PROMPT_LENGTH = 5000;
+const UNSAVED_MESSAGE = "有未保存的修改，确定离开当前页面吗？";
+
+function isPlainNavigation(event: MouseEvent): boolean {
+  if (event.defaultPrevented || event.button !== 0) return false;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+  const anchor = (event.target as Element | null)?.closest?.("a[href]");
+  if (!anchor) return false;
+  const href = anchor.getAttribute("href");
+  if (!href || href.startsWith("#") || anchor.hasAttribute("download")) return false;
+  if (anchor.getAttribute("target") === "_blank") return false;
+  return true;
+}
 
 export function useUnsavedChangesWarning(dirty: boolean) {
   useEffect(() => {
@@ -15,8 +27,18 @@ export function useUnsavedChangesWarning(dirty: boolean) {
       event.preventDefault();
       event.returnValue = "";
     };
+    const handleLinkClick = (event: MouseEvent) => {
+      if (!isPlainNavigation(event)) return;
+      if (window.confirm(UNSAVED_MESSAGE)) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleLinkClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleLinkClick, true);
+    };
   }, [dirty]);
 }
 

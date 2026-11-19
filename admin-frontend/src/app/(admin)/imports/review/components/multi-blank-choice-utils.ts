@@ -777,7 +777,6 @@ export function reduceMultiBlankEditState(
  *  - `sharedOptions` for the editor
  */
 export function syncDerivedMultiBlankFields(
-  prev: { answer: string; multiBlank?: MultiBlankEditState },
   nextMultiBlank: MultiBlankEditState,
 ): { answer: string; multiBlank: MultiBlankEditState } {
   const groupIds = nextMultiBlank.groups.map((g) => g.id);

@@ -11,7 +11,7 @@ const KEY = "admin-question-saved-filter";
 function storageWith(raw: string | null = null) {
   let stored = raw;
   const getItem = vi.fn((): string | null => stored);
-  const setItem = vi.fn((key: string, value: string) => { stored = value; });
+  const setItem = vi.fn((_key: string, value: string) => { stored = value; });
   const removeItem = vi.fn(() => { stored = null; });
   const storage: FilterStorage = { getItem, setItem, removeItem };
   return { storage, getItem, setItem, removeItem, getStored: () => stored };

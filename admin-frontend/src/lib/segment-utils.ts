@@ -5,12 +5,6 @@
 
 export type SegmentData = Record<string, unknown>;
 
-export type EditableOption = {
-  key: string;
-  text: string;
-  segments?: SegmentData[];
-};
-
 const IMAGE_SEGMENT_TYPES = ["image", "math_image", "table_image", "code_image"];
 const TABLE_SEGMENT_TYPES = ["table", "table_markdown"];
 

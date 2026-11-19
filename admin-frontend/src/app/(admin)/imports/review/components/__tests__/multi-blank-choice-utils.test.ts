@@ -1143,7 +1143,6 @@ describe("reduceMultiBlankEditState", () => {
 describe("syncDerivedMultiBlankFields", () => {
   it("computes canonical answer from answerMap", () => {
     const result = syncDerivedMultiBlankFields(
-      { answer: "old" },
       {
         groups: [
           { id: "①", options: [] },
@@ -1159,7 +1158,6 @@ describe("syncDerivedMultiBlankFields", () => {
 
   it("computes sharedOptions when usesSharedOptions and groups match", () => {
     const result = syncDerivedMultiBlankFields(
-      { answer: "" },
       {
         groups: [
           { id: "①", options: [{ key: "A", text: "x" }, { key: "B", text: "y" }] },
@@ -1175,7 +1173,6 @@ describe("syncDerivedMultiBlankFields", () => {
 
   it("returns empty sharedOptions when usesSharedOptions is false", () => {
     const result = syncDerivedMultiBlankFields(
-      { answer: "" },
       {
         groups: [
           { id: "①", options: [{ key: "A", text: "x" }] },

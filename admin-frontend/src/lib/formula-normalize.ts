@@ -339,17 +339,3 @@ export function normalizeFormulaText(text: string | null | undefined): string | 
     return text;
   }
 }
-
-/**
- * Batch-normalise multiple fields.
- * Only the fields present in the input object are returned.
- */
-export function normalizeFormulaFields(fields: {
-  conditions?: string;
-  errorTips?: string;
-}): { conditions?: string; errorTips?: string } {
-  const result: { conditions?: string; errorTips?: string } = {};
-  if ('conditions' in fields) result.conditions = normalizeFormulaText(fields.conditions) ?? undefined;
-  if ('errorTips' in fields) result.errorTips = normalizeFormulaText(fields.errorTips) ?? undefined;
-  return result;
-}
