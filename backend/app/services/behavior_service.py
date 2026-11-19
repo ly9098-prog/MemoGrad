@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.answer_behavior import AnswerBehavior
@@ -22,45 +24,12 @@ async def record_answer_behavior(
     session_type: str = "random",
     commit: bool = True,
 ) -> AnswerBehavior:
-    """记录一条答题行为数据"""
-    # 检查是否已有相同记录
-    if practice_record_id:
-        result = await db.execute(
-            select(AnswerBehavior).where(
-                AnswerBehavior.user_id == user_id,
-                AnswerBehavior.question_id == question_id,
-                AnswerBehavior.practice_record_id == practice_record_id,
-            )
-        )
-        existing = result.scalar_one_or_none()
-        if existing:
-            # 更新已有记录
-            existing.question_version_id = question_version_id
-            existing.time_spent_sec = time_spent_sec
-            existing.is_first_correct = (
-                is_first_correct
-                if is_first_correct is not None
-                else existing.is_first_correct
-            )
-            existing.is_final_correct = is_final_correct
-            existing.view_answer_count = view_answer_count
-            existing.switch_count = switch_count
-            existing.user_answer = user_answer or existing.user_answer
-            existing.correct_answer = correct_answer or existing.correct_answer
-            if subject_id is not None:
-                existing.subject_id = subject_id
-            if commit:
-                await db.commit()
-                await db.refresh(existing)
-            else:
-                await db.flush()
-            return existing
-
-    behavior = AnswerBehavior(
+    """Atomically record one behavior per non-NULL practice record."""
+    values = dict(
         user_id=user_id,
         question_id=question_id,
-        practice_record_id=practice_record_id,
         question_version_id=question_version_id,
+        practice_record_id=practice_record_id,
         time_spent_sec=time_spent_sec,
         is_first_correct=is_first_correct,
         is_final_correct=is_final_correct,
@@ -72,12 +41,54 @@ async def record_answer_behavior(
         subject_id=subject_id,
         session_type=session_type,
     )
-    db.add(behavior)
+    behavior = await _write_answer_behavior(db, values)
     if commit:
         await db.commit()
         await db.refresh(behavior)
     else:
         await db.flush()
+    return behavior
+
+
+async def _write_answer_behavior(db: AsyncSession, values: dict) -> AnswerBehavior:
+    table = AnswerBehavior.__table__
+    dialect = db.get_bind().dialect.name
+    insert = pg_insert if dialect == "postgresql" else sqlite_insert
+    statement = insert(AnswerBehavior).values(**values)
+    if values["practice_record_id"] is not None:
+        excluded = statement.excluded
+        mutable = {
+            key: getattr(excluded, key)
+            for key in (
+                "time_spent_sec",
+                "is_final_correct",
+                "view_answer_count",
+                "switch_count",
+                "is_abandoned",
+            )
+        }
+        for key in ("is_first_correct", "subject_id"):
+            mutable[key] = func.coalesce(getattr(excluded, key), table.c[key])
+        for key in ("user_answer", "correct_answer"):
+            mutable[key] = func.coalesce(
+                func.nullif(getattr(excluded, key), ""), table.c[key]
+            )
+        statement = statement.on_conflict_do_update(
+            index_elements=["practice_record_id"],
+            set_=mutable,
+            where=(table.c.user_id == values["user_id"])
+            & (table.c.question_id == values["question_id"])
+            & (table.c.question_version_id == values["question_version_id"]),
+        )
+    result = await db.execute(
+        statement.returning(AnswerBehavior),
+        execution_options={"populate_existing": True},
+    )
+    behavior = result.scalar_one_or_none()
+    if behavior is None:
+        raise ValueError(
+            "practice record already belongs to a different answer identity"
+        )
     return behavior
 
 

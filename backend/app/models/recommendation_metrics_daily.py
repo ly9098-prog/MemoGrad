@@ -5,9 +5,11 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,7 +26,10 @@ class RecommendationMetricsDaily(Base):
 
     date = mapped_column(Date, nullable=False, index=True)
     subject_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("subjects.id", ondelete="RESTRICT"), nullable=False, index=True
+        Integer,
+        ForeignKey("subjects.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     subject_ref = relationship(
         "Subject", back_populates="recommendation_metrics_daily", lazy="noload"
@@ -67,6 +72,18 @@ class RecommendationMetricsDaily(Base):
     )
 
     __table_args__ = (
+        # The ordinary five-column key protects non-NULL variants. This partial
+        # key gives the NULL group the same identity on PostgreSQL and SQLite.
+        Index(
+            "uq_rmd_null_variant",
+            "date",
+            "subject_id",
+            "scene",
+            "strategy",
+            unique=True,
+            postgresql_where=text("variant_key IS NULL"),
+            sqlite_where=text("variant_key IS NULL"),
+        ),
         UniqueConstraint(
             "date",
             "subject_id",

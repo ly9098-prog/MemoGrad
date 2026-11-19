@@ -454,7 +454,7 @@ class TestAggregateMetricsDaily:
         mock_row.avg_mastery_delta = 0.15
 
         # 第一次 execute: 聚合查询
-        # 第二次 execute: 查已有 daily（不存在）
+        # 第二次 execute: 原子 UPSERT daily
         db.execute.side_effect = [
             _make_execute_result(all=[mock_row]),
             _make_execute_result(scalar_one_or_none=None),
@@ -469,7 +469,9 @@ class TestAggregateMetricsDaily:
             ))
 
         assert result["aggregated_rows"] == 1
-        db.add.assert_called_once()
+        statement = db.execute.await_args_list[-1].args[0]
+        assert statement.compile().params["exposure_count"] == 100
+        assert statement.compile().params["correct_count"] == 30
 
 
 # ── Test 8: get_recommendation_metrics 优先读取 daily 表 ──

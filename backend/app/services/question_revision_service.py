@@ -23,6 +23,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.core.error_codes import ApiError, ErrorCode
 from app.models.admin import QuestionVersion, QuestionVersionKnowledgePoint, Subject
 from app.models.knowledge_point import KnowledgePoint
 from app.models.question import Question
@@ -122,6 +123,49 @@ async def lock_question_for_revision(
     return question
 
 
+async def validate_question_kp_subjects(
+    db: AsyncSession, question: Question, kp_links: list[tuple]
+) -> None:
+    """Validate the final scalar+association state, after any subject migration."""
+    ids = {link[0] for link in kp_links}
+    if not ids:
+        return
+    rows = await db.execute(
+        select(KnowledgePoint.id, KnowledgePoint.subject_id).where(KnowledgePoint.id.in_(ids))
+    )
+    subjects = dict(rows.all())
+    if set(subjects) != ids or any(sid != question.subject_id for sid in subjects.values()):
+        raise ApiError(
+            ErrorCode.VALIDATION_ERROR,
+            message="题目知识点与科目不一致，请同时修正科目和知识点后保存",
+        )
+
+
+async def revision_matches_projection(
+    db: AsyncSession, question: Question, revision: QuestionVersion,
+    kp_links: list[tuple] | None = None,
+) -> bool:
+    """Compare actual immutable fields/links; historical checksums may be stale."""
+    if revision.subject_id is None or not revision.question_type:
+        return False
+    if kp_links is None:
+        kp_links = await load_question_kp_link_ids(db, question.id)
+    current_hash = compute_question_state_hash(question, kp_links)
+    if revision.question_id != question.id:
+        return False
+    payload = _canonical_state_payload(question, kp_links)
+    snapshot = SimpleNamespace(id=revision.question_id, **{
+        key: getattr(revision, key)
+        for key in payload if key not in ("question_id", "knowledge_points")
+    })
+    links = (await load_revision_kp_links(db, [revision.id])).get(revision.id, [])
+    frozen_links = [
+        (link.knowledge_point_id, link.position, link.role, link.weight, link.source)
+        for link in links
+    ]
+    return compute_question_state_hash(snapshot, frozen_links) == current_hash
+
+
 async def ensure_question_revision(
     db: AsyncSession,
     question: Question,
@@ -141,6 +185,7 @@ async def ensure_question_revision(
     question = await lock_question_for_revision(db, int(question.id))
 
     kp_links = await load_question_kp_link_ids(db, int(question.id))
+    await validate_question_kp_subjects(db, question, kp_links)
     state_hash = compute_question_state_hash(question, kp_links)
 
     latest = await db.scalar(
@@ -149,9 +194,6 @@ async def ensure_question_revision(
         .order_by(QuestionVersion.version.desc(), QuestionVersion.id.desc())
         .limit(1)
     )
-    current = None
-    if question.current_version_id:
-        current = await db.get(QuestionVersion, int(question.current_version_id))
 
     # ``current_version_id`` is a projection pointer, not a separate branch of
     # history.  If it ever falls behind the newest immutable revision (for
@@ -159,20 +201,11 @@ async def ensure_question_revision(
     # because its state hash happens to equal the mutable projection.  Re-point
     # to the newest matching revision, or append a new monotonic revision when
     # the projection represents an older state.
-    if latest is not None and latest.state_hash == state_hash:
+    if latest is not None and await revision_matches_projection(db, question, latest, kp_links):
         if int(question.current_version_id or 0) != int(latest.id):
             question.current_version_id = int(latest.id)
             await db.flush()
         return latest
-
-    if (
-        current is not None
-        and int(current.question_id) == int(question.id)
-        and current.state_hash == state_hash
-        and latest is not None
-        and int(latest.id) == int(current.id)
-    ):
-        return current
 
     next_version = int(latest.version if latest is not None else 0) + 1
 

@@ -116,7 +116,8 @@ class TestEmbeddingIncrementalBackfill:
         hash_value = vector_retrieval_service.embedding_service.compute_content_hash(
             content
         )
-        row = {"question_id": 10, "content_hash": str(hash_value)}
+        row = {"question_id": 10, "content_hash": str(hash_value),
+               "subject_id": 1, "question_type": "single_choice"}
         result, generate, db = await self._run_backfill(
             existing_rows=[row], embeddings=[]
         )

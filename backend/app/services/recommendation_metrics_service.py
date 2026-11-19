@@ -5,9 +5,11 @@ import logging
 from datetime import date, timedelta
 
 from sqlalchemy import case, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.time_utils import shanghai_date_utc_range, shanghai_today
+from app.core.time_utils import shanghai_date_utc_range, shanghai_today, utcnow
 from app.models.recommendation_experiment import RecommendationExperiment
 from app.models.recommendation_log import RecommendationLog
 from app.models.recommendation_metrics_daily import RecommendationMetricsDaily
@@ -29,7 +31,9 @@ async def _lock_metrics_aggregation(
     bind = db.get_bind()
     dialect = getattr(getattr(bind, "dialect", None), "name", "")
     if dialect == "postgresql":
-        scope = f"{target_date.isoformat()}:{subject_id if subject_id is not None else '*'}"
+        # Global, parent and leaf runs may all update the same daily groups.
+        # Their lock identity must therefore depend on the day, not the request scope.
+        scope = target_date.isoformat()
         lock_key = int.from_bytes(hashlib.sha256(scope.encode()).digest()[:4], "big")
         await db.execute(
             select(
@@ -119,54 +123,29 @@ async def aggregate_recommendation_metrics_daily(
         accuracy = correct / answers if answers > 0 else 0.0
         completion_rate = answers / exposure if exposure > 0 else 0.0
 
-        # UPSERT: 先查是否存在
-        existing_result = await db.execute(
-            select(RecommendationMetricsDaily).where(
-                RecommendationMetricsDaily.date == target_date,
-                RecommendationMetricsDaily.subject_id == row.subject_id,
-                RecommendationMetricsDaily.scene == row.scene,
-                RecommendationMetricsDaily.strategy == row.strategy,
-                RecommendationMetricsDaily.variant_key == row.variant_key,
-            )
+        await _upsert_daily_metrics(
+            db,
+            {
+                "date": target_date,
+                "subject_id": row.subject_id,
+                "scene": row.scene,
+                "strategy": row.strategy,
+                "variant_key": row.variant_key,
+                "exposure_count": exposure,
+                "click_count": clicks,
+                "answer_count": answers,
+                "correct_count": correct,
+                "wrong_count": wrong,
+                "avg_recommend_score": row.avg_recommend_score or 0.0,
+                "avg_similarity": row.avg_similarity or 0.0,
+                "avg_mastery_before": row.avg_mastery_before,
+                "avg_mastery_after": row.avg_mastery_after,
+                "avg_mastery_delta": row.avg_mastery_delta,
+                "completion_rate": completion_rate,
+                "accuracy": accuracy,
+                "ctr": ctr,
+            },
         )
-        existing = existing_result.scalar_one_or_none()
-
-        if existing:
-            existing.exposure_count = exposure
-            existing.click_count = clicks
-            existing.answer_count = answers
-            existing.correct_count = correct
-            existing.wrong_count = wrong
-            existing.avg_recommend_score = row.avg_recommend_score or 0.0
-            existing.avg_similarity = row.avg_similarity or 0.0
-            existing.avg_mastery_before = row.avg_mastery_before
-            existing.avg_mastery_after = row.avg_mastery_after
-            existing.avg_mastery_delta = row.avg_mastery_delta
-            existing.completion_rate = completion_rate
-            existing.accuracy = accuracy
-            existing.ctr = ctr
-        else:
-            daily = RecommendationMetricsDaily(
-                date=target_date,
-                subject_id=row.subject_id,
-                scene=row.scene,
-                strategy=row.strategy,
-                variant_key=row.variant_key,
-                exposure_count=exposure,
-                click_count=clicks,
-                answer_count=answers,
-                correct_count=correct,
-                wrong_count=wrong,
-                avg_recommend_score=row.avg_recommend_score or 0.0,
-                avg_similarity=row.avg_similarity or 0.0,
-                avg_mastery_before=row.avg_mastery_before,
-                avg_mastery_after=row.avg_mastery_after,
-                avg_mastery_delta=row.avg_mastery_delta,
-                completion_rate=completion_rate,
-                accuracy=accuracy,
-                ctr=ctr,
-            )
-            db.add(daily)
 
         count += 1
 
@@ -176,6 +155,33 @@ async def aggregate_recommendation_metrics_daily(
         "target_date": str(target_date),
         "subject_id": subject_id,
     }
+
+
+async def _upsert_daily_metrics(db: AsyncSession, values: dict) -> None:
+    """Replace one aggregate atomically, including its NULL-variant identity."""
+    table = RecommendationMetricsDaily.__table__
+    dialect = db.get_bind().dialect.name
+    insert = pg_insert if dialect == "postgresql" else sqlite_insert
+    statement = insert(table).values(**values)
+    keys = ["date", "subject_id", "scene", "strategy"]
+    conflict = {}
+    if values["variant_key"] is None:
+        conflict["index_where"] = table.c.variant_key.is_(None)
+    else:
+        keys.append("variant_key")
+    changes = {
+        key: getattr(statement.excluded, key)
+        for key in values
+        if key not in (*keys, "variant_key")
+    }
+    changes["updated_at"] = utcnow()
+    await db.execute(
+        statement.on_conflict_do_update(
+            index_elements=keys,
+            set_=changes,
+            **conflict,
+        )
+    )
 
 
 async def get_recommendation_metrics(

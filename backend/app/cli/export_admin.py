@@ -136,13 +136,12 @@ async def _do_cleanup(dry_run: bool, confirmed: bool):
         print("ERROR: --confirm required for --execute")
         sys.exit(1)
 
-    from sqlalchemy import and_, func, or_, select
+    from sqlalchemy import select
 
     from app.core.config import settings
     from app.core.database import async_session
     from app.models.export_task import ExportTask
-    from app.schemas.export_task import ExportTaskStatus
-    from app.services.export.cleanup import cleanup_expired
+    from app.services.export.cleanup import cleanup_expired, export_cleanup_condition
 
     if dry_run:
         print("[DRY RUN] Would clean up expired tasks")
@@ -153,26 +152,7 @@ async def _do_cleanup(dry_run: bool, confirmed: bool):
             )
             result = await db.execute(
                 select(ExportTask)
-                .where(
-                    ExportTask.status.in_(
-                        [ExportTaskStatus.COMPLETED, ExportTaskStatus.FAILED]
-                    ),
-                    or_(
-                        and_(
-                            ExportTask.expires_at.isnot(None),
-                            ExportTask.expires_at < now,
-                        ),
-                        and_(
-                            ExportTask.expires_at.is_(None),
-                            func.coalesce(
-                                ExportTask.completed_at,
-                                ExportTask.updated_at,
-                                ExportTask.created_at,
-                            )
-                            < retention_cutoff,
-                        ),
-                    ),
-                )
+                .where(export_cleanup_condition(now, retention_cutoff))
                 .limit(50)
             )
             expired = result.scalars().all()

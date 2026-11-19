@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.config import settings
 from app.core.time_utils import utcnow
@@ -34,6 +35,37 @@ from app.services.storage_backend import (
 logger = logging.getLogger(__name__)
 
 _TERMINAL_EXPIRABLE = (ExportTaskStatus.COMPLETED, ExportTaskStatus.FAILED)
+
+
+def export_cleanup_condition(now: datetime, retention_cutoff: datetime) -> ColumnElement[bool]:
+    """One eligibility definition for dry-run CLI and the mutating cleanup."""
+    return or_(
+        and_(
+            ExportTask.status == ExportTaskStatus.EXPIRED,
+            or_(
+                ExportTask.file_key.isnot(None),
+                ExportTask.file_size.isnot(None),
+                ExportTask.snapshot_id.isnot(None),
+                ExportTask.processing_started_at.isnot(None),
+                ExportTask.heartbeat_at.isnot(None),
+            ),
+        ),
+        and_(
+            ExportTask.status.in_(_TERMINAL_EXPIRABLE),
+            or_(
+                and_(ExportTask.expires_at.isnot(None), ExportTask.expires_at < now),
+                and_(
+                    ExportTask.expires_at.is_(None),
+                    func.coalesce(
+                        ExportTask.completed_at,
+                        ExportTask.updated_at,
+                        ExportTask.created_at,
+                    )
+                    < retention_cutoff,
+                ),
+            ),
+        ),
+    )
 
 
 def inspect_export_cleanup_capability() -> tuple[bool, str | None]:
@@ -87,7 +119,8 @@ async def cleanup_expired(
 ) -> dict[str, Any]:
     """Expire terminal export tasks whose retention window has elapsed.
 
-    ``completed`` and ``failed`` are the only eligible states.  Failed tasks
+    ``completed`` and ``failed`` become expired. Already expired rows with
+    leftover artifact metadata are reconciled through the same cleanup. Failed tasks
     receive ``expires_at`` when they fail, so their snapshots also have a
     bounded lifetime.  Each candidate is re-read under ``FOR UPDATE`` before
     any destructive action to avoid racing re-export/delete operations.
@@ -98,6 +131,7 @@ async def cleanup_expired(
     stats: dict[str, Any] = {
         "candidates": 0,
         "tasks_expired": 0,
+        "expired_metadata_repaired": 0,
         "files_deleted": 0,
         "files_delete_failed": 0,
         "snapshots_deleted": 0,
@@ -110,21 +144,7 @@ async def cleanup_expired(
     # work remains without scanning/counting the entire table.
     result = await db.execute(
         select(ExportTask.id)
-        .where(
-            ExportTask.status.in_(_TERMINAL_EXPIRABLE),
-            or_(
-                and_(ExportTask.expires_at.isnot(None), ExportTask.expires_at < now),
-                and_(
-                    ExportTask.expires_at.is_(None),
-                    func.coalesce(
-                        ExportTask.completed_at,
-                        ExportTask.updated_at,
-                        ExportTask.created_at,
-                    )
-                    < retention_cutoff,
-                ),
-            ),
-        )
+        .where(export_cleanup_condition(now, retention_cutoff))
         .order_by(
             func.coalesce(
                 ExportTask.expires_at,
@@ -167,8 +187,19 @@ async def cleanup_expired(
                 and terminal_at is not None
                 and terminal_at < retention_cutoff
             )
-            if task.status not in _TERMINAL_EXPIRABLE or not (
-                expired_by_deadline or expired_by_invariant_repair
+            repairing_expired = task.status == ExportTaskStatus.EXPIRED and any(
+                value is not None
+                for value in (
+                    task.file_key,
+                    task.file_size,
+                    task.snapshot_id,
+                    task.processing_started_at,
+                    task.heartbeat_at,
+                )
+            )
+            if not repairing_expired and not (
+                task.status in _TERMINAL_EXPIRABLE
+                and (expired_by_deadline or expired_by_invariant_repair)
             ):
                 await db.rollback()
                 continue
@@ -225,7 +256,8 @@ async def cleanup_expired(
             task.heartbeat_at = None
             await db.commit()
 
-            stats["tasks_expired"] += 1
+            stats["tasks_expired"] += int(not repairing_expired)
+            stats["expired_metadata_repaired"] += int(repairing_expired)
             if had_file and file_deleted:
                 stats["files_deleted"] += 1
             if snapshot_deleted:

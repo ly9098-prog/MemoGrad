@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -18,6 +19,9 @@ from app.core.orm_base import Base
 
 class AnswerBehavior(Base):
     __tablename__ = "answer_behaviors"
+    __table_args__ = (
+        Index("uq_answer_behaviors_practice_record", "practice_record_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

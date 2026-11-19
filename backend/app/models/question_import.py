@@ -44,7 +44,10 @@ class QuestionImport(Base):
     source_type: Mapped[str] = mapped_column(String(16), nullable=False)
     source_file: Mapped[str | None] = mapped_column(String(256), nullable=True)
     subject_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey("subjects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     subject_ref = relationship(
@@ -72,7 +75,16 @@ class QuestionImport(Base):
         String(16), nullable=False, default="pending", index=True
     )
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    question_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Publishing history survives removal of its current question target.
+    question_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey(
+            "questions.id",
+            ondelete="SET NULL",
+            name="fk_question_imports_question_id_questions",
+        ),
+        nullable=True,
+    )
     reject_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

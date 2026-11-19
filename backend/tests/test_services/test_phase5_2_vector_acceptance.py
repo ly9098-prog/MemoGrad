@@ -434,7 +434,8 @@ class TestQualityVerification:
 
         from app.services.vector_retrieval_service import search_similar_questions
         source = inspect.getsource(search_similar_questions)
-        assert "qe.subject_id = :subject_id" in source, "SQL 必须限制同科目"
+        assert "q.subject_id = :subject_id" in source, "SQL 必须按当前题目限制同科目"
+        assert "qe.subject_id = q.subject_id" in source, "SQL 必须排除过期向量科目"
 
     def test_vector_recall_subject_filter(self):
         """验证 vector_recall_by_text SQL 限制科目（subject_id + subjects 关联）。"""
@@ -442,8 +443,9 @@ class TestQualityVerification:
 
         from app.services.vector_retrieval_service import vector_recall_by_text
         source = inspect.getsource(vector_recall_by_text)
-        assert "qe.subject_id = ANY(:subject_ids)" in source, "SQL 必须限制科目"
-        assert "JOIN subjects s ON s.id = qe.subject_id" in source, "SQL 必须关联 subjects 表"
+        assert "q.subject_id = ANY(:subject_ids)" in source, "SQL 必须按当前题目限制科目"
+        assert "qe.subject_id = q.subject_id" in source, "SQL 必须排除过期向量科目"
+        assert "JOIN subjects s ON s.id = q.subject_id" in source, "SQL 必须关联当前题目所属科目"
 
 
 # ──────────────────────────────────────────────────────────────
@@ -667,12 +669,18 @@ class TestFaultInjection:
 
         db = _make_mock_db("postgresql")
         rows = MagicMock()
-        rows.first.side_effect = [None, ("[0.1,0.2,0.3]",)]
         db.execute.return_value = rows
         db.begin_nested.return_value.__aenter__ = AsyncMock()
         db.begin_nested.return_value.__aexit__ = AsyncMock(return_value=False)
         question = _make_question(id=9)
-        content = embedding_service.build_question_embedding_text(question)
+        question.subject_id = 3
+        content = embedding_service.build_question_embedding_text(
+            question, subject_code="ds", knowledge_points=[]
+        )
+        content_hash = embedding_service.compute_content_hash(content)
+        rows.first.side_effect = [
+            None, ("[0.1,0.2,0.3]", content_hash, 3, question.question_type)
+        ]
         tokens = max(1, estimate_tokens(content))
         reservation = object()
         trace = MagicMock()
@@ -688,17 +696,20 @@ class TestFaultInjection:
             ai_token_budget, "settle_token_reservation", settle
         ), patch.object(ai_token_budget, "cancel_token_reservation", cancel), patch.object(
             vector_retrieval_service, "upsert_question_embedding", provider
+        ), patch.object(
+            vector_retrieval_service, "_resolve_question_subject_code", AsyncMock(return_value="ds")
+        ), patch.object(
+            vector_retrieval_service, "load_question_kps", AsyncMock(return_value={9: []})
         ):
             result = _run(vector_retrieval_service._ensure_source_embedding(
                 db, question, user_id=7
             ))
         reserve.assert_awaited_once_with(db, 7, tokens)
+        assert result == [0.1, 0.2, 0.3]
         if status == "skipped":
-            assert result is None
             assert [call[0] for call in trace.mock_calls] == ["reserve", "provider", "cancel"]
             cancel.assert_awaited_once_with(reservation)
         else:
-            assert result == [0.1, 0.2, 0.3]
             assert [call[0] for call in trace.mock_calls] == ["reserve", "provider", "record", "settle"]
             assert record.await_args.args[:5] == (db, 7, "vector_source_embedding", content[:500], "")
             assert record.await_args.args[5]["tokens_used"] == tokens
@@ -714,6 +725,7 @@ class TestFaultInjection:
         )
 
         db = _make_mock_db("postgresql")
+        db.execute.return_value = _make_execute_result(rows=[])
         query = "导数定义"
         tokens = max(1, estimate_tokens(query))
         reservation = object()
