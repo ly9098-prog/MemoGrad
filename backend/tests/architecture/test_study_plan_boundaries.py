@@ -263,6 +263,7 @@ def test_request_module_owns_activity_snapshot_and_settings_writes():
     assert functions == [
         "_claim_day_snapshot",
         "_ensure_day_snapshot",
+        "_lock_active_user",
         "upsert_study_plan",
         "deactivate_study_plan",
     ]

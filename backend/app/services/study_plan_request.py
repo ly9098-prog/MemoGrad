@@ -80,7 +80,7 @@ async def _ensure_day_snapshot(
     return await _claim_day_snapshot(db, row, plan, today, ports=ports)
 
 
-async def upsert_study_plan(db: Any, user_id: int, data: Any, *, ports):
+async def _lock_active_user(db: Any, user_id: int, *, ports) -> None:
     user = await db.scalar(
         ports("select")(ports("User"))
         .where(ports("User").id == user_id)
@@ -89,6 +89,10 @@ async def upsert_study_plan(db: Any, user_id: int, data: Any, *, ports):
     )
     if user is None or user.deleted_at is not None:
         raise ValueError("账号已注销")
+
+
+async def upsert_study_plan(db: Any, user_id: int, data: Any, *, ports):
+    await _lock_active_user(db, user_id, ports=ports)
     today = ports("shanghai_today")()
     if data.target_date < today:
         raise ValueError("目标日期不能早于今天")
