@@ -944,12 +944,26 @@ jobs:
         run: |
           alembic upgrade head
 
-      - name: Downgrade one revision and upgrade again
+      - name: Downgrade latest checkpoint and upgrade again
         env:
           DATABASE_URL: sqlite:///migration-ci.db
         run: |
-          alembic downgrade -1
-          alembic upgrade head
+          # Reuse the history-matrix helper: relative -1 is ambiguous at a merge.
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          from scripts.ci_migration_matrix_check import run_matrix
+
+          head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+          with tempfile.TemporaryDirectory() as directory:
+              checkpoints = Path(directory) / "checkpoints.json"
+              checkpoints.write_text(json.dumps([head]), encoding="utf-8")
+              run_matrix(checkpoints)
+          PY
 
 
   migration-history-matrix:
