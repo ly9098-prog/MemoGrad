@@ -54,8 +54,10 @@ RUN mkdir -p /app/staging && chown app:app /app/staging && chmod 700 /app/stagin
 RUN mkdir -p /app/exports && chown app:app /app/exports && chmod 700 /app/exports
 # fontconfig 缓存目录（app 无写权限 → "No writable cache directories"，字体仍可用但无缓存）
 RUN mkdir -p /home/app/.cache && chown app:app /home/app/.cache
-# 用户头像上传持久化（Docker volume mount point；static/ 被 gitignore，镜像内显式预建保证命名卷首挂继承 app 属主）
-RUN mkdir -p /app/static/avatars && chown app:app /app/static/avatars && chmod 755 /app/static/avatars
+# 静态资源持久化（static/ 被 gitignore；预建各命名卷挂载目录，保证首挂继承 app 属主）
+RUN mkdir -p /app/static/avatars /app/static/question-assets /app/static/formulas && \
+    chown app:app /app/static/avatars /app/static/question-assets /app/static/formulas && \
+    chmod 755 /app/static/avatars /app/static/question-assets /app/static/formulas
 
 USER app
 
