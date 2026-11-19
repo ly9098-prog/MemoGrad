@@ -50,10 +50,12 @@
     <view class="fr-card-wrap">
       <view class="fr-transition-stage {{transitionClass}}">
         <view class="fr-reader-meta">
-          <view class="fr-reader-copy">
-            <text class="fr-reader-mode">{{isRandom ? '随机速记' : (currentCard.studyCardTypeLabel || '速记阅读')}}</text>
+          <view class="fr-mode-switch" aria-role="group" aria-label="阅读模式">
+            <button class="fr-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{!recitationMode}}" disabled="{{loadingNext}}">浏览</button>
+            <button class="fr-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{recitationMode}}" disabled="{{loadingNext}}">背诵</button>
           </view>
           <view class="fr-reader-actions">
+            <text class="fr-random-context" wx:if="{{isRandom}}">随机</text>
             <view class="fr-index-pill" wx:if="{{isRandom || sequenceIds.length > 1}}">
               <text>{{isRandom ? currentIndex + 1 : sequenceIndex + 1}}</text>
               <text class="fr-index-unit">{{isRandom ? '/ ' + displayCards.length : '/ ' + sequenceIds.length}}</text>
@@ -76,11 +78,6 @@
           </view>
         </view>
 
-        <view class="fr-mode-switch" aria-role="group" aria-label="阅读模式">
-          <button class="fr-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{!recitationMode}}" disabled="{{loadingNext}}">浏览</button>
-          <button class="fr-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{recitationMode}}" disabled="{{loadingNext}}">背诵</button>
-        </view>
-        <text class="fr-mode-note">{{recitationMode ? '先回想，再翻面核对' : '完整查看本卡内容'}}</text>
         <formula-card
           id="readerFormulaCard"
           card="{{currentCard}}"
@@ -112,6 +109,7 @@
       bindtap="goPrev"
       role="button"
       aria-label="上一张速记卡"
+      aria-disabled="{{!canGoPrev || loadingNext}}"
     >
       <text class="fr-arrow fr-arrow-left"></text>
     </view>
@@ -125,6 +123,7 @@
       bindtap="goNext"
       role="button"
       aria-label="下一张速记卡"
+      aria-disabled="{{!canGoNext || loadingNext}}"
     >
       <text class="fr-arrow fr-arrow-right"></text>
     </view>

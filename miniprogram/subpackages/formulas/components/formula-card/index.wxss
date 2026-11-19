@@ -47,11 +47,11 @@
 .fc-flip-stage:not(.is-flipped) .fc-flip-back,
 .fc-flip-stage.is-flipped .fc-flip-front { pointer-events: none; }
 .fc-flip-front-scroll, .fc-flip-back-scroll { flex: 1; height: 0; min-height: 0; width: 100%; }
-.fc-flip-front-scroll { margin: 20rpx 0; }
+.fc-flip-front-scroll { margin-bottom: 24rpx; }
 .fc-answer-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 24rpx; }
 .fc-face-label, .fc-scroll-note { color: #507568; font-size: 24rpx; line-height: 1.5; }
 .fc-scroll-note { flex-shrink: 0; }
-.fc-recall-prompt { display: block; margin-top: 32rpx; color: #507568; font-size: 28rpx; line-height: 1.8; }
+.fc-recall-prompt { display: block; flex-shrink: 0; margin-bottom: 20rpx; color: #507568; font-size: 28rpx; line-height: 1.8; }
 .fc-flip-action {
   display: flex;
   align-items: center;

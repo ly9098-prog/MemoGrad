@@ -82,12 +82,11 @@
     <view class="fc-flip-stage {{recitationMode ? 'is-recite' : 'is-browse'}} {{recitationMode && isFlipped ? 'is-flipped' : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-        <text class="fc-face-label">回想这一张</text>
         <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}"
           bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
           <template is="card-heading" data="{{card: card, content: content}}" />
-          <text class="fc-recall-prompt">先回想核心内容与适用条件，再翻面核对</text>
         </scroll-view>
+        <text class="fc-recall-prompt">先回想核心内容与适用条件，再翻面核对</text>
         <button class="fc-flip-action" bindtap="toggleCardFlip" hover-class="fc-control-pressed" aria-label="显示答案" aria-expanded="{{isFlipped}}" disabled="{{isFlipped}}">显示答案</button>
       </view>
       <view class="fc-flip-face {{recitationMode ? 'fc-flip-back' : 'fc-browse-face'}}" aria-hidden="{{recitationMode && !isFlipped}}">

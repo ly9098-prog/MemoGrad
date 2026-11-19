@@ -213,7 +213,8 @@ assert.doesNotMatch(read('subpackages/formulas/reader/index.wxml'), /fr-card-sur
 const readerStyles = read('subpackages/formulas/reader/index.wxss')
 assert.match(readerStyles.slice(readerStyles.lastIndexOf('@media (prefers-reduced-motion: reduce)')),
   /\.fr-transition-stage,[\s\S]*transition: none !important/, 'reduced motion wins after the reader transition rules')
-for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [readerStyles, 'fr-mode-tab']]) {
+for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [readerStyles, 'fr-mode-tab'],
+  [readerStyles, 'fr-card-favorite'], [readerStyles, 'fr-nav-hit']]) {
   assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
     control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
 }

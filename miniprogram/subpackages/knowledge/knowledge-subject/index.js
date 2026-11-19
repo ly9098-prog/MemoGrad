@@ -1883,10 +1883,10 @@ retry() { return this.loadMap() },
 forceControlData() {
 const forces = this._forces || DEFAULT_FORCES
 return [
-{ key: 'center', label: '向心力', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
-{ key: 'repel', label: '节点斥力', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(2) },
-{ key: 'link', label: '连线引力', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
-{ key: 'distance', label: '连线长度', min: 120, max: 360, step: 5, value: forces.distance, valueText: String(Math.round(forces.distance)) },
+{ key: 'center', label: '向心力', hint: '越高，整体越向中心聚拢', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
+{ key: 'repel', label: '节点斥力', hint: '越高，节点之间越分散', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(1) },
+{ key: 'link', label: '连线引力', hint: '越高，相连节点拉得越紧', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
+{ key: 'distance', label: '连线长度', hint: '越高，相连节点的间距越大', min: 120, max: 360, step: 5, value: forces.distance, valueText: String(Math.round(forces.distance)) },
 ]
 },
 toggleForcePanel() { this.setData({ forcePanelOpen: !this.data.forcePanelOpen }) },

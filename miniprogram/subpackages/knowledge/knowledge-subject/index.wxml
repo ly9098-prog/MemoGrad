@@ -215,9 +215,9 @@
 <view class="force-sheet-mask" catchtap="closeForcePanel" catchtouchmove="preventBackgroundScroll" aria-label="关闭图谱设置" aria-role="button"></view>
 <view class="force-panel">
 <view class="force-panel-head"><text id="force-panel-title">图谱设置</text><button class="force-panel-close" catchtap="closeForcePanel" hover-class="atlas-pressed" aria-label="关闭图谱设置"><view class="clear-symbol" aria-hidden="true"></view></button></view>
-<scroll-view class="force-panel-scroll {{forceAdvancedOpen ? 'force-panel-expanded' : ''}}" scroll-y enhanced show-scrollbar="{{false}}">
+<scroll-view class="force-panel-scroll {{forceAdvancedOpen ? 'force-panel-expanded' : ''}}" scroll-y enhanced show-scrollbar="{{forceAdvancedOpen}}">
 <view class="force-panel-body">
-<view class="force-display-row"><text>知识点名称</text><view class="force-label-options" aria-role="group" aria-label="知识点名称显示">
+<view class="force-display-row"><view class="force-display-copy"><text class="force-display-title">知识点名称</text><text class="force-display-note">{{showAllGraphLabels ? '始终显示所有名称' : '随缩放显示，减少重叠'}}</text></view><view class="force-label-options" aria-role="group" aria-label="知识点名称显示">
 <button class="force-label-option {{!showAllGraphLabels ? 'is-selected' : ''}}" data-mode="auto" bindtap="setGraphLabels" hover-class="atlas-pressed" aria-pressed="{{!showAllGraphLabels}}">自动</button>
 <button class="force-label-option {{showAllGraphLabels ? 'is-selected' : ''}}" data-mode="all" bindtap="setGraphLabels" hover-class="atlas-pressed" aria-pressed="{{showAllGraphLabels}}">全部</button>
 </view></view>
@@ -225,12 +225,13 @@
 <view class="force-advanced" wx:if="{{forceAdvancedOpen}}">
 <view class="force-row" wx:for="{{forceControls}}" wx:key="key">
 <view class="force-row-meta"><text>{{item.label}}</text><text class="force-value">{{item.valueText}}</text></view>
-<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchange="changeForce" activeColor="#3A6F5B" backgroundColor="#D8EEE6" block-color="#3A6F5B" block-size="20" aria-label="{{item.label}}" />
+<text class="force-row-hint">{{item.hint}}</text>
+<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchange="changeForce" activeColor="#3A6F5B" backgroundColor="#E3ECE6" block-color="#3A6F5B" block-size="24" aria-label="{{item.label}}，{{item.hint}}，当前值 {{item.valueText}}" />
 </view>
-<button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">重置布局参数</button>
 </view>
 </view>
 </scroll-view>
+<view class="force-panel-foot" wx:if="{{forceAdvancedOpen}}"><button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">恢复默认布局</button></view>
 </view>
 </view>
 <view class="theme-sheet-layer {{themeSheetClosing ? 'theme-sheet-closing' : ''}}" wx:if="{{themeSheetOpen}}">

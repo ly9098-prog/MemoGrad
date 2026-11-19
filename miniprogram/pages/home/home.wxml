@@ -118,7 +118,7 @@
       </view>
       <view class="section-quick-action" bindtap="startRandom" hover-class="section-quick-action-pressed" aria-role="button" aria-label="进入随机练习">
         <image class="section-quick-icon" src="/assets/icons/home-actions/shuffle.svg" mode="aspectFit" />
-        <text>随机练习</text><text class="section-quick-arrow">›</text>
+        <text>随机练习</text><view class="home-chevron" aria-hidden="true"></view>
       </view>
     </view>
 
@@ -139,7 +139,7 @@
             <text class="hub-task-meta">{{item.metaText}}</text>
           </view>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
 
       <!-- Wrong-book is a permanent Home tool, never hidden by recommendation availability. -->
@@ -147,9 +147,8 @@
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/wrong-book.svg" mode="aspectFit" /></view>
         <view class="route-copy">
           <text class="route-title">错题本</text>
-          <text class="route-eyebrow">常用工具</text>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
 
       <!-- Exam paper is also a permanent Home tool and must remain visible with Smart Study Hub recommendations. -->
@@ -157,13 +156,12 @@
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
         <view class="route-copy">
           <text class="route-title">选择题真题 / 模拟</text>
-          <text class="route-eyebrow">套卷训练</text>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
       <view wx:else class="route-card route-exam is-locked" aria-disabled="true">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
-        <view class="route-copy"><text class="route-title">选择题真题 / 模拟</text><text class="route-eyebrow">套卷训练</text></view>
+        <view class="route-copy"><text class="route-title">选择题真题 / 模拟</text></view>
         <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
@@ -173,31 +171,28 @@
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/refresh-cw.svg" mode="aspectFit" /></view>
         <view class="route-copy">
           <text class="route-title">今日复习</text>
-          <text class="route-eyebrow">记忆复习</text>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
 
       <view class="route-card route-wrong" bindtap="goWrongBook" hover-class="card-pressed">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/wrong-book.svg" mode="aspectFit" /></view>
         <view class="route-copy">
           <text class="route-title">错题本</text>
-          <text class="route-eyebrow">薄弱项管理</text>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
 
       <view wx:if="{{!guestMode}}" class="route-card route-exam" bindtap="goExams" hover-class="card-pressed">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
         <view class="route-copy">
           <text class="route-title">选择题真题 / 模拟</text>
-          <text class="route-eyebrow">套卷训练</text>
         </view>
-        <view class="route-arrow">→</view>
+        <view class="route-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
       </view>
       <view wx:else class="route-card route-exam is-locked" aria-disabled="true">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
-        <view class="route-copy"><text class="route-title">选择题真题 / 模拟</text><text class="route-eyebrow">套卷训练</text></view>
+        <view class="route-copy"><text class="route-title">选择题真题 / 模拟</text></view>
         <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>

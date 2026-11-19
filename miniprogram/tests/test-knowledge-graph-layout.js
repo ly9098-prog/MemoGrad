@@ -120,7 +120,7 @@ test('knowledge graph presentation keeps motion fallbacks and accessible control
 
   assert.match(markup, /scene-animating/)
   assert.match(markup, /point-card-reveal-\{\{indexDetailRevealPhase/)
-  assert.match(markup, /<slider\b[^>]*bindchange="changeForce"[^>]*aria-label="\{\{item\.label\}\}"/)
+  assert.match(markup, /<slider\b[^>]*bindchange="changeForce"[^>]*aria-label="\{\{item\.label\}\}，\{\{item\.hint\}\}，当前值 \{\{item\.valueText\}\}"/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\{\.page-reveal[\s\S]*?\.atlas-stage,\.atlas-node/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\{[\s\S]*?\.scene-animating \.atlas-node/)
   assert.match(homeMarkup, /brand-mark-image[^>]*aria-hidden="true"/)
