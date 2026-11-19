@@ -463,12 +463,15 @@ export function ModelWorkbench() {
                 const kind = getModelKind(model);
                 const features = configuredFeatures(model);
                 const isSelected = selectedModel?.id === model.id;
+                const canDrop = draggedId !== null
+                  && draggedId !== model.id
+                  && filteredModels.find((item) => item.id === draggedId)?.is_enabled === model.is_enabled;
 
                 return (
                   <li
                     key={model.id}
                     data-model-id={model.id}
-                    data-drop={dropTargetId === model.id && draggedId !== model.id
+                    data-drop={dropTargetId === model.id && canDrop
                       ? (filteredModels.findIndex((item) => item.id === draggedId) < index ? "after" : "before")
                       : undefined}
                     className={cn(
@@ -478,7 +481,7 @@ export function ModelWorkbench() {
                       draggedId === model.id && styles.modelRowDragging,
                     )}
                     onDragOver={(event) => {
-                      if (draggedId === null) return;
+                      if (!canDrop) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                       setDropTargetId(model.id);
@@ -489,7 +492,7 @@ export function ModelWorkbench() {
                       }
                     }}
                     onDrop={(event) => {
-                      if (draggedId === null) return;
+                      if (!canDrop || draggedId === null) return;
                       event.preventDefault();
                       moveModel(draggedId, model.id);
                       endDrag();
@@ -498,11 +501,11 @@ export function ModelWorkbench() {
                     <ModelSortControl
                       modelId={model.id}
                       name={model.display_name}
-                      first={index === 0}
-                      last={index === filteredModels.length - 1}
+                      first={filteredModels[index - 1]?.is_enabled !== model.is_enabled}
+                      last={filteredModels[index + 1]?.is_enabled !== model.is_enabled}
                       onMove={(direction) => {
                         const target = filteredModels[index + direction];
-                        if (target) moveModel(model.id, target.id);
+                        if (target?.is_enabled === model.is_enabled) moveModel(model.id, target.id);
                       }}
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "move";
@@ -564,9 +567,9 @@ export function ModelWorkbench() {
 
           <div className={styles.catalogFooter}>
             <span>{modelsQuery.isError ? "目录读取失败" : `共 ${filteredModels.length} 个结果`}</span>
-            <span className={styles.catalogFooterHint}>拖动手柄排序 · 仅保存到本机</span>
+            <span className={styles.catalogFooterHint}>启用优先 · 组内拖动排序</span>
           </div>
-          <p id="model-order-help" className="sr-only">拖动手柄调整顺序，或点击手柄后选择上移、下移。聚焦手柄后也可按上下方向键。顺序按账号保存在本机，筛选时只调整可见模型。</p>
+          <p id="model-order-help" className="sr-only">启用模型优先展示，同状态模型内可拖动排序，或点击手柄后选择上移、下移。聚焦手柄后也可按上下方向键。顺序按账号保存在本机，筛选时只调整可见模型。</p>
           <p className="sr-only" role="status" aria-live="polite">{orderMessage}</p>
         </aside>
 

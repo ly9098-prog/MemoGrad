@@ -1,5 +1,6 @@
 type CatalogModel = {
   id: number;
+  is_enabled: boolean;
   is_default: boolean;
   sort_order: number;
 };
@@ -23,6 +24,7 @@ export function sortModelCatalog<Model extends CatalogModel>(
 ): Model[] {
   const positions = new Map(order.map((id, index) => [id, index]));
   return [...models].sort((left, right) => {
+    if (left.is_enabled !== right.is_enabled) return left.is_enabled ? -1 : 1;
     const leftPosition = positions.get(left.id) ?? Infinity;
     const rightPosition = positions.get(right.id) ?? Infinity;
     if (leftPosition !== rightPosition) return leftPosition - rightPosition;
@@ -31,7 +33,7 @@ export function sortModelCatalog<Model extends CatalogModel>(
   });
 }
 
-export function moveModelCatalogItem<Model extends { id: number }>(
+export function moveModelCatalogItem<Model extends { id: number; is_enabled: boolean }>(
   models: Model[],
   visibleIds: number[],
   sourceId: number,
@@ -42,6 +44,7 @@ export function moveModelCatalogItem<Model extends { id: number }>(
   const sourceIndex = visibleModels.findIndex((model) => model.id === sourceId);
   const targetIndex = visibleModels.findIndex((model) => model.id === targetId);
   if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return models;
+  if (visibleModels[sourceIndex].is_enabled !== visibleModels[targetIndex].is_enabled) return models;
   const [moved] = visibleModels.splice(sourceIndex, 1);
   visibleModels.splice(targetIndex, 0, moved);
   let visibleIndex = 0;

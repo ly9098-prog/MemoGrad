@@ -2,13 +2,43 @@ import { describe, expect, it } from "vitest";
 import { moveModelCatalogItem, parseModelCatalogOrder, sortModelCatalog } from "./model-catalog-order";
 
 const models = [
-  { id: 1, is_default: false, sort_order: 2 },
-  { id: 2, is_default: true, sort_order: 5 },
-  { id: 3, is_default: false, sort_order: 1 },
-  { id: 4, is_default: false, sort_order: 2 },
+  { id: 1, is_enabled: true, is_default: false, sort_order: 2 },
+  { id: 2, is_enabled: true, is_default: true, sort_order: 5 },
+  { id: 3, is_enabled: true, is_default: false, sort_order: 1 },
+  { id: 4, is_enabled: true, is_default: false, sort_order: 2 },
 ];
 
 describe("model catalog order", () => {
+  const mixedModels = models.map((model) => ({ ...model, is_enabled: model.id === 1 || model.id === 3 }));
+
+  it("prioritizes enabled models over default status and saved positions", () => {
+    expect(sortModelCatalog(mixedModels, []).map((model) => model.id)).toEqual([3, 1, 2, 4]);
+    expect(sortModelCatalog(mixedModels, [4, 1, 2, 3]).map((model) => model.id)).toEqual([1, 3, 4, 2]);
+  });
+
+  it("places a newly added enabled model before saved disabled models", () => {
+    expect(sortModelCatalog(mixedModels, [4, 2, 1]).map((model) => model.id)).toEqual([1, 3, 4, 2]);
+  });
+
+  it("regroups after a status change while preserving saved order within groups", () => {
+    const changed = mixedModels.map((model) => ({ ...model, is_enabled: model.id === 2 || model.id === 3 }));
+    expect(sortModelCatalog(changed, [1, 3, 4, 2]).map((model) => model.id)).toEqual([3, 2, 1, 4]);
+  });
+
+  it("rejects moves across enabled and disabled groups in both directions", () => {
+    const ordered = sortModelCatalog(mixedModels, []);
+    expect(moveModelCatalogItem(ordered, [3, 1, 2, 4], 1, 2)).toBe(ordered);
+    expect(moveModelCatalogItem(ordered, [3, 1, 2, 4], 2, 1)).toBe(ordered);
+  });
+
+  it("preserves the disabled group during a filtered enabled move", () => {
+    const ordered = sortModelCatalog(mixedModels, []);
+    const moved = moveModelCatalogItem(ordered, [3, 1, 4], 1, 3);
+    expect(moved.map((model) => model.id)).toEqual([1, 3, 2, 4]);
+    expect(moved[2]).toBe(ordered[2]);
+    expect(moved[3]).toBe(ordered[3]);
+  });
+
   it("starts with the existing default, then server order and stable IDs", () => {
     expect(sortModelCatalog(models, []).map((model) => model.id)).toEqual([2, 3, 1, 4]);
     expect(models.map((model) => model.id)).toEqual([1, 2, 3, 4]);
@@ -18,7 +48,7 @@ describe("model catalog order", () => {
     const ordered = sortModelCatalog(models, [3, 1, 4, 2]);
     expect(ordered.map((model) => model.id)).toEqual([3, 1, 4, 2]);
     expect(ordered.find((model) => model.id === 2)).toBe(models[1]);
-    expect(models[1]).toEqual({ id: 2, is_default: true, sort_order: 5 });
+    expect(models[1]).toEqual({ id: 2, is_enabled: true, is_default: true, sort_order: 5 });
   });
 
   it("ignores deleted IDs and appends new models in the server order", () => {
