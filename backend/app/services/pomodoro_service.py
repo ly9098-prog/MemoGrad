@@ -31,7 +31,8 @@ from app.models.pomodoro import (
 )
 from app.models.practice_session import PracticeSession
 from app.models.review_scheduler import ReviewSession
-from app.models.user import User
+from app.models.user_auth import UserAuthIdentity
+from app.services.identity_service import wechat_namespace
 from app.services.pomodoro_attribution import (
     active_intervals_for_session,
     split_duration_excluding_intervals,
@@ -379,8 +380,15 @@ async def _create_start_session(
 async def _prepare_new_start(
     db: AsyncSession, user_id: int, request: PomodoroStartRequest, allocation_mode: str
 ):
-    user_row = await db.execute(select(User.openid).where(User.id == user_id))
-    openid_snapshot = user_row.scalar_one_or_none()
+    openid_snapshot = await db.scalar(
+        select(UserAuthIdentity.subject)
+        .where(
+            UserAuthIdentity.user_id == user_id,
+            UserAuthIdentity.provider == "wechat",
+            UserAuthIdentity.namespace == wechat_namespace(),
+        )
+        .limit(1)
+    )
     work_duration, break_duration, notification_enabled = _normalize_start_preset(
         request.preset,
         request.work_duration,

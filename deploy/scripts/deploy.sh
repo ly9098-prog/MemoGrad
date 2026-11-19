@@ -65,6 +65,12 @@ do_build_admin() {
   info "admin 构建完成"
 }
 
+do_build_web() {
+  info "构建用户 Web 前端镜像（保留 Docker layer cache）..."
+  compose build web
+  info "用户 Web 构建完成"
+}
+
 do_build_nginx_config() {
   info "校验生产 Compose 配置..."
   compose config --quiet
@@ -106,6 +112,14 @@ do_update_admin() {
   info "替换 admin 前端服务..."
   compose up -d --no-deps admin
   info "admin 服务已替换"
+  do_nginx_reload
+}
+
+do_update_web() {
+  info "替换用户 Web 前端服务..."
+  compose up -d --no-deps web
+  info "用户 Web 服务已替换"
+  do_nginx_reload
 }
 
 do_admin_health_check() {
@@ -119,6 +133,23 @@ do_admin_health_check() {
     if [ "$attempt" -eq 5 ]; then
       warn "admin 前端健康检查未通过"
       compose logs --tail=30 admin || true
+      return 1
+    fi
+    sleep 3
+  done
+}
+
+do_web_health_check() {
+  info "检查用户 Web 前端健康状态..."
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if compose exec -T web sh -c "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1"; then
+      info "用户 Web 前端健康检查通过"
+      return 0
+    fi
+    if [ "$attempt" -eq 5 ]; then
+      warn "用户 Web 前端健康检查未通过"
+      compose logs --tail=30 web || true
       return 1
     fi
     sleep 3
@@ -195,8 +226,10 @@ do_status() {
 do_init() {
   check_prereqs
   do_build
-  do_build_nginx_config
+  do_build_admin
+  do_build_web
   do_up
+  do_build_nginx_config
   info "等待数据库就绪..."
   sleep 5
   do_migrate
@@ -223,13 +256,16 @@ do_update_all() {
   check_prereqs
   do_build
   do_build_admin
-  do_build_nginx_config
+  do_build_web
   do_update_app
   do_update_admin
+  do_update_web
+  do_build_nginx_config
   do_health_check || error "更新后 app 健康检查失败"
   do_admin_health_check || warn "admin 前端健康检查未通过，请检查日志"
+  do_web_health_check || warn "用户 Web 前端健康检查未通过，请检查日志"
   do_scheduler_health_check || warn "scheduler 健康检查未通过（export 功能可能不可用）"
-  info "=== 全量更新完成（app + admin + scheduler，未执行 git pull，未执行数据库迁移） ==="
+  info "=== 全量更新完成（app + admin + web + scheduler，未执行 git pull，未执行数据库迁移） ==="
 }
 
 do_backup() {
@@ -253,25 +289,29 @@ case "${1:-help}" in
   init)         do_init ;;
   update)       do_update ;;
   update-admin) check_prereqs; do_build_admin; do_update_admin; do_admin_health_check || warn "admin 前端健康检查未通过" ;;
+  update-web)   check_prereqs; do_build_web; do_update_web; do_web_health_check || warn "用户 Web 前端健康检查未通过" ;;
   update-scheduler) do_update_scheduler ;;
   update-all)   do_update_all ;;
   build)        check_prereqs; do_build ;;
   build-admin)  check_prereqs; do_build_admin ;;
+  build-web)    check_prereqs; do_build_web ;;
   backup)       do_backup ;;
   backup-redis) bash deploy/scripts/redis_backup.sh backup ;;
   redis-restore) do_restore_redis "${2:-}" ;;
   status)       do_status ;;
   migrate)      do_migrate ;;
   *)
-    echo "使用方法: $0 {init|update|update-admin|update-scheduler|update-all|build|build-admin|backup|backup-redis|redis-restore|status|migrate}"
+    echo "使用方法: $0 {init|update|update-admin|update-web|update-scheduler|update-all|build|build-admin|build-web|backup|backup-redis|redis-restore|status|migrate}"
     echo ""
     echo "  init              首次部署（构建 + 启动 + 显式初始化迁移）"
     echo "  update            日常更新（缓存构建 + 替换 app + scheduler，不 git pull，不默认迁移）"
     echo "  update-admin      仅更新 admin 前端（构建 + 替换 admin 服务）"
+    echo "  update-web        仅更新用户 Web 前端（构建 + 替换 web 服务）"
     echo "  update-scheduler  仅更新 scheduler（构建 + 替换 scheduler 服务）"
-    echo "  update-all        全量更新（app + admin + scheduler，不 git pull，不默认迁移）"
+    echo "  update-all        全量更新（app + admin + web + scheduler，不 git pull，不默认迁移）"
     echo "  build             仅重新构建 app 镜像"
     echo "  build-admin       仅重新构建 admin 前端镜像"
+    echo "  build-web         仅重新构建用户 Web 前端镜像"
     echo "  backup            执行 PostgreSQL + Redis 备份（Docker 模式）"
     echo "  backup-redis      仅执行 Redis RDB 备份"
     echo "  redis-restore     从指定 RDB 安全恢复 Redis（AOF-safe，会短暂停止 Redis）"

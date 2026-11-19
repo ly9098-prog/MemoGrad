@@ -10,6 +10,7 @@ from app.models.admin import AdminUser, Role
 from app.models.app_user_admin_binding import AppUserAdminBinding
 from app.models.practice_record import PracticeRecord
 from app.models.user import User
+from app.models.user_auth import UserAuthIdentity
 from app.models.wrong_question import WrongQuestion
 from app.schemas.admin_app_users import (
     AdminAppUserBanRequest,
@@ -40,7 +41,21 @@ async def list_app_users(
     conditions = []
     if keyword:
         pattern = f"%{keyword}%"
-        conditions.append(or_(User.openid.ilike(pattern), User.nickname.ilike(pattern)))
+        identity_match = (
+            select(UserAuthIdentity.id)
+            .where(
+                UserAuthIdentity.user_id == User.id,
+                UserAuthIdentity.subject.ilike(pattern),
+            )
+            .exists()
+        )
+        conditions.append(
+            or_(
+                User.openid.ilike(pattern),
+                User.nickname.ilike(pattern),
+                identity_match,
+            )
+        )
     if is_banned is not None:
         conditions.append(User.is_banned.is_(is_banned))
     if created_from:
@@ -84,6 +99,15 @@ async def get_app_user_detail(db: AsyncSession, user_id: int) -> dict:
         )
     )
 
+    identities = list(
+        (
+            await db.execute(
+                select(UserAuthIdentity)
+                .where(UserAuthIdentity.user_id == user.id)
+                .order_by(UserAuthIdentity.created_at.asc())
+            )
+        ).scalars()
+    )
     return {
         "id": user.id,
         "openid": user.openid,
@@ -95,6 +119,19 @@ async def get_app_user_detail(db: AsyncSession, user_id: int) -> dict:
         "banned_by": user.banned_by,
         "created_at": user.created_at,
         "updated_at": user.updated_at,
+        "lifecycle_status": user.lifecycle_status,
+        "login_identities": [
+            {
+                "provider": identity.provider,
+                "masked_subject": (
+                    f"{identity.subject[:2]}***@{identity.subject.split('@', 1)[1]}"
+                    if identity.provider == "email"
+                    else f"{identity.provider}:***"
+                ),
+                "verified": identity.verified_at is not None,
+            }
+            for identity in identities
+        ],
         "practice_count": int(practice_count or 0),
         "wrong_count": int(wrong_count or 0),
         "recent_active_at": recent_active_at,

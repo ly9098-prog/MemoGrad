@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from app.schemas.base import BaseModel
 
@@ -32,10 +32,17 @@ class AdminUserResponse(BaseModel):
     username: str
     display_name: str | None = None
     email: str | None = None
+    email_verified: bool = False
+    must_change_password: bool = False
     is_active: bool
     role_id: int
     last_login_at: datetime | None = None
     last_login_ip: str | None = None
+
+    @field_validator("must_change_password", mode="before")
+    @classmethod
+    def default_first_login_flag(cls, value):
+        return False if value is None else value
 
 
 class AdminTokenResponse(BaseModel):
@@ -50,3 +57,26 @@ class AdminMeResponse(BaseModel):
     user: AdminUserResponse
     role: AdminRoleResponse
     permissions: list[str]
+
+
+class AdminEmailStartRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=128)
+
+
+class AdminEmailActivationRequest(AdminEmailStartRequest):
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class AdminEmailVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=32, max_length=64)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class AdminRecoveryVerifyResponse(BaseModel):
+    reset_token: str
+    expires_in: int = 300
+
+
+class AdminPasswordRecoveryRequest(BaseModel):
+    reset_token: str = Field(min_length=32, max_length=256)
+    new_password: str = Field(min_length=12, max_length=128)

@@ -84,6 +84,31 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?必须设置 CORS_ORIGINS}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:?必须设置 ALLOWED_HOSTS}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?必须设置 PUBLIC_BASE_URL}
+      USER_WEB_BASE_URL: ${USER_WEB_BASE_URL:?必须设置 USER_WEB_BASE_URL}
+      ADMIN_WEB_BASE_URL: ${ADMIN_WEB_BASE_URL:?必须设置 ADMIN_WEB_BASE_URL}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-}
+      GITHUB_OAUTH_STATE_TTL_SEC: ${GITHUB_OAUTH_STATE_TTL_SEC:-600}
+      AUTH_EMAIL_ENABLED: ${AUTH_EMAIL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-MemoGrad}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-true}
+      SMTP_USE_STARTTLS: ${SMTP_USE_STARTTLS:-false}
+      SMTP_TIMEOUT_SEC: ${SMTP_TIMEOUT_SEC:-10}
+      OTP_EXPIRE_SEC: ${OTP_EXPIRE_SEC:-300}
+      OTP_RESEND_SEC: ${OTP_RESEND_SEC:-60}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-3}
+      OTP_EMAIL_HOURLY_LIMIT: ${OTP_EMAIL_HOURLY_LIMIT:-5}
+      OTP_IP_HOURLY_LIMIT: ${OTP_IP_HOURLY_LIMIT:-20}
+      OTP_USER_DOMAIN_DAILY_LIMIT: ${OTP_USER_DOMAIN_DAILY_LIMIT:-100}
+      OTP_ADMIN_DOMAIN_DAILY_LIMIT: ${OTP_ADMIN_DOMAIN_DAILY_LIMIT:-30}
+      USER_AGREEMENT_VERSION: ${USER_AGREEMENT_VERSION:-2026-11-20}
+      PRIVACY_POLICY_VERSION: ${PRIVACY_POLICY_VERSION:-2026-11-20}
       OCR_ENABLED: ${OCR_ENABLED:-false}
       OCR_MAX_WORKERS: ${OCR_MAX_WORKERS:-1}
       DEPLOYMENT_PROFILE: ${DEPLOYMENT_PROFILE:-cloud_api}
@@ -190,6 +215,8 @@ services:
       # AI 配置加密密钥（Fernet）
       AI_CONFIG_ENCRYPT_KEY: ${AI_CONFIG_ENCRYPT_KEY:?必须设置 AI_CONFIG_ENCRYPT_KEY}
       # 生产验证所需（scheduler 虽无 HTTP，但配置验证器会检查）
+      USER_WEB_BASE_URL: ${USER_WEB_BASE_URL:?必须设置 USER_WEB_BASE_URL}
+      ADMIN_WEB_BASE_URL: ${ADMIN_WEB_BASE_URL:?必须设置 ADMIN_WEB_BASE_URL}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:?必须设置 ALLOWED_HOSTS}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?必须设置 PUBLIC_BASE_URL}
       WECHAT_APP_ID: ${WECHAT_APP_ID:?必须设置 WECHAT_APP_ID}
@@ -249,6 +276,8 @@ services:
       # AI 配置加密密钥（Fernet）
       AI_CONFIG_ENCRYPT_KEY: ${AI_CONFIG_ENCRYPT_KEY:?必须设置 AI_CONFIG_ENCRYPT_KEY}
       # 生产验证所需（worker 虽无 HTTP，但配置验证器会检查）
+      USER_WEB_BASE_URL: ${USER_WEB_BASE_URL:?必须设置 USER_WEB_BASE_URL}
+      ADMIN_WEB_BASE_URL: ${ADMIN_WEB_BASE_URL:?必须设置 ADMIN_WEB_BASE_URL}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:?必须设置 ALLOWED_HOSTS}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?必须设置 PUBLIC_BASE_URL}
       WECHAT_APP_ID: ${WECHAT_APP_ID:?必须设置 WECHAT_APP_ID}
@@ -286,6 +315,8 @@ services:
     build:
       context: ../admin-frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-/api/admin/v1}
     restart: always
     mem_limit: 256m
     mem_reservation: 128m
@@ -297,6 +328,27 @@ services:
       HOSTNAME: 0.0.0.0
     ports:
       - "127.0.0.1:3000:3000"
+    depends_on:
+      - app
+
+  web:
+    build:
+      context: ../web-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_USER_API_BASE_URL: ${NEXT_PUBLIC_USER_API_BASE_URL:-/api/v1}
+        NEXT_PUBLIC_USER_AGREEMENT_VERSION: ${USER_AGREEMENT_VERSION:-2026-11-20}
+        NEXT_PUBLIC_PRIVACY_POLICY_VERSION: ${PRIVACY_POLICY_VERSION:-2026-11-20}
+    restart: always
+    mem_limit: 256m
+    mem_reservation: 128m
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Shanghai
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "127.0.0.1:3001:3000"
     depends_on:
       - app
 
@@ -319,6 +371,8 @@ services:
       - nginx_logs:/var/log/nginx
     depends_on:
       - app
+      - admin
+      - web
 
   # PostgreSQL 定期备份服务（手动触发，不随 compose up 自动启动）
   # 使用方法：

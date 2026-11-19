@@ -154,26 +154,26 @@ global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'release' } }
 global.wx.getSystemInfoSync = () => ({ platform: 'ios' })
 config = freshConfig()
 assertEqual(config.DEV, false, 'release → DEV=false')
-assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'release → HTTPS release URL')
+assertEqual(config.BASE_URL, 'https://api.xzshub.top/api/v1', 'release → HTTPS release URL')
 assertEqual(config.BASE_URL.includes('localhost'), false, 'release URL must not contain localhost')
 
 global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'trial' } })
 config = freshConfig()
 assertEqual(config.DEV, false, 'trial → DEV=false')
-assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'trial → HTTPS trial URL')
+assertEqual(config.BASE_URL, 'https://api.xzshub.top/api/v1', 'trial → HTTPS trial URL')
 
 global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'develop' } })
 global.wx.getSystemInfoSync = () => ({ platform: 'devtools' })
 config = freshConfig()
 assertEqual(config.DEV, false, 'devtools without opt-in → DEV=false')
-assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'devtools without opt-in → HTTPS release URL')
+assertEqual(config.BASE_URL, 'https://api.xzshub.top/api/v1', 'devtools without opt-in → HTTPS release URL')
 
 global.wx.getAccountInfoSync = () => {
   throw new Error('account info unavailable')
 }
 config = freshConfig()
 assertEqual(config.DEV, false, 'account info failure → DEV=false')
-assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'account info failure → HTTPS release URL')
+assertEqual(config.BASE_URL, 'https://api.xzshub.top/api/v1', 'account info failure → HTTPS release URL')
 
 // ══════════════════════════════════════════════
 // Results

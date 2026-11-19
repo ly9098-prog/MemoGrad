@@ -127,6 +127,7 @@ export default function AdminUsersPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.permissions);
   const currentRole = useAuthStore((state) => state.role);
+  const isCurrentSuperAdmin = currentRole?.name === "super_admin";
 
   const [searchInput, setSearchInput] = useState("");
 
@@ -434,12 +435,12 @@ export default function AdminUsersPage() {
   };
 
   const canSubmitForm: PermissionKey = form.id ? "admin-user:update" : "admin-user:create";
-  const canUseForm = hasActionPermission(canSubmitForm);
-  const canCreate = hasActionPermission("admin-user:create");
+  const canCreate = isCurrentSuperAdmin && hasActionPermission("admin-user:create");
   const canUpdate = hasActionPermission("admin-user:update");
   const canForceLogout = hasActionPermission("admin-user:force-logout");
-  const canResetPassword = hasActionPermission("admin-user:reset-password");
+  const canResetPassword = isCurrentSuperAdmin && hasActionPermission("admin-user:reset-password");
   const canDelete = hasActionPermission("admin-user:delete");
+  const canUseForm = form.id ? hasActionPermission(canSubmitForm) : canCreate;
 
   const confirmDescription = confirmState
     ? {
@@ -458,14 +459,15 @@ export default function AdminUsersPage() {
         title="后台管理员"
         description="管理后台账号、角色归属与登录安全操作；保护账号继续遵循前后端双重限制。"
         actions={
-          <Button
-            onClick={(event) => openCreateForm(event.currentTarget)}
-            disabled={!canCreate}
-            className="h-11 gap-2 rounded-xl px-5 shadow-none"
-          >
-            <Plus className="h-4 w-4" />
-            新建管理员
-          </Button>
+          canCreate ? (
+            <Button
+              onClick={(event) => openCreateForm(event.currentTarget)}
+              className="h-11 gap-2 rounded-xl px-5 shadow-none"
+            >
+              <Plus className="h-4 w-4" />
+              新建管理员
+            </Button>
+          ) : null
         }
         meta={<span>超级管理员账号不可在此页面降级、停用或重置密码。</span>}
       />
@@ -709,15 +711,17 @@ export default function AdminUsersPage() {
                             >
                               <LogOut className="h-4 w-4" />
                             </button>
-                            <button
-                              type="button"
-                              title="重置密码"
-                              disabled={protectedRow || !canResetPassword}
-                              onClick={() => setConfirmState({ action: "reset-password", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
-                            >
-                              <KeyRound className="h-4 w-4" />
-                            </button>
+                            {canResetPassword ? (
+                              <button
+                                type="button"
+                                title="重置密码"
+                                disabled={protectedRow}
+                                onClick={() => setConfirmState({ action: "reset-password", userId: user.id, userName: user.username })}
+                                className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               title="停用账号"

@@ -1,0 +1,249 @@
+import hashlib
+import hmac
+import secrets
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
+
+from app.core.cache import CacheUnavailableError, cache
+from app.core.config import settings
+from app.services.email_delivery import build_otp_email, send_auth_email
+
+DOMAINS = {"user", "admin"}
+PURPOSES = {"login", "bind", "step_up", "activate", "recover"}
+
+
+class OtpError(ValueError):
+    pass
+
+
+class OtpRateLimitError(OtpError):
+    pass
+
+
+class OtpUnavailableError(OtpError):
+    pass
+
+
+@dataclass(frozen=True)
+class IssuedOtp:
+    challenge_id: str
+    expires_in: int
+    resend_after: int
+
+
+def _digest(*parts: str) -> str:
+    payload = "\0".join(parts).encode("utf-8")
+    return hmac.new(
+        settings.APP_SECRET.encode("utf-8"), payload, hashlib.sha256
+    ).hexdigest()
+
+
+def _email_digest(domain: str, purpose: str, email: str) -> str:
+    return _digest("email-address", domain, purpose, email)
+
+
+def _challenge_key(challenge_id: str) -> str:
+    return f"auth:otp:challenge:{challenge_id}"
+
+
+def _resend_key(domain: str, purpose: str, email: str) -> str:
+    return f"auth:otp:resend:{domain}:{purpose}:{_email_digest(domain, purpose, email)}"
+
+
+def _active_key(domain: str, purpose: str, email: str) -> str:
+    return f"auth:otp:active:{domain}:{purpose}:{_email_digest(domain, purpose, email)}"
+
+
+def _budget_keys(
+    domain: str, purpose: str, email: str, client_ip: str
+) -> tuple[str, ...]:
+    day = datetime.now(UTC).strftime("%Y%m%d")
+    digest = _email_digest(domain, purpose, email)
+    email_key = f"auth:otp:email:{domain}:{purpose}:{digest}"
+    ip_digest = hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
+    return (
+        f"auth:otp:ip:{domain}:{purpose}:{ip_digest}",
+        f"auth:otp:total:{domain}:{day}",
+        email_key,
+    )
+
+
+async def _enforce_budgets(
+    domain: str, purpose: str, email: str, client_ip: str
+) -> None:
+    ip_key, total_key, email_key = _budget_keys(domain, purpose, email, client_ip)
+    daily_limit = (
+        settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT
+        if domain == "admin"
+        else settings.OTP_USER_DOMAIN_DAILY_LIMIT
+    )
+    try:
+        ip_count = await cache.increment_strict(ip_key, ttl=3600)
+        email_count = await cache.increment_strict(email_key, ttl=3600)
+        total_count = await cache.increment_strict(total_key, ttl=86400)
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+    if (
+        ip_count > settings.OTP_IP_HOURLY_LIMIT
+        or email_count > settings.OTP_EMAIL_HOURLY_LIMIT
+        or total_count > daily_limit
+    ):
+        raise OtpRateLimitError("验证码请求过于频繁，请稍后重试")
+
+
+async def _publish_challenge(
+    challenge_id: str, challenge: dict[str, Any], subject: str, text: str
+) -> None:
+    domain, purpose, email = (challenge[key] for key in ("domain", "purpose", "email"))
+    active_key = _active_key(domain, purpose, email)
+    old_challenge_id: str | None = None
+    try:
+        old_challenge_id = await cache.get_strict(active_key)
+        await cache.set_strict(
+            _challenge_key(challenge_id), challenge, ttl=settings.OTP_EXPIRE_SEC
+        )
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+
+    try:
+        await send_auth_email(to_email=email, subject=subject, text=text)
+    except Exception as exc:
+        try:
+            await cache.delete_strict(_challenge_key(challenge_id))
+            await cache.delete_strict(_resend_key(domain, purpose, email))
+        except CacheUnavailableError:
+            pass
+        if isinstance(exc, OtpError):
+            raise
+        raise OtpUnavailableError(str(exc) or "邮件发送失败，请稍后重试") from exc
+    try:
+        await cache.set_strict(active_key, challenge_id, ttl=settings.OTP_EXPIRE_SEC)
+        if old_challenge_id and old_challenge_id != challenge_id:
+            old_key = _challenge_key(str(old_challenge_id))
+            await cache.delete_strict(old_key)
+            await cache.delete_strict(f"{old_key}:attempts")
+    except CacheUnavailableError as exc:
+        try:
+            await cache.delete_strict(_challenge_key(challenge_id))
+        except CacheUnavailableError:
+            pass
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+
+
+async def issue_otp(
+    *,
+    domain: str,
+    email: str,
+    purpose: str,
+    client_ip: str,
+    user_id: int | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> IssuedOtp:
+    if domain not in DOMAINS or purpose not in PURPOSES:
+        raise OtpError("验证码用途无效")
+    await _enforce_budgets(domain, purpose, email, client_ip)
+    try:
+        acquired = await cache.acquire_lock_strict(
+            _resend_key(domain, purpose, email),
+            uuid4().hex,
+            ttl=settings.OTP_RESEND_SEC,
+        )
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+    if not acquired:
+        raise OtpRateLimitError("请稍后再获取验证码")
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    challenge_id = uuid4().hex
+    challenge = {
+        "domain": domain,
+        "purpose": purpose,
+        "email": email,
+        "user_id": user_id,
+        "code_digest": _digest("otp-code", challenge_id, email, domain, purpose, code),
+        "metadata": metadata or {},
+    }
+    subject, text = build_otp_email(domain, purpose, code)
+    await _publish_challenge(challenge_id, challenge, subject, text)
+    return IssuedOtp(
+        challenge_id=challenge_id,
+        expires_in=settings.OTP_EXPIRE_SEC,
+        resend_after=settings.OTP_RESEND_SEC,
+    )
+
+
+async def _verify_code(
+    challenge_id: str, challenge: dict[str, Any], code: str, domain: str, purpose: str
+) -> None:
+    expected = str(challenge.get("code_digest") or "")
+    actual = _digest(
+        "otp-code", challenge_id, str(challenge["email"]), domain, purpose, code
+    )
+    if not hmac.compare_digest(expected, actual):
+        key = _challenge_key(challenge_id)
+        attempt_key = f"{key}:attempts"
+        attempts = await cache.increment_strict(
+            attempt_key, ttl=settings.OTP_EXPIRE_SEC
+        )
+        if attempts >= settings.OTP_MAX_ATTEMPTS:
+            await cache.delete_strict(key)
+            await cache.delete_strict(attempt_key)
+        raise OtpError("验证码错误或已失效")
+
+
+async def consume_otp(
+    *, challenge_id: str, code: str, domain: str, purpose: str
+) -> dict[str, Any]:
+    key = _challenge_key(challenge_id)
+    lock_key = f"{key}:lock"
+    owner = uuid4().hex
+    try:
+        acquired = await cache.acquire_lock_strict(lock_key, owner, ttl=10)
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+    if not acquired:
+        raise OtpRateLimitError("验证请求过于频繁，请稍后重试")
+    try:
+        challenge = await cache.get_strict(key)
+        if not isinstance(challenge, dict):
+            raise OtpError("验证码无效或已过期")
+        active_challenge_id = await cache.get_strict(
+            _active_key(domain, purpose, str(challenge["email"]))
+        )
+        if active_challenge_id != challenge_id:
+            raise OtpError("验证码无效或已过期")
+        if challenge.get("domain") != domain or challenge.get("purpose") != purpose:
+            raise OtpError("验证码用途不匹配")
+        await _verify_code(challenge_id, challenge, code, domain, purpose)
+        deleted = await cache.delete_strict(key)
+        if deleted != 1:
+            raise OtpError("验证码无效或已过期")
+        await cache.delete_strict(f"{key}:attempts")
+        active_key = _active_key(domain, purpose, str(challenge["email"]))
+        if await cache.get_strict(active_key) == challenge_id:
+            await cache.delete_strict(active_key)
+        return challenge
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+    finally:
+        try:
+            await cache.release_lock(lock_key, owner)
+        except Exception:
+            pass
+
+
+async def get_active_challenge(challenge_id: str) -> dict[str, Any]:
+    """Read resend context; this never verifies a code or grants authentication."""
+    try:
+        challenge = await cache.get_strict(_challenge_key(challenge_id))
+        if not isinstance(challenge, dict):
+            raise OtpError("验证码已失效，请重新完成安全验证")
+        active = await cache.get_strict(
+            _active_key(challenge["domain"], challenge["purpose"], challenge["email"])
+        )
+        if active != challenge_id:
+            raise OtpError("验证码已失效，请重新完成安全验证")
+        return challenge
+    except CacheUnavailableError as exc:
+        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc

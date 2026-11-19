@@ -83,7 +83,7 @@
   align-items: center;
   gap: 8px;
   color: var(--login-muted);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.06em;
 }
 
@@ -106,7 +106,7 @@
   position: relative;
   isolation: isolate;
   width: 100%;
-  max-width: 400px;
+  max-width: 430px;
   perspective: 1050px;
   animation: cardEnter 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -279,6 +279,49 @@
   margin-top: 30px;
 }
 
+.modeTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 24px;
+  border: 1px solid rgb(202 233 251 / 10%);
+  border-radius: 11px;
+  padding: 4px;
+  background: rgb(2 12 19 / 24%);
+}
+
+.modeTabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  border-radius: 7px;
+  color: #9fb5c4;
+  font-size: 12px;
+  transition: color 180ms, background-color 180ms, box-shadow 180ms;
+}
+
+.modeTabs button[data-active] {
+  background: rgb(230 247 255 / 9%);
+  color: #f1faff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+
+.modeTabs button:hover {
+  color: #f1faff;
+}
+
+.modeTabs button:focus-visible {
+  outline: 2px solid var(--login-focus);
+  outline-offset: 2px;
+}
+
+.modeTabs svg {
+  width: 14px;
+  height: 14px;
+}
+
 .field {
   display: grid;
   gap: 9px;
@@ -288,6 +331,70 @@
   color: #d7e7f0;
   font-size: 12px;
   font-weight: 500;
+}
+
+.formMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: -4px;
+  color: var(--login-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.formMeta a,
+.backButton,
+.resendButton {
+  border-radius: 3px;
+  color: #ccebff;
+  text-underline-offset: 3px;
+}
+
+.formMeta a:hover,
+.backButton:hover,
+.resendButton:hover:enabled {
+  color: #fff;
+}
+
+.formMeta a:focus-visible,
+.backButton:focus-visible,
+.resendButton:focus-visible {
+  outline: 2px solid var(--login-focus);
+  outline-offset: 3px;
+}
+
+.emailIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgb(202 233 251 / 11%);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: rgb(255 255 255 / 2.5%);
+  color: var(--login-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.emailIntro[data-success] {
+  border-color: var(--login-border);
+  background: rgb(230 247 255 / 4%);
+}
+
+.emailIntro svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  color: #bce9ff;
+}
+
+.emailIntro strong {
+  color: #eaf8ff;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .inputShell {
@@ -343,6 +450,41 @@
 .surface .input::placeholder {
   color: #aec3d1;
   opacity: 1;
+}
+
+.surface .codeInput {
+  font-family: var(--font-mono);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.28em;
+}
+
+.otpActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -5px;
+}
+
+.backButton,
+.resendButton {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.backButton svg {
+  width: 13px;
+  height: 13px;
+}
+
+.resendButton:disabled {
+  color: #6f8796;
+  cursor: default;
 }
 
 .surface .input:autofill {
@@ -433,7 +575,7 @@
   padding: 17px 20px;
   background: rgb(3 13 21 / 10%);
   color: var(--login-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .cardFooter svg {
@@ -558,7 +700,7 @@
   }
 
   .accessLabel {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .main {

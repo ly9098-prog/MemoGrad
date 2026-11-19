@@ -8,19 +8,55 @@ Covers scenarios from the pre-launch audit:
 Uses unique login codes per test to avoid conflicts with soft-deleted users
 from previous test runs.
 """
+import asyncio
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
+from app.core.database import Base, get_db
 from app.main import app
 
 client = TestClient(app)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def isolated_database(tmp_path_factory):
+    from app import models  # noqa: F401
+
+    database = tmp_path_factory.mktemp("auth-session") / "session.db"
+    engine = create_async_engine(f"sqlite+aiosqlite:///{database}", poolclass=NullPool)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def create_schema():
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+
+    async def override_db():
+        async with factory() as session:
+            yield session
+
+    asyncio.run(create_schema())
+    app.dependency_overrides[get_db] = override_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+    asyncio.run(engine.dispose())
+
+
 def _login(code=None):
     if code is None:
         code = f"test_code_{uuid.uuid4().hex[:12]}"
-    resp = client.post("/api/v1/auth/login", json={"code": code})
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "code": code,
+            "accepted_terms": True,
+            "agreement_version": "2026-11-20",
+            "privacy_version": "2026-11-20",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     return data["access_token"], data["refresh_token"]
@@ -28,6 +64,11 @@ def _login(code=None):
 
 def _auth_header(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_wechat_login_requires_current_consent_versions():
+    resp = client.post("/api/v1/auth/login", json={"code": "consent-required"})
+    assert resp.status_code == 422
 
 
 def test_logout_revokes_token():
@@ -39,9 +80,8 @@ def test_logout_revokes_token():
     assert resp.status_code == 200
     assert resp.json()["message"] == "已退出登录"
 
-    # Refresh token has a 60-second revocation grace period for rotation races,
-    # so it may still be accepted briefly after logout. The key assertion is
-    # that the logout call itself succeeds.
+    response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert response.status_code == 401
 
 
 def test_deletion_soft_deletes_user():

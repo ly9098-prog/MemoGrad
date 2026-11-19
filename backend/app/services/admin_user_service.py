@@ -11,6 +11,7 @@ from app.core.admin_security import (
     set_admin_user_nbf,
     validate_admin_password_strength,
 )
+from app.core.email_address import normalize_email
 from app.models.admin import AdminUser, Role
 from app.schemas.admin_users import (
     AdminUserCreateRequest,
@@ -96,19 +97,45 @@ async def _ensure_assignable_role(db: AsyncSession, role_id: int) -> Role:
     return role
 
 
+async def ensure_super_admin_operator(
+    db: AsyncSession, operator: AdminPrincipal
+) -> None:
+    role = await db.get(Role, operator.role_id)
+    if role is None or role.name != "super_admin":
+        raise PermissionError("仅超级管理员可执行此操作")
+
+
+async def _normalized_unique_email(
+    db: AsyncSession, email: str | None, *, except_user_id: int | None = None
+) -> tuple[str | None, str | None]:
+    if email is None or not email.strip():
+        return None, None
+    normalized = normalize_email(email)
+    query = select(AdminUser.id).where(AdminUser.email_normalized == normalized)
+    if except_user_id is not None:
+        query = query.where(AdminUser.id != except_user_id)
+    if await db.scalar(query) is not None:
+        raise ValueError("该邮箱已被其他管理员使用")
+    return email.strip(), normalized
+
+
 async def create_admin_user(
     db: AsyncSession,
     data: AdminUserCreateRequest,
     operator: AdminPrincipal,
     request: Request | None = None,
 ) -> AdminUser:
+    await ensure_super_admin_operator(db, operator)
     await _ensure_assignable_role(db, data.role_id)
     validate_admin_password_strength(data.password)
+    email, email_normalized = await _normalized_unique_email(db, data.email)
     admin_user = AdminUser(
         username=data.username,
         password_hash=hash_admin_password(data.password),
         display_name=data.display_name,
-        email=data.email,
+        email=email,
+        email_normalized=email_normalized,
+        must_change_password=True,
         role_id=data.role_id,
         is_active=data.is_active,
     )
@@ -151,13 +178,30 @@ async def update_admin_user(
             raise ValueError("禁止修改自己的角色")
         await _ensure_assignable_role(db, update_data["role_id"])
 
+    email = update_data.get("email", admin_user.email)
+    normalized_email, email_normalized = await _normalized_unique_email(
+        db, email, except_user_id=admin_user.id
+    )
+    update_data["email"] = normalized_email
+    update_data["email_normalized"] = email_normalized
+    if normalized_email != admin_user.email:
+        update_data["email_verified_at"] = None
+        await set_admin_user_nbf(admin_user.id)
+
     before = {
         "display_name": admin_user.display_name,
         "email": admin_user.email,
         "is_active": admin_user.is_active,
         "role_id": admin_user.role_id,
     }
-    for field in ("display_name", "email", "is_active", "role_id"):
+    for field in (
+        "display_name",
+        "email",
+        "email_normalized",
+        "email_verified_at",
+        "is_active",
+        "role_id",
+    ):
         if field in update_data:
             setattr(admin_user, field, update_data[field])
     after = {
@@ -241,12 +285,14 @@ async def reset_admin_user_password(
     operator: AdminPrincipal,
     request: Request | None = None,
 ) -> None:
+    await ensure_super_admin_operator(db, operator)
     admin_user = await get_admin_user_detail(db, admin_user_id)
     if admin_user.id == operator.id:
         raise ValueError("禁止重置自己的密码")
     await _ensure_not_super_admin(db, admin_user)
     validate_admin_password_strength(data.new_password)
     admin_user.password_hash = hash_admin_password(data.new_password)
+    admin_user.must_change_password = True
     await set_admin_user_nbf(admin_user.id)
     await write_admin_audit(
         db,

@@ -65,6 +65,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const adminId = useAuthStore(({ user }) => user && ("id" in user ? user.id : user.user.id));
+  const mustChangepassword = useAuthStore(({ user }) =>
+    Boolean(user && "must_change_password" in user && user.must_change_password),
+  );
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const [mobileNavigationPath, setMobileNavigationPath] = useState<string | null>(null);
   const [isNavigationHovered, setNavigationHovered] = useState(false);
@@ -88,8 +91,25 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {
       router.replace(`/login${redirectPath}`);
+      return;
     }
-  }, [isAuthenticated, isBootstrapping, router, redirectPath]);
+    if (
+      !isBootstrapping
+      && isAuthenticated
+      && mustChangepassword
+      && pathname !== "/change-password"
+    ) {
+      const next = pathname === "/login" ? "" : `?next=${encodeURIComponent(pathname)}`;
+      router.replace(`/change-password${next}`);
+    }
+  }, [
+    isAuthenticated,
+    isBootstrapping,
+    mustChangepassword,
+    pathname,
+    router,
+    redirectPath,
+  ]);
 
   // Bootstrapping: render skeleton layout matching real structure
   if (isBootstrapping) {

@@ -125,7 +125,15 @@ async def seed_pending_imports(batch_id: str) -> list[int]:
 
 
 async def login(client: httpx.AsyncClient) -> str:
-    res = await client.post("/api/v1/auth/login", json={"code": "phase7-test-code"})
+    res = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "code": "phase7-test-code",
+            "accepted_terms": True,
+            "agreement_version": "2026-11-20",
+            "privacy_version": "2026-11-20",
+        },
+    )
     assert res.status_code == 200, res.text
     return res.json()["access_token"]
 
@@ -138,7 +146,15 @@ async def case_health(client: httpx.AsyncClient) -> None:
     res = await client.get("/health")
     check("GET /health 200", res.status_code == 200,
           f"status={res.status_code}")
-    res = await client.post("/api/v1/auth/login", json={"code": "phase7-x"})
+    res = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "code": "phase7-x",
+            "accepted_terms": True,
+            "agreement_version": "2026-11-20",
+            "privacy_version": "2026-11-20",
+        },
+    )
     check("POST /auth/login 200", res.status_code == 200, res.text)
     body = res.json()
     check("login 返回 access_token", "access_token" in body, str(body))

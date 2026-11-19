@@ -61,6 +61,8 @@ def validate_production_config() -> None:
         _check_cors,
         _check_allowed_hosts,
         _check_public_base_url,
+        _check_browser_auth_endpoints,
+        _check_auth_delivery,
         _check_directories,
         _check_deployment_profile,
         _check_process_role,
@@ -217,8 +219,126 @@ def _check_public_base_url(errors: list[str]) -> None:
         return
     if parsed.scheme != "https" or not parsed.hostname:
         errors.append("生产环境 PUBLIC_BASE_URL 必须是有效的 HTTPS URL")
+    if parsed.path not in {"", "/"}:
+        errors.append("PUBLIC_BASE_URL 必须是 API 站点根地址，不得包含路径")
     if parsed.query or parsed.fragment or parsed.username or parsed.password:
         errors.append("PUBLIC_BASE_URL 不得包含凭据、查询参数或片段")
+
+
+def _parsed_web_origin(value: str) -> tuple[str, str] | None:
+    from urllib.parse import urlsplit
+
+    try:
+        parsed = urlsplit(str(value or "").strip())
+        parsed_port = parsed.port
+    except ValueError:
+        return None
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        return None
+    port = f":{parsed_port}" if parsed_port and parsed_port != 443 else ""
+    return f"https://{parsed.hostname.lower()}{port}", parsed.hostname.lower()
+
+
+def _check_browser_auth_endpoints(errors: list[str]) -> None:
+    user = _parsed_web_origin(settings.USER_WEB_BASE_URL)
+    admin = _parsed_web_origin(settings.ADMIN_WEB_BASE_URL)
+    api = _parsed_web_origin(settings.PUBLIC_BASE_URL)
+    if user is None:
+        errors.append("USER_WEB_BASE_URL 必须是 HTTPS 站点根地址")
+    if admin is None:
+        errors.append("ADMIN_WEB_BASE_URL 必须是 HTTPS 站点根地址")
+    if user and admin and user[0] == admin[0]:
+        errors.append("USER_WEB_BASE_URL 与 ADMIN_WEB_BASE_URL 必须使用不同站点")
+
+    allowed_hosts = {
+        str(value).strip().lower() for value in settings.ALLOWED_HOSTS
+    }
+    for label, parsed in (
+        ("USER_WEB_BASE_URL", user),
+        ("ADMIN_WEB_BASE_URL", admin),
+        ("PUBLIC_BASE_URL", api),
+    ):
+        if parsed and parsed[1] not in allowed_hosts:
+            errors.append(f"{label} 的主机名必须加入 ALLOWED_HOSTS")
+
+    cors_origins = {_origin_key(value) for value in settings.CORS_ORIGINS}
+    for label, parsed in (
+        ("USER_WEB_BASE_URL", user),
+        ("ADMIN_WEB_BASE_URL", admin),
+    ):
+        if parsed and _origin_key(parsed[0]) not in cors_origins:
+            errors.append(f"{label} 必须加入 CORS_ORIGINS")
+
+
+def _origin_key(value: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        parsed = urlsplit(str(value or "").strip())
+        parsed_port = parsed.port
+    except ValueError:
+        return ""
+    if not parsed.scheme or not parsed.hostname:
+        return ""
+    port = parsed_port or (443 if parsed.scheme == "https" else 80)
+    return f"{parsed.scheme.lower()}://{parsed.hostname.lower()}:{port}"
+
+
+def _check_auth_delivery(errors: list[str]) -> None:
+    github_id = (settings.GITHUB_CLIENT_ID or "").strip()
+    github_secret = (settings.GITHUB_CLIENT_SECRET or "").strip()
+    if bool(github_id) != bool(github_secret):
+        errors.append("GITHUB_CLIENT_ID 与 GITHUB_CLIENT_SECRET 必须同时配置")
+    if github_id and github_secret:
+        expected_callback = (
+            f"{settings.USER_WEB_BASE_URL.rstrip('/')}/api/v1/auth/github/callback"
+        )
+        if settings.GITHUB_OAUTH_CALLBACK_URL != expected_callback:
+            errors.append(
+                "GITHUB_OAUTH_CALLBACK_URL 必须与 USER_WEB_BASE_URL 对应的固定回调一致"
+            )
+
+    if settings.OTP_EXPIRE_SEC < 60 or settings.OTP_EXPIRE_SEC > 900:
+        errors.append("OTP_EXPIRE_SEC 必须在 60~900 秒之间")
+    if not 30 <= settings.OTP_RESEND_SEC <= settings.OTP_EXPIRE_SEC:
+        errors.append("OTP_RESEND_SEC 必须在 30 秒到验证码有效期之间")
+    if not 1 <= settings.OTP_MAX_ATTEMPTS <= 10:
+        errors.append("OTP_MAX_ATTEMPTS 必须在 1~10 之间")
+    for name, value in (
+        ("OTP_EMAIL_HOURLY_LIMIT", settings.OTP_EMAIL_HOURLY_LIMIT),
+        ("OTP_IP_HOURLY_LIMIT", settings.OTP_IP_HOURLY_LIMIT),
+        ("OTP_USER_DOMAIN_DAILY_LIMIT", settings.OTP_USER_DOMAIN_DAILY_LIMIT),
+        ("OTP_ADMIN_DOMAIN_DAILY_LIMIT", settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT),
+    ):
+        if value <= 0:
+            errors.append(f"{name} 必须大于 0")
+
+    if not settings.AUTH_EMAIL_ENABLED:
+        return
+    if not (settings.SMTP_HOST or "").strip():
+        errors.append("AUTH_EMAIL_ENABLED=true 时 SMTP_HOST 不能为空")
+    if not 1 <= settings.SMTP_PORT <= 65535:
+        errors.append("SMTP_PORT 必须在 1~65535 之间")
+    if settings.SMTP_USE_SSL and settings.SMTP_USE_STARTTLS:
+        errors.append("SMTP_USE_SSL 与 SMTP_USE_STARTTLS 不能同时启用")
+    if bool((settings.SMTP_USERNAME or "").strip()) != bool(
+        (settings.SMTP_PASSWORD or "").strip()
+    ):
+        errors.append("SMTP_USERNAME 与 SMTP_PASSWORD 必须同时配置或同时留空")
+    try:
+        from app.core.email_address import normalize_email
+
+        normalize_email(settings.SMTP_FROM_EMAIL)
+    except ValueError:
+        errors.append("SMTP_FROM_EMAIL 必须是有效邮箱地址")
 
 
 def _check_directories(errors: list[str]) -> None:

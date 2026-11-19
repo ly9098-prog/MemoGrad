@@ -1,0 +1,435 @@
+.surface {
+  --login-background: #090f16;
+  --login-text: #f3faff;
+  --login-muted: #a9bdcc;
+  --login-border: rgb(196 228 248 / 14%);
+  --login-focus: #8fd4ff;
+  --login-error: #ffc4c9;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  overflow: clip;
+  background: var(--login-background);
+  color: var(--login-text);
+  color-scheme: dark;
+}
+
+.atmosphere {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 75% 55% at 50% -18%, rgb(44 116 147 / 42%), transparent 72%),
+    linear-gradient(180deg, #0e202c 0%, #08131c 58%, #090f16 100%);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 24px 40px;
+}
+
+.wordmark {
+  color: var(--login-text);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.main {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 28px 24px 72px;
+}
+
+.stage {
+  width: 100%;
+  max-width: 392px;
+  animation: cardEnter 240ms ease-out both;
+}
+
+.card {
+  overflow: hidden;
+  border: 1px solid var(--login-border);
+  border-radius: 16px;
+  padding: 32px 28px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 4%), transparent 55%),
+    rgb(7 23 35 / 34%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    0 24px 64px -34px rgb(0 0 0 / 72%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  backdrop-filter: blur(24px) saturate(120%);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .card {
+    background: rgb(10 25 36 / 96%);
+  }
+}
+
+.card h1 {
+  margin: 0 0 24px;
+  color: var(--login-text);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.githubButton {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgb(202 233 251 / 13%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 4%);
+  color: var(--login-text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+  transition: border-color 180ms, background-color 180ms;
+}
+
+.githubButton:hover:enabled {
+  border-color: rgb(202 233 251 / 22%);
+  background: rgb(255 255 255 / 7%);
+}
+
+.githubButton svg,
+.githubIcon {
+  width: 18px;
+  height: auto;
+}
+
+.githubButton:focus-visible,
+.submit:focus-visible,
+.quietButton:focus-visible,
+.resendButton:focus-visible {
+  outline: 2px solid var(--login-focus);
+  outline-offset: 3px;
+}
+
+.githubButton:disabled,
+.submit:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.divider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: var(--login-muted);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  background: rgb(203 234 251 / 11%);
+  content: "";
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field label {
+  color: #d7e7f0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  min-width: 0;
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid rgb(202 233 251 / 13%);
+  border-radius: 10px;
+  outline: 0;
+  background: rgb(3 13 21 / 25%);
+  color: var(--login-text);
+  caret-color: var(--login-focus);
+  font-size: 16px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+  transition: border-color 180ms, background-color 180ms, box-shadow 180ms;
+}
+
+.input:hover {
+  border-color: rgb(202 233 251 / 22%);
+}
+
+.input:focus {
+  border-color: var(--login-focus);
+  background: rgb(255 255 255 / 4%);
+  box-shadow: 0 0 0 3px rgb(143 212 255 / 10%);
+}
+
+.input::placeholder {
+  color: #8da7b8;
+  opacity: 1;
+}
+
+.codeInput {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.28em;
+}
+
+.sentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--login-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.sentRow > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sentRow strong {
+  color: #eaf8ff;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.otpActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--login-muted);
+  font-size: 12px;
+}
+
+.quietButton,
+.resendButton {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccebff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.quietButton {
+  flex: 0 0 auto;
+}
+
+.quietButton:hover,
+.resendButton:hover:enabled {
+  color: #fff;
+}
+
+.resendButton:disabled {
+  color: #6f8796;
+  cursor: default;
+}
+
+.submit {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid rgb(229 247 255 / 58%);
+  border-radius: 10px;
+  background: #eaf5fb;
+  color: #0a1b26;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 180ms;
+}
+
+.submit svg {
+  width: 16px;
+  height: 16px;
+}
+
+.submit:hover:enabled {
+  background: #fff;
+}
+
+.spinner {
+  animation: spin 850ms linear infinite;
+}
+
+.consentRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 16px;
+  color: var(--login-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.consentRow input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.consentCheck {
+  width: 17px;
+  height: 17px;
+  border: 1px solid #6f8b9c;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.consentRow input:checked + .consentCheck {
+  border-color: #bce9ff;
+  background: #bce9ff;
+}
+
+.consentRow input:checked + .consentCheck::after {
+  width: 7px;
+  height: 4px;
+  margin: 4px 0 0 4px;
+  display: block;
+  border-bottom: 2px solid #0a1b26;
+  border-left: 2px solid #0a1b26;
+  content: "";
+  transform: rotate(-45deg);
+}
+
+.consentRow input:focus-visible + .consentCheck {
+  outline: 2px solid var(--login-focus);
+  outline-offset: 3px;
+}
+
+.consentRow a {
+  margin: 0 3px;
+  color: #ccebff;
+  text-underline-offset: 3px;
+}
+
+.consentRow a:focus-visible {
+  outline: 2px solid var(--login-focus);
+  outline-offset: 3px;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--login-error);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-height: 720px) {
+  .header {
+    padding-block: 16px;
+  }
+
+  .main {
+    padding: 12px 24px 28px;
+  }
+
+  .card {
+    padding-block: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .header {
+    padding: 20px 24px;
+  }
+
+  .wordmark {
+    font-size: 15px;
+  }
+
+  .main {
+    padding: 12px 16px 28px;
+  }
+
+  .card {
+    padding: 24px;
+  }
+
+  .input {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 359px) {
+  .main {
+    padding-inline: 12px;
+  }
+
+  .card {
+    padding-inline: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface *,
+  .surface *::before,
+  .surface *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

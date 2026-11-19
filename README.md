@@ -218,11 +218,17 @@ npm ci
 npm run dev
 ```
 
-默认地址为 `http://localhost:3000`。本地开发 API 默认指向：
+默认地址为 `http://localhost:3002`。本地开发 API 默认指向：
 
 ```env
 NEXT_PUBLIC_ADMIN_API_BASE_URL=http://localhost:8000/api/admin/v1
 ```
+
+### 用户 Web（待发布）
+
+`web-frontend/` 提供 GitHub／邮箱验证码登录、账号概览与登录身份管理，复用现有 FastAPI。开发时运行 `npm ci`、`npm run dev`，默认地址为 `http://localhost:3000`；管理端使用 `3002` 端口。
+
+本地后端需设置 `USER_WEB_BASE_URL=http://localhost:3000`、`ADMIN_WEB_BASE_URL=http://localhost:3002`。GitHub 回调应为用户 Web 同源的 `/api/v1/auth/github/callback`，以便保留 host-only Cookie。真实 GitHub／SMTP 和四域生产入口须在发布时配置和验收。
 
 开发环境会初始化本地管理员：
 

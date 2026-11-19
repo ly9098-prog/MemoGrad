@@ -159,6 +159,7 @@ async def change_admin_password(
     validate_admin_password_strength(data.new_password)
     # hash_admin_password 内部已有字节长度校验，超长会抛 ValueError
     admin_user.password_hash = hash_admin_password(data.new_password)
+    admin_user.must_change_password = False
     # 水印取凭据变更时刻（而非操作者 token 的 iat），使此前签发的全部会话失效；
     # 路由随后删除刷新 Cookie，操作者需重新登录。
     await set_admin_user_nbf(admin_user.id, int(unix_timestamp(utcnow())) + 1)

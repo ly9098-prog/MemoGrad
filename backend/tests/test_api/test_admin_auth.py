@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi import HTTPException
 from fastapi import Response as FastAPIResponse
 from fastapi.testclient import TestClient
@@ -11,6 +12,8 @@ from app.core.admin_security import (
     PasswordPolicyError,
     create_admin_token,
     delete_refresh_cookie,
+    get_current_admin,
+    get_current_admin_any_scope,
     hash_admin_password,
     set_refresh_cookie,
 )
@@ -100,6 +103,33 @@ def test_admin_me_rejects_app_token():
     assert resp.status_code == 401
 
 
+def test_restricted_admin_token_is_only_accepted_by_all_scope_dependency():
+    import asyncio
+
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    user = _admin_user()
+    user.must_change_password = True
+    token = create_admin_token(user)
+    credentials = HTTPAuthorizationCredentials(
+        scheme="Bearer", credentials=token
+    )
+
+    class _Db:
+        async def execute(self, _statement):
+            return type(
+                "Result",
+                (),
+                {"scalar_one_or_none": lambda self: user},
+            )()
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(get_current_admin(credentials, _Db()))
+    assert exc.value.status_code == 403
+    principal = asyncio.run(get_current_admin_any_scope(credentials, _Db()))
+    assert principal.user is user
+
+
 def test_admin_me_returns_current_admin(monkeypatch):
     user = _admin_user()
     role = _role()
@@ -109,12 +139,12 @@ def test_admin_me_returns_current_admin(monkeypatch):
         return AdminPrincipal(user, {"jti": "token-id", "exp": 4102444800})
 
     monkeypatch.setattr(admin_auth, "get_admin_me_response", AsyncMock(return_value={"user": user, "role": role, "permissions": permissions}))
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/auth/me")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
         app.dependency_overrides.pop(get_db, None)
 
     assert resp.status_code == 200
@@ -132,11 +162,11 @@ def test_admin_logout_blacklists_token(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -152,7 +182,7 @@ def test_admin_change_password_success(monkeypatch):
 
     monkeypatch.setattr(admin_auth, "change_admin_password", change_password)
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post(
             "/api/admin/v1/auth/change-password",
@@ -160,7 +190,7 @@ def test_admin_change_password_success(monkeypatch):
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -201,8 +231,8 @@ def test_set_refresh_cookie_lax_for_http(monkeypatch):
     assert "SameSite=lax" in header
 
 
-def test_set_refresh_cookie_none_for_https():
-    """SameSite=None + Secure when request is HTTPS."""
+def test_set_refresh_cookie_is_lax_for_https():
+    """SameSite=Lax + Secure when request is HTTPS."""
     response = FastAPIResponse()
     request = MagicMock()
     request.url.scheme = "https"
@@ -210,7 +240,7 @@ def test_set_refresh_cookie_none_for_https():
     set_refresh_cookie(response, "test", request=request)
     header = response.headers.get("set-cookie", "")
     assert "Secure" in header
-    assert "SameSite=none" in header
+    assert "SameSite=lax" in header
 
 
 def test_set_refresh_cookie_x_forwarded_proto():
@@ -223,7 +253,7 @@ def test_set_refresh_cookie_x_forwarded_proto():
     set_refresh_cookie(response, "test", request=request)
     header = response.headers.get("set-cookie", "")
     assert "Secure" in header
-    assert "SameSite=none" in header
+    assert "SameSite=lax" in header
 
 
 def test_set_refresh_cookie_x_forwarded_proto_http(monkeypatch):
@@ -380,11 +410,11 @@ def test_admin_logout_deletes_refresh_cookie(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -522,7 +552,7 @@ def test_change_password_weak_password_returns_400(monkeypatch):
 
     monkeypatch.setattr(admin_auth, "change_admin_password", _weak)
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post(
             "/api/admin/v1/auth/change-password",
@@ -530,7 +560,7 @@ def test_change_password_weak_password_returns_400(monkeypatch):
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 400
     error = resp.json()["error"]

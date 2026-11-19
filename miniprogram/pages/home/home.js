@@ -214,6 +214,11 @@ Page({
     })
   },
 
+  openAccountSecurity() {
+    if (!auth.isLoggedIn()) return
+    wx.navigateTo({ url: '/pages/login/login?mode=account' })
+  },
+
   _ensureWechatProfilePrivacyAuthorized() {
     if (this.data.isDevtools || typeof wx.requirePrivacyAuthorize !== 'function') {
       return Promise.resolve(true)

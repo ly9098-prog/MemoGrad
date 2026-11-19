@@ -97,7 +97,12 @@ async function wechatLogin(options = {}) {
   const { code } = await wx.login()
   if (options.shouldCommit && !options.shouldCommit()) return null
   if (!code) throw new Error('微信登录失败，请重试')
-  const data = await api.post('/auth/login', { code })
+  const data = await api.post('/auth/login', {
+    code,
+    accepted_terms: true,
+    agreement_version: config.AGREEMENT_VERSION,
+    privacy_version: config.PRIVACY_POLICY_VERSION,
+  })
   if (options.shouldCommit && !options.shouldCommit()) return null
   const user = normalizeUser(data.user)
   saveAuthSession(data, user)

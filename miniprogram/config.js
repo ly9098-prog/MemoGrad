@@ -11,8 +11,8 @@ const LOCAL_DEBUG = false
 
 const API_URLS = {
   local: 'http://localhost:8000/api/v1',
-  trial: 'https://xzshub.top/api/v1',
-  release: 'https://xzshub.top/api/v1',
+  trial: 'https://api.xzshub.top/api/v1',
+  release: 'https://api.xzshub.top/api/v1',
 }
 
 // 发布前检查：发布时必须改 LOCAL_DEBUG = false
@@ -59,6 +59,8 @@ module.exports = {
   debug: debugMode,
   DEBUG_QUESTION_ID: '',
   ENV: runtimeEnv,
+  AGREEMENT_VERSION: '2026-11-20',
+  PRIVACY_POLICY_VERSION: '2026-11-20',
   resolveRuntimeConfig,
   enableMathImage: false,
   // Wrong-book export entry for all users (backend capability check enabled).

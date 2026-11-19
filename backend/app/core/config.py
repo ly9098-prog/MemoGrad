@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
     ]
     # Host header allowlist. Production startup validation rejects these
     # development defaults until explicit public hostnames are configured.
@@ -86,6 +88,39 @@ class Settings(BaseSettings):
     # WeChat (jscode2session)
     WECHAT_APP_ID: str = ""
     WECHAT_APP_SECRET: str = ""
+
+    # Browser-facing origins and GitHub OAuth. Callback URLs must be exact
+    # reviewed allow-list entries; no request parameter can override them.
+    USER_WEB_BASE_URL: str = "http://localhost:3000"
+    ADMIN_WEB_BASE_URL: str = "http://localhost:3002"
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    GITHUB_OAUTH_CALLBACK_URL: str = (
+        "http://localhost:3000/api/v1/auth/github/callback"
+    )
+    GITHUB_OAUTH_STATE_TTL_SEC: int = 600
+
+    # SMTP transport. Production validation requires configured values when
+    # public email OTP is enabled; local/test may use the logging transport.
+    AUTH_EMAIL_ENABLED: bool = False
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 465
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "MemoGrad"
+    SMTP_USE_SSL: bool = True
+    SMTP_USE_STARTTLS: bool = False
+    SMTP_TIMEOUT_SEC: int = 10
+    OTP_EXPIRE_SEC: int = 300
+    OTP_RESEND_SEC: int = 60
+    OTP_MAX_ATTEMPTS: int = 3
+    OTP_EMAIL_HOURLY_LIMIT: int = 5
+    OTP_IP_HOURLY_LIMIT: int = 20
+    OTP_USER_DOMAIN_DAILY_LIMIT: int = 100
+    OTP_ADMIN_DOMAIN_DAILY_LIMIT: int = 30
+    USER_AGREEMENT_VERSION: str = "2026-11-20"
+    PRIVACY_POLICY_VERSION: str = "2026-11-20"
 
     # 部署档案（留空跟随 APP_ENV）
     DEPLOY_PROFILE: str = ""  # "local" | "production"

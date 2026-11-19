@@ -7,6 +7,7 @@ import {
   SlidersHorizontal,
   Users,
   UserCog,
+  UserRoundCog,
   Sigma,
   ListTree,
   FlaskConical,
@@ -115,6 +116,13 @@ const adminUsersRoute: AdminRoute = {
   description: "账号与角色",
   permission: "admin-user:read",
   icon: UserCog,
+};
+
+const securityRoute: AdminRoute = {
+  href: "/security",
+  label: "账号安全",
+  description: "邮箱与登录凭据",
+  icon: UserRoundCog,
 };
 
 
@@ -271,6 +279,7 @@ export const adminRoutes: AdminRoute[] = [
   dashboardRoute,
   appUsersRoute,
   adminUsersRoute,
+  securityRoute,
   subjectsRoute,
   questionsRoute,
   questionReviewRoute,
@@ -326,7 +335,7 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "系统管理",
     description: "配置、审计与任务",
     icon: SlidersHorizontal,
-    children: [aiSettingsRoute, auditLogsRoute, systemTasksRoute],
+    children: [securityRoute, aiSettingsRoute, auditLogsRoute, systemTasksRoute],
   },
   {
     type: "group",

@@ -50,10 +50,10 @@ if [ ! -d "node_modules" ]; then
 fi
 
 printf "\n%b\n" "${CYAN}Starting admin frontend...${NC}"
-printf "%b\n" "${CYAN}URL: http://127.0.0.1:3000${NC}"
+printf "%b\n" "${CYAN}URL: http://localhost:3002${NC}"
 printf "%b\n" "${CYAN}API: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-http://localhost:8000/api/admin/v1}${NC}"
 printf "%b\n" "${CYAN}Stop: Ctrl+C${NC}"
 printf "%b\n\n" "${CYAN}========================================${NC}"
 
 export NEXT_PUBLIC_ADMIN_API_BASE_URL="${NEXT_PUBLIC_ADMIN_API_BASE_URL:-http://localhost:8000/api/admin/v1}"
-exec npm run dev -- --hostname 0.0.0.0 --port 3000
+exec npm run dev -- --hostname 0.0.0.0

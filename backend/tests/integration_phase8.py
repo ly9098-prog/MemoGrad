@@ -187,7 +187,15 @@ async def teardown_db() -> None:
 
 
 async def login(client: httpx.AsyncClient) -> str:
-    res = await client.post("/api/v1/auth/login", json={"code": "phase8-test"})
+    res = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "code": "phase8-test",
+            "accepted_terms": True,
+            "agreement_version": "2026-11-20",
+            "privacy_version": "2026-11-20",
+        },
+    )
     assert res.status_code == 200, res.text
     return res.json()["access_token"]
 

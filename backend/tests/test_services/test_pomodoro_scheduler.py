@@ -105,19 +105,33 @@ async def reset_tables(isolated_db):
             PomodoroSubjectAllocation,
         )
         from app.models.user import User
+        from app.models.user_auth import UserAuthIdentity
 
         await db.execute(delete(PomodoroPauseInterval))
         # SQLite does not enable the allocation table's FK cascade in this fixture.
         await db.execute(delete(PomodoroSubjectAllocation))
         await db.execute(delete(PomodoroSession))
+        await db.execute(delete(UserAuthIdentity))
         await db.execute(delete(User))
         await db.commit()
 
 
 async def _make_user(db, openid: str = "openid_test") -> int:
     from app.models.user import User
+    from app.models.user_auth import UserAuthIdentity
+    from app.services.identity_service import wechat_namespace
+
     u = User(openid=openid)
     db.add(u)
+    await db.flush()
+    db.add(
+        UserAuthIdentity(
+            user_id=u.id,
+            provider="wechat",
+            namespace=wechat_namespace(),
+            subject=openid,
+        )
+    )
     await db.flush()
     return u.id
 
@@ -126,6 +140,7 @@ async def _make_subject(db) -> int:
     from sqlalchemy import select
 
     from app.models.admin import Subject
+
     subj = await db.scalar(select(Subject).where(Subject.code == "advanced_math"))
     if subj is not None:
         return subj.id
@@ -235,7 +250,60 @@ class TestServiceLayer:
         assert row.notification_sent is False
 
     @pytest.mark.asyncio
-    async def test_pause_then_resume_extends_expected_end_time(self, isolated_db, clock):
+    async def test_email_user_has_no_fabricated_wechat_snapshot(self, isolated_db):
+        from app.models.user import User
+        from app.services import pomodoro_service as svc
+
+        async with isolated_db.async_session() as db:
+            user = User()
+            db.add(user)
+            await db.flush()
+            subject_id = await _make_subject(db)
+            session = await svc.start_session(
+                db, user.id, subject_id, None, "standard", 25, 5
+            )
+            assert session.openid_snapshot is None
+
+    @pytest.mark.asyncio
+    async def test_wechat_snapshot_only_uses_the_current_app_namespace(
+        self, isolated_db
+    ):
+        from app.models.user import User
+        from app.models.user_auth import UserAuthIdentity
+        from app.services import pomodoro_service as svc
+        from app.services.identity_service import wechat_namespace
+
+        async with isolated_db.async_session() as db:
+            user = User()
+            db.add(user)
+            await db.flush()
+            db.add_all(
+                [
+                    UserAuthIdentity(
+                        user_id=user.id,
+                        provider="wechat",
+                        namespace="other-app",
+                        subject="wrong-openid",
+                    ),
+                    UserAuthIdentity(
+                        user_id=user.id,
+                        provider="wechat",
+                        namespace=wechat_namespace(),
+                        subject="current-openid",
+                    ),
+                ]
+            )
+            await db.flush()
+            subject_id = await _make_subject(db)
+            session = await svc.start_session(
+                db, user.id, subject_id, None, "standard", 25, 5
+            )
+            assert session.openid_snapshot == "current-openid"
+
+    @pytest.mark.asyncio
+    async def test_pause_then_resume_extends_expected_end_time(
+        self, isolated_db, clock
+    ):
         from sqlalchemy import select
 
         from app.models.pomodoro import PomodoroPauseInterval, PomodoroSession
