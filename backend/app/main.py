@@ -15,7 +15,7 @@ from app.core.database import async_session, init_db
 from app.core.deployment_profile import is_restricted_environment
 from app.core.event_loop_health import event_loop_health, monitor_event_loop_lag
 from app.core.http_error_handlers import register_http_exception_handlers
-from app.core.http_middleware import register_http_middleware
+from app.core.http_middleware import HttpApplication, register_http_middleware
 from app.core.http_runtime_policy import (
     assert_http_ocr_isolation,
     prepare_http_runtime_role,
@@ -298,7 +298,7 @@ async def lifespan(app: FastAPI):
 
 
 _production_mode = is_restricted_environment()
-app = FastAPI(
+app = HttpApplication(
     title="2240AI",
     version="0.1.0",
     lifespan=lifespan,

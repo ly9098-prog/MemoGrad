@@ -7,17 +7,52 @@ from collections.abc import Sequence
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from starlette.middleware.base import DispatchFunction, RequestResponseEndpoint
+from starlette.middleware import Middleware
+from starlette.middleware.base import (
+    BaseHTTPMiddleware,
+    DispatchFunction,
+    RequestResponseEndpoint,
+)
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp
 
 import app.core.log_context as log_context
+
+
+class HttpApplication(FastAPI):
+    """Apply response policies outside the framework's unhandled-error boundary."""
+
+    response_middleware: tuple[Middleware, ...]
+
+    def build_middleware_stack(self) -> ASGIApp:
+        stack = super().build_middleware_stack()
+        for middleware in reversed(getattr(self, "response_middleware", ())):
+            stack = middleware.cls(stack, *middleware.args, **middleware.kwargs)
+        return stack
+
+
+def _request_correlation_ids(request: Request) -> tuple[str, str]:
+    request_id = getattr(request.state, "request_id", None)
+    trace_id = getattr(request.state, "trace_id", None)
+    if not request_id:
+        request_id = log_context.normalize_request_id(request.headers.get("x-request-id"))
+        request.state.request_id = request_id
+    if not trace_id:
+        trace_id = log_context.normalize_trace_id(
+            request.headers.get("x-trace-id"), request.headers.get("traceparent"),
+        )
+        request.state.trace_id = trace_id
+    return request_id, trace_id
 
 
 def create_security_headers_middleware(*, production_mode: bool) -> DispatchFunction:
     async def add_security_headers(
         request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
+        request_id, trace_id = _request_correlation_ids(request)
         response = await call_next(request)
+        response.headers.setdefault("X-Request-ID", request_id)
+        response.headers.setdefault("X-Trace-ID", trace_id)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -67,15 +102,7 @@ async def log_requests(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
     access_logger = logging.getLogger("app.access")
-    trace_id = log_context.normalize_trace_id(
-        request.headers.get("x-trace-id"),
-        request.headers.get("traceparent"),
-    )
-    request_id = log_context.normalize_request_id(request.headers.get("x-request-id"))
-    # ServerErrorMiddleware handles unexpected exceptions after this middleware
-    # clears its ContextVars. Keep the normalized IDs on the shared ASGI scope.
-    request.state.request_id = request_id
-    request.state.trace_id = trace_id
+    request_id, trace_id = _request_correlation_ids(request)
     start = time.time()
     try:
         log_context.bind_log_context(trace_id=trace_id, request_id=request_id)
@@ -112,19 +139,23 @@ async def log_requests(
 
 
 def register_http_middleware(
-    app: FastAPI, *, allowed_hosts: Sequence[str], cors_origins: Sequence[str],
+    app: HttpApplication, *, allowed_hosts: Sequence[str], cors_origins: Sequence[str],
     production_mode: bool,
 ) -> None:
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["X-Request-ID", "X-Trace-ID"],
-    )
-    app.middleware("http")(
-        create_security_headers_middleware(production_mode=production_mode)
-    )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
     app.middleware("http")(log_requests)
+    # CORS must wrap ServerErrorMiddleware; security must also cover preflights.
+    app.response_middleware = (
+        Middleware(
+            BaseHTTPMiddleware,
+            dispatch=create_security_headers_middleware(production_mode=production_mode),
+        ),
+        Middleware(
+            CORSMiddleware,
+            allow_origins=list(cors_origins),
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["X-Request-ID", "X-Trace-ID"],
+        ),
+    )

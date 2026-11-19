@@ -29,21 +29,23 @@ def test_main_uses_actual_middleware_and_preserves_order_and_options():
     from app.core.http_middleware import log_requests
 
     registered = main.app.user_middleware
-    assert len(registered) == 4
+    assert len(registered) == 2
     assert registered[0].kwargs["dispatch"] is log_requests
-    security = registered[1].kwargs["dispatch"]
+    outer = main.app.response_middleware
+    assert len(outer) == 2
+    security = outer[0].kwargs["dispatch"]
     assert security.__module__ == "app.core.http_middleware"
     assert security.__name__ == "add_security_headers"
-    assert registered[2].cls is CORSMiddleware
-    assert registered[2].kwargs == {
+    assert outer[1].cls is CORSMiddleware
+    assert outer[1].kwargs == {
         "allow_origins": main.settings.CORS_ORIGINS,
         "allow_credentials": True,
         "allow_methods": ["*"],
         "allow_headers": ["*"],
         "expose_headers": ["X-Request-ID", "X-Trace-ID"],
     }
-    assert registered[3].cls is TrustedHostMiddleware
-    assert registered[3].kwargs == {"allowed_hosts": main.settings.ALLOWED_HOSTS}
+    assert registered[1].cls is TrustedHostMiddleware
+    assert registered[1].kwargs == {"allowed_hosts": main.settings.ALLOWED_HOSTS}
     assert not hasattr(main, "log_requests")
     assert not hasattr(main, "add_security_headers")
 

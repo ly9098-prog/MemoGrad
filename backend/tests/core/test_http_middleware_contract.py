@@ -3,10 +3,12 @@
 import asyncio
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.testclient import TestClient
+from starlette.background import BackgroundTask
 from starlette.requests import Request
+from starlette.responses import StreamingResponse
 
 from app.core import http_middleware as middleware
 from app.core import log_context
@@ -146,7 +148,7 @@ async def test_access_correlation_normalizes_or_generates_ids(monkeypatch, heade
 @pytest.mark.parametrize("production", [False, True])
 def test_real_stack_order_cors_host_and_exception_responses(monkeypatch, production):
     monkeypatch.setattr(log_context, "log_event", lambda *_args, **_kwargs: None)
-    app = FastAPI()
+    app = middleware.HttpApplication()
     middleware.register_http_middleware(
         app, allowed_hosts=["testserver"], cors_origins=["https://allowed.example"],
         production_mode=production,
@@ -220,7 +222,7 @@ async def test_query_parse_failure_and_missing_client_keep_start_event(monkeypat
 
 @pytest.mark.asyncio
 async def test_security_mode_is_owned_by_each_registered_application():
-    apps = [FastAPI(), FastAPI()]
+    apps = [middleware.HttpApplication(), middleware.HttpApplication()]
     for app, production in zip(apps, [True, False], strict=True):
         middleware.register_http_middleware(
             app, allowed_hosts=["testserver"], cors_origins=[], production_mode=production,
@@ -231,6 +233,119 @@ async def test_security_mode_is_owned_by_each_registered_application():
 
     incoming = request()
     for app, production in [(apps[0], True), (apps[1], False), (apps[0], True)]:
-        dispatch = app.user_middleware[1].kwargs["dispatch"]
+        dispatch = app.response_middleware[0].kwargs["dispatch"]
         response = await dispatch(incoming, downstream)
         assert ("Strict-Transport-Security" in response.headers) is production
+
+
+@pytest.mark.parametrize("production", [False, True])
+@pytest.mark.parametrize("path", ["/ordinary", "/api/admin/v1/auth/synthetic"])
+@pytest.mark.parametrize("origin", [None, "https://allowed.example", "https://denied.example"])
+@pytest.mark.parametrize("failure", ["endpoint", "access_log"])
+def test_unhandled_500_keeps_response_policies(monkeypatch, production, path, origin, failure):
+    def log_event(_logger, event, **_fields):
+        if failure == "access_log" and event == "http.request.start":
+            raise RuntimeError("synthetic-private-log-failure")
+
+    monkeypatch.setattr(log_context, "log_event", log_event)
+    monkeypatch.setattr(log_context, "generate_request_id", lambda: "normalized-request")
+    monkeypatch.setattr(log_context, "generate_trace_id", lambda: "normalized-trace")
+    app = middleware.HttpApplication()
+    middleware.register_http_middleware(
+        app, allowed_hosts=["testserver"], cors_origins=["https://allowed.example"],
+        production_mode=production,
+    )
+    register_http_exception_handlers(app)
+
+    @app.get(path)
+    async def endpoint():
+        raise RuntimeError("synthetic-private-database-detail")
+
+    headers = {"X-Request-ID": "invalid request value", "X-Trace-ID": "invalid trace value"}
+    if origin is not None:
+        headers["Origin"] = origin
+    response = TestClient(app, raise_server_exceptions=False).get(path, headers=headers)
+    assert response.status_code == 500
+    error = response.json()["error"]
+    assert error["code"] == "INTERNAL_ERROR"
+    assert error["request_id"] == response.headers["X-Request-ID"] == "normalized-request"
+    assert error["trace_id"] == response.headers["X-Trace-ID"] == "normalized-trace"
+    assert "synthetic-private" not in response.text
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "Permissions-Policy" in response.headers
+    assert ("Strict-Transport-Security" in response.headers) is production
+    assert response.headers.get("Cache-Control") == ("no-store" if "/auth/" in path else None)
+    assert response.headers.get("Pragma") == ("no-cache" if "/auth/" in path else None)
+    allowed = origin == "https://allowed.example"
+    assert response.headers.get("Access-Control-Allow-Origin") == (origin if allowed else None)
+    if allowed:
+        assert response.headers["Access-Control-Allow-Credentials"] == "true"
+        assert response.headers["Access-Control-Expose-Headers"] == "X-Request-ID, X-Trace-ID"
+        assert "Origin" in response.headers["Vary"]
+
+
+def test_outer_policies_keep_framework_boundary_and_snapshot_configuration():
+    from fastapi import FastAPI
+    from starlette.middleware.cors import CORSMiddleware
+    from starlette.middleware.errors import ServerErrorMiddleware
+
+    allowed_hosts, origins = ["testserver"], ["https://allowed.example"]
+    app = middleware.HttpApplication()
+    middleware.register_http_middleware(
+        app, allowed_hosts=allowed_hosts, cors_origins=origins, production_mode=True,
+    )
+    allowed_hosts.clear()
+    origins.clear()
+    stack = app.build_middleware_stack()
+    assert isinstance(app, FastAPI)
+    assert isinstance(stack.app, CORSMiddleware)
+    assert isinstance(stack.app.app, ServerErrorMiddleware)
+    assert app.user_middleware[1].kwargs["allowed_hosts"] == ["testserver"]
+    assert app.response_middleware[1].kwargs["allow_origins"] == ["https://allowed.example"]
+    assert middleware.HttpApplication().build_middleware_stack() is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["stream", "background"])
+async def test_failure_after_response_start_does_not_send_a_second_response(failure):
+    app = middleware.HttpApplication()
+    middleware.register_http_middleware(
+        app, allowed_hosts=["testserver"], cors_origins=["https://allowed.example"],
+        production_mode=True,
+    )
+    register_http_exception_handlers(app)
+
+    async def fail():
+        raise RuntimeError("synthetic-after-response-start")
+
+    async def stream():
+        yield b"first-chunk"
+        await fail()
+
+    @app.get("/synthetic")
+    async def endpoint():
+        if failure == "background":
+            return JSONResponse({"status": "ok"}, background=BackgroundTask(fail))
+        return StreamingResponse(stream())
+
+    incoming = request([("host", "testserver"), ("origin", "https://allowed.example")])
+    incoming.scope.update({"asgi": {"version": "3.0", "spec_version": "2.4"},
+                           "http_version": "1.1", "scheme": "http", "root_path": ""})
+    messages = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        messages.append(message)
+
+    with pytest.raises(RuntimeError, match="synthetic-after-response-start"):
+        await app(incoming.scope, receive, send)
+    starts = [message for message in messages if message["type"] == "http.response.start"]
+    assert [message["status"] for message in starts] == [200]
+    headers = dict(starts[0]["headers"])
+    assert headers[b"access-control-allow-origin"] == b"https://allowed.example"
+    assert headers[b"x-content-type-options"] == b"nosniff"
+    assert all(b"INTERNAL_ERROR" not in message.get("body", b"") for message in messages)
