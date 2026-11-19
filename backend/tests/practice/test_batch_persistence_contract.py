@@ -144,8 +144,12 @@ async def test_wrong_side_effects_interleave_before_each_outbox():
         "outbox",
     ]
     assert events[3][-1] == {"question_version_id": 901, "commit": False}
-    assert events[5][1] == {"practice_record_id": 70, "request_id": "r1"}
-    assert events[8][1] == {"practice_record_id": 71, "request_id": "r2"}
+    assert events[5][1] == {
+        "practice_record_id": 70, "request_id": "r1", "owner_user_id": 8,
+    }
+    assert events[8][1] == {
+        "practice_record_id": 71, "request_id": "r2", "owner_user_id": 8,
+    }
     assert result.prewarm_wrong_questions[0].id == 71
     assert result.wrong_question_ids == {1: 71, 2: 72}
     assert db.added[0]._error_diagnosis_payload == {"question": "1"}
@@ -178,7 +182,7 @@ async def test_correct_only_skips_wrong_ports_and_reads_request_after_flush():
         ("add", 3),
         ("flush",),
         ("request", 3, None),
-        ("outbox", {"practice_record_id": 70, "request_id": "r3"}),
+        ("outbox", {"practice_record_id": 70, "request_id": "r3", "owner_user_id": 8}),
     ]
 
 

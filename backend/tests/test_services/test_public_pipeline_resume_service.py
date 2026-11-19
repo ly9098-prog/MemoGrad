@@ -17,6 +17,7 @@ from starlette.datastructures import Headers
 
 from app.api.v1 import imports
 from app.models.import_pipeline import ImportPipeline, ImportPipelineChunk
+from app.models.user import User
 from app.services import import_pipeline_service, staging_storage, task_queue_worker
 from app.services.db_fencing import initialize_fencing_fields
 from app.services.task_queue_contract import EnqueueResult, Task
@@ -27,6 +28,7 @@ from tests.fixtures.pdf_helper import make_minimal_pdf
 async def resume_case(monkeypatch):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
+        await conn.run_sync(User.__table__.create)
         await conn.run_sync(ImportPipeline.__table__.create)
         await conn.run_sync(ImportPipelineChunk.__table__.create)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
@@ -49,6 +51,7 @@ async def resume_case(monkeypatch):
 
 async def _seed_pipeline(sessions: async_sessionmaker, pdf: bytes) -> None:
     async with sessions() as db:
+        db.add(User(id=7, openid="synthetic-resume-owner", is_banned=False))
         db.add(
             ImportPipeline(
                 pipeline_id="public-pdf",

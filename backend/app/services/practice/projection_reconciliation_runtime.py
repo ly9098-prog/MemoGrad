@@ -20,6 +20,20 @@ class ReconcileCyclePorts:
     log_exception: Callable[..., Any]
 
 
+def reconciliation_grace(
+    grace_sec: int | None,
+    get_settings: Callable[[], Any],
+) -> int:
+    return max(
+        0,
+        int(
+            grace_sec
+            if grace_sec is not None
+            else get_settings().ANSWER_PROJECTION_RECONCILE_GRACE_SEC
+        ),
+    )
+
+
 def reconciliation_limits(
     batch_size: int | None,
     grace_sec: int | None,
@@ -33,15 +47,7 @@ def reconciliation_limits(
             else get_settings().ANSWER_PROJECTION_RECONCILE_BATCH_SIZE
         ),
     )
-    effective_grace = max(
-        0,
-        int(
-            grace_sec
-            if grace_sec is not None
-            else get_settings().ANSWER_PROJECTION_RECONCILE_GRACE_SEC
-        ),
-    )
-    return effective_batch, effective_grace
+    return effective_batch, reconciliation_grace(grace_sec, get_settings)
 
 
 def reconciler_parameters(

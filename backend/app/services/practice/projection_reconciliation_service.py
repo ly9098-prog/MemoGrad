@@ -34,6 +34,7 @@ from app.services.practice.answer_projection_contract import (
 from app.services.practice.projection_reconciliation_runtime import (
     ReconcileCyclePorts,
     reconciler_parameters,
+    reconciliation_grace,
     reconciliation_limits,
     run_projection_reconcile_cycles,
 )
@@ -79,16 +80,8 @@ async def get_projection_backlog_metrics(
     grace_sec: int | None = None,
     now: datetime | None = None,
 ) -> dict[str, int | str | None]:
-    effective_grace = max(
-        0,
-        int(
-            grace_sec
-            if grace_sec is not None
-            else settings.ANSWER_PROJECTION_RECONCILE_GRACE_SEC
-        ),
-    )
     current = normalize_to_naive_utc(now) if now is not None else utcnow()
-    cutoff = current - timedelta(seconds=effective_grace)
+    cutoff = current - timedelta(seconds=reconciliation_grace(grace_sec, lambda: settings))
 
     aggregate = (
         await db.execute(
@@ -108,9 +101,7 @@ async def get_projection_backlog_metrics(
     return {
         "unprojected": count,
         "oldest_age_sec": oldest_age_sec,
-        "oldest_answered_at": serialize_utc_datetime(oldest)
-        if oldest is not None
-        else None,
+        "oldest_answered_at": serialize_utc_datetime(oldest) if oldest is not None else None,
     }
 
 
