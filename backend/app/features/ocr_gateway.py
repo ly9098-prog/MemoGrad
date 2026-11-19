@@ -224,6 +224,7 @@ class OCRGateway:
         self,
         images: list[tuple[int, bytes]],
         *,
+        options: dict | None = None,
         requirements: RequiredOCRCapabilities | None = None,
         trace_id: str = "",
     ) -> list[WorkerResult]:
@@ -282,7 +283,7 @@ class OCRGateway:
                 for idx, _ in images
             ]
 
-        return await worker_client.recognize_batch(images)
+        return await worker_client.recognize_batch(images, options=options)
 
     async def shutdown(
         self,
@@ -342,6 +343,12 @@ class OCRGateway:
         """Return the shared worker client, creating it once on demand."""
         if self._worker_client is None:
             self._worker_client = self._init_worker_client()
+        if (
+            self._profile == DeploymentProfile.CLOUD_API
+            and getattr(self._worker_client, "cpu_fallback_enabled", False) is True
+        ):
+            logger.error("Cloud OCR Gateway refuses a client with local CPU fallback")
+            return None
         return self._worker_client
 
     async def route_page(

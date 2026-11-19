@@ -229,6 +229,13 @@ async def initialize_fencing_fields(
         update(model_class)
         .where(pk_col == record_id)
         .where(
+            # Generations belong to one queue task. A different task must first
+            # reserve this business row explicitly (for example, manual retry).
+            (model_class.current_task_id == task_id)
+            | (model_class.current_task_id.is_(None))
+            | (model_class.current_task_id == "")
+        )
+        .where(
             # Only set if not already set by a higher generation
             (model_class.execution_generation == 0)
             | (model_class.execution_generation < generation)

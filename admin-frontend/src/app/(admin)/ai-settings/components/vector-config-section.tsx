@@ -3,17 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  Brain,
   CheckCircle2,
+  ChevronDown,
   Loader2,
   Save,
-  SlidersHorizontal,
   Wifi,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
-import { Toggle } from "@/components/ui/toggle";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import type {
@@ -22,39 +20,56 @@ import type {
   VectorConfig,
   VectorConfigPatchRequest,
 } from "@/lib/api/types";
-
-type Tab = "search" | "embedding";
-
-const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "search", label: "检索配置", icon: SlidersHorizontal },
-  { key: "embedding", label: "Embedding 模型", icon: Brain },
-];
-
-const inputCls =
-  "mt-1 h-9 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none transition-colors focus:border-primary";
-const labelCls = "text-[11px] font-medium text-muted-foreground/70";
+import { Section, useUnsavedChangesWarning } from "./editorial-settings";
+import styles from "./editorial-settings.module.css";
 
 function hasEmbeddingCapability(model: AdminAiModelConfig) {
-  return (model.features ?? []).includes("embedding") || model.feature === "embedding";
+  return (
+    (model.features ?? []).includes("embedding") || model.feature === "embedding"
+  );
+}
+
+function showToast(message: string, isError = false) {
+  const element = document.createElement("div");
+  element.className =
+    "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-card px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in " +
+    (isError ? "border-destructive/30 text-destructive" : "border-success/30 text-success");
+  element.setAttribute("role", isError ? "alert" : "status");
+  element.setAttribute("aria-live", isError ? "assertive" : "polite");
+  element.textContent = message;
+  document.body.appendChild(element);
+  window.setTimeout(() => element.remove(), 2500);
+}
+
+export function isVectorConfigValid(values: {
+  dim: number;
+  timeout: number;
+  batchSize: number;
+  topK: number;
+  threshold: number;
+  ttl: number;
+}) {
+  const integerInRange = (value: number, min: number, max: number) =>
+    Number.isInteger(value) && value >= min && value <= max;
+  return (
+    integerInRange(values.dim, 1, 8192) &&
+    integerInRange(values.timeout, 1, 300) &&
+    integerInRange(values.batchSize, 1, 256) &&
+    integerInRange(values.topK, 1, 10000) &&
+    Number.isFinite(values.threshold) &&
+    values.threshold >= 0 &&
+    values.threshold <= 1 &&
+    integerInRange(values.ttl, 0, 86400)
+  );
 }
 
 export function VectorConfigSection() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<VectorConfigPatchRequest>({});
   const [testResult, setTestResult] = useState<EmbeddingTestResponse | null>(null);
-  const [tab, setTab] = useState<Tab>("search");
-
-  function showToast(msg: string, isError = false) {
-    const el = document.createElement("div");
-    el.className =
-      "fixed left-1/2 top-4 z-[200] -translate-x-1/2 rounded-xl border bg-card px-5 py-3 text-sm font-semibold shadow-[var(--shadow-card)] animate-rise-in" +
-      (isError
-        ? " border-destructive/30 text-destructive"
-        : " border-success/30 text-success");
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
-  }
+  const testRequestRef = useRef(0);
+  const dirty = Object.keys(form).length > 0;
+  useUnsavedChangesWarning(dirty);
 
   const config = useQuery({
     queryKey: ["vector-config"],
@@ -80,12 +95,15 @@ export function VectorConfigSection() {
       setTestResult(null);
       showToast("向量配置已保存");
     },
-    onError: (err) => showToast(getErrorMessage(err), true),
+    onError: (error) => showToast(getErrorMessage(error), true),
   });
 
   const set = useCallback(
-    <K extends keyof VectorConfigPatchRequest>(key: K, value: VectorConfigPatchRequest[K]) => {
-      setForm((prev) => ({ ...prev, [key]: value }));
+    <K extends keyof VectorConfigPatchRequest>(
+      key: K,
+      value: VectorConfigPatchRequest[K],
+    ) => {
+      setForm((current) => ({ ...current, [key]: value }));
     },
     [],
   );
@@ -97,7 +115,10 @@ export function VectorConfigSection() {
       : c?.embedding_model_config_id ?? null;
 
   const embeddingModels = useMemo(
-    () => (models.data ?? []).filter((model) => model.is_enabled && hasEmbeddingCapability(model)),
+    () =>
+      (models.data ?? []).filter(
+        (model) => model.is_enabled && hasEmbeddingCapability(model),
+      ),
     [models.data],
   );
 
@@ -106,310 +127,531 @@ export function VectorConfigSection() {
     [models.data, selectedModelId],
   );
 
+  const invalidateTestResult = useCallback(() => {
+    testRequestRef.current += 1;
+    setTestResult(null);
+  }, []);
+
   const testMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedModelId) throw new Error("请先选择 Embedding 模型");
+    mutationFn: (variables: {
+      requestId: number;
+      modelConfigId: number;
+      dim: number;
+      timeout: number;
+    }) => {
+      if (!variables.modelConfigId) throw new Error("请先选择 Embedding 模型");
       return apiRequest<EmbeddingTestResponse>("/vector-config/test-embedding", {
         method: "POST",
         body: JSON.stringify({
-          model_config_id: selectedModelId,
-          dim: form.embedding_dim ?? c?.embedding_dim ?? 1024,
-          timeout: form.embedding_timeout ?? c?.embedding_timeout ?? 30,
+          model_config_id: variables.modelConfigId,
+          dim: variables.dim,
+          timeout: variables.timeout,
         }),
       });
     },
-    onSuccess: (data) => setTestResult(data),
-    onError: (err) =>
+    onSuccess: (data, variables) => {
+      if (variables.requestId === testRequestRef.current) setTestResult(data);
+    },
+    onError: (error, variables) => {
+      if (variables.requestId !== testRequestRef.current) return;
       setTestResult({
         success: false,
         status: "network_error",
-        message: getErrorMessage(err),
+        message: getErrorMessage(error),
         latency_ms: 0,
         returned_dim: null,
-      }),
+      });
+    },
   });
 
   if (config.isLoading || models.isLoading) {
     return (
-      <div className="rounded-2xl border border-border/80 bg-card/80 p-8 text-center shadow-sm">
-        <Loader2 className="mx-auto h-5 w-5 animate-spin text-primary" />
-        <p className="mt-2 text-sm text-muted-foreground/70">加载向量配置…</p>
-      </div>
+      <Section eyebrow="05 / 向量" title="检索与嵌入" lead="把题目变成可检索的语义坐标。">
+        <div className={styles.loadingBlock} aria-label="正在加载向量配置">
+          {Array.from({ length: 5 }, (_, index) => (
+            <span
+              key={index}
+              className={styles.loadingLine}
+              style={{ width: `${86 - index * 7}%` }}
+            />
+          ))}
+        </div>
+      </Section>
     );
   }
 
   if (config.isError || !c) {
     return (
-      <p className="rounded-xl border border-destructive bg-destructive-light px-4 py-3 text-sm text-destructive">
-        {getErrorMessage(config.error)}
-      </p>
+      <Section eyebrow="05 / 向量" title="检索与嵌入" lead="把题目变成可检索的语义坐标。">
+        <p className={styles.noticeError}>
+          {getErrorMessage(config.error) || "暂时无法读取向量配置"}
+        </p>
+      </Section>
     );
   }
 
-  const dirty = Object.keys(form).length > 0;
   const isEnabled = form.vector_enabled ?? c.vector_enabled;
-  const selectedInvalid = Boolean(selectedModel && (!selectedModel.is_enabled || !hasEmbeddingCapability(selectedModel)));
+  const selectedInvalid = Boolean(
+    selectedModel &&
+      (!selectedModel.is_enabled || !hasEmbeddingCapability(selectedModel)),
+  );
+  const configuredDim = form.embedding_dim ?? c.embedding_dim;
+  const configuredTimeout = form.embedding_timeout ?? c.embedding_timeout;
+  const configuredBatchSize = form.embedding_batch_size ?? c.embedding_batch_size;
+  const configuredTopK = form.vector_top_k ?? c.vector_top_k;
+  const configuredThreshold =
+    form.vector_similarity_threshold ?? c.vector_similarity_threshold;
+  const configuredTtl = form.vector_cache_ttl_sec ?? c.vector_cache_ttl_sec;
+
+  const formValid = isVectorConfigValid({
+    dim: configuredDim,
+    timeout: configuredTimeout,
+    batchSize: configuredBatchSize,
+    topK: configuredTopK,
+    threshold: configuredThreshold,
+    ttl: configuredTtl,
+  });
+
+  const connectionLabel = !selectedModel
+    ? "未选择"
+    : selectedInvalid
+      ? "不可用"
+      : testResult && !testResult.success
+        ? "测试失败"
+        : !selectedModel.api_configured
+          ? "未配置 Key"
+          : testResult?.success
+            ? "可用（已测试）"
+            : "待测试";
+  const connectionTone =
+    connectionLabel === "可用（已测试）"
+      ? "good"
+      : connectionLabel === "未配置 Key" || connectionLabel === "待测试"
+        ? "warn"
+        : "bad";
+  const connectionHint = !selectedModel
+    ? "选择模型后开始校验"
+    : selectedInvalid
+      ? "模型已停用或缺少 Embedding 能力"
+      : testResult && !testResult.success
+        ? testResult.message || "Provider 连接测试失败"
+        : testResult?.success
+          ? "最近一次连接测试成功"
+          : selectedModel.api_configured
+            ? "API Key 已配置，尚未测试"
+            : "API Key 未配置";
+  const dimStatus =
+    testResult?.success && testResult.returned_dim != null
+      ? testResult.returned_dim === configuredDim
+        ? "维度已对齐"
+        : `返回 ${testResult.returned_dim} · 与配置不一致`
+      : testResult?.success
+        ? "连接成功"
+        : testResult
+          ? "连接测试失败"
+          : "等待连接测试";
+
+  const aside = (
+    <div>
+      <span className={styles.statusText} data-on="true">
+        <span className={styles.statusDot} data-on="true" />
+        pgvector · cosine
+      </span>
+      <div className={styles.asideSwitch}>
+        <span>{isEnabled ? "向量检索已启用" : "向量检索已禁用"}</span>
+        <Toggle
+          ariaLabel="向量检索"
+          checked={isEnabled}
+          disabled={saveMutation.isPending}
+          onChange={() => set("vector_enabled", !isEnabled)}
+          size="sm"
+          color="#3e7c96"
+        />
+      </div>
+    </div>
+  );
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/80 bg-card/80 shadow-[var(--shadow-card)] animate-rise-in">
-      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-        <div>
-          <h3 className="font-display text-xl font-bold text-foreground">向量检索 & Embedding</h3>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            选择模型配置中已注册的 Embedding 模型，并管理 pgvector 检索参数
-          </p>
+    <Section
+      eyebrow="05 / 向量"
+      title="检索与嵌入"
+      lead="把题目变成可检索的语义坐标。"
+      aside={aside}
+    >
+      <div className={styles.identityBand}>
+        <div className={styles.identityCell}>
+          <span className={styles.identityIndex}>01</span>
+          <span className={styles.identityLabel}>当前模型</span>
+          <div className={styles.selectWrap}>
+            <select
+              aria-label="当前 Embedding 模型"
+              className={styles.modelSelect}
+              disabled={saveMutation.isPending}
+              onChange={(event) => {
+                set(
+                  "embedding_model_config_id",
+                  event.target.value ? Number(event.target.value) : null,
+                );
+                invalidateTestResult();
+              }}
+              value={selectedModelId ?? ""}
+            >
+              <option value="">
+                {embeddingModels.length > 0
+                  ? "选择 Embedding 模型"
+                  : "暂无 Embedding 模型"}
+              </option>
+              {embeddingModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.display_name} · {model.name}
+                </option>
+              ))}
+              {selectedModel &&
+              !embeddingModels.some((model) => model.id === selectedModel.id) ? (
+                <option value={selectedModel.id}>
+                  {selectedModel.display_name} · 已停用
+                </option>
+              ) : null}
+            </select>
+            <ChevronDown className={styles.selectChevron} />
+          </div>
+          <span className={styles.identitySub}>
+            {selectedModel?.provider ?? "从模型页注册模型"}
+          </span>
         </div>
-        <Button disabled={!dirty || saveMutation.isPending} onClick={() => saveMutation.mutate(form)}>
-          {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          保存
-        </Button>
+
+        <div className={styles.identityCell}>
+          <span className={styles.identityIndex}>02</span>
+          <span className={styles.identityLabel}>向量维度</span>
+          <div className={styles.identityNumberRow}>
+            <input
+              aria-label="向量维度"
+              className={styles.identityNumberInput}
+              disabled={saveMutation.isPending}
+              max={8192}
+              min={1}
+              onChange={(event) => {
+                set("embedding_dim", Number(event.target.value));
+                invalidateTestResult();
+              }}
+              type="number"
+              value={configuredDim}
+            />
+            <span className={styles.identityNumberUnit}>dim</span>
+          </div>
+          <span
+            className={styles.identitySub}
+            data-tone={
+              testResult?.success &&
+              testResult.returned_dim != null &&
+              testResult.returned_dim === configuredDim
+                ? "good"
+                : testResult?.success &&
+                    testResult.returned_dim != null &&
+                    testResult.returned_dim !== configuredDim
+                  ? "warn"
+                  : testResult && !testResult.success
+                    ? "bad"
+                    : undefined
+            }
+          >
+            {dimStatus}
+          </span>
+        </div>
+
+        <div className={styles.identityCell}>
+          <span className={styles.identityIndex}>03</span>
+          <span className={styles.identityLabel}>连接状态</span>
+          <span className={styles.identityValue} data-tone={connectionTone}>
+            <span
+              className={styles.statusDot}
+              data-on={connectionTone === "good" ? "true" : "false"}
+            />
+            {connectionLabel}
+          </span>
+          <span className={styles.identitySub}>{connectionHint}</span>
+        </div>
       </div>
 
-      <div className="flex min-h-[360px]">
-        <nav className="flex w-[160px] shrink-0 flex-col gap-1 border-r border-border/60 bg-muted/50 p-2.5">
-          <div
-            className={cn(
-              "mb-2 flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors",
-              isEnabled
-                ? "border-success/30 bg-success-light"
-                : "border-border bg-card/60",
-            )}
-          >
-            <span className={cn("text-xs font-semibold", isEnabled ? "text-success" : "text-muted-foreground/70")}>
-              {isEnabled ? "已启用" : "已禁用"}
-            </span>
-            <Toggle checked={isEnabled} size="sm" onChange={() => set("vector_enabled", !isEnabled)} />
+      {models.isError ? (
+        <p className={styles.noticeError}>{getErrorMessage(models.error)}</p>
+      ) : null}
+
+      <div className={`${styles.split} ${styles.splitVector}`}>
+        <div className={styles.pane}>
+          <div className={styles.paneHeader}>
+            <h3 className={styles.paneTitle}>检索参数</h3>
+            <span className={styles.paneMeta}>pgvector · cosine</span>
           </div>
 
-          {TABS.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setTab(item.key)}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-all",
-                  active
-                    ? "bg-card font-semibold text-foreground shadow-[0_2px_8px_rgba(0,0,0,.06)]"
-                    : "text-muted-foreground hover:bg-card/60",
-                )}
+          <div className={styles.parameterRows}>
+            <label className={styles.parameterRow}>
+              <div className={styles.parameterCopy}>
+                <span className={styles.parameterLabel}>Top K</span>
+                <span className={styles.parameterHint}>每次召回最相近的题目数量</span>
+              </div>
+              <div className={styles.parameterValueWrap}>
+                <input
+                  aria-label="Top K"
+                  className={styles.parameterInput}
+                  disabled={saveMutation.isPending}
+                  max={10000}
+                  min={1}
+                  onChange={(event) => set("vector_top_k", Number(event.target.value))}
+                  type="number"
+                  value={configuredTopK}
+                />
+                <span className={styles.parameterUnit}>条</span>
+              </div>
+            </label>
+
+            <label className={styles.parameterRow}>
+              <div className={styles.parameterCopy}>
+                <span className={styles.parameterLabel}>相似度阈值</span>
+                <span className={styles.parameterHint}>低于阈值的候选会被丢弃</span>
+              </div>
+              <div className={styles.parameterValueWrap}>
+                <input
+                  aria-label="相似度阈值"
+                  className={styles.parameterInput}
+                  disabled={saveMutation.isPending}
+                  max={1}
+                  min={0}
+                  onChange={(event) =>
+                    set("vector_similarity_threshold", Number(event.target.value))
+                  }
+                  step={0.01}
+                  type="number"
+                  value={configuredThreshold}
+                />
+              </div>
+            </label>
+
+            <label className={styles.parameterRow}>
+              <div className={styles.parameterCopy}>
+                <span className={styles.parameterLabel}>缓存 TTL</span>
+                <span className={styles.parameterHint}>检索结果在内存中的有效期</span>
+              </div>
+              <div className={styles.parameterValueWrap}>
+                <input
+                  aria-label="缓存 TTL"
+                  className={styles.parameterInput}
+                  disabled={saveMutation.isPending}
+                  max={86400}
+                  min={0}
+                  onChange={(event) =>
+                    set("vector_cache_ttl_sec", Number(event.target.value))
+                  }
+                  step={60}
+                  type="number"
+                  value={configuredTtl}
+                />
+                <span className={styles.parameterUnit}>秒</span>
+              </div>
+            </label>
+          </div>
+          <p className={styles.parameterNote}>
+            参数修改后需保存，下一次检索请求生效。
+          </p>
+
+          <div className={styles.vectorChecklist}>
+            <div className={styles.paneSub}>配置检查</div>
+            {[
+              { label: "向量检索已启用", ok: isEnabled },
+              { label: "Embedding 模型已选择", ok: Boolean(selectedModelId) },
+              { label: "API Key 已配置", ok: Boolean(selectedModel?.api_configured) },
+              { label: "模型能力有效", ok: Boolean(selectedModel) && !selectedInvalid },
+              { label: "检索参数合法", ok: formValid },
+            ].map((item) => (
+              <div className={styles.vectorCheckRow} key={item.label} data-ok={item.ok}>
+                <span className={styles.statusDot} data-on={item.ok ? "true" : "false"} />
+                <span>{item.label}</span>
+                <em>{item.ok ? "通过" : "待处理"}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.pane}>
+          <div className={styles.paneHeader}>
+            <h3 className={styles.paneTitle}>Embedding 连接</h3>
+            <span className={styles.paneMeta}>
+              {selectedModel?.display_name ?? "模型配置"}
+            </span>
+          </div>
+
+          {embeddingModels.length === 0 ? (
+            <p className={styles.noticeWarn}>
+              尚未注册 Embedding 模型，请先到「模型」标签添加并启用 Embedding 能力。
+            </p>
+          ) : null}
+
+          <div className={styles.connectionList}>
+            <div className={styles.connectionRow}>
+              <span className={styles.connectionLabel}>Provider</span>
+              <span className={styles.connectionValue}>
+                {selectedModel?.provider ?? "—"}
+              </span>
+            </div>
+            <div className={styles.connectionRow}>
+              <span className={styles.connectionLabel}>Model ID</span>
+              <span className={styles.connectionValue}>
+                {selectedModel?.name ?? "—"}
+              </span>
+            </div>
+            <div className={styles.connectionRow}>
+              <span className={styles.connectionLabel}>Base URL</span>
+              <span
+                className={styles.connectionValue}
+                data-tone={selectedModel?.api_base_url ? undefined : "warn"}
               >
-                <Icon className={cn("h-3.5 w-3.5", active ? "text-primary" : "text-muted-foreground/70")} />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="flex-1 p-5">
-          {tab === "search" && (
-            <div className="space-y-5 animate-rise-in">
-              <div className="grid grid-cols-3 gap-3">
-                <label className="block">
-                  <span className={labelCls}>Top K</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10000}
-                    className={inputCls}
-                    value={form.vector_top_k ?? c.vector_top_k}
-                    onChange={(e) => set("vector_top_k", Number(e.target.value))}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelCls}>相似度阈值</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    className={inputCls}
-                    value={form.vector_similarity_threshold ?? c.vector_similarity_threshold}
-                    onChange={(e) => set("vector_similarity_threshold", Number(e.target.value))}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelCls}>缓存 TTL (秒)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={86400}
-                    className={inputCls}
-                    value={form.vector_cache_ttl_sec ?? c.vector_cache_ttl_sec}
-                    onChange={(e) => set("vector_cache_ttl_sec", Number(e.target.value))}
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-lg border border-border/50 bg-muted/35 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-                Provider、API Key、Base URL 与 Model ID 统一在「模型配置」维护；本页不再保存第二套 Embedding 凭据。
-              </div>
+                {selectedModel?.api_base_url || "未配置"}
+              </span>
             </div>
-          )}
+            <div className={styles.connectionRow}>
+              <span className={styles.connectionLabel}>API Key</span>
+              <span
+                className={styles.connectionValue}
+                data-tone={
+                  selectedModel
+                    ? selectedModel.api_configured
+                      ? "good"
+                      : "warn"
+                    : undefined
+                }
+              >
+                {selectedModel
+                  ? selectedModel.api_configured
+                    ? "已配置"
+                    : "未配置"
+                  : "—"}
+              </span>
+            </div>
+            <div className={styles.connectionRow}>
+              <span className={styles.connectionLabel}>状态</span>
+              <span
+                className={styles.connectionValue}
+                data-tone={selectedModel ? connectionTone : undefined}
+              >
+                {selectedModel ? connectionLabel : "未选择"}
+              </span>
+            </div>
+          </div>
 
-          {tab === "embedding" && (
-            <div className="space-y-4 animate-rise-in">
-              {models.isError && (
-                <div className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-xs text-destructive">
-                  {getErrorMessage(models.error)}
-                </div>
-              )}
+          {selectedInvalid ? (
+            <p className={styles.noticeError}>
+              当前选择的模型已禁用或不再具备 Embedding 能力，请重新选择。
+            </p>
+          ) : null}
 
-              {embeddingModels.length === 0 ? (
-                <div className="rounded-xl border border-warning/40 bg-warning-light px-4 py-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">尚未注册 Embedding 模型</p>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                        请先到「模型」标签添加模型，并将模型类型设置为 Embedding。API Key、Base URL 和模型标识只需配置一次。
-                      </p>
-                    </div>
-                  </div>
-                </div>
+          <div className={styles.miniFieldGrid}>
+            <label className={styles.miniField}>
+              <span className={styles.miniFieldLabel}>请求超时（秒）</span>
+              <input
+                className={styles.miniFieldInput}
+                disabled={saveMutation.isPending}
+                max={300}
+                min={1}
+                onChange={(event) => {
+                  set("embedding_timeout", Number(event.target.value));
+                  invalidateTestResult();
+                }}
+                type="number"
+                value={configuredTimeout}
+              />
+            </label>
+            <label className={styles.miniField}>
+              <span className={styles.miniFieldLabel}>批量大小</span>
+              <input
+                className={styles.miniFieldInput}
+                disabled={saveMutation.isPending}
+                max={256}
+                min={1}
+                onChange={(event) =>
+                  set("embedding_batch_size", Number(event.target.value))
+                }
+                type="number"
+                value={configuredBatchSize}
+              />
+            </label>
+          </div>
+
+          <div className={styles.testRow}>
+            <button
+              className={styles.outlineButton}
+              disabled={
+                testMutation.isPending ||
+                  saveMutation.isPending ||
+                !selectedModelId ||
+                !selectedModel?.api_configured ||
+                selectedInvalid
+              }
+              onClick={() => {
+                if (!selectedModelId) return;
+                const requestId = testRequestRef.current + 1;
+                testRequestRef.current = requestId;
+                setTestResult(null);
+                testMutation.mutate({
+                  requestId,
+                  modelConfigId: selectedModelId,
+                  dim: form.embedding_dim ?? c?.embedding_dim ?? 1024,
+                  timeout: form.embedding_timeout ?? c?.embedding_timeout ?? 30,
+                });
+              }}
+              type="button"
+            >
+              {testMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <label className="block">
-                  <span className={labelCls}>当前 Embedding 模型</span>
-                  <select
-                    className={inputCls}
-                    value={selectedModelId ?? ""}
-                    onChange={(e) => {
-                      set("embedding_model_config_id", e.target.value ? Number(e.target.value) : null);
-                      setTestResult(null);
-                    }}
-                  >
-                    <option value="">请选择模型</option>
-                    {embeddingModels.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.display_name} · {model.name} · {model.provider}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Wifi className="h-3.5 w-3.5" />
               )}
+              测试 Embedding
+            </button>
 
-              {selectedModel && (
-                <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/60 bg-muted/30 p-4">
-                  <div>
-                    <p className={labelCls}>Provider</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">{selectedModel.provider}</p>
-                  </div>
-                  <div>
-                    <p className={labelCls}>模型标识</p>
-                    <p className="mt-1 break-all font-mono text-xs font-semibold text-foreground">{selectedModel.name}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className={labelCls}>API Base URL</p>
-                    <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-                      {selectedModel.api_base_url || "未配置"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className={labelCls}>API Key</p>
-                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.api_configured ? "text-success" : "text-warning-foreground")}>
-                      {selectedModel.api_configured ? "● 已配置" : "● 未配置"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className={labelCls}>状态</p>
-                    <p className={cn("mt-1 text-xs font-semibold", selectedModel.is_enabled ? "text-success" : "text-destructive")}>
-                      {selectedModel.is_enabled ? "● 可用" : "● 已禁用"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {selectedInvalid && (
-                <div className="rounded-lg border border-destructive bg-destructive-light px-3 py-2 text-xs text-destructive">
-                  当前选择的模型已禁用或不再具备 Embedding 能力，请重新选择。
-                </div>
-              )}
-
-              <div className="grid grid-cols-3 gap-3">
-                <label className="block">
-                  <span className={labelCls}>向量维度</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={8192}
-                    className={inputCls}
-                    value={form.embedding_dim ?? c.embedding_dim}
-                    onChange={(e) => set("embedding_dim", Number(e.target.value))}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelCls}>请求超时 (秒)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={300}
-                    className={inputCls}
-                    value={form.embedding_timeout ?? c.embedding_timeout}
-                    onChange={(e) => set("embedding_timeout", Number(e.target.value))}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelCls}>批量大小</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={256}
-                    className={inputCls}
-                    value={form.embedding_batch_size ?? c.embedding_batch_size}
-                    onChange={(e) => set("embedding_batch_size", Number(e.target.value))}
-                  />
-                </label>
-              </div>
-
-              <div className="border-t border-border/40 pt-4">
-                <Button
-                  variant="secondary"
-                  disabled={testMutation.isPending || !selectedModelId || !selectedModel?.api_configured || selectedInvalid}
-                  onClick={() => {
-                    setTestResult(null);
-                    testMutation.mutate();
-                  }}
-                >
-                  {testMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
-                  测试 Embedding
-                </Button>
-
-                {testResult && (
-                  <div
-                    className={cn(
-                      "mt-3 rounded-lg px-3 py-2.5 text-xs",
-                      testResult.success
-                        ? "border border-success bg-success-light text-success"
-                        : "border border-destructive bg-destructive-light text-destructive",
-                    )}
-                  >
-                    <div className="flex items-start gap-2">
-                      {testResult.success ? (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                      ) : (
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-semibold">{testResult.success ? "连接成功" : "连接失败"}</p>
-                        <p className="mt-0.5 break-words leading-relaxed">{testResult.message}</p>
-                        {(testResult.latency_ms > 0 || testResult.returned_dim != null) && (
-                          <p className="mt-1 opacity-70">
-                            {testResult.latency_ms > 0 && `耗时 ${testResult.latency_ms}ms`}
-                            {testResult.latency_ms > 0 && testResult.returned_dim != null && " · "}
-                            {testResult.returned_dim != null && `维度 ${testResult.returned_dim}`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+            {testResult ? (
+              <span
+                className={styles.testSuccess}
+                data-error={testResult.success ? "false" : "true"}
+              >
+                {testResult.success ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5" />
                 )}
-              </div>
-            </div>
-          )}
+                {testResult.success
+                  ? `连接成功${testResult.latency_ms > 0 ? ` · ${testResult.latency_ms}ms` : ""}${
+                      testResult.returned_dim != null
+                        ? ` · 返回维度 ${testResult.returned_dim}`
+                        : ""
+                    }`
+                  : `连接失败 · ${testResult.message}`}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
-    </section>
+
+      {saveMutation.isError ? (
+        <p className={styles.noticeError}>{getErrorMessage(saveMutation.error)}</p>
+      ) : null}
+
+      <div className={styles.footerBar}>
+        <span className={styles.footerNote}>
+          保存后立即作用于向量检索请求
+        </span>
+        <div className={styles.footerActions}>
+          <Button
+            className={styles.primaryButton}
+            disabled={!dirty || saveMutation.isPending || !formValid}
+            onClick={() => saveMutation.mutate(form)}
+            type="button"
+            variant="primary"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {saveMutation.isPending ? "保存中…" : "保存配置"}
+          </Button>
+        </div>
+      </div>
+    </Section>
   );
 }

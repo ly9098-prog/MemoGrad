@@ -18,7 +18,10 @@ function readingViewport(info) {
 /** Size from already-visible reader nodes BEFORE opening; no hidden math tree. */
 function prepareReadingLayout(block, measurements, viewport) {
   var rpx = viewport.rpx
-  var scale = 32 / 28
+  // Match the reader's compact-width reading floor and the larger panel math.
+  var readerMathSize = viewport.width <= 360 ? 34 : 32
+  var expandedMathSize = viewport.width <= 360 ? 38 : 36
+  var scale = expandedMathSize / readerMathSize
   var rects = measurements && measurements[0] || []
   var cursor = 0
   var contentHeight = 40 * rpx + viewport.bottomInset
@@ -50,7 +53,7 @@ function prepareReadingLayout(block, measurements, viewport) {
   var title = measurements && measurements[1]
   var note = measurements && measurements[2]
   // Header dimensions match the actual CSS, including the close target's margins.
-  var titleHeight = title && title.height ? title.height * (28 * 1.4) / (24 * 1.45) : 40 * rpx
+  var titleHeight = title && title.height ? title.height * (28 * 1.4) / (26 * 1.65) : 40 * rpx
   var headerHeight = Math.ceil(Math.max(60 * rpx, titleHeight + (hasWideRows ? 41 * rpx : 0)) + 45 * rpx)
   if (block.noteNodes && block.noteNodes.length) contentHeight += (note && note.height || 34 * rpx) + 9 * rpx
   var fitted = fitReadingHeight(contentHeight, headerHeight, viewport.maxHeight)

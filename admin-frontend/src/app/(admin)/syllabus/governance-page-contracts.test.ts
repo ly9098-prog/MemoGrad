@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CoveragePage from "../coverage/page";
-import KnowledgeGraphPage from "../knowledge-graph/page";
+import KnowledgeGraphWorkspace from "../knowledge-graph/graph-workspace";
 import SubjectsPage from "../subjects/page";
 import SyllabusPage from "./page";
 import type { AdminSubjectNode } from "@/lib/api/types";
@@ -159,19 +159,19 @@ describe("coverage and graph page request contracts", () => {
   });
 
   it("does not request a graph automatically without a subject", () => {
-    KnowledgeGraphPage();
+    KnowledgeGraphWorkspace();
     expect(h.queries[1].enabled).toBe(false);
   });
 
   it.each([
-    { center: null, search: "", max: 24 },
-    { center: 7, search: "", max: 36 },
-    { center: null, search: "alias", max: 36 },
+    { center: null, search: "" },
+    { center: 7, search: "" },
+    { center: null, search: "alias" },
   ])(
     "keeps graph focus/search scope and node budget: %j",
-    async ({ center, search, max }) => {
-      h.states = ["4", "parent", "3", "uncommitted", search, false, center];
-      KnowledgeGraphPage();
+    async ({ center, search }) => {
+      h.states = ["4", "parent", "3", true, search, search, center];
+      KnowledgeGraphWorkspace();
       await h.queries[0].queryFn();
       await h.queries[1].queryFn();
       expect(h.queries[1].queryKey).toEqual([
@@ -188,7 +188,7 @@ describe("coverage and graph page request contracts", () => {
         knowledge_point_id: center ?? undefined,
         search: search || undefined,
         depth: 3,
-        max_nodes: max,
+        max_nodes: search || center != null ? 56 : 120,
       });
       expect(h.request.mock.calls.map(([path]) => path)).toEqual([
         "/knowledge/subjects",

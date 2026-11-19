@@ -461,6 +461,9 @@ Component({
           var patch = {}
 
           if (renderKey !== this.data.cardRenderKey) {
+            this._flipGesture = null
+            this._flipTapSuppressedUntil = 0
+            patch.isFlipped = false
             if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
             this._readingLayouts = {}
             patch.cardRenderKey = renderKey
@@ -559,7 +562,31 @@ Component({
 
   methods: {
     toggleCardFlip() {
+      if (this.data.expandedBlock || Date.now() < (this._flipTapSuppressedUntil || 0)) return
       this.setData({ isFlipped: !this.data.isFlipped })
+    },
+    onCardTouchStart(event) {
+      var touches = event && event.touches || []
+      var touch = touches[0]
+      this._flipGesture = touch ? { x: touch.clientX, y: touch.clientY } : null
+      if (touches.length > 1) this._flipTapSuppressedUntil = Date.now() + 500
+    },
+    onCardTouchMove(event) {
+      var touches = event && event.touches || []
+      var touch = touches[0]
+      var start = this._flipGesture
+      if (touches.length > 1 || start && touch &&
+          Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 10) {
+        this._flipTapSuppressedUntil = Date.now() + 500
+      }
+    },
+    onCardTouchEnd(event) {
+      this.onCardTouchMove({ touches: event && event.changedTouches || [] })
+      this._flipGesture = null
+    },
+    onCardTouchCancel() {
+      this._flipGesture = null
+      this._flipTapSuppressedUntil = Date.now() + 500
     },
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)

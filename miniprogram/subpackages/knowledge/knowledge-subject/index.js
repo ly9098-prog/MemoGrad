@@ -1,7 +1,7 @@
 const api = require('../../../utils/api')
 const { knowledgePracticeSync } = require('../../../utils/storage')
 const { buildKnowledgeGroups, summarizeGroups } = require('./tree-groups')
-const { POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle } = require('./graph-layout')
+const { POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay } = require('./graph-layout')
 const STATUS_TEXT = { no_data: '未开始', insufficient: '数据不足', weak: '薄弱', developing: '提升中', good: '良好', mastered: '已掌握' }
 const FILTERS = [
 { id: 'all', label: '全部' }, { id: 'weak', label: '需强化', statuses: ['weak', 'developing'] },
@@ -262,6 +262,7 @@ scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
 pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphInteracting: false,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
 forcePanelOpen: false, forceControls: [],
+showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {},
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
 indexNodes: [], indexCount: 0, indexDisplayCount: 0, hasMore: false, indexSearchOpen: false, indexSearchFocused: false,
 indexQuery: '', indexSearchDraft: '', indexSearchPending: false, indexSearchResultCount: 0, indexNavigatingId: 0,
@@ -286,6 +287,7 @@ this._pageVisible = true
 this._focusNodeId = 0
 this._forces = { ...DEFAULT_FORCES }
 this._manualPositions = {}
+this._layoutCache = {}
 this._sceneNodeIndex = new Map()
 this._sceneEdgeLinks = new Map()
 this._dragNodeId = ''
@@ -337,6 +339,10 @@ else setTimeout(start, 0)
 },
 onShow() {
 this._pageVisible = true
+if (this._forceDirty && this._loadedOnce) {
+this._forceDirty = false
+this.applyView(false, false)
+}
 this._practiceNavigationPending = false
 this._detailNavigationPending = false
 if (this.data.indexDetailRevealPhase || this.data.indexDetailRevealStyle) {
@@ -367,11 +373,12 @@ if (!this._unloaded && this._pageVisible !== false) this._refreshMapAfterPractic
 onPageScroll(event) { this._scrollTop = Number(event.scrollTop) || 0 },
 onHide() {
 this._pageVisible = false
+this._forceDirty = Boolean(this._forceTimer)
+clearTimeout(this._forceTimer)
+this._forceTimer = null
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
 clearTimeout(this._inertiaTimer)
-clearTimeout(this._forceTimer)
-this._forceTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -399,12 +406,13 @@ this._practiceLaunchFeedbackTimer = null
 onResize() { this.measureViewport(true) },
 onUnload() {
 this._pageVisible = false
+clearTimeout(this._forceTimer)
+this._forceTimer = null
+this._layoutCache = null
 this._unloaded = true
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
 clearTimeout(this._inertiaTimer)
-clearTimeout(this._forceTimer)
-this._forceTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -821,6 +829,7 @@ applyView(resetCamera = false, animateScene = resetCamera, callback) {
     this._camera = fitCamera(this._frame)
     Object.assign(payload, this.cameraPayload(true, { graphInteracting: false }))
   }
+  if (this._camera && this._frame) Object.assign(payload, labelDisplay(this._camera, this._frame, sceneState.scene.nodes))
   this._commitView(payload, animateScene, callback)
 },
 
@@ -849,6 +858,8 @@ _buildSceneState(availableGroups, activeGroupKey, focusNodeId) {
   const options = {
     groupKey: activeGroupKey,
     activeGroupKey,
+    page: this._graphPage || 0,
+    layoutCache: this._layoutCache || (this._layoutCache = {}),
     focusNodeId,
     selectedId: this._selectedId,
     forces: this._forces,
@@ -859,7 +870,7 @@ _buildSceneState(availableGroups, activeGroupKey, focusNodeId) {
   let selectedId = this._selectedId
   if (!scene.pointIds.some(id => Number(id) === Number(selectedId))) {
     selectedId = scene.focused && scene.pointIds.length ? Number(scene.pointIds[0]) : 0
-    scene = buildScene(availableGroups, this.data.subject, { ...options, focusNodeId: focusNodeIdResolved, selectedId })
+    if (Number(selectedId) !== Number(options.selectedId)) highlightScene(scene, { ...options, selectedId })
   }
   this._sceneNodeIndex = new Map(scene.nodes.map((node, index) => [node.id, index]))
   this._sceneEdgeLinks = new Map()
@@ -1438,7 +1449,6 @@ this.setData({ themeSheetClosing: true }, () => this.finishThemeSheetClose(key))
 })
 },
 stopThemeSheetTap() {},
-preventBackgroundScroll() {},
 changeGraphPage(event) {
 const next = this.data.scene.page + Number(event.currentTarget.dataset.step)
 if (!Number.isFinite(next) || next < 0 || next >= this.data.scene.pageCount) return
@@ -1889,6 +1899,7 @@ return [
 },
 toggleForcePanel() { this.setData({ forcePanelOpen: !this.data.forcePanelOpen }) },
 closeForcePanel() { this.setData({ forcePanelOpen: false }) },
+toggleGraphLabels() { this.setData({ showAllGraphLabels: !this.data.showAllGraphLabels }) },
 preventBackgroundScroll() {},
 changeForce(event) {
 const key = String(event.currentTarget.dataset.key || '')
@@ -1922,7 +1933,8 @@ return
 this._lastGraphTap = now
 },
 startGraphNodeTouch(event) {
-this._dragNodeId = (event.touches || []).length === 1 ? String(event.currentTarget.dataset.nodeId || '') : ''
+const nodeId = String(event.currentTarget.dataset.nodeId || '')
+this._dragNodeId = nodeId !== 'core' && (event.touches || []).length === 1 ? nodeId : ''
 },
 moveDraggedNode(point) {
 const gesture = this._gesture
@@ -1949,7 +1961,7 @@ const toIndex = this._sceneNodeIndex.get(edge.to)
 if (fromIndex === undefined || toIndex === undefined) return
 patch[`scene.edges[${edgeIndex}].style`] = edgeStyle(nodes[fromIndex], nodes[toIndex])
 })
-this.setData(patch)
+this.setData({ ...patch, ...labelDisplay(this._camera, this._frame, nodes) })
 },
 measureViewport(reset = false) {
 if (!wx.createSelectorQuery || !this.data.subject) return
@@ -1962,7 +1974,7 @@ if (reset || changed) this.resetView()
 },
 cameraPayload(includeMetrics = true, extra = {}) {
 if (!this._frame || !this._camera) return extra
-const payload = { ...extra, stageStyle: cameraStyle(this._camera) }
+const payload = { ...extra, ...labelDisplay(this._camera, this._frame, (this.data.scene || {}).nodes), stageStyle: cameraStyle(this._camera) }
 if (!includeMetrics) return payload
 const fit = fitCamera(this._frame)
 const limits = cameraLimits(this._frame)

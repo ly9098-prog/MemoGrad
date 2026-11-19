@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import {
   useCallback,
@@ -16,6 +17,7 @@ export interface SelectOption {
   value: string;
   label: string;
   suffix?: string;
+  icon?: string;
   disabled?: boolean;
 }
 
@@ -102,6 +104,7 @@ export function CustomSelect({
             o.value.toLowerCase().includes(search.toLowerCase()),
         )
       : options;
+  const showIconColumn = options.some((option) => Boolean(option.icon));
 
   // Correct active index after filtering changes
   useEffect(() => {
@@ -277,6 +280,16 @@ export function CustomSelect({
           className,
         )}
       >
+        {selected?.icon ? (
+          <Image
+            src={selected.icon}
+            alt=""
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] shrink-0 object-contain"
+            unoptimized
+          />
+        ) : null}
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-left",
@@ -334,6 +347,7 @@ export function CustomSelect({
           onSearchChange={setSearch}
           searchRef={searchRef}
           filtered={filtered}
+          showIconColumn={showIconColumn}
           value={value}
           onChange={selectValue}
           listRef={listRef}
@@ -357,6 +371,7 @@ function PortalDropdown({
   onSearchChange,
   searchRef,
   filtered,
+  showIconColumn,
   value,
   onChange,
   listRef,
@@ -374,6 +389,7 @@ function PortalDropdown({
   onSearchChange: (v: string) => void;
   searchRef: React.RefObject<HTMLInputElement | null>;
   filtered: SelectOption[];
+  showIconColumn: boolean;
   value: string;
   onChange: (v: string) => void;
   listRef: React.RefObject<HTMLDivElement | null>;
@@ -583,6 +599,20 @@ function PortalDropdown({
                     </svg>
                   )}
                 </span>
+                {showIconColumn ? (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                    {opt.icon ? (
+                      <Image
+                        src={opt.icon}
+                        alt=""
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 object-contain"
+                        unoptimized
+                      />
+                    ) : null}
+                  </span>
+                ) : null}
                 <span className="min-w-0 flex-1 truncate whitespace-nowrap">
                   {opt.label}
                 </span>

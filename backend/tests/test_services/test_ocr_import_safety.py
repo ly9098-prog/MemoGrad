@@ -75,6 +75,7 @@ def _run_import_safety_subprocess(backend: str = "paddlex_http") -> dict:
         "has_worker_pool": has_worker_pool,
         "client_type": type(client).__name__ if client is not None else "None",
         "execution_backend": cfg.execution_backend,
+        "profile": cfg.profile,
         "before_paddle": before_paddle,
         "before_paddleocr": before_paddleocr,
     }}
@@ -118,8 +119,12 @@ class TestImportSafetyPaddlexHttp:
 
     def test_client_type(self):
         result = _run_import_safety_subprocess(backend="paddlex_http")
-        assert result.get("client_type") == "PaddleXHttpOcrWorkerClient", (
-            f"Expected PaddleXHttpOcrWorkerClient, got {result.get('client_type')}"
+        expected = (
+            "CpuFallbackOcrWorkerClient" if result.get("profile") == "local_import"
+            else "PaddleXHttpOcrWorkerClient"
+        )
+        assert result.get("client_type") == expected, (
+            f"Expected {expected}, got {result.get('client_type')}"
         )
 
     def test_local_process_imports_worker_pool(self):

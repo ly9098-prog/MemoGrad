@@ -17,6 +17,7 @@ import {
   WorkspacePage,
   workspaceStyles as ws,
 } from "@/components/admin/workspace";
+import "./import-workspace.css";
 
 const importTabs = [
   { href: "/imports/questions", label: "题目列表", icon: FileQuestion },
@@ -55,7 +56,7 @@ export default function ImportsLayout({
   }, [pathname]);
 
   const isClearWorkspace =
-    pathname === "/imports/questions" || pathname === "/imports/maintenance";
+    ["/imports/questions", "/imports/maintenance", "/imports/tasks", "/imports/batch-image", "/imports/text-import", "/imports/history"].includes(pathname);
   if (isClearWorkspace) {
     return (
       <WorkspacePage>

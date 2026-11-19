@@ -311,6 +311,51 @@ async def test_admin_resume_reads_payload_before_checkpoint_and_session(
 
 
 @pytest.mark.asyncio
+async def test_admin_image_resume_uses_image_executor_and_preserves_settings(harness, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.features import pipeline_coordinator_entry
+    from app.services import import_pipeline_service
+
+    image = AsyncMock()
+    document = AsyncMock()
+    monkeypatch.setattr(import_pipeline_service, "_run_image_pipeline_with_db", image)
+    monkeypatch.setattr(pipeline_coordinator_entry, "run_pipeline", document)
+    await worker._process_task(harness.task(
+        worker.TASK_TYPE_ADMIN_RESUME, pipeline_id="img-existing", staging_object_id="original",
+        source_type="image", source_file="original.png", subject="DS", subject_id=3,
+        created_by="admin:1", options={"image_fast_mode": False, "confidence_threshold": 0.8},
+    ))
+    image.assert_awaited_once_with(
+        pipeline_id="img-existing", image_path="/work/original", source_file="original.png",
+        subject="DS", subject_id=3, created_by="admin:1",
+        options={"image_fast_mode": False, "confidence_threshold": 0.8},
+    )
+    document.assert_not_awaited()
+    assert harness.events[-1] == ("cleanup", "/work/original")
+
+
+@pytest.mark.asyncio
+async def test_batch_retry_keeps_selected_sequence_and_original_filename(harness, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.features import batch_image_import_service as batch
+
+    run = AsyncMock()
+    monkeypatch.setattr(batch, "run_batch_job", run)
+    await worker._process_task(harness.task(
+        worker.TASK_TYPE_BATCH_IMAGE, job_id="same-job", staging_object_ids=["retry-original"],
+        source_seqs=[3], source_files=["original-third.png"], subject="DS", subject_id=3,
+        options={"ocr_mode": "local"},
+    ))
+    payload = run.await_args.kwargs
+    assert payload["job_id"] == "same-job"
+    assert [(src.seq, src.source_file) for src in payload["sources"]] == [(3, "original-third.png")]
+    assert payload["options"] == {"ocr_mode": "local"}
+    assert harness.events[-1] == ("cleanup", "/work/retry-original")
+
+
+@pytest.mark.asyncio
 async def test_empty_staging_id_skips_resolution_and_cleanup(harness, monkeypatch):
     from app.services import import_pipeline_service
 

@@ -43,6 +43,8 @@ class StudyHubSubjectMastery(BaseModel):
     subject_code: str
     subject_name: str
     data_available: bool = False
+    status: Literal["no_data", "insufficient", "weak", "developing", "good", "mastered"] | None = None
+    observed_point_count: int = 0
     mastery_score: float | None = None
     confidence: float = 0.0
     attempt_count: int = 0

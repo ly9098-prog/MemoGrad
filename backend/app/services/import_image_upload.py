@@ -1,12 +1,14 @@
 """Image upload validation, staging and queue admission."""
 
 import logging
+import uuid
 from datetime import datetime
 
 from app.core.config import settings
 from app.core.log_context import get_log_context, log_event
 from app.schemas.import_review import PipelineUploadResponse
 from app.services import import_pipeline_service as runtime
+from app.services.import_enqueue_outcome import require_known_enqueue_outcome
 from app.services.import_pipeline_admission import admit_pipeline_record
 from app.services.import_upload_request import UploadRequest
 from app.services.staging_storage import StagingObject, async_store_file
@@ -22,18 +24,19 @@ def _prepare_image(request: UploadRequest) -> tuple[str, str, int, int, str]:
         raise ValueError("图片 Content-Type 不支持")
     if not settings.OCR_ENABLED:
         raise ValueError("图片 OCR 功能未启用")
-    from app.core.deployment_profile import DeploymentProfile, detect_deployment_profile
-    from app.core.ocr_isolation import local_paddleocr_available
+    from app.features.ocr_mode import validate_ocr_mode_dependencies
 
-    if detect_deployment_profile() == DeploymentProfile.LOCAL_IMPORT and (
-        not local_paddleocr_available()
-    ):
-        raise ValueError("OCR 依赖未安装：paddleocr")
+    try:
+        validate_ocr_mode_dependencies("local")
+    except RuntimeError as exc:
+        raise ValueError(str(exc)) from exc
     image_width, image_height, image_format = runtime._validate_image_path(
         request.file_path
     )
     image_hash = runtime._sha256_of_file(request.file_path)
-    pipeline_id = f"img_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image_hash[:8]}"
+    pipeline_id = (
+        f"img_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image_hash[:8]}_{uuid.uuid4().hex[:12]}"
+    )
     return (pipeline_id, image_hash, image_width, image_height, image_format)
 
 
@@ -106,7 +109,6 @@ async def start_image_upload(
             file_size,
         )
         from app.services.task_queue_worker import enqueue_image_pipeline
-
         result = await enqueue_image_pipeline(
             pipeline_id=pipeline_id,
             staging_object_id=staging_obj.object_id,
@@ -116,6 +118,7 @@ async def start_image_upload(
             options=options,
             created_by=request.created_by,
         )
+        require_known_enqueue_outcome(result, pipeline_id)
         if not result:
             await runtime._set_image_pipeline_status(
                 pipeline_id,

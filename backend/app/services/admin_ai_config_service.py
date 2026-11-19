@@ -581,7 +581,7 @@ async def patch_configs(
             key in ("ocr_correction_prompt", "completion_prompt")
             and len(str(value)) > MAX_PROMPT_LENGTH
         ):
-            raise ValueError(f"{key} exceeds max length of {MAX_PROMPT_LENGTH}")
+            raise ValueError(f"提示词长度不能超过 {MAX_PROMPT_LENGTH} 字符")
         serialized = str(value).lower() if isinstance(value, bool) else str(value)
         existing = await db.get(AdminAiConfig, key)
         if existing is None:

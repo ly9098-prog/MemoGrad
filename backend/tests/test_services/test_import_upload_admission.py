@@ -21,6 +21,9 @@ from app.services.task_queue_service import EnqueueResult
 
 @pytest.fixture
 def admission(monkeypatch, tmp_path):
+    from app.features import ocr_mode
+
+    monkeypatch.setattr(ocr_mode, "validate_ocr_mode_dependencies", lambda _mode: None)
     trace = []
     control = {"failure": None}
     queued = []
@@ -54,6 +57,8 @@ def admission(monkeypatch, tmp_path):
     async def queue(**kwargs):
         mark("queue")
         queued.append(kwargs)
+        if control["failure"] == "unknown":
+            return EnqueueResult(False, None, "redis_unavailable")
         return EnqueueResult(control["failure"] != "reject", "task", "queue_full")
 
     class Document:
@@ -191,3 +196,17 @@ async def test_queue_cancellation_preserves_existing_release_semantics(admission
         await start(admission, "txt")
     assert admission.trace[-1] == "queue"
     assert "release" not in admission.trace
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extension", ["txt", "pdf", "xlsx", "png"])
+async def test_uncertain_delivery_does_not_report_a_failed_pipeline(admission, extension):
+    from app.services.import_enqueue_outcome import ImportEnqueueUncertainError
+
+    admission.control["failure"] = "unknown"
+    with pytest.raises(ImportEnqueueUncertainError):
+        await start(admission, extension)
+    assert admission.trace[-2:] == ["queue", "release"]
+    for args, kwargs in admission.statuses:
+        state = kwargs if extension == "png" else args[1]
+        assert state.get("status") != "failed"

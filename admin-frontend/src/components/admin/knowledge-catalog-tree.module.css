@@ -71,6 +71,9 @@
 .knowledgeNode[data-disabled="true"] .knowledgeNodeLabel {
   opacity: 0.6;
 }
+.knowledgeNode[data-excluded="true"] .knowledgeNodeLabel {
+  opacity: 0.42;
+}
 .knowledgeChildren {
   margin-inline-start: 20px;
   padding-inline-start: 20px;

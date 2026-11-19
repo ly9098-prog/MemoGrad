@@ -81,17 +81,17 @@
 </view>
 <view class="graph-head-actions">
 <view class="graph-count"><text>{{scene.countText}}</text></view>
-<button class="graph-force-toggle {{forcePanelOpen ? 'is-open' : ''}}" catchtap="toggleForcePanel" hover-class="atlas-pressed" aria-label="图谱力度设置"><view class="force-toggle-icon" aria-hidden="true"><view></view><view></view><view></view></view><text>力度</text></button>
+<button class="graph-force-toggle {{forcePanelOpen ? 'is-open' : ''}}" catchtap="toggleForcePanel" hover-class="atlas-pressed" aria-label="图谱显示与力度设置" aria-expanded="{{forcePanelOpen}}"><view class="force-toggle-icon" aria-hidden="true"><view></view><view></view><view></view></view><text>设置</text></button>
 </view>
 </view>
-<view id="atlas-viewport" class="atlas-viewport graph-canvas {{graphInteracting ? 'graph-interacting' : ''}}" bindtouchstart="startGraphTouch" catchtouchmove="moveGraphTouch" bindtouchend="endGraphTouch" bindtouchcancel="endGraphTouch" bindtap="onGraphBackgroundTap">
-<view class="atlas-stage" style="{{stageStyle}}" wx:if="{{scene.nodes.length}}">
+<view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}} {{showAllGraphLabels ? 'graph-label-all' : ''}} {{graphInteracting ? 'graph-interacting' : ''}}" bindtouchstart="startGraphTouch" catchtouchmove="moveGraphTouch" bindtouchend="endGraphTouch" bindtouchcancel="endGraphTouch" bindtap="onGraphBackgroundTap">
+<view class="atlas-stage" style="{{stageStyle}}font-size:{{graphLabelSize || 32}}px;" wx:if="{{scene.nodes.length}}">
 <view wx:for="{{scene.edges}}" wx:key="id" class="atlas-edge force-edge edge-{{item.kind}} {{item.active ? 'edge-active' : ''}} {{item.dimmed ? 'edge-dimmed' : ''}}" style="{{item.style}}" aria-hidden="true"></view>
-<view wx:for="{{scene.nodes}}" wx:key="id" class="atlas-node force-node force-{{item.kind}} tone-{{item.tone}} {{item.pathActive ? 'node-path' : ''}} {{item.selected ? 'node-selected' : ''}} {{item.dimmed ? 'node-dimmed' : ''}}" style="{{item.style}}" data-kind="{{item.kind}}" data-key="{{item.groupKey}}" data-id="{{item.pointId}}" data-node-id="{{item.id}}" bindtouchstart="startGraphNodeTouch" catchtap="onGraphNodeTap" hover-class="graph-node-pressed" hover-start-time="18" hover-stay-time="72" hover-stop-propagation="true" aria-role="button" aria-label="{{item.label}}">
+<view wx:for="{{scene.nodes}}" wx:key="id" class="atlas-node force-node force-{{item.kind}} tone-{{item.tone}} {{item.pathActive ? 'node-path' : ''}} {{item.selected ? 'node-selected' : ''}} {{item.neighbor ? 'node-neighbor' : ''}} {{graphLabelVisibility[item.id] ? 'node-label-visible' : ''}} {{item.dimmed ? 'node-dimmed' : ''}}" style="{{item.style}}" data-kind="{{item.kind}}" data-key="{{item.groupKey}}" data-id="{{item.pointId}}" data-node-id="{{item.id}}" bindtouchstart="startGraphNodeTouch" catchtap="onGraphNodeTap" hover-class="graph-node-pressed" hover-start-time="18" hover-stay-time="72" hover-stop-propagation="true" aria-role="button" aria-label="{{item.label}}">
 <view class="force-hit" aria-hidden="true"></view>
 <view class="force-dot" aria-hidden="true"></view>
 <view class="force-ring" wx:if="{{item.selected || item.kind === 'core'}}" aria-hidden="true"></view>
-<text class="force-label" wx:if="{{item.showLabel}}">{{item.label}}</text>
+<text class="force-label">{{item.label}}</text>
 </view>
 </view>
 <view class="atlas-empty graph-empty" wx:else>
@@ -108,12 +108,19 @@
 <view class="graph-zoom-text" wx:if="{{scene.nodes.length}}">{{zoomText}}</view>
 </view>
 <view class="force-panel" wx:if="{{forcePanelOpen}}">
-<view class="force-panel-head"><text>力度</text><button class="force-panel-close" catchtap="closeForcePanel" aria-label="关闭力度设置">×</button></view>
+<view class="force-panel-head"><text>图谱设置</text><button class="force-panel-close" catchtap="closeForcePanel" aria-label="关闭图谱设置">×</button></view>
+<view class="force-display-row"><text>知识点名称</text><button class="force-label-toggle" bindtap="toggleGraphLabels" hover-class="atlas-pressed" aria-label="切换图谱名称显示，当前{{showAllGraphLabels ? '全部显示' : '随缩放显示'}}">{{showAllGraphLabels ? '全部显示' : '随缩放显示'}}</button></view>
 <view class="force-row" wx:for="{{forceControls}}" wx:key="key">
 <view class="force-row-meta"><text>{{item.label}}</text><text class="force-value">{{item.valueText}}</text></view>
-<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchanging="changeForce" bindchange="changeForce" aria-label="{{item.label}}" activeColor="#55C89B" backgroundColor="#D8EEE6" block-color="#FFFFFF" block-size="20" />
+<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchange="changeForce" activeColor="#3A6F5B" backgroundColor="#D8EEE6" block-color="#FFFFFF" block-size="20" aria-label="{{item.label}}" />
 </view>
 <button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">恢复默认力度</button>
+</view>
+<view class="graph-help" wx:if="{{scene.nodes.length}}">拖动移动 · 双指缩放，点击节点查看</view>
+<view class="graph-page-navigation" wx:if="{{scene.pageCount > 1}}">
+<button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" bindtap="changeGraphPage" aria-label="上一页知识节点">上一页</button>
+<text>{{scene.page + 1}} / {{scene.pageCount}}</text>
+<button class="graph-page-turn" disabled="{{scene.page + 1 >= scene.pageCount}}" data-step="1" bindtap="changeGraphPage" aria-label="下一页知识节点">下一页</button>
 </view>
 </view>
 <view class="point-card-reveal-shell point-card-reveal-{{indexDetailRevealPhase || 'stable'}}" style="{{indexDetailRevealStyle}}" wx:if="{{selectedPoint}}"><view id="knowledge-point-detail-card" class="point-card point-card-index-target {{themeSwitching ? 'theme-content-switching' : ''}} theme-switch-{{themeSwitchPhase}}">

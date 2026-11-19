@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.services.import_sse_metrics as import_sse_metrics
+from app.api.v1.admin_import_ocr_text import router as ocr_text_router
 from app.core.admin_guards import (
     admin_rate_limit,
     finish_idempotency,
@@ -31,13 +32,8 @@ from app.core.admin_security import AdminPrincipal, require_permissions
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
-from app.core.time_utils import serialize_utc_datetime, utcnow
 from app.features import question_publish_service as publish_svc
 from app.features.import_mode import ImportMode
-from app.features.pipeline_orchestrator import (
-    _get_stage_checkpoint,
-    _set_pipeline_store,
-)
 from app.schemas.admin_imports import (
     AdminImportActionResponse,
     AdminImportBatchCompleteRequest,
@@ -88,6 +84,7 @@ from app.services.admin_import_service import (
     reject_import_question,
     update_import_question,
 )
+from app.services.import_enqueue_outcome import ImportEnqueueUncertainError
 from app.services.import_pipeline_service import (
     get_pipeline_status as svc_get_pipeline_status,
 )
@@ -104,6 +101,60 @@ from app.services.streaming_upload_handler import stream_to_temp, validate_image
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/imports", tags=["admin-imports"])
+router.include_router(ocr_text_router)
+
+_SSE_MAX_CONNECTIONS_PER_USER = 5
+_SSE_MAX_GLOBAL_CONNECTIONS = 50
+_PIPELINE_SSE_MAX_SECONDS = 300
+_PIPELINE_SSE_POLL_SECONDS = 2.5
+_PIPELINE_STOPPED = {
+    "completed",
+    "completed_with_warnings",
+    "success",
+    "finished",
+    "failed",
+    "error",
+    "cancelled",
+    "paused",
+    "interrupted",
+}
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+def _stream_connections() -> dict[int, int]:
+    from app.features import batch_image_import_service as batch_svc
+
+    if not hasattr(batch_svc, "_active_sse_connections"):
+        batch_svc._active_sse_connections = {}
+    return batch_svc._active_sse_connections
+
+
+def _stream_limit_response(connections: dict[int, int], admin_id: int) -> JSONResponse | None:
+    total = sum(connections.values())
+    if total >= _SSE_MAX_GLOBAL_CONNECTIONS:
+        import_sse_metrics.counters["global_rejected"] += 1
+        logger.warning("SSE global connection limit reached: %d active", total)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Server at SSE capacity", "code": "SSE_GLOBAL_LIMIT"},
+        )
+    if connections.get(admin_id, 0) >= _SSE_MAX_CONNECTIONS_PER_USER:
+        import_sse_metrics.counters["per_user_rejected"] += 1
+        logger.warning("SSE per-user connection limit reached for user %s", admin_id)
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many SSE connections", "code": "SSE_LIMIT"},
+        )
+    return None
+
+
+def _change_stream_count(connections: dict[int, int], admin_id: int, delta: int) -> None:
+    connections[admin_id] = max(0, connections.get(admin_id, 0) + delta)
+    import_sse_metrics.counters["active"] = sum(connections.values())
 
 
 def _question_csv_error_response(
@@ -176,10 +227,13 @@ async def upload_import_file(
             page_end=page_end,
             created_by=f"admin:{current_admin.id}",
         )
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
-        tmp.close()
         raise HTTPException(status_code=400, detail=str(exc))
-    tmp.detach()
+    finally:
+        # Workers consume the durable staging object, not this request's file.
+        tmp.close()
     return result
 
 
@@ -299,6 +353,67 @@ async def get_admin_pipeline_status(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+@router.get(
+    "/pipelines/{pipeline_id}/stream",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
+)
+async def stream_admin_pipeline_status(
+    pipeline_id: str,
+    request: Request,
+    current_admin: AdminPrincipal = Depends(require_permissions("import:read")),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.core.database import async_session
+
+    admin_id = current_admin.id
+    connections = _stream_connections()
+    rejection = _stream_limit_response(connections, admin_id)
+    if rejection is not None:
+        return rejection
+    try:
+        initial = await svc_get_pipeline_status(pipeline_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    finally:
+        await db.close()
+
+    async def events():
+        if _stream_limit_response(connections, admin_id) is not None:
+            yield 'event: error\ndata: {"message":"SSE connection limit reached"}\n\n'
+            return
+
+        _change_stream_count(connections, admin_id, 1)
+        deadline = time.monotonic() + _PIPELINE_SSE_MAX_SECONDS
+        snapshot = initial
+        previous = None
+        try:
+            while time.monotonic() < deadline:
+                if await request.is_disconnected():
+                    import_sse_metrics.counters["disconnected"] += 1
+                    return
+                if snapshot != previous:
+                    yield f"event: status\ndata: {snapshot.model_dump_json()}\n\n"
+                    if snapshot.status in _PIPELINE_STOPPED:
+                        yield f'event: done\ndata: {json.dumps({"status": snapshot.status})}\n\n'
+                        return
+                    previous = snapshot
+                else:
+                    yield ": heartbeat\n\n"
+                await asyncio.sleep(_PIPELINE_SSE_POLL_SECONDS)
+                async with async_session() as status_db:
+                    snapshot = await svc_get_pipeline_status(pipeline_id, status_db)
+            import_sse_metrics.counters["max_duration_closed"] += 1
+            yield 'event: timeout\ndata: {"message":"SSE connection expired"}\n\n'
+        except Exception:
+            logger.exception("Pipeline SSE status lookup failed: pipeline_id=%s", pipeline_id)
+            yield 'event: error\ndata: {"message":"Status lookup failed"}\n\n'
+        finally:
+            _change_stream_count(connections, admin_id, -1)
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
 _RESUMABLE_STATUSES = {"failed", "paused", "interrupted"}
 
 
@@ -308,159 +423,28 @@ async def admin_resume_pipeline(
     file: UploadFile,
     enable_ai_repair: bool | None = None,
     enable_ocr_correction: bool | None = None,
-    confidence_threshold: float | None = None,
+    confidence_threshold: float | None = Query(None, ge=0, le=1),
+    image_fast_mode: bool | None = None,
+    subject: str | None = None,
+    subject_id: int | None = Query(None, ge=1),
     _=Depends(require_permissions("import:write")),
     db: AsyncSession = Depends(get_db),
 ):
-    """P3-3: 恢复失败的导入流水线。
+    """Re-upload the original file and resume with its original execution settings."""
+    from app.services.import_recovery_service import ImportRecoveryError, resume_import
 
-    检查 checkpoint 后重新提交后台任务。仅允许 failed / interrupted 状态。
-    需要重新上传原始文件。可通过可选参数覆盖原始流水线配置。
-
-    P4-3: 自动检测 artifact 实现真断点恢复（从可恢复 stage 继续而非全部重跑）。
-    """
-
-    # 检查当前状态 — use pipeline_store directly for non-DB pipelines
-    from app.features.pipeline_orchestrator import _get_pipeline_store as _get_ps
-    from app.features.pipeline_orchestrator import _pipeline_store
-
-    status_data = await _get_ps(pipeline_id)
-    if status_data is None:
-        # check image pipeline store
-        from app.services.import_pipeline_service import _get_image_pipeline_status
-
-        status_data = await _get_image_pipeline_status(pipeline_id)
-
-    if status_data is None:
-        raise HTTPException(status_code=404, detail="流水线不存在")
-
-    current_status = status_data.get("status", "")
-    if current_status not in _RESUMABLE_STATUSES:
-        raise HTTPException(
-            status_code=409,
-            detail=f"流水线当前状态为 {current_status}，不可恢复（仅允许 {_RESUMABLE_STATUSES}）",
-        )
-
-    # 读取 checkpoint
-    ckpt = await _get_stage_checkpoint(pipeline_id)
-    if not ckpt:
-        logger.warning(
-            "No stage checkpoint found for pipeline %s; will run full pipeline",
-            pipeline_id,
-        )
-    else:
-        logger.info(
-            "Pipeline %s resume with checkpoint: %d stages completed, failed_stage=%s",
-            pipeline_id,
-            len(ckpt.get("completed_stages") or []),
-            ckpt.get("failed_stage"),
-        )
-
-    # P4-3: 检查 artifact 状态，记录哪些 stage 可通过 artifact 恢复
-    artifact_stages: list[str] = []
     try:
-        from app.features.pipeline_artifacts import list_artifacts
-
-        artifact_stages = list_artifacts(pipeline_id)
-        if artifact_stages:
-            logger.info(
-                "Pipeline %s has artifacts for stages: %s — will use true resume",
-                pipeline_id,
-                artifact_stages,
-            )
-    except Exception:
-        pass
-
-    # 保存上传文件 — 流式写入临时文件
-    suffix = os.path.splitext(file.filename or "")[1] or ".bin"
-    tmp = await stream_to_temp(file, suffix=suffix)
-    if tmp.size == 0:
-        tmp.close()
-        raise HTTPException(status_code=400, detail="文件内容为空")
-    tmp_path = tmp.path
-
-    # 从 checkpoint 恢复选项，允许调用方覆盖
-    opts = dict(ckpt.get("options") or {}) if ckpt else {}
-    if enable_ai_repair is not None:
-        opts["enable_ai_repair"] = enable_ai_repair
-    if enable_ocr_correction is not None:
-        opts["enable_ocr_correction"] = enable_ocr_correction
-    if confidence_threshold is not None:
-        opts["confidence_threshold"] = confidence_threshold
-    subject = ckpt.get("subject") if ckpt else None
-    subject_id = ckpt.get("subject_id") if ckpt else None
-    source_type = ckpt.get("source_type") or "pdf"
-    source_file = ckpt.get("source_file") or file.filename or ""
-
-    # 设置 pipeline store 为 processing
-    existing_store = _pipeline_store.get(pipeline_id, {})
-    await _set_pipeline_store(
-        pipeline_id,
-        {
-            "pipeline_id": pipeline_id,
-            "status": "processing",
-            "source_type": source_type,
-            "current_stage": "extract",
-            "stages": {},
-            "stats": {},
-            "errors": [],
-            "started_at": serialize_utc_datetime(utcnow()),
-            "page_range": existing_store.get("page_range"),
-        },
-    )
-
-    # Stage the re-uploaded file to persistent storage
-    from app.services.staging_storage import async_store_file
-
-    resume_staging = await async_store_file(
-        tmp_path,
-        original_name=file.filename or f"resume_{pipeline_id}",
-        mime="application/pdf" if source_type == "pdf" else "text/plain",
-    )
-
-    # Enqueue via durable queue — replaces asyncio.create_task(_run_resume)
-    from app.services.task_queue_worker import enqueue_admin_resume
-
-    result = await enqueue_admin_resume(
-        pipeline_id=pipeline_id,
-        staging_object_id=resume_staging.object_id,
-        source_type=source_type,
-        source_file=source_file,
-        subject=subject,
-        subject_id=subject_id,
-        options=opts,
-    )
-    if not result:
-        # Enqueue rejected — set pipeline to failed so it doesn't hang forever
-        await _set_pipeline_store(
-            pipeline_id,
-            {
-                **existing_store,
-                "status": "failed",
-                "errors": existing_store.get("errors", [])
-                + [f"Queue rejected: {result.reason}"],
-            },
-        )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"任务队列已满，请稍后重试: {result.reason}",
-        )
-
-    # Detach temp file — staging storage owns the data now
-    tmp.detach()
-
-    failed_stage = (ckpt or {}).get("failed_stage")
-    completed_stages = (ckpt or {}).get("completed_stages", [])
-    return {
-        "pipeline_id": pipeline_id,
-        "status": "processing",
-        "resumed_chunks": [],
-        "failed_stage": failed_stage,
-        "completed_stages": len(completed_stages),
-        # P4-3: artifact-based resume diagnostics
-        "artifact_stages": artifact_stages,
-        "true_resume": bool(artifact_stages),
-    }
+        return await resume_import(db, pipeline_id, file, {
+            "enable_ai_repair": enable_ai_repair,
+            "enable_ocr_correction": enable_ocr_correction,
+            "confidence_threshold": confidence_threshold,
+            "image_fast_mode": image_fast_mode,
+            "subject": subject, "subject_id": subject_id,
+        })
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ImportRecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code}) from exc
 
 
 @router.get("/review-queue")
@@ -768,11 +752,12 @@ async def list_imports(
     status: str | None = None,
     source_type: str | None = None,
     keyword: str | None = None,
+    batch_id: str | None = None,
     _=Depends(require_permissions("import:read")),
     db: AsyncSession = Depends(get_db),
 ):
     batches, total = await list_import_batches(
-        db, page, page_size, status, source_type, keyword
+        db, page, page_size, status, source_type, keyword, batch_id=batch_id,
     )
     return paginated_response(
         [AdminImportBatchListItem.model_validate(item) for item in batches],
@@ -789,6 +774,7 @@ async def list_pipelines(
     status: str | None = None,
     source_type: str | None = None,
     sort_by: str = "started_at",
+    keyword: str | None = None,
     _=Depends(require_permissions("import:read")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -799,6 +785,7 @@ async def list_pipelines(
         status=status,
         source_type=source_type,
         sort_by=sort_by,
+        keyword=keyword,
         db=db,
     )
 
@@ -1290,7 +1277,7 @@ async def batch_image_upload(
     subject_id: int | None = None,
     concurrency: int | None = None,
     enable_ai_repair: bool = True,
-    confidence_threshold: float = 0.6,
+    confidence_threshold: float = Query(0.6, ge=0, le=1, allow_inf_nan=False),
     batch_fast_mode: bool = Query(
         True,
         description="批量图片快速模式：OCR 后跳过逐块纠错/代码重建/Roman 独立调用，仅保留题目级 AI repair",
@@ -1322,6 +1309,10 @@ async def batch_image_upload(
     - image_id: 向后兼容的单图模式。多图时传 image_ids[]。
     """
     from app.features import batch_image_import_service as batch_svc
+    from app.services.batch_image_idempotency import (
+        BatchSubmissionConflictError,
+        validate_submission_ids,
+    )
 
     if not files:
         raise HTTPException(status_code=400, detail="未上传任何图片")
@@ -1330,6 +1321,13 @@ async def batch_image_upload(
             status_code=400,
             detail=f"单次最多上传 {settings.BATCH_IMAGE_MAX_FILES} 张图片",
         )
+
+    try:
+        validate_submission_ids(
+            request_id=request_id, batch_id=batch_id, image_id=image_id, image_ids=image_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # P0-3: only validate dependencies matching the requested ocr_mode
     from app.features.ocr_mode import resolve_ocr_mode, validate_ocr_mode_dependencies
@@ -1359,13 +1357,12 @@ async def batch_image_upload(
             len(files),
         )
 
-    import hashlib as _hashlib
-
-    sources: list[batch_svc.BatchImageSource] = []
-    sources_with_sha: list[tuple[batch_svc.BatchImageSource, str, str]] = []
-    rejected_files: list[str] = []
-    seq = 0
+    temporaries = []
     try:
+        sources: list[batch_svc.BatchImageSource] = []
+        sources_with_sha: list[tuple[batch_svc.BatchImageSource, str, str]] = []
+        rejected_files: list[str] = []
+        seq = 0
         for idx, upload in enumerate(files):
             filename = upload.filename or f"image_{seq + 1}"
 
@@ -1388,6 +1385,7 @@ async def batch_image_upload(
                 tmp = await stream_to_temp(
                     upload, max_size=settings.IMAGE_IMPORT_MAX_BYTES or 0, suffix=suffix
                 )
+                temporaries.append(tmp)
             except ValueError as exc:
                 rejected_files.append(f"{filename}: {exc}")
                 continue
@@ -1403,11 +1401,9 @@ async def batch_image_upload(
                 continue
 
             # Compute source_sha256 for content-level dedup
-            source_sha256 = _hashlib.sha256()
-            with open(tmp.path, "rb") as fh:
-                for chunk in iter(lambda: fh.read(65536), b""):
-                    source_sha256.update(chunk)
-            source_sha256_hex = source_sha256.hexdigest()
+            from app.services.import_pipeline_admission import _hash_file
+
+            source_sha256_hex = await asyncio.to_thread(_hash_file, tmp.path)
 
             seq += 1
 
@@ -1429,11 +1425,16 @@ async def batch_image_upload(
             sources.append(source_obj)
             sources_with_sha.append((source_obj, source_sha256_hex, per_image_id))
 
-            # Detach — the temp file persists but will be staged below
-            tmp.detach()
-
         # Stage all source files to persistent storage for cross-process access
         from app.services.staging_storage import async_store_file
+
+        try:
+            validate_submission_ids(
+                request_id=request_id, batch_id=batch_id, image_id=image_id,
+                image_ids=[entry[2] for entry in sources_with_sha],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         staging_object_ids: list[str] = []
         for src in sources:
@@ -1444,98 +1445,130 @@ async def batch_image_upload(
                     mime="image/png",
                 )
                 staging_object_ids.append(staging_obj.object_id)
-            except Exception:
-                logger.warning(
-                    "Failed to stage batch image %s, marking as failed",
-                    src.source_file,
+            except Exception as exc:
+                logger.warning("Failed to stage batch image %s", src.source_file, exc_info=True)
+                raise HTTPException(
+                    status_code=503, detail="图片暂存失败，请稍后重新上传"
+                ) from exc
+
+        if not sources:
+            raise HTTPException(
+                status_code=400,
+                detail="没有可处理的图片"
+                + (f"（{rejected_files[0]}）" if rejected_files else ""),
+            )
+
+        concurrency = batch_svc.clamp_concurrency(concurrency)
+        job_id = batch_svc.new_job_id()
+        options = {
+            "enable_ai_repair": enable_ai_repair,
+            "confidence_threshold": confidence_threshold,
+            "batch_fast_mode": batch_fast_mode,
+            "ocr_mode": resolved_mode,
+        }
+
+        # P0-4: pass per-file image_import_id + source_sha256
+        per_file_image_ids = [sid[2] for sid in sources_with_sha]
+        per_file_sha256 = [sid[1] for sid in sources_with_sha]
+        try:
+            job = await batch_svc.create_batch_job(
+                db,
+                job_id=job_id,
+                sources=sources,
+                subject=subject,
+                subject_id=subject_id,
+                concurrency=concurrency,
+                created_by=f"admin:{current_admin.id}",
+                batch_import_id=batch_id,
+                image_import_id=image_id,
+                request_id=request_id,
+                per_file_image_ids=per_file_image_ids,
+                per_file_sha256=per_file_sha256,
+                options=options,
+                rejected_files=rejected_files,
+            )
+        except BatchSubmissionConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        # Idempotency: duplicate submission returns existing job_id
+        is_duplicate = job.status == "duplicate"
+        if is_duplicate:
+            from app.models.import_batch_job import ImportBatchJob
+
+            existing_job = await db.get(ImportBatchJob, job.job_id, populate_existing=True)
+            logger.info(
+                "Duplicate batch image upload, returning existing job_id=%s", job.job_id
+            )
+            if (existing_job.status != "queued" or existing_job.current_owner_token
+                    or not existing_job.submission_fingerprint):
+                return BatchImageUploadResponse(
+                    job_id=job.job_id,
+                    status=existing_job.status,
+                    total=existing_job.total,
+                    rejected=len(rejected_files),
+                    rejected_files=rejected_files,
+                    concurrency=existing_job.concurrency,
+                    duplicate=True,
                 )
-                staging_object_ids.append("")
-    except Exception:
-        # Clean up temp files on error
-        for src in sources:
-            if os.path.exists(src.temp_path):
-                try:
-                    os.unlink(src.temp_path)
-                except OSError:
-                    pass
-        raise
+            # A producer may have lost its enqueue reply or exited after DB
+            # commit. Replaying this same task_id repairs the handoff; Redis's
+            # idempotency guard prevents a second execution if it was accepted.
+            job_id = existing_job.job_id
 
-    if not sources:
-        raise HTTPException(
-            status_code=400,
-            detail="没有可处理的图片"
-            + (f"（{rejected_files[0]}）" if rejected_files else ""),
-        )
+        # Enqueue via durable queue — replaces BackgroundTasks (P0-3)
+        from app.services.import_recovery_context import save_recovery_context
+        from app.services.task_queue_worker import enqueue_batch_image_job
 
-    concurrency = batch_svc.clamp_concurrency(concurrency)
-    job_id = batch_svc.new_job_id()
-    options = {
-        "enable_ai_repair": enable_ai_repair,
-        "confidence_threshold": confidence_threshold,
-        "batch_fast_mode": batch_fast_mode,
-        "ocr_mode": ocr_mode,
-    }
+        await save_recovery_context(job_id, {
+            "subject": subject, "subject_id": subject_id, "options": options,
+        })
 
-    # P0-4: pass per-file image_import_id + source_sha256
-    per_file_image_ids = [sid[2] for sid in sources_with_sha]
-    per_file_sha256 = [sid[1] for sid in sources_with_sha]
-    job = await batch_svc.create_batch_job(
-        db,
-        job_id=job_id,
-        sources=sources,
-        subject=subject,
-        subject_id=subject_id,
-        concurrency=concurrency,
-        created_by=f"admin:{current_admin.id}",
-        batch_import_id=batch_id,
-        image_import_id=image_id,
-        request_id=request_id,
-        per_file_image_ids=per_file_image_ids,
-        per_file_sha256=per_file_sha256,
-    )
+        from functools import partial
 
-    # Idempotency: duplicate submission returns existing job_id
-    is_duplicate = job.status == "duplicate"
-    if is_duplicate:
-        logger.info(
-            "Duplicate batch image upload, returning existing job_id=%s", job.job_id
-        )
+        from sqlalchemy.exc import OperationalError
+
+        from app.services.batch_image_admission import dispatch_batch_admission
+
+        try:
+            result = await dispatch_batch_admission(db, job_id, partial(
+                enqueue_batch_image_job,
+                job_id=job_id,
+                staging_object_ids=staging_object_ids,
+                subject=subject,
+                subject_id=subject_id,
+                options=options,
+                concurrency=concurrency,
+                source_files=[src.source_file for src in sources],
+            ))
+        except ImportEnqueueUncertainError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except OperationalError as exc:
+            await db.rollback()
+            raise HTTPException(status_code=503, detail="任务准入暂不可用，请查询状态后重试") from exc
+        if result is not None and not result:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"任务队列已满，请稍后重试: {result.reason}",
+            )
+
+        from app.models.import_batch_job import ImportBatchJob
+
+        admitted = await db.get(ImportBatchJob, job_id, populate_existing=True)
+
         return BatchImageUploadResponse(
-            job_id=job.job_id,
-            status="queued",
-            total=0,
-            rejected=0,
-            rejected_files=[],
-            concurrency=concurrency,
-            duplicate=True,
+            job_id=job_id,
+            status=admitted.status,
+            total=admitted.total,
+            rejected=len(rejected_files),
+            rejected_files=rejected_files,
+            concurrency=admitted.concurrency,
+            duplicate=is_duplicate,
         )
-
-    # Enqueue via durable queue — replaces BackgroundTasks (P0-3)
-    from app.services.task_queue_worker import enqueue_batch_image_job
-
-    result = await enqueue_batch_image_job(
-        job_id=job_id,
-        staging_object_ids=staging_object_ids,
-        subject=subject,
-        subject_id=subject_id,
-        options=options,
-        concurrency=concurrency,
-    )
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"任务队列已满，请稍后重试: {result.reason}",
-        )
-
-    return BatchImageUploadResponse(
-        job_id=job_id,
-        status="queued",
-        total=len(sources),
-        rejected=len(rejected_files),
-        rejected_files=rejected_files,
-        concurrency=concurrency,
-        duplicate=False,
-    )
+    finally:
+        # Staging is content-addressed and may be shared by other jobs. Only
+        # these request-owned temporary files are safe to remove immediately.
+        for temporary in temporaries:
+            temporary.close()
 
 
 @router.get("/batch-image/{job_id}", response_model=BatchImageJobStatusResponse)
@@ -1553,13 +1586,18 @@ async def get_batch_image_job(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
-@router.get("/batch-image/{job_id}/stream")
+@router.get(
+    "/batch-image/{job_id}/stream",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}}},
+)
 async def stream_batch_image_job(
     job_id: str,
     request: Request,
     last_event_id_query: int = Query(0, alias="lastEventId"),
     last_event_id_header: str | None = Header(None, alias="Last-Event-ID"),
     admin_user=Depends(require_permissions("import:read")),
+    db: AsyncSession = Depends(get_db),
 ):
     """SSE 流：增量推送 trace events，job 终态时发送 done event 后关闭。
 
@@ -1575,47 +1613,20 @@ async def stream_batch_image_job(
     from app.features import batch_image_import_service as batch_svc
 
     # ── Connection limits ──
-    _SSE_MAX_CONNECTIONS_PER_USER = 5
-    _SSE_MAX_GLOBAL_CONNECTIONS = 50
     _SSE_MAX_DURATION_SEC = 7200  # 2 hours max
     _SSE_MAX_IDLE_SEC = 300  # 5 min without business event
 
-    # Active SSE connections metric (module-level dict: user_id -> count)
-    if not hasattr(batch_svc, "_active_sse_connections"):
-        batch_svc._active_sse_connections = {}
-    active_conns = batch_svc._active_sse_connections
+    active_conns = _stream_connections()
     current_user_id = (
         admin_user.get("id")
         if isinstance(admin_user, dict)
         else getattr(admin_user, "id", 0)
     )
 
-    # Global connection limit
-    total_active = sum(active_conns.values())
-    if total_active >= _SSE_MAX_GLOBAL_CONNECTIONS:
-        import_sse_metrics.counters["global_rejected"] += 1
-        logger.warning(
-            "SSE global connection limit reached: %d active",
-            total_active,
-        )
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "Server at SSE capacity", "code": "SSE_GLOBAL_LIMIT"},
-        )
-
-    # Per-user connection limit
-    user_count = active_conns.get(current_user_id, 0)
-    if user_count >= _SSE_MAX_CONNECTIONS_PER_USER:
-        import_sse_metrics.counters["per_user_rejected"] += 1
-        logger.warning(
-            "SSE per-user limit reached for user %s: %d active",
-            current_user_id,
-            user_count,
-        )
-        return JSONResponse(
-            status_code=429,
-            content={"detail": "Too many SSE connections", "code": "SSE_LIMIT"},
-        )
+    rejection = _stream_limit_response(active_conns, current_user_id)
+    if rejection is not None:
+        return rejection
+    await db.close()
 
     def _resolve_last_event_id() -> int:
         if last_event_id_query:
@@ -1628,14 +1639,15 @@ async def stream_batch_image_job(
         return 0
 
     async def event_generator():
-        nonlocal current_user_id
+        if _stream_limit_response(active_conns, current_user_id) is not None:
+            yield 'event: error\ndata: {"message":"SSE connection limit reached"}\n\n'
+            return
+
         last_event_id = _resolve_last_event_id()
         queue: asyncio.Queue = asyncio.Queue(maxsize=100)
-        subscribed = False
 
         # Track active connection
-        active_conns[current_user_id] = active_conns.get(current_user_id, 0) + 1
-        import_sse_metrics.counters["active"] = sum(active_conns.values())
+        _change_stream_count(active_conns, current_user_id, 1)
         start_time = time.time()
         last_business_event_time = start_time  # for idle timeout
 
@@ -1688,8 +1700,6 @@ async def stream_batch_image_job(
             _run_sse_subscribe(job_id, on_event, on_done, poll_db),
             name=f"sse-sub-{job_id}",
         )
-        subscribed = True
-
         try:
             while True:
                 elapsed = time.time() - start_time
@@ -1719,45 +1729,20 @@ async def stream_batch_image_job(
                 except TimeoutError:
                     # Heartbeat — no events in 2s (no DB access)
                     yield ": heartbeat\n\n"
-                except asyncio.CancelledError:
-                    # Client disconnect
-                    yield f"event: done\ndata: {json.dumps({'message': 'disconnected'})}\n\n"
-                    return
-                except Exception as exc:
+                except Exception:
                     logger.exception("batch image SSE stream error: job_id=%s", job_id)
-                    yield f"event: error\ndata: {json.dumps({'message': str(exc)}, ensure_ascii=False)}\n\n"
+                    yield 'event: error\ndata: {"message":"Status stream failed"}\n\n'
                     return
-                finally:
-                    if (
-                        subscribed
-                        and sub_task.done()
-                        and sub_task.exception() is not None
-                    ):
-                        sub_task = create_background_task(
-                            _run_sse_subscribe(job_id, on_event, on_done, poll_db),
-                            name=f"sse-sub-{job_id}",
-                        )
         finally:
-            # Cleanup: decrement active connection count, cancel subscription
-            active_conns[current_user_id] = max(
-                0, active_conns.get(current_user_id, 0) - 1
-            )
-            if subscribed and not sub_task.done():
+            _change_stream_count(active_conns, current_user_id, -1)
+            if not sub_task.done():
                 sub_task.cancel()
                 try:
                     await sub_task
                 except (asyncio.CancelledError, Exception):
                     logger.debug("SSE subscriber task cleanup for job %s", job_id)
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 async def _run_sse_subscribe(
@@ -1780,6 +1765,29 @@ async def _run_sse_subscribe(
         )
     except Exception:
         logger.warning("SSE subscribe failed for job %s, using direct poll", job_id)
+
+
+@router.post(
+    "/batch-image/items/{item_id}/retry",
+)
+async def retry_batch_image_item(
+    item_id: int,
+    file: UploadFile,
+    _=Depends(require_permissions("import:write")),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Re-upload one failed original image, retaining successful items in the job."""
+    from app.services.batch_image_recovery_service import (
+        retry_batch_image_item as retry_item,
+    )
+    from app.services.import_recovery_service import ImportRecoveryError
+
+    try:
+        return await retry_item(db, item_id, file)
+    except ImportEnqueueUncertainError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ImportRecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code}) from exc
 
 
 @router.post(
@@ -1865,91 +1873,11 @@ async def _list_pipelines_impl(
     status: str | None = None,
     source_type: str | None = None,
     sort_by: str = "started_at",
-):
-    """列出所有 ImportPipeline 记录，合并内存中的 quality_report。
+    keyword: str | None = None,
+) -> dict:
+    from app.services.admin_import_history_service import list_import_runs
 
-    不新增 DB migration；quality_report 仅对近期 pipeline 可用（内存 store 有上限）。
-    历史 pipeline 返回基础字段。
-    """
-    from sqlalchemy import desc, func, select
-
-    from app.models.import_pipeline import ImportPipeline
-
-    # Whitelist sort_by to avoid getattr on arbitrary model attributes
-    _ALLOWED_SORT = {
-        "started_at",
-        "finished_at",
-        "status",
-        "source_type",
-        "total_pages",
-        "pipeline_id",
-    }
-    if sort_by not in _ALLOWED_SORT:
-        sort_by = "started_at"
-
-    query = select(ImportPipeline)
-    count_query = select(func.count(ImportPipeline.pipeline_id))
-
-    if status:
-        query = query.where(ImportPipeline.status == status)
-        count_query = count_query.where(ImportPipeline.status == status)
-    if source_type:
-        query = query.where(ImportPipeline.source_type == source_type)
-        count_query = count_query.where(ImportPipeline.source_type == source_type)
-
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-
-    # Default sort: newest first
-    order = desc(getattr(ImportPipeline, sort_by, ImportPipeline.started_at))
-    query = query.order_by(order).offset((page - 1) * page_size).limit(page_size)
-
-    rows = (await db.execute(query)).scalars().all()
-
-    # Merge in-memory quality_report + alerts for recent pipelines
-    from app.features.pipeline_orchestrator import (
-        _pipeline_store,
-    )
-
-    items = []
-    for row in rows:
-        item = {
-            "pipeline_id": row.pipeline_id,
-            "source_type": row.source_type,
-            "source_file": row.source_file,
-            "status": row.status,
-            "total_pages": row.total_pages,
-            "error_message": row.error_message,
-            "started_at": serialize_utc_datetime(row.started_at)
-            if row.started_at
-            else None,
-            "finished_at": serialize_utc_datetime(row.finished_at)
-            if row.finished_at
-            else None,
-        }
-        # Merge quality_report from in-memory store if available, else DB
-        store_data = _pipeline_store.get(row.pipeline_id)
-        if store_data:
-            qr = store_data.get("quality_report")
-            if qr:
-                item["quality_report"] = qr
-            alerts = store_data.get("alerts")
-            if alerts:
-                item["alerts"] = alerts
-        else:
-            # P7-4: fallback to DB columns for historical pipelines
-            if row.quality_report:
-                item["quality_report"] = row.quality_report
-            if row.alerts:
-                item["alerts"] = row.alerts
-        items.append(item)
-
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
+    return await list_import_runs(db, page, page_size, status, source_type, sort_by, keyword)
 
 
 # ---------------------------------------------------------------------------

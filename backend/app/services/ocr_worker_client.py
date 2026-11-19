@@ -7,11 +7,12 @@ this protocol so that ``OCRGateway`` can remain backend-agnostic.
 from __future__ import annotations
 
 import logging
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import httpx
 
 from app.core.ocr_runtime_config import OcrRuntimeConfig, sanitize_url
+from app.core.ocr_types import WorkerResult
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class OcrWorkerClient(Protocol):
         *,
         mode: str = "boxes",
         options: dict | None = None,
-    ) -> Any:  # WorkerResult
+    ) -> WorkerResult:
         ...
 
     async def recognize_batch(
@@ -40,7 +41,7 @@ class OcrWorkerClient(Protocol):
         *,
         mode: str = "boxes",
         options: dict | None = None,
-    ) -> list[Any]:  # list[WorkerResult]
+    ) -> list[WorkerResult]:
         ...
 
     async def shutdown(
@@ -94,6 +95,10 @@ def create_ocr_worker_client(
     if backend == "paddlex_http":
         # Delay-import so that ``PaddleXHttpOcrWorkerClient`` and its
         # httpx-only dependencies are loaded only when actually needed.
+        from app.services.ocr_cpu_fallback_client import (
+            CpuFallbackOcrWorkerClient,
+            allows_local_cpu_fallback,
+        )
         from app.services.ocr_paddlex_http_client import PaddleXHttpOcrWorkerClient
 
         logger.info(
@@ -101,7 +106,13 @@ def create_ocr_worker_client(
             sanitize_url(config.remote_url),
             config.remote_max_concurrency,
         )
-        return PaddleXHttpOcrWorkerClient(config, http_client=http_client)
+        fallback = allows_local_cpu_fallback(config)
+        remote = PaddleXHttpOcrWorkerClient(
+            config,
+            http_client=http_client,
+            connection_fallback_enabled=fallback,
+        )
+        return CpuFallbackOcrWorkerClient(config, remote) if fallback else remote
 
     raise ValueError(
         f"Unrecognised OCR execution_backend '{backend}'. "

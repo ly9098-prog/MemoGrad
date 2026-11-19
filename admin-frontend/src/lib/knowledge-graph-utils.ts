@@ -21,32 +21,64 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function edgeStrength(edge: KnowledgeGraphEdge): number {
+export function edgeStrength(edge: Pick<KnowledgeGraphEdge, "weight" | "confidence">): number {
   const normalizedWeight = clamp(edge.weight / 10, 0, 1);
   return edge.confidence * 0.76 + normalizedWeight * 0.24;
 }
 
-export function collapseEdgesByPair(edges: KnowledgeGraphEdge[]): KnowledgeGraphEdge[] {
-  const byPair = new Map<string, KnowledgeGraphEdge>();
-  for (const edge of edges) {
-    const key = edge.source < edge.target ? `${edge.source}:${edge.target}` : `${edge.target}:${edge.source}`;
-    const current = byPair.get(key);
-    if (!current || edgeStrength(edge) > edgeStrength(current)) byPair.set(key, edge);
-  }
-  return [...byPair.values()];
+export function graphNodeRadius(
+  node: Pick<KnowledgeGraphNode, "is_chapter_root">,
+): number {
+  return node.is_chapter_root ? 18 : 10;
 }
 
-export function nodeRadius(node: KnowledgeGraphNode): number {
-  return clamp(16 + Math.sqrt(Math.max(0, node.degree)) * 2.05, 18, 28);
+export const GRAPH_MIN_ZOOM = 0.04;
+export const GRAPH_MAX_ZOOM = 4;
+
+export function graphZoomTarget(current: number, pending: number | undefined, factor: number): number {
+  const reversing = pending != null && (factor - 1) * (pending - current) < 0;
+  const start = pending == null || reversing ? current : pending;
+  return clamp(start * factor, GRAPH_MIN_ZOOM, GRAPH_MAX_ZOOM);
 }
 
-export function estimatedLabelWidth(node: KnowledgeGraphNode): number {
-  const text = shortName(node.name, 11);
-  return clamp(text.length * 10.8 + 18, 54, 154);
+export function advanceGraphZoom(current: number, target: number, elapsed: number): number {
+  const remaining = Math.log(target / current);
+  if (Math.abs(remaining) < 0.0005) return target;
+  const progress = 1 - Math.exp(-Math.max(0, elapsed) / 65);
+  return current * Math.exp(remaining * progress);
+}
+
+export function wheelZoomFactor(
+  deltaY: number,
+  deltaMode = 0,
+  viewportHeight = 800,
+  ctrlKey = false,
+): number {
+  const modeScale = deltaMode === 1 ? 16 : deltaMode === 2 ? Math.max(1, viewportHeight) : 1;
+  const normalizedDelta = clamp(deltaY * modeScale, -240, 240);
+  const sensitivity = ctrlKey ? 0.0034 : 0.0015;
+  return clamp(Math.exp(-normalizedDelta * sensitivity), 0.84, 1.19);
 }
 
 export function relationLabel(type: string): string {
   return RELATIONS[type as RelationKey]?.label ?? type;
+}
+
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
 }
 
 export function relationColor(type: string): string {

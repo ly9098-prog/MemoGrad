@@ -450,6 +450,11 @@ jobs:
             tests/architecture/test_pipeline_resume_boundaries.py \
             tests/test_features/test_pipeline_chunk_runner.py \
             tests/test_features/test_pipeline_resume.py \
+            tests/test_services/test_import_recovery_service.py \
+            tests/test_services/test_import_recovery_boundaries.py \
+            tests/test_services/test_public_pipeline_resume_service.py \
+            tests/test_services/test_admin_import_history_service.py \
+            tests/test_services/test_ocr_cpu_fallback_client.py \
             tests/test_features/test_pipeline_status_chunk_progress.py \
             tests/test_features/test_pipeline_e2e.py \
             tests/architecture/test_pipeline_stage_completion_boundaries.py \
@@ -593,6 +598,14 @@ jobs:
             tests/test_services/test_question_writer_parsers.py \
             tests/test_services/test_formula_graph_batch.py \
             tests/test_services/test_import_upload_admission.py \
+            tests/test_services/test_ocr_image_admission_stability.py \
+            tests/test_services/test_ocr_upload_stability.py \
+            tests/test_services/test_batch_submission_idempotency.py \
+            tests/test_services/test_batch_submission_migration.py \
+            tests/test_services/test_batch_ocr_text_export.py \
+            tests/test_api/test_admin_import_ocr_text.py \
+            tests/test_features/test_batch_image_execution_stability.py \
+            tests/test_features/test_streaming_faults.py \
             tests/test_services/test_pomodoro_study_day_stats.py \
             tests/test_services/test_pomodoro_subject_projection.py \
             tests/test_services/test_pomodoro_snapshot_contract.py \

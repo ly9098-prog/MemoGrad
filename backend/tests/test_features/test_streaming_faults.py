@@ -4,12 +4,125 @@ Tests that ``stream_to_temp`` and the upload endpoints handle
 errors gracefully: oversized files, corrupt data, disk full, etc.
 """
 
+import asyncio
 import os
+import threading
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.services.streaming_upload_handler import stream_to_temp
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error", [asyncio.CancelledError(), ValueError("synthetic read error")]
+)
+async def test_interrupted_read_reclaims_file_and_descriptor(
+    tmp_path, monkeypatch, error
+):
+    from app.services import streaming_upload_handler as uploads
+
+    created = []
+    original = uploads._create_temp
+
+    def create(suffix):
+        result = original(suffix)
+        created.append(result)
+        return result
+
+    monkeypatch.setattr(uploads, "_create_temp", create)
+    upload = MagicMock(read=AsyncMock(side_effect=[b"partial", error]))
+    with pytest.raises(type(error)):
+        await uploads.stream_to_temp(upload)
+    assert len(created) == 1
+    descriptor, path = created[0]
+    try:
+        assert not Path(path).exists()
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+    finally:
+        uploads._close_and_unlink(descriptor, path)
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_temp_creation_reclaims_late_file(monkeypatch):
+    from app.services import streaming_upload_handler as uploads
+
+    started, release = threading.Event(), threading.Event()
+    created = []
+    original = uploads._create_temp
+
+    def create(suffix):
+        result = original(suffix)
+        created.append(result)
+        started.set()
+        assert release.wait(timeout=5)
+        return result
+
+    monkeypatch.setattr(uploads, "_create_temp", create)
+    task = asyncio.create_task(
+        uploads.stream_to_temp(MagicMock(read=AsyncMock(return_value=b"")))
+    )
+    try:
+        assert await asyncio.to_thread(started.wait, 5)
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert all(not Path(path).exists() for _, path in created)
+    finally:
+        release.set()
+        for descriptor, path in created:
+            uploads._close_and_unlink(descriptor, path)
+
+
+@pytest.mark.asyncio
+async def test_partial_os_write_preserves_the_complete_upload(monkeypatch):
+    from app.services import streaming_upload_handler as uploads
+
+    original = os.write
+    monkeypatch.setattr(uploads.os, "write", lambda fd, data: original(fd, data[:3]))
+    upload = MagicMock(read=AsyncMock(side_effect=[b"complete synthetic content", b""]))
+    result = await uploads.stream_to_temp(upload)
+    try:
+        assert Path(result.path).read_bytes() == b"complete synthetic content"
+    finally:
+        result.close()
+
+
+@pytest.mark.asyncio
+async def test_repeated_cancellation_waits_for_inflight_write(monkeypatch):
+    from app.services import streaming_upload_handler as uploads
+
+    started, release = threading.Event(), threading.Event()
+    writes = []
+    original = os.write
+
+    def write(fd, data):
+        started.set()
+        assert release.wait(timeout=5)
+        result = original(fd, data)
+        writes.append(result)
+        return result
+
+    monkeypatch.setattr(uploads.os, "write", write)
+    upload = MagicMock(read=AsyncMock(side_effect=[b"synthetic content", b""]))
+    task = asyncio.create_task(uploads.stream_to_temp(upload))
+    try:
+        assert await asyncio.to_thread(started.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done(), "fd must stay owned until the executor write finishes"
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert writes == [len(b"synthetic content")]
+    finally:
+        release.set()
 
 
 class TestStreamToTempFaults:

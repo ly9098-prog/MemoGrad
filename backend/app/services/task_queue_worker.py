@@ -511,6 +511,7 @@ async def enqueue_resume_pipeline(
     subject: str | None,
     subject_id: int | None,
     options: dict,
+    retry_token: str | None = None,
 ) -> EnqueueResult:
     """Enqueue a pipeline resume task."""
     payload = {
@@ -523,7 +524,7 @@ async def enqueue_resume_pipeline(
     return await _enqueue_v2_with_local_fallback(
         TASK_TYPE_RESUME_PIPELINE,
         payload,
-        task_id=f"resume:{pipeline_id}",
+        task_id=f"resume:{retry_token or pipeline_id}",
         max_retries=2,
     )
 
@@ -603,6 +604,8 @@ async def enqueue_admin_resume(
     subject: str | None,
     subject_id: int | None,
     options: dict,
+    created_by: str | None = None,
+    retry_token: str | None = None,
 ) -> EnqueueResult:
     """Enqueue an admin resume pipeline task via the durable queue.
 
@@ -618,10 +621,12 @@ async def enqueue_admin_resume(
         "subject_id": subject_id,
         "options": options,
     }
+    if created_by is not None:
+        payload["created_by"] = created_by
     return await _enqueue_v2_with_local_fallback(
         TASK_TYPE_ADMIN_RESUME,
         payload,
-        task_id=f"admin_resume:{pipeline_id}",
+        task_id=f"admin_resume:{retry_token or pipeline_id}",
         max_retries=2,
     )
 
@@ -633,6 +638,9 @@ async def enqueue_batch_image_job(
     subject_id: int | None,
     options: dict,
     concurrency: int = 2,
+    source_seqs: list[int] | None = None,
+    source_files: list[str] | None = None,
+    retry_token: str | None = None,
 ) -> EnqueueResult:
     """Enqueue a batch image import job via the durable queue.
 
@@ -648,10 +656,14 @@ async def enqueue_batch_image_job(
         "options": options,
         "concurrency": concurrency,
     }
+    if source_seqs is not None:
+        payload["source_seqs"] = source_seqs
+    if source_files is not None:
+        payload["source_files"] = source_files
     return await _enqueue_v2_with_local_fallback(
         TASK_TYPE_BATCH_IMAGE,
         payload,
-        task_id=f"batch_image:{job_id}",
+        task_id=f"batch_image:{retry_token or job_id}",
         max_retries=1,
     )
 

@@ -108,17 +108,17 @@ async def _build_target(
         features,
         model,
     )
-    key, error = _resolve_api_key(api_key, model)
+    try:
+        base_url = validated_api_base_url(api_base_url) or ""
+    except ValueError as exc:
+        return _empty_target(), _network_error(str(exc))
+    key, error = _resolve_api_key(api_key, model, target_base_url=base_url)
     if error is not None:
         return _empty_target(), error
     if not key:
         return _empty_target(), _auth_error(
             "未提供 API Key，请在上方输入后测试，或先保存模型配置"
         )
-    try:
-        base_url = validated_api_base_url(api_base_url) or ""
-    except ValueError as exc:
-        return _empty_target(), _network_error(str(exc))
     return (
         _ConnectionTarget(
             api_base_url=base_url,
@@ -176,10 +176,17 @@ def _resolve_model_defaults(
 def _resolve_api_key(
     explicit_api_key: str | None,
     model: AdminAiModelConfig | None,
+    *,
+    target_base_url: str,
 ) -> tuple[str | None, dict | None]:
     key = (explicit_api_key or "").strip() or None
     if key is not None or model is None or not model.api_key_encrypted:
         return key, None
+    saved_base_url = (model.api_base_url or "").strip().rstrip("/")
+    if saved_base_url and saved_base_url != target_base_url.rstrip("/"):
+        return None, _auth_error(
+            "Base URL 已变更，请重新输入 API Key 后再测试连接"
+        )
     try:
         return decrypt_secret(model.api_key_encrypted), None
     except (SecretDecryptionError, SecretEncryptionError):

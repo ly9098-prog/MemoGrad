@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import LoginPage from "./page";
+import LoginPage, { loginErrorMessage } from "./page";
+import { ApiError } from "@/lib/api/errors";
 
 type Element = ReactElement<Record<string, unknown>>;
 type PointerHandler = (event: unknown) => void;
@@ -47,6 +48,15 @@ function pointerFixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("login glass interaction", () => {
+  it.each([
+    [new ApiError(401, "Unauthorized", null), "用户名或密码错误"],
+    [new ApiError(429, "Too many requests", null), "尝试次数过多，请稍后再试"],
+    [new ApiError(503, "Unavailable", null), "服务暂时不可用，请稍后再试"],
+    [new TypeError("Failed to fetch"), "网络异常，请检查连接后重试"],
+  ])("maps login failures to a specific message", (error, expected) => {
+    expect(loginErrorMessage(error)).toBe(expected);
+  });
+
   it("uses a stable frame and caps stronger tilt at eight and ten degrees", () => {
     vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
     const { card, event, properties } = pointerFixture();

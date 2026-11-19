@@ -1,4 +1,5 @@
 import { createApiRequestId, createApiTraceId, getApiAccessToken } from "./client";
+import type { ImportPipelineStatusResponse } from "./types";
 
 export type TraceEvent = {
   seq: number;
@@ -13,10 +14,10 @@ export type TraceEvent = {
 
 export type DoneEvent = {
   status: string;
-  total_questions: number;
-  error_message: string | null;
-  succeeded: number;
-  failed: number;
+  total_questions?: number;
+  error_message?: string | null;
+  succeeded?: number;
+  failed?: number;
   [key: string]: unknown;
 };
 
@@ -28,6 +29,7 @@ export type SSEMessage = {
 export type SSEHandlers = {
   onOpen?: () => void;
   onTrace?: (event: TraceEvent) => void;
+  onStatus?: (status: ImportPipelineStatusResponse) => void;
   onDone?: (summary: DoneEvent) => void;
   onError?: (error: SSEError) => void;
   onClose?: () => void;
@@ -144,9 +146,10 @@ export function connectSSE(
 
   const baseUrl = getBaseUrl(baseUrlOverride);
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
-  const controller = new AbortController();
+  let controller: AbortController | undefined;
   let retryCount = 0;
   let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let disconnectedByUser = false;
   const traceId = requestedTraceId && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/.test(requestedTraceId)
     ? requestedTraceId
@@ -167,35 +170,51 @@ export function connectSSE(
     heartbeatTimer = null;
   }
 
-  function resetHeartbeat() {
-    if (heartbeatTimer) clearTimeout(heartbeatTimer);
+  function resetHeartbeat(connection: AbortController) {
+    cleanup();
     if (heartbeatTimeoutMs <= 0) return;
     heartbeatTimer = setTimeout(() => {
-      // No data received within heartbeat window
       emitError({
         type: "heartbeat",
         message: "SSE 连接心跳超时",
       });
-      controller.abort();
+      connection.abort();
     }, heartbeatTimeoutMs);
   }
 
+  function reconnect() {
+    if (disconnectedByUser || retryCount >= maxRetries) return;
+    const delay = Math.min(retryDelayMs * 2 ** retryCount, 30_000);
+    retryCount++;
+    retryTimer = setTimeout(() => { void connect(); }, delay);
+  }
+
   async function connect() {
+    if (disconnectedByUser) return;
+    const connection = new AbortController();
+    controller = connection;
     const effectiveToken = tokenOverride !== undefined ? tokenOverride : getApiAccessToken() ?? token;
     currentTraceId = traceId;
     currentRequestId = createApiRequestId();
     const headers: Record<string, string> = {
+      "Accept": "text/event-stream",
       "X-Trace-ID": traceId,
       "X-Request-ID": currentRequestId,
     };
     if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
 
     try {
+      resetHeartbeat(connection);
       const response = await fetch(url, {
         headers,
-        signal: controller.signal,
+        signal: connection.signal,
         credentials: "same-origin",
       });
+      if (disconnectedByUser) return;
+      if (connection.signal.aborted) {
+        reconnect();
+        return;
+      }
 
       currentTraceId = response.headers.get("X-Trace-ID") || traceId;
       currentRequestId = response.headers.get("X-Request-ID") || currentRequestId;
@@ -209,122 +228,99 @@ export function connectSSE(
             ? "认证已过期，请重新登录"
             : `SSE 连接返回 HTTP ${response.status}`,
         });
+        if (response.status === 401 || response.status === 429 || response.status >= 500) reconnect();
         return;
       }
 
-      if (!response.body) {
+      if (!response.body || !response.headers.get("Content-Type")?.includes("text/event-stream")) {
         emitError({
           type: "http",
-          message: "SSE 响应体为空",
+          message: "服务未返回事件流",
         });
         return;
       }
 
-      // Connection established
-      retryCount = 0;
       handlers.onOpen?.();
-      resetHeartbeat();
+      resetHeartbeat(connection);
+      const openedAt = Date.now();
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       const parser = new SSEParser();
 
-      while (true) {
+      while (!disconnectedByUser) {
         const { done, value } = await reader.read();
+        if (disconnectedByUser) return;
+        if (connection.signal.aborted) {
+          reconnect();
+          return;
+        }
         if (done) break;
 
-        resetHeartbeat();
+        if (Date.now() - openedAt >= 10_000) retryCount = 0;
+        resetHeartbeat(connection);
 
         const text = decoder.decode(value, { stream: true });
         const messages = parser.feed(text);
 
         for (const msg of messages) {
-          if (msg.event === "trace") {
-            try {
-              const trace = JSON.parse(msg.data) as TraceEvent;
-              handlers.onTrace?.(trace);
-            } catch {
-              emitError({
-                type: "parse",
-                message: `SSE trace 事件 JSON 解析失败: ${msg.data.slice(0, 100)}`,
-              });
-            }
-          } else if (msg.event === "done") {
-            try {
-              const done = JSON.parse(msg.data) as DoneEvent;
-              handlers.onDone?.(done);
-            } catch {
-              emitError({
-                type: "parse",
-                message: `SSE done 事件 JSON 解析失败: ${msg.data.slice(0, 100)}`,
-              });
-            }
+          if (disconnectedByUser) return;
+          if (["error", "timeout", "idle_timeout"].includes(msg.event)) {
+            emitError({ type: "network", message: "SSE 连接已中断，正在同步任务状态" });
+            reconnect();
+            return;
+          }
+          if (msg.event !== "trace" && msg.event !== "status" && msg.event !== "done") continue;
+
+          let data: unknown;
+          try {
+            data = JSON.parse(msg.data);
+          } catch {
+            emitError({ type: "parse", message: `SSE ${msg.event} 事件无法读取` });
+            continue;
+          }
+          if (msg.event === "status" && (!data || typeof data !== "object" || !("pipeline_id" in data) || !("status" in data))) {
+            emitError({ type: "parse", message: "SSE 状态快照缺少任务标识" });
+            continue;
+          }
+          if (msg.event === "trace") handlers.onTrace?.(data as TraceEvent);
+          if (msg.event === "status") handlers.onStatus?.(data as ImportPipelineStatusResponse);
+          if (msg.event === "done") {
+            handlers.onDone?.(data as DoneEvent);
+            return;
           }
         }
       }
 
-      // Stream ended without a done event
       if (!disconnectedByUser) {
         emitError({
           type: "eof",
           message: "SSE 流意外结束，任务可能未完成",
         });
 
-        // Attempt reconnection
-        if (maxRetries > 0 && retryCount < maxRetries) {
-          retryCount++;
-          const delay = Math.min(retryDelayMs * Math.pow(2, retryCount - 1), 30_000);
-          emitError({
-            type: "network",
-            message: `SSE 将在 ${Math.round(delay / 1000)} 秒后重连 (第 ${retryCount}/${maxRetries} 次)`,
-          });
-          setTimeout(() => {
-            if (!controller.signal.aborted) connect();
-          }, delay);
-          return;
-        }
+        reconnect();
       }
     } catch (error) {
-      if (disconnectedByUser) return; // user-initiated abort, no error
-
-      // Network error or abort
-      if (error instanceof DOMException && error.name === "AbortError") {
-        if (!disconnectedByUser) {
-          emitError({
-            type: "network",
-            message: "SSE 连接被中断",
-          });
-        }
-        return;
+      if (disconnectedByUser) return;
+      if (!connection.signal.aborted) {
+        emitError({ type: "network", message: error instanceof Error ? error.message : "SSE 网络错误" });
       }
-
-      emitError({
-        type: "network",
-        message: error instanceof Error ? error.message : "SSE 网络错误",
-      });
-
-      // Attempt reconnection for network errors
-      if (maxRetries > 0 && retryCount < maxRetries) {
-        retryCount++;
-        const delay = Math.min(retryDelayMs * Math.pow(2, retryCount - 1), 30_000);
-        setTimeout(() => {
-          if (!controller.signal.aborted) connect();
-        }, delay);
-        return;
-      }
+      reconnect();
     } finally {
       cleanup();
+      connection.abort();
       handlers.onClose?.();
     }
   }
 
-  connect();
+  void connect();
 
   return {
     close: () => {
       disconnectedByUser = true;
       cleanup();
-      controller.abort();
+      clearTimeout(retryTimer);
+      controller?.abort();
     },
   };
 }

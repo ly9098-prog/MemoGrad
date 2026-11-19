@@ -113,6 +113,7 @@ async def get_knowledge_graph(
     from app.models.knowledge_point import KnowledgePoint
     from app.models.question import Question
     from app.models.question_knowledge_point import QuestionKnowledgePoint
+    from app.services.knowledge_graph_chapters import graph_chapter_metadata
 
     valid_relations = {"prerequisite", "parent", "related", "next"}
     if relation_type and relation_type not in valid_relations:
@@ -243,6 +244,10 @@ async def get_knowledge_graph(
             if kp_id not in parent_targets and kp_id != subject_root_id
         ]
         topic_ids.extend(roots)
+
+    chapter_metadata = await graph_chapter_metadata(
+        db, knowledge_points, all_edges, subject_root_id
+    )
 
     def overview_rank(kp_id: int) -> tuple[int, int, int, int]:
         return (
@@ -417,6 +422,7 @@ async def get_knowledge_graph(
                 "out_degree": outgoing_counts[kp.id],
                 "degree": all_degree[kp.id],
                 "relation_counts": dict(relation_breakdown),
+                **chapter_metadata[kp.id],
             }
         )
 

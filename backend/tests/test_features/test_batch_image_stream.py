@@ -86,6 +86,7 @@ def test_stream_event_generator_handles_exception():
                 last_event_id_query=0,
                 last_event_id_header=None,
                 admin_user=AsyncMock(),
+                db=AsyncMock(),
             )
         chunks = []
         async for chunk in resp.body_iterator:

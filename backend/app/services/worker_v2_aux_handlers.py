@@ -16,7 +16,9 @@ async def run_formula_handler(state: WorkerTaskState) -> None:
     admin_id = state.payload.get("admin_id", 0)
     job_id = state.payload.get("job_id", "")
     async with async_session() as db:
-        result = await db.execute(select(FormulaCard).where(FormulaCard.id.in_(card_ids)))
+        result = await db.execute(
+            select(FormulaCard).where(FormulaCard.id.in_(card_ids))
+        )
         cards = list(result.scalars().all())
     await process_batch(job_id, cards, admin_id)
 
@@ -34,6 +36,14 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
         await state.namespace["_verify_fencing_or_cancel"](
             state.task, state.fence_record_id, state.task_type
         )
+    source_seqs = state.payload.get("source_seqs") or list(
+        range(1, len(staging_ids) + 1)
+    )
+    source_files = state.payload.get("source_files") or [
+        f"image_{idx + 1}.png" for idx in range(len(staging_ids))
+    ]
+    if len(source_seqs) != len(staging_ids) or len(source_files) != len(staging_ids):
+        raise ValueError("Batch image source metadata length mismatch")
     sources: list[batch_svc.BatchImageSource] = []
     for idx, staging_id in enumerate(staging_ids):
         if not staging_id:
@@ -41,11 +51,13 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
         work_path = await state.resolve_owned_staging(staging_id)
         sources.append(
             batch_svc.BatchImageSource(
-                seq=idx + 1, source_file=f"image_{idx + 1}.png", temp_path=work_path
+                seq=source_seqs[idx], source_file=source_files[idx], temp_path=work_path
             )
         )
     if not sources:
-        raise FileNotFoundError(f"No valid staging sources for batch image job {job_id}")
+        raise FileNotFoundError(
+            f"No valid staging sources for batch image job {job_id}"
+        )
     await batch_svc.run_batch_job(
         job_id=job_id,
         sources=sources,
@@ -53,4 +65,5 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
         subject_id=subject_id,
         options=options,
         concurrency=concurrency,
+        execution_fence=(state.task.task_id, state.task.owner_token, state.task.generation),
     )

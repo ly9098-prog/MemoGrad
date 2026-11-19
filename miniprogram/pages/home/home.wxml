@@ -4,7 +4,7 @@
   <view class="home-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="home-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="brand-lockup">
-        <image class="brand-mark brand-mark-image" src="/assets/icons/brand-logo.png" mode="aspectFit" aria-hidden="true" />
+        <image class="brand-mark brand-mark-image" src="/assets/icons/memograd-mark.svg" mode="aspectFit" aria-hidden="true" />
         <view class="brand-copy">
           <text class="brand-name">MEMOGRAD</text>
           <text class="brand-caption">STUDY DESK</text>
@@ -56,25 +56,15 @@
             <text class="focus-title">{{primaryTaskTitle}}</text>
           </view>
           <text class="focus-desc">{{primaryTaskDesc}}</text>
-
-          <view wx:if="{{!guestMode}}" class="progress-head">
-            <view class="progress-head-copy">
-              <text class="progress-label">今日刷题进度</text>
-              <text class="progress-head-sub">目标题量 {{todayGoalTotal}} 题</text>
-            </view>
-            <view class="progress-pair">
-              <text class="progress-value">{{_animGoalDone}} / {{todayGoalTotal}}</text>
-            </view>
-          </view>
           <text wx:if="{{guestMode}}" class="focus-guest-hint">{{missionText}}</text>
 
           <view class="focus-actions">
             <view class="primary-action" bindtap="startPrimaryTask" hover-class="primary-action-pressed">
               <text>{{primaryTaskAction}}</text>
-              <view class="primary-action-arrow">↗</view>
+              <view class="primary-action-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
             </view>
             <view wx:if="{{!guestMode}}" class="secondary-action" bindtap="startSecondaryTask" hover-class="secondary-action-pressed">
-              <text>学习报告</text>
+              <text>学习报告</text><view class="home-chevron" aria-hidden="true"></view>
             </view>
             <view wx:else class="secondary-action is-locked" aria-disabled="true">
               <text>学习报告</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
@@ -82,10 +72,10 @@
           </view>
         </view>
 
-        <view wx:if="{{!guestMode}}" class="focus-ring-wrap" aria-label="今日题量 {{_animGoalDone}} / {{todayGoalTotal}}，完成 {{_animLevelProgress}}%">
+        <view wx:if="{{!guestMode}}" class="focus-ring-wrap" bindtap="goStudyPlan" hover-class="soft-pressed" aria-role="button" aria-label="今日刷题进度 {{_animGoalDone}} / {{todayGoalTotal}}，完成 {{_animLevelProgress}}%，查看学习目标">
           <view class="focus-ring" style="background: conic-gradient(#7ED8B5 0deg, #55C89B {{_animLevelProgress * 3.6}}deg, #E0F1EB {{_animLevelProgress * 3.6}}deg 360deg);">
             <view class="focus-ring-inner">
-              <text class="focus-ring-value">{{_animGoalDone}} / {{todayGoalTotal}}</text>
+              <view class="focus-ring-value"><text>{{_animGoalDone}}</text><text class="focus-ring-goal">/ {{todayGoalTotal}}</text></view>
               <text class="focus-ring-label">今日题量</text>
             </view>
           </view>
@@ -124,7 +114,6 @@
   <view class="content-section route-enter-page delay-two">
     <view class="section-heading">
       <view>
-        <text class="section-kicker">SMART STUDY HUB</text>
         <text class="section-title">今日学习</text>
       </view>
       <view class="section-quick-action" bindtap="startRandom" hover-class="section-quick-action-pressed" aria-role="button" aria-label="进入随机练习">
@@ -225,41 +214,18 @@
   <view class="content-section mastery-section route-enter-page delay-three" wx:if="{{subjectMastery.length > 0}}">
     <view class="section-heading compact-heading mastery-heading">
       <view class="mastery-heading-copy">
-        <text class="section-kicker">MASTERY SNAPSHOT</text>
         <text class="section-title">四科掌握概览</text>
-      </view>
-    </view>
-
-    <view class="mastery-radar" wx:if="{{_masteryRadarItems.length === 4}}">
-      <view class="mastery-radar-stage">
-        <view
-          class="radar-polygon"
-          style="{{_masteryRadarPolygonStyle}}"
-        ></view>
-        <view
-          wx:for="{{_masteryRadarItems}}"
-          wx:key="key"
-          class="radar-point"
-          style="{{item.pointStyle}} animation-delay: {{item.delay}}ms;"
-        ></view>
-      </view>
-      <view class="mastery-radar-legend">
-        <view wx:for="{{_masteryRadarItems}}" wx:key="key" class="mastery-radar-legend-item">
-          <text class="mastery-radar-legend-name">{{item.subjectName}}</text>
-          <text class="mastery-radar-legend-value">{{item.score}}%</text>
-          <text wx:if="{{item.trend}}" class="mastery-radar-trend trend-{{item.trend}}">{{item.trendText}}</text>
-        </view>
+        <text class="mastery-basis">基于已练知识点的评估</text>
       </view>
     </view>
 
     <view class="mastery-grid mastery-grid-tech">
-      <view wx:for="{{subjectMastery}}" wx:key="subjectCode" class="mastery-card mastery-card-tech {{item.hasData ? 'has-data' : 'no-data'}}" data-subject-id="{{item.subjectId}}" bindtap="openMasterySubject" hover-class="mastery-card-pressed">
+      <view wx:for="{{subjectMastery}}" wx:key="subjectCode" class="mastery-card mastery-card-tech {{item.hasData ? 'has-data' : 'no-data'}}" data-subject-id="{{item.subjectId}}" bindtap="openMasterySubject" hover-class="mastery-card-pressed" aria-role="button" aria-label="{{item.subjectName}}，{{item.scoreText}}，{{item.statusText}}，{{item.questionStatText}}">
         <view class="mastery-card-head">
           <view class="mastery-icon mastery-icon-{{item.iconClass}}">
             <image wx:if="{{item.iconSrc}}" class="mastery-icon-image" src="{{item.iconSrc}}" mode="aspectFit" />
             <text wx:else class="mastery-icon-fallback">{{item.mark}}</text>
           </view>
-          <view class="mastery-more" aria-hidden="true"><view></view><view></view><view></view></view>
         </view>
 
         <view class="mastery-title-row">
@@ -268,31 +234,19 @@
         </view>
 
         <view class="mastery-track mastery-track-tech">
-          <!-- Reference rail: independent hexagonal rail + independent hexagonal fill.
-               Do not skew the entire rail; both ends use fixed chamfers like the design. -->
-          <view class="mastery-hex-rail">
+          <view class="mastery-mint-rail">
             <view
               wx:if="{{item.hasData && item.score > 0}}"
-              class="mastery-hex-fill {{item.score >= 99 ? 'is-full' : ''}}"
+              class="mastery-mint-fill"
               style="width: {{item.barWidth}}%;"
             >
-              <view class="mastery-hex-gradient"></view>
-              <view class="mastery-hex-stripes" aria-hidden="true">
-                <view class="mastery-hex-stripe stripe-one"></view>
-                <view class="mastery-hex-stripe stripe-two"></view>
-                <view class="mastery-hex-stripe stripe-three"></view>
-                <view class="mastery-hex-stripe stripe-four"></view>
-                <view class="mastery-hex-stripe stripe-five"></view>
-              </view>
-              <view class="mastery-hex-toplight" aria-hidden="true"></view>
-              <view class="mastery-hex-bottomshade" aria-hidden="true"></view>
             </view>
           </view>
         </view>
 
         <view class="mastery-foot mastery-foot-tech">
-          <text class="mastery-status">{{item.statusText}}</text>
-          <text class="mastery-sample-copy">{{item.questionStatText}}</text>
+          <view class="mastery-status-row"><text class="mastery-status">{{item.statusText}}</text><image wx:if="{{item.statusIconSrc}}" class="mastery-status-icon" src="{{item.statusIconSrc}}" mode="aspectFit" aria-hidden="true" /></view>
+          <text class="mastery-sample-copy">{{item.sampleText}}</text>
         </view>
       </view>
     </view>
@@ -302,7 +256,6 @@
   <view class="content-section tool-section route-enter-page delay-three">
     <view class="section-heading compact-heading">
       <view>
-        <text class="section-kicker">TOOLS</text>
         <text class="section-title">学习工作台</text>
       </view>
       <text class="section-note">数据与效率</text>
@@ -326,14 +279,14 @@
       <view class="tool-item" bindtap="goFormulas" hover-class="tool-pressed">
         <view class="tool-icon formula-icon">∑</view>
         <text class="tool-title">速记</text>
-        <text class="tool-desc">只展示有效学习内容</text>
+        <text class="tool-desc">公式与考点</text>
       </view>
     </view>
   </view>
 
   <view class="growth-note route-enter-page delay-three">
     <view class="growth-note-copy">
-      <text class="growth-note-label">TODAY'S NOTE</text>
+      <text class="growth-note-label">今日寄语</text>
       <text class="growth-note-text">{{dailyBoostText}}</text>
     </view>
   </view>

@@ -1,17 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, Suspense, type ReactElement } from "react";
 import AISettingsPage from "./page";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ModelCards } from "./components/model-cards";
+import { ModelWorkbench } from "./components/model-workbench";
+import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overview";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
+import {
+  SystemSettingsSection,
+  isQuotaExhausted,
+} from "./components/system-settings";
 import ExperimentsPage from "../recommendation/experiments/page";
 import MetricsPage from "../recommendation/metrics/page";
 import ReportsPage from "../recommendation/reports/page";
 import StrategiesPage from "../recommendation/strategies/page";
 import SystemTasksPage from "../system/tasks/page";
-import { VectorConfigSection } from "./components/vector-config-section";
+import {
+  isVectorConfigValid,
+  VectorConfigSection,
+} from "./components/vector-config-section";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -107,26 +114,37 @@ beforeEach(() => {
   h.queries = []; h.mutations = []; h.data = {}; h.refetches = [];
   h.search = ""; h.roleName = "super_admin"; h.mutationPending = false; h.mutates = [];
   h.request.mockReset().mockResolvedValue({});
+  vi.stubGlobal("window", globalThis);
   vi.stubGlobal("document", {
-    createElement: () => ({ remove: vi.fn() }),
+    createElement: () => ({ remove: vi.fn(), setAttribute: vi.fn() }),
     body: { appendChild: vi.fn() },
   });
 });
 
 describe("AI configuration request ownership", () => {
-  it("keeps settings hydration and model registration after moving statistics to the dashboard", async () => {
+  it("treats usage equal to the monthly limit as exhausted", () => {
+    expect(isQuotaExhausted(99, 100)).toBe(false);
+    expect(isQuotaExhausted(100, 100)).toBe(true);
+    expect(isQuotaExhausted(101, 100)).toBe(true);
+    expect(isQuotaExhausted(100, 0)).toBe(false);
+  });
+
+  it("keeps settings reads pure and still loads statistics and model registration", async () => {
     renderAiSettings();
     const settings = { ai_parse_enabled: false, monthly_call_limit: 42 };
     h.request.mockResolvedValue(settings);
-    await h.queries[0].queryFn();
-    expect(h.setters[0]).toHaveBeenCalledWith("42");
-    expect(h.setters[1]).toHaveBeenCalledWith(false);
+    await expect(h.queries[0].queryFn()).resolves.toEqual(settings);
+    expect(h.setters[0]).not.toHaveBeenCalled();
+    expect(h.setters[1]).not.toHaveBeenCalled();
     await h.queries[1].queryFn();
     await h.queries[2].queryFn();
+    await h.queries[3].queryFn();
     expect(h.request.mock.calls.map(([url]) => url)).toEqual([
-      "/ai-settings", "/ai-configs", "/ai-models",
+      "/ai-settings", "/ai-settings/stats?fixture", "/ai-configs", "/ai-models",
     ]);
-    expect(h.queries.map((query) => query.queryKey)).toEqual([["ai-settings"], ["ai-configs"], ["ai-models"]]);
+    expect(h.queries.map((query) => query.queryKey)).toEqual([
+      ["ai-settings"], ["ai-settings", "stats"], ["ai-configs"], ["ai-models"],
+    ]);
   });
 
   it("publishes the server-confirmed settings into cache after PATCH", async () => {
@@ -146,20 +164,20 @@ describe("AI configuration request ownership", () => {
     expect(h.queries).toEqual([]);
   });
 
-  it.each(["", "tab=", "tab=overview", "tab=unknown"])("defaults invalid or absent tabs to models (%s)", (search) => {
+  it.each(["", "tab=", "tab=unknown"])("defaults invalid or absent tabs to overview (%s)", (search) => {
     h.search = search;
     const tree = renderAiSettings();
-    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=models");
-    expect(find(tree, (element) => element.type === ModelCards)).toBeDefined();
-    expect(find(tree, (element) => typeof element.props.href === "string" && element.props.href.includes("tab=overview"))).toBeUndefined();
+    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=overview");
+    expect(find(tree, (element) => element.type === ModelWorkbench)).toBeUndefined();
   });
 
   it.each([
-    { tab: "models", component: ModelCards },
+    { tab: "overview", component: DashboardAiOverview },
+    { tab: "models", component: ModelWorkbench },
     { tab: "ocr", component: OcrAccordion },
     { tab: "completion", component: AiCompletionPreview },
     { tab: "vector", component: VectorConfigSection },
-    { tab: "system", component: Button },
+    { tab: "system", component: SystemSettingsSection },
   ])("opens the existing $tab pane from its shareable URL", ({ tab, component }) => {
     h.search = `tab=${tab}&source=workbench`;
     const tree = renderAiSettings();
@@ -174,7 +192,7 @@ describe("AI configuration request ownership", () => {
       h.search = `tab=${tab}`;
       h.index = 0; h.setters = [];
       expect(selectedSettingsLink(renderAiSettings())?.props.href).toBe(`/ai-settings?tab=${tab}`);
-      expect(h.setters).toHaveLength(3);
+      expect(h.setters).toHaveLength(4);
       expect(h.setters.every((setter) => setter.mock.calls.length === 0)).toBe(true);
     }
   });
@@ -183,7 +201,7 @@ describe("AI configuration request ownership", () => {
     h.roleName = "admin";
     const tree = renderAiSettings();
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
-    expect(find(tree, (element) => element.type === ModelCards || element.type === ConfirmDialog)).toBeUndefined();
+    expect(find(tree, (element) => element.type === ModelWorkbench || element.type === ConfirmDialog)).toBeUndefined();
   });
 
   it("opens confirmation before writing and only submits the confirmed settings draft", () => {
@@ -193,9 +211,9 @@ describe("AI configuration request ownership", () => {
       ai_parse_enabled: true, monthly_call_limit: 100, current_usage: { call_count: 10 },
     };
     const tree = renderAiSettings();
-    const saveButton = find(tree, (element) => element.type === Button)!;
-    expect(saveButton.props.disabled).toBe(false);
-    (saveButton.props.onClick as () => void)();
+    const section = find(tree, (element) => element.type === SystemSettingsSection)!;
+    expect(section.props.canSave).toBe(true);
+    (section.props.onSave as () => void)();
     expect(h.setters[2]).toHaveBeenCalledExactlyOnceWith(true);
     expect(h.mutates[0]).not.toHaveBeenCalled();
     const dialog = find(tree, (element) => element.type === ConfirmDialog)!;
@@ -206,6 +224,7 @@ describe("AI configuration request ownership", () => {
   });
 
   it.each([
+    { limit: "", pending: false },
     { limit: "-1", pending: false },
     { limit: "1.5", pending: false },
     { limit: "invalid", pending: false },
@@ -218,7 +237,9 @@ describe("AI configuration request ownership", () => {
       ai_parse_enabled: true, monthly_call_limit: 100, current_usage: { call_count: 10 },
     };
     const tree = renderAiSettings();
-    expect(find(tree, (element) => element.type === Button)?.props.disabled).toBe(true);
+    expect(
+      find(tree, (element) => element.type === SystemSettingsSection)?.props.canSave,
+    ).toBe(false);
     (find(tree, (element) => element.type === ConfirmDialog)!.props.onConfirm as () => void)();
     expect(h.mutates[0]).not.toHaveBeenCalled();
   });
@@ -226,7 +247,12 @@ describe("AI configuration request ownership", () => {
   it("tests the selected embedding ID and draft dimensions without sending provider credentials", async () => {
     h.states = [{ embedding_model_config_id: 7, embedding_dim: 256, embedding_timeout: 9 }];
     VectorConfigSection();
-    await h.mutations[1].mutationFn();
+    await h.mutations[1].mutationFn({
+      requestId: 1,
+      modelConfigId: 7,
+      dim: 256,
+      timeout: 9,
+    } as never);
     expect(h.request).toHaveBeenCalledWith("/vector-config/test-embedding", {
       method: "POST", body: JSON.stringify({ model_config_id: 7, dim: 256, timeout: 9 }),
     });
@@ -234,8 +260,34 @@ describe("AI configuration request ownership", () => {
 
   it("rejects an absent embedding selection before issuing a connection test", () => {
     VectorConfigSection();
-    expect(() => h.mutations[1].mutationFn()).toThrow();
+    expect(() =>
+      h.mutations[1].mutationFn({
+        requestId: 1,
+        modelConfigId: 0,
+        dim: 1024,
+        timeout: 30,
+      } as never),
+    ).toThrow();
     expect(h.request).not.toHaveBeenCalled();
+  });
+
+  it("mirrors every backend vector bound before enabling save", () => {
+    const valid = {
+      dim: 1024,
+      timeout: 30,
+      batchSize: 16,
+      topK: 100,
+      threshold: 0.15,
+      ttl: 300,
+    };
+    expect(isVectorConfigValid(valid)).toBe(true);
+    expect(isVectorConfigValid({ ...valid, dim: 1.5 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, dim: 8193 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, timeout: 301 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, batchSize: 0 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, topK: 10001 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, threshold: 1.01 })).toBe(false);
+    expect(isVectorConfigValid({ ...valid, ttl: -1 })).toBe(false);
   });
 
   it("clears vector drafts and stale test results only on successful save", async () => {

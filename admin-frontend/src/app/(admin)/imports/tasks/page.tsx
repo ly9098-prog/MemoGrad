@@ -1,18 +1,41 @@
 "use client";
 
-import { useId, useEffect, useRef, useState, type DragEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, ChevronDown, FileBox, FileText, FileUp, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useId, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useStore } from "zustand";
+import {
+  AlertCircle,
+  ArrowRight,
+  ChevronDown,
+  FileText,
+  FileUp,
+  Eye,
+  FolderOpen,
+  Gauge,
+  History,
+  Plus,
+  RefreshCw,
+  ScanLine,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { StatusBadge } from "@/components/status-badge";
-import { apiRequest, toQuery } from "@/lib/api/client";
-import type { ImportPipelineStatusResponse, ImportPipelineUploadResponse, QuestionCsvImportResponse } from "@/lib/api/types";
+import { useOcrImportSession } from "@/components/layout/ocr-import-session-provider";
+import type { ImportPipelineStatusResponse } from "@/lib/api/types";
 import { parseProgressPercent } from "@/lib/import-utils";
-import { cn } from "@/lib/utils";
-import { ImportMetric, ImportPanelHeader, ImportProgressBar, ImportWorkspaceHeader } from "../components/import-workspace";
+import { isImportBusy } from "@/lib/imports/import-run";
+import { isSuccessfulPipeline, type PipelineDraft } from "@/lib/imports/ocr-import-session";
+import { ImportFileThumb } from "../components/import-file-thumb";
 import { ImportToast } from "../components/import-toast";
+import { importSubjectOptions } from "../hooks/use-import-subject-options";
+import { ImportContentDialog } from "../components/import-content-dialog";
+import { ImportImagePreview } from "../components/import-image-preview";
+import { ImportFailurePanel } from "../components/import-failure-panel";
+import { OcrBackendMotion } from "../components/ocr-backend-motion";
+import { importErrorMessage } from "@/lib/imports/import-messages";
+import { resolveOcrBackendState } from "@/lib/imports/ocr-backend-state";
 
 function renderJson(value: unknown) {
   if (value === undefined || value === null || value === "") return "—";
@@ -20,103 +43,130 @@ function renderJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function statusTone(status: string) {
-  if (["completed", "success", "finished"].includes(status)) return "success";
-  if (["failed", "error"].includes(status)) return "danger";
-  if (["running", "processing", "queued", "pending"].includes(status)) return "warning";
-  return "neutral";
+function formatElapsed(start?: string, end?: string) {
+  if (!start) return "—";
+  const started = new Date(start).getTime();
+  if (Number.isNaN(started)) return "—";
+  const finished = end ? new Date(end).getTime() : Date.now();
+  if (!finished || Number.isNaN(finished)) return "—";
+  const seconds = Math.max(0, Math.round((finished - started) / 1000));
+  if (seconds < 60) return `${seconds} 秒`;
+  return `${Math.floor(seconds / 60)} 分 ${String(seconds % 60).padStart(2, "0")} 秒`;
 }
 
-function isTerminalStatus(status?: string) {
-  return Boolean(status && ["completed", "success", "finished", "failed", "error"].includes(status));
+const STATUS_LABELS: Record<string, string> = {
+  queued: "排队中",
+  pending: "等待中",
+  processing: "处理中",
+  running: "运行中",
+  completed: "已完成",
+  completed_with_warnings: "完成 · 有警告",
+  failed: "失败",
+  error: "失败",
+  cancelled: "已取消",
+  paused: "已暂停",
+  interrupted: "已中断",
+  success: "已完成",
+  finished: "已完成",
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  extract: "OCR 文字提取",
+  normalize_text: "文本归一化",
+  split: "题目切分",
+  match: "题目匹配",
+  normalize_schema: "结构归一化",
+  review: "质量检查",
+};
+
+function stageLabel(stage?: string | null) {
+  if (!stage) return "等待阶段信息";
+  return STAGE_LABELS[stage] ?? "处理中";
 }
 
 /* ─── Stage-bar: maps pipeline status → 4 discrete stages ─── */
 
-function getStageStatuses(status?: ImportPipelineStatusResponse, isRunning?: boolean) {
+function getStageStatuses(status: ImportPipelineStatusResponse, isRunning: boolean) {
   const stage = (status?.current_stage || "").toLowerCase();
-  const st = status?.status || "";
-  const term = isTerminalStatus(st);
-  const fail = ["failed", "error"].includes(st);
-  /* Backend pipeline stages → visual stage mapping:
-   *   extract / normalize_text / split           → OCR 识别
-   *   match / normalize_schema                    → AI 解析
-   *   review                                      → 质量检查
-   * "normalize" (without "schema") = text normalization (OCR phase)
-   * "normalize" + "schema"         = schema normalization (AI phase)
-   */
-  const ocrDone = term
-    || stage.includes("normalize")  /* normalize_text / normalize_schema */
-    || stage.includes("split")
-    || stage.includes("match")
-    || stage.includes("review");
-  const aiDone = term
-    || stage.includes("match")
-    || (stage.includes("normalize") && stage.includes("schema"))
-    || stage.includes("review");
-  const qualDone = term && !fail;
+  const current = stage.includes("review") || stage.includes("quality") ? 3
+    : /split|match|schema|repair|dedup/.test(stage) ? 2 : 1;
+  const completed = isSuccessfulPipeline(status.status);
+  const failed = ["failed", "error"].includes(status.status);
+  const waiting = status.status === "queued" || status.status === "pending";
   return [
-    { name: "上传文件", s: "done" as const },
-    { name: "OCR 识别", s: ocrDone ? "done" as const : isRunning ? "active" as const : "pending" as const },
-    { name: "AI 解析", s: aiDone ? (fail && !ocrDone ? "failed" as const : "done" as const) : ocrDone && isRunning ? "active" as const : "pending" as const },
-    { name: "质量检查", s: qualDone ? (fail ? "failed" as const : "done" as const) : aiDone && isRunning ? "active" as const : "pending" as const },
-  ];
-}
-
-
-function readableImportError(error: unknown) {
-  const text = error instanceof Error ? error.message.trim() : "上传失败，请稍后重试。";
-  if (!text) return "上传失败，请稍后重试。";
-  if (text.includes("\n• ")) return text;
-
-  const rowIssues = text
-    .split(/[；;]/)
-    .map((item) => item.trim())
-    .map((item) => item.match(/^第\s*(\d+)\s*行[:：]\s*(.+)$/))
-    .filter((match): match is RegExpMatchArray => Boolean(match));
-  if (rowIssues.length < 3) return text.replace(/；/g, "\n");
-
-  const grouped = new Map<string, number[]>();
-  for (const match of rowIssues) {
-    const line = Number(match[1]);
-    const reason = match[2].trim();
-    const lines = grouped.get(reason) ?? [];
-    lines.push(line);
-    grouped.set(reason, lines);
-  }
-  const details = [...grouped.entries()]
-    .sort((a, b) => b[1].length - a[1].length)
-    .slice(0, 6)
-    .map(([reason, lines]) => {
-      const sample = lines.slice(0, 8).join("、");
-      const more = lines.length > 8 ? ` 等 ${lines.length} 行` : "";
-      return `• ${reason}：第 ${sample} 行${more}`;
-    });
-  return [`CSV 校验失败，共 ${rowIssues.length} 处问题：`, ...details].join("\n");
+    { name: "上传文件", hint: "接收原始文件" },
+    { name: "OCR 识别", hint: "版面与文字提取" },
+    { name: "AI 解析", hint: "结构化题目" },
+    { name: "质量检查", hint: "风险与报告" },
+  ].map((item, index) => ({
+    ...item,
+    s: completed || index < current ? "done"
+      : index !== current ? "pending"
+        : failed ? "failed" : isRunning && !waiting ? "active" : "pending",
+  }));
 }
 
 type TabKey = "upload" | "progress" | "quality";
 
+const IMPORT_MODES = [
+  { value: "auto", label: "自动检测" },
+  { value: "book", label: "教辅模式" },
+  { value: "exam", label: "试卷模式" },
+];
+
+const OUTPUT_CHIPS = ["拆分为单题", "保留原图", "自动去重"];
 
 export default function ImportTasksPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("upload");
-  const [file, setFile] = useState<File | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeParam = searchParams.get("retry_pipeline");
+  const resumeTarget = resumeParam && /^[a-zA-Z0-9_-]{1,128}$/.test(resumeParam) ? resumeParam : null;
+  const { pipeline } = useOcrImportSession();
+  const { draft, submitted, phase, upload, snapshot: status, notice, uploadError, statusError } = useStore(pipeline.store);
+  const { file, subjectId, importMode, enableAiRepair, confidenceThreshold, pageStart, pageEnd } = draft;
+  const [selectedTab, setActiveTab] = useState<TabKey | null>(null);
+  const pipelineId = upload?.pipeline_id;
+  const awaitingRecoveryFile = Boolean(resumeTarget && resumeTarget !== pipelineId);
+  const activeTab = awaitingRecoveryFile ? "upload" : selectedTab ?? (pipelineId ? "progress" : "upload");
+  const isPipelineRunning = phase === "tracking";
+  const isUploading = phase === "uploading";
+  const isBusy = isImportBusy(phase);
   const [dragActive, setDragActive] = useState(false);
-  const [subjectId, setSubjectId] = useState("");
-  const [subjectOptions, setSubjectOptions] = useState<Array<{id: number; code: string; name: string}>>([]);
+  const { data: subjectOptions = [] } = useQuery(importSubjectOptions);
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [contentOpen, setContentOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const recoveryTargetRef = useRef<string | null>(null);
+  const failed = Boolean(uploadError || status && ["failed", "error", "paused", "interrupted"].includes(status.status));
+
   useEffect(() => {
-    apiRequest<Array<{id: number; code: string; name: string; path: string; level: number}>>("/imports/subject-options")
-      .then(setSubjectOptions)
-      .catch(() => {});
-  }, []);
-  const [importMode, setImportMode] = useState("auto");
-  const [enableAiRepair, setEnableAiRepair] = useState(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState("0.6");
-  const [pageStart, setPageStart] = useState("");
-  const [pageEnd, setPageEnd] = useState("");
+    if (!resumeTarget || isBusy || recoveryTargetRef.current === resumeTarget || pipelineId === resumeTarget) return;
+    recoveryTargetRef.current = resumeTarget;
+    pipeline.reset();
+    pipeline.updateDraft((previous) => ({ ...previous, file: null, resumePipelineId: resumeTarget }));
+  }, [resumeTarget, isBusy, pipelineId, pipeline]);
+
+  const retryImport = () => {
+    if (!file) { setActiveTab("upload"); fileInputRef.current?.click(); return; }
+    setActiveTab(pipelineId ? "progress" : null);
+    if (pipelineId || resumeTarget) void pipeline.retry({ resumePipelineId: resumeTarget || pipelineId });
+    else void pipeline.start();
+  };
+
+  function updateDraft(fields: Partial<PipelineDraft>) {
+    pipeline.updateDraft((previous) => ({ ...previous, ...fields }));
+  }
+
+  function setFile(next: File | null) {
+    updateDraft({ file: next, pageStart: "", pageEnd: "" });
+  }
 
   const isPdfFile = file?.name.toLowerCase().endsWith(".pdf") ?? false;
   const isCsvFile = file?.name.toLowerCase().endsWith(".csv") ?? false;
+  const isImageFile = file?.type.startsWith("image/") ?? false;
+  const submittedFile = submitted?.file;
+  const submittedImage = submittedFile?.type.startsWith("image/") ? submittedFile : null;
   const pageStartNum = pageStart ? Number(pageStart) : null;
   const pageEndNum = pageEnd ? Number(pageEnd) : null;
   const pageStartError = pageStartNum !== null && (!Number.isInteger(pageStartNum) || pageStartNum < 1) ? "起始页必须是 ≥ 1 的正整数" : null;
@@ -124,15 +174,10 @@ export default function ImportTasksPage() {
   const pageRangeError = pageStartNum !== null && pageEndNum !== null && pageStartNum > pageEndNum ? "起始页不能大于结束页" : null;
   const confidenceNum = Number(confidenceThreshold);
   const confidenceError = confidenceThreshold && (isNaN(confidenceNum) || confidenceNum < 0 || confidenceNum > 1) ? "阈值必须在 0-1 之间" : null;
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const fileInputId = useId();
-  const queryClient = useQueryClient();
-  const wasNotTerminal = useRef(true);
-
+  const confidenceSliderValue = Number.isFinite(confidenceNum) ? Math.min(1, Math.max(0, confidenceNum)) : 0.6;
   const handleFileDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (!isPipelineRunning) setDragActive(true);
+    if (!isBusy) setDragActive(true);
   };
   const handleFileDragLeave = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -141,484 +186,1075 @@ export default function ImportTasksPage() {
   const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragActive(false);
-    if (isPipelineRunning) return;
+    if (isBusy) return;
     const dropped = event.dataTransfer.files?.[0];
     if (dropped) setFile(dropped);
   };
 
-  const statusQuery = useQuery({
-    queryKey: ["import-pipeline", pipelineId],
-    queryFn: () => apiRequest<ImportPipelineStatusResponse>(`/imports/pipelines/${pipelineId}`),
-    enabled: pipelineId !== null,
-    refetchInterval: (query) => (isTerminalStatus(query.state.data?.status) ? false : 2500),
-    retry: false,
+  const stages = status ? getStageStatuses(status, isPipelineRunning) : [];
+  const fileExtension = file ? (file.name.split(".").pop() || "FILE").toUpperCase() : "";
+  const fileSize = file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "";
+  const subjectLabel = subjectId
+    ? subjectOptions.find((subject) => String(subject.id) === subjectId)?.name || `科目 #${subjectId}`
+    : "未指定科目";
+  const importModeLabel = IMPORT_MODES.find((mode) => mode.value === importMode)?.label || "自动检测";
+
+  const parsePct = status ? isSuccessfulPipeline(status.status) ? 100 : parseProgressPercent(status.ocr_progress) : 0;
+  const ocrBackendState = resolveOcrBackendState({
+    stats: status?.stats,
+    diagnostics: status?.diagnostics,
+    running: isPipelineRunning,
   });
+  const pageRange = status?.page_range ?? upload?.page_range;
+  const selectedPages = pageRange?.selected_page_count ?? (submitted?.file?.type.startsWith("image/") ? 1 : 0);
+  const pageCount = selectedPages || pageRange?.total_pages || 0;
+  const pageRangeLabel = pageRange
+    ? `第 ${pageRange.effective_start}–${pageRange.effective_end} 页 · 共 ${pageCount} 页`
+    : pageCount > 0 ? `共 ${pageCount} 页` : "全文预览";
+  const rawPreview = status?.raw_text_preview?.trim() || "";
+  const report = status?.quality_report ?? null;
+  const reportReady = Boolean(report);
+  const totalQuestions = report?.total_questions ?? 0;
+  const riskPercent = (value?: number) => (totalQuestions > 0 ? Math.round(((value ?? 0) / totalQuestions) * 100) : 0);
+  const hasSubMetrics = Boolean(report && [
+    report.ai_answer_count,
+    report.math_image_count,
+    report.table_markdown_count,
+    report.estimated_manual_check_rate,
+  ].some((value) => value !== undefined));
 
-  const uploadMutation = useMutation({
-    mutationFn: async (): Promise<
-      | { kind: "pipeline"; data: ImportPipelineUploadResponse }
-      | { kind: "csv"; data: QuestionCsvImportResponse }
-    > => {
-      if (!file) throw new Error("请选择要导入的文件");
-      const formData = new FormData();
-      formData.set("file", file);
+  const statusToneValue = status
+    ? ["failed", "error"].includes(status.status)
+      ? "bad"
+      : status.status === "completed_with_warnings" ? "warn"
+        : isSuccessfulPipeline(status.status) ? "ok" : phase === "done" ? "idle" : "accent"
+    : "idle";
+  const canStart = Boolean(file)
+    && !isBusy
+    && (isCsvFile || (!confidenceError && (!isPdfFile || !(pageStartError || pageEndError || pageRangeError))));
 
-      if (file.name.toLowerCase().endsWith(".csv")) {
-        const data = await apiRequest<QuestionCsvImportResponse>("/imports/questions-csv", {
-          method: "POST",
-          body: formData,
-          timeoutMs: 120_000,
-          exposeErrorDetail: true,
-        });
-        return { kind: "csv", data };
-      }
-
-      const query = toQuery({
-        subject_id: subjectId ? Number(subjectId) : undefined,
-        import_mode: importMode,
-        enable_ai_repair: enableAiRepair,
-        confidence_threshold: confidenceThreshold || undefined,
-        image_fast_mode: true,
-        page_start: pageStart || undefined,
-        page_end: pageEnd || undefined,
-      });
-      const data = await apiRequest<ImportPipelineUploadResponse>(`/imports/upload${query}`, { method: "POST", body: formData });
-      return { kind: "pipeline", data };
-    },
-    onSuccess: (result) => {
-      if (result.kind === "csv") {
-        setPipelineId(null);
-        setMessage(`CSV 导入完成：共 ${result.data.total_rows} 行，新增 ${result.data.inserted_count} 题，跳过 ${result.data.skipped_count} 题。`);
-        setActiveTab("upload");
-        queryClient.invalidateQueries({ queryKey: ["questions"] });
-        return;
-      }
-      setPipelineId(result.data.pipeline_id);
-      setMessage(`导入任务已提交：${result.data.pipeline_id}`);
-      setActiveTab("progress");
-    },
-    onError: (error) => {
-      setMessage(readableImportError(error));
-    },
-  });
-
-  const isPipelineRunning = pipelineId !== null && !(statusQuery.data && isTerminalStatus(statusQuery.data.status));
-  const status = statusQuery.data;
-  const progressItems = [
-    ["当前状态", status?.status],
-    ["当前阶段", status?.current_stage],
-    ["OCR 进度", status?.ocr_progress],
-    ["来源类型", status?.source_type],
-    ["批次 ID", status?.batch_id],
-    ["题目数量", status?.question_count],
-  ];
-
-  /* Auto-switch to quality tab when pipeline completes */
-  useEffect(() => {
-    if (status && wasNotTerminal.current && isTerminalStatus(status.status)) {
-      wasNotTerminal.current = false;
-      queryClient.invalidateQueries({ queryKey: ["import-review-queue"] });
-      if (status.quality_report) {
-        requestAnimationFrame(() => setActiveTab("quality"));
-      }
-    }
-  }, [status, queryClient, setActiveTab]);
-
-  const stages = getStageStatuses(status, isPipelineRunning);
-  const lastReachedStage = stages.reduce((last, stage, index) => stage.s !== "pending" ? index : last, 0);
-  const stageRailProgress = stages.length > 1 ? (lastReachedStage / (stages.length - 1)) * 100 : 0;
-
-  const tabs: { key: TabKey; label: string; desc: string; badge?: string }[] = [
-    { key: "upload", label: "上传", desc: "选择文件与配置" },
-    { key: "progress", label: "进度", desc: "实时管线状态", badge: isPipelineRunning ? "处理中" : undefined },
-    { key: "quality", label: "质量", desc: "报告与审核", badge: status?.quality_report ? "就绪" : undefined },
-  ];
+  const openUpload = () => {
+    if (isBusy) return;
+    pipeline.reset();
+    setActiveTab(null);
+    if (resumeTarget) router.replace("/imports/tasks", { scroll: false });
+  };
 
   return (
-    <div className="space-y-6 pb-4">
-      <ImportWorkspaceHeader
-        icon={FileUp}
-        title="导入任务"
-        description="支持 PDF、文档、表格、图片解析导入，也支持 questions CSV 直接导入题库。"
-        meta={
-          pipelineId ? (
-            <div className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">
-              <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-warning" : status && ["failed", "error"].includes(status.status) ? "bg-destructive" : "bg-success")} aria-hidden="true" />
-              {isPipelineRunning ? "任务处理中" : status ? (["failed", "error"].includes(status.status) ? "任务失败" : "任务完成") : "任务已提交"}
-            </div>
-          ) : (
-            <div className="inline-flex h-9 items-center rounded-full border border-border bg-card/70 px-3 text-xs text-muted-foreground">支持 CSV / PDF / 图片 / TXT / Excel</div>
-          )
-        }
-      />
+    <div className="imports-v2">
+      <header className="v2-head">
+        <div className="min-w-0">
+          <h1 className="v2-title">导入任务</h1>
+        </div>
+        <div className="v2-head-actions">
+          {pipelineId ? <button type="button" className="v2-btn" disabled={!status?.batch_id} onClick={() => setContentOpen(true)} title={status?.batch_id ? "查看题干、答案与解析" : "生成题目后可查看"}><Eye className="h-4 w-4" aria-hidden="true" />查看题目</button> : null}
+          <Link className="v2-btn" href="/imports/history?return_to=%2Fimports%2Ftasks">
+            <History className="h-3.5 w-3.5" aria-hidden="true" />
+            导入历史
+          </Link>
+          <button
+            type="button"
+            className="v2-btn"
+            disabled={isBusy}
+            onClick={openUpload}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            新建导入
+          </button>
+        </div>
+      </header>
 
       <ImportToast
-        message={message}
-        title={uploadMutation.isError ? (isCsvFile ? "CSV 导入失败" : "导入失败") : null}
-        tone={uploadMutation.isError ? "error" : "success"}
-        onDismiss={() => setMessage(null)}
+        message={notice?.tone === "error" ? null : notice?.text ?? null}
+        title={uploadError ? (isCsvFile ? "CSV 导入失败" : "导入失败") : null}
+        tone={notice?.tone ?? "info"}
+        onDismiss={() => pipeline.setNotice(null)}
       />
 
-      <nav aria-label="导入任务步骤" className="grid grid-cols-3 overflow-hidden rounded-2xl border border-border/60 bg-muted/40 p-1.5 import-enter" style={{ animationDelay: "45ms" }}>
-        {tabs.map((tab) => {
-          const active = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              aria-current={active ? "step" : undefined}
-              className={cn(
-                "relative flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl px-3 text-left import-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "bg-card text-foreground shadow-[0_2px_10px_rgba(27,39,51,0.06)]" : "text-muted-foreground/70 hover:bg-card/55 hover:text-muted-foreground",
-              )}
-            >
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold sm:text-sm">{tab.label}</span>
-                <span className="mt-0.5 hidden text-[10px] font-normal text-muted-foreground/70 sm:block">{tab.desc}</span>
-              </span>
-              {tab.badge ? (
-                <span className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold",
-                  tab.badge === "处理中"
-                    ? "border-warning/30 bg-warning-light text-warning-foreground"
-                    : "border-success/25 bg-success-light text-success",
-                )}>{tab.badge}</span>
-              ) : null}
-              <span aria-hidden="true" className={cn("absolute bottom-1.5 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary transition-[transform,opacity] duration-200", active ? "scale-x-100 opacity-100" : "scale-x-50 opacity-0")} />
-            </button>
-          );
-        })}
-      </nav>
+      {failed && !awaitingRecoveryFile ? <ImportFailurePanel message={uploadError || status?.errors?.[0] || "导入处理失败，可重新上传文件重试。"} onRetry={retryImport} disabled={isBusy} retryLabel={isUploading ? "重新上传中" : uploadError && !pipelineId ? "重试上传" : "重新上传"} /> : null}
+      {awaitingRecoveryFile ? <div className="v2-resume-context" role="status">选择原文件，恢复失败的导入任务。{uploadError ? <p>{uploadError}</p> : null}</div> : null}
 
       {activeTab === "upload" ? (
-        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
-          <ImportPanelHeader title="新建导入任务" description="上传来源与解析配置在同一工作台完成；任务运行期间配置将锁定。" />
-          <div className="grid lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-            <div className="border-b border-border/60 p-4 sm:p-5 lg:border-b-0 lg:border-r">
-              <label htmlFor={fileInputId} className="block">
-                <div
-                  onDragOver={handleFileDragOver}
-                  onDragLeave={handleFileDragLeave}
-                  onDrop={handleFileDrop}
-                  className={cn(
-                  "relative flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-8 text-center transition-[border-color,background-color,box-shadow] import-interactive",
-                  (dragActive || file) && "import-drop-active",
-                  isPipelineRunning
-                    ? "cursor-not-allowed border-border bg-muted opacity-60"
-                    : dragActive || file
-                      ? "border-primary bg-accent shadow-[inset_0_0_0_1px_rgba(74,111,138,0.08)]"
-                      : "border-border bg-card/60 hover:border-primary hover:bg-card",
-                )}>
-                  <div className="grid h-14 w-14 place-items-center rounded-2xl border border-primary/15 bg-card/80 text-accent-foreground import-drop-icon">
-                    <FileBox className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
-                  </div>
-                  {file ? (
-                    <div className="mt-4 max-w-full import-feedback-in">
-                      <p className="max-w-md truncate text-sm font-semibold text-foreground" title={file.name}>{file.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground/70">{(file.size / 1024 / 1024).toFixed(1)} MB · 已就绪</p>
-                    </div>
-                  ) : (
-                    <div className="mt-4">
-                      <p className="text-sm font-semibold text-foreground">选择导入文件</p>
-                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">CSV、PDF、JPG、PNG、WebP、TXT、XLSX、XLS</p>
-                    </div>
-                  )}
-                  <input id={fileInputId} type="file" accept=".csv,.pdf,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.webp" disabled={isPipelineRunning} className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+        <div className="v2-layout">
+          <section className="v2-desk v2-surface">
+            <div className="v2-desk-head">
+              <div className="v2-file-tile">
+                {file && isImageFile ? <FileText className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /> : <FileUp className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="v2-file-name">{file?.name ?? "尚未选择文件"}</div>
+                <div className="v2-file-meta">
+                  {file
+                    ? `${fileSize} · ${fileExtension} · ${isUploading ? "上传中" : "已就绪"}`
+                    : "PDF · JPG · PNG · WEBP · CSV · TXT · XLSX"}
                 </div>
-              </label>
+              </div>
+              <div className="v2-desk-head-right">
+                {pipelineId ? (
+                  <button type="button" className="v2-textlink" onClick={() => setActiveTab("progress")}>
+                    查看上次任务
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <span className="v2-chip" data-tone="accent">
+                    <ScanLine className="h-3 w-3" aria-hidden="true" />
+                    解析管线 · 4 阶段
+                  </span>
+                )}
+              </div>
+            </div>
 
-              {!isCsvFile ? (
-                <div className="mt-4 space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground">科目</span>
-                  <CustomSelect
-                    value={subjectId}
-                    onChange={setSubjectId}
-                    placeholder="选择科目（可选）"
-                    disabled={isPipelineRunning}
-                    options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
-                    className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
-                  />
-                </div>
+            <div className="v2-desk-body">
+              <div
+                className="v2-dropfield"
+                data-active={dragActive || Boolean(file) ? "true" : undefined}
+                data-disabled={isBusy ? "true" : undefined}
+                onDragOver={handleFileDragOver}
+                onDragLeave={handleFileDragLeave}
+                onDrop={handleFileDrop}
+              >
+                {file ? (
+                  <>
+                    <div className="v2-receipt">
+                      <div className="v2-receipt-thumb">
+                        {isImageFile ? (
+                          <button type="button" className="v2-preview-trigger" onClick={() => setPreviewFile(file)} aria-label={`放大预览 ${file.name}`}><ImportFileThumb file={file} /></button>
+                        ) : (
+                          <FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="v2-receipt-body">
+                        <span className="v2-receipt-name" title={file.name}>{file.name}</span>
+                        <span className="v2-receipt-meta">{fileSize} · {fileExtension}</span>
+                        {isUploading ? <span className="v2-receipt-hint" role="status">正在上传</span> : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="v2-receipt-remove"
+                        disabled={isBusy}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setFile(null);
+                        }}
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" />
+                        移除
+                      </button>
+                    </div>
+                    <div className="v2-drop-note">
+                      {isCsvFile
+                        ? "CSV 将逐行写入正式题库，不经过 OCR / AI 审核管线。"
+                        : "解析结果将进入待审核队列。"}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="v2-upload-mark" aria-hidden="true">
+                      <FileUp />
+                    </div>
+
+                    <div className="v2-drop-title">拖入试卷或题目文件</div>
+
+                    <div className="v2-sources">
+                      <button type="button" className="v2-btn v2-btn-primary" onClick={() => fileInputRef.current?.click()}>
+                        <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                        选择文件
+                      </button>
+                    </div>
+
+                    <div className="v2-formats" aria-label="支持的文件格式">
+                      {["CSV", "PDF", "JPG", "PNG", "WEBP", "TXT", "XLSX", "XLS"].map((format) => (
+                        <span key={format} className="v2-format">{format}</span>
+                      ))}
+                    </div>
+
+                    <div className="v2-drop-note">CSV 会跳过 OCR 直接入库 · 其余格式进入解析管线</div>
+                  </>
+                )}
+                <input
+                  id={fileInputId}
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.pdf,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.webp"
+                  disabled={isBusy}
+                  className="sr-only"
+                  aria-label="选择导入文件"
+                  onChange={(event) => {
+                    setFile(event.target.files?.[0] ?? null);
+                    event.target.value = "";
+                  }}
+                />
+              </div>
+            </div>
+
+          </section>
+
+          <aside className="v2-insp v2-surface">
+            <div className="v2-insp-head">
+              <span className="v2-insp-title">解析配置</span>
+            </div>
+
+            <div className="v2-insp-body">
+              {isCsvFile ? (
+                <>
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">CSV 直接入库</span>
+                      <span className="v2-label">无需识别</span>
+                    </div>
+                    <div className="v2-note-block" style={{ marginTop: 9 }}>
+                      全批校验通过后写入正式题库，按文件中的科目归属导入，相同记录自动跳过。
+                    </div>
+                  </div>
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">科目归属</span>
+                      <span className="v2-label">按行归属</span>
+                    </div>
+                    <div className="v2-group-hint">
+                      以每行的 <span className="mono">subject_id</span> 为准，不需要在页面上额外选择或覆盖科目。
+                    </div>
+                  </div>
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">输出</span>
+                      <span className="v2-label">直接入库</span>
+                    </div>
+                    <div className="v2-chips">
+                      {["正式题库", "sync_uuid 去重", "逐行校验"].map((chip) => (
+                        <span key={chip} className="v2-chip">{chip}</span>
+                      ))}
+                    </div>
+                    <div className="v2-group-hint">校验失败的批次不会部分写入，修复 CSV 后可重新导入。</div>
+                  </div>
+                </>
               ) : (
-                <div className="mt-4 rounded-xl border border-primary/15 bg-card/55 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
-                  CSV 将逐行读取 <span className="font-mono font-semibold text-foreground">subject_id</span>，支持同一文件包含多个科目，无需额外选择或覆盖科目。
-                </div>
+                <>
+                  <div className="v2-group">
+                    <div className="v2-group-title">目标题库</div>
+                    <CustomSelect
+                      value={subjectId}
+                      onChange={(value) => updateDraft({ subjectId: value })}
+                      placeholder="未指定科目"
+                      aria-label="目标题库"
+                      clearable={!isBusy}
+                      disabled={isBusy}
+                      options={[{ value: "", label: "未指定科目" }, ...subjectOptions.map((subject) => ({ value: String(subject.id), label: subject.name }))]}
+                      className="v2-select"
+                    />
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">解析方式</span>
+                      <span className="v2-group-hint" style={{ marginTop: 0 }}>{importModeLabel}</span>
+                    </div>
+                    <div className="v2-seg" role="group" aria-label="解析方式">
+                      {IMPORT_MODES.map((mode) => (
+                        <button
+                          key={mode.value}
+                          type="button"
+                          className="v2-seg-item"
+                          disabled={isBusy}
+                          aria-pressed={importMode === mode.value}
+                          onClick={() => updateDraft({ importMode: mode.value })}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">置信度阈值</span>
+                      <span className="v2-slider-val">{confidenceSliderValue.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      disabled={isBusy}
+                      value={confidenceSliderValue}
+                      onChange={(event) => updateDraft({ confidenceThreshold: Number(event.target.value).toFixed(2) })}
+                      className="v2-range"
+                      style={{ "--v2-fill": `${confidenceSliderValue * 100}%` } as CSSProperties}
+                      aria-label="置信度阈值"
+                      aria-invalid={Boolean(confidenceError)}
+                    />
+                    <div className="v2-track-ends">
+                      <span>0.00 宽松</span>
+                      <span>1.00 严格</span>
+                    </div>
+                    {confidenceError ? (
+                      <p className="v2-group-hint" style={{ color: "var(--v2-bad)" }}>{confidenceError}</p>
+                    ) : (
+                      <div className="v2-group-hint">低于阈值的题目将标记为待复核</div>
+                    )}
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-title">AI 修复</div>
+                    <label className="v2-toggle">
+                      <input
+                        type="checkbox"
+                        checked={enableAiRepair}
+                        onChange={(event) => updateDraft({ enableAiRepair: event.target.checked })}
+                        disabled={isBusy}
+                        className="sr-only"
+                      />
+                      <span className="v2-switch" data-on={enableAiRepair ? "true" : undefined} aria-hidden="true" />
+                      <span className="v2-toggle-text">自动校正 OCR 错字与公式断裂</span>
+                    </label>
+                  </div>
+
+                  {isPdfFile ? <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">页码范围</span>
+                    </div>
+                    {isPdfFile ? (
+                      <>
+                        <div className="v2-range-row">
+                          <label className="v2-input-label">
+                            <span>起始页</span>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="默认第 1 页"
+                              disabled={isBusy}
+                              value={pageStart}
+                              onChange={(event) => updateDraft({ pageStart: event.target.value })}
+                              className="v2-mini-input"
+                              aria-invalid={Boolean(pageStartError || pageRangeError)}
+                            />
+                          </label>
+                          <label className="v2-input-label">
+                            <span>结束页</span>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="默认最后一页"
+                              disabled={isBusy}
+                              value={pageEnd}
+                              onChange={(event) => updateDraft({ pageEnd: event.target.value })}
+                              className="v2-mini-input"
+                              aria-invalid={Boolean(pageEndError || pageRangeError)}
+                            />
+                          </label>
+                        </div>
+                        {pageStartError || pageEndError || pageRangeError ? (
+                          <p className="v2-group-hint" style={{ color: "var(--v2-bad)" }}>
+                            {pageStartError || pageEndError || pageRangeError}
+                          </p>
+                        ) : (
+                          null
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="v2-select" style={{ cursor: "default" }}>
+                          {isImageFile ? "整张图片" : "整份文件"}
+                          <span className="mono" style={{ marginLeft: "auto", color: "var(--v2-ink4)" }}>{fileExtension || "FILE"}</span>
+                        </div>
+                        <div className="v2-group-hint">页码范围仅对 PDF 生效，当前格式会按整份文件处理。</div>
+                      </>
+                    )}
+                  </div> : null}
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">输出</span>
+                    </div>
+                    <div className="v2-chips">
+                      {OUTPUT_CHIPS.map((chip) => (
+                        <span key={chip} className="v2-chip">{chip}</span>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="flex flex-col p-4 sm:p-5">
-              {isCsvFile ? (
-                <div className="rounded-xl border border-primary/20 bg-accent p-4 import-panel-swap">
-                  <div className="flex items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-card/80 text-accent-foreground">
-                      <FileText className="h-5 w-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">questions CSV 直接导入</p>
-                      <p className="mt-1 text-[11px] leading-5 text-muted-foreground">CSV 会逐行使用各自的 subject_id 直接写入正式题库，支持多科目混合导入，不经过 OCR / AI 审核管线。源文件中的 id 与 current_version_id 不复用，目标库会自动生成主键和题目版本；相同 sync_uuid 会自动跳过。</p>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {!isCsvFile ? (
-                <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground">导入模式</span>
-                  <CustomSelect
-                    value={importMode}
-                    onChange={setImportMode}
-                    disabled={isPipelineRunning}
-                    options={[
-                      { value: "auto", label: "自动检测" },
-                      { value: "book", label: "教辅模式" },
-                      { value: "exam", label: "试卷模式" },
-                    ]}
-                    className="h-11 w-full justify-between rounded-xl border border-border bg-muted px-3 text-sm"
-                  />
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground">置信度阈值</span>
-                  <Input type="number" step="0.1" min="0" max="1" disabled={isPipelineRunning} value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(event.target.value)} className="h-11" aria-invalid={Boolean(confidenceError)} aria-describedby={confidenceError ? "confidence-error" : undefined} />
-                  {confidenceError ? <p id="confidence-error" className="text-[11px] text-destructive">{confidenceError}</p> : <p className="text-[11px] text-muted-foreground/70">0–1，越高越保守</p>}
-                </label>
-              </div>
-
-              {isPdfFile ? (
-                <div className="mt-4 grid gap-4 rounded-xl border border-border/60 bg-card/55 p-4 sm:grid-cols-2 import-panel-swap">
-                  <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground">起始页</span>
-                    <Input type="number" min="1" placeholder="默认第 1 页" disabled={isPipelineRunning} value={pageStart} onChange={(event) => setPageStart(event.target.value)} className="h-11" aria-invalid={Boolean(pageStartError || pageRangeError)} />
-                    {pageStartError ? <p className="text-[11px] text-destructive">{pageStartError}</p> : null}
-                  </label>
-                  <label className="space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground">结束页</span>
-                    <Input type="number" min="1" placeholder="默认最后一页" disabled={isPipelineRunning} value={pageEnd} onChange={(event) => setPageEnd(event.target.value)} className="h-11" aria-invalid={Boolean(pageEndError || pageRangeError)} />
-                    {pageEndError ? <p className="text-[11px] text-destructive">{pageEndError}</p> : null}
-                  </label>
-                  {pageRangeError ? <p className="sm:col-span-2 text-[11px] text-destructive">{pageRangeError}</p> : null}
-                </div>
-              ) : null}
-
-              <label className={cn(
-                "mt-4 flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 import-interactive",
-                enableAiRepair ? "border-primary/25 bg-accent" : "border-border bg-card/55 hover:border-primary",
-              )}>
-                <input type="checkbox" checked={enableAiRepair} onChange={(event) => setEnableAiRepair(event.target.checked)} disabled={isPipelineRunning} className="h-4 w-4 rounded border-border accent-primary" />
+            <div className="v2-insp-foot">
+              <div className="v2-estimate">
                 <span>
-                  <span className="block text-xs font-semibold text-foreground">启用 AI 修复</span>
-                  <span className="mt-0.5 block text-[11px] leading-5 text-muted-foreground/70">自动校正 OCR 偏差与结构异常</span>
+                  {!file ? "选择文件后可开始" : isCsvFile ? "CSV 直接写入正式题库" : `${fileExtension} · ${fileSize} · ${subjectLabel}`}
                 </span>
-              </label>
-                </>
-              ) : null}
-
-              <div className={cn("mt-auto flex items-center justify-between gap-4 border-t border-border/60 pt-5", isCsvFile && "mt-5")}>
-                <p className="text-[11px] leading-5 text-muted-foreground/70">{isCsvFile ? "CSV 导入成功后可直接在题库管理中查看；重复 sync_uuid 不会重复写入。" : "提交后自动切换至进度页，完成后可查看质量报告。"}</p>
-                <Button
-                  disabled={!file || uploadMutation.isPending || isPipelineRunning || (!isCsvFile && Boolean(confidenceError || pageStartError || pageEndError || pageRangeError))}
-                  onClick={() => uploadMutation.mutate()}
-                  className="h-11 min-w-32 import-interactive group"
+                <span className="mono">{isCsvFile ? "CSV" : confidenceSliderValue.toFixed(2)}</span>
+              </div>
+              <div className="v2-actions">
+                {isUploading && !isCsvFile ? (
+                  <button type="button" className="v2-btn" onClick={pipeline.cancelUpload}>
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    取消上传
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="v2-cta"
+                  disabled={!canStart}
+                  onClick={() => { setActiveTab(null); if (resumeTarget) void pipeline.retry({ resumePipelineId: resumeTarget }); else void pipeline.start(); }}
                 >
-                  <FileUp className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 motion-reduce:transform-none" aria-hidden="true" />
-                  {uploadMutation.isPending ? "导入中" : isPipelineRunning ? "解析中" : isCsvFile ? "导入 CSV" : "开始导入"}
-                </Button>
+                  <FileUp className="h-4 w-4" aria-hidden="true" />
+                  {isUploading ? (isCsvFile ? "导入中" : "上传中…") : isPipelineRunning ? "解析中" : resumeTarget ? "重新上传" : isCsvFile ? "导入 CSV" : "开始导入"}
+                </button>
               </div>
             </div>
-          </div>
-        </section>
+          </aside>
+        </div>
       ) : null}
 
       {activeTab === "progress" ? (
-        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
-          <ImportPanelHeader
-            title="管线状态"
-            description="跟踪上传、OCR、AI 解析和质量检查；运行中每 2.5 秒自动刷新。"
-            trailing={pipelineId ? (
-              <Button variant="secondary" disabled={statusQuery.isFetching} onClick={() => statusQuery.refetch()} className="h-11 w-11 p-0" aria-label="刷新导入进度" title="刷新进度">
-                <RefreshCw className={cn("h-4 w-4", statusQuery.isFetching && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
-              </Button>
-            ) : null}
-          />
-
-          {!pipelineId ? (
-            <div className="flex min-h-[430px] items-center justify-center px-6 py-14">
-              <div className="max-w-sm text-center import-panel-swap">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop"><FileUp className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
-                <p className="mt-4 text-sm font-semibold text-foreground">暂无导入任务</p>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">先在上传页选择文件并提交，任务状态会在这里持续更新。</p>
-                <Button variant="secondary" className="mt-5 h-11 import-interactive" onClick={() => setActiveTab("upload")}>前往上传</Button>
+        <div className="v2-layout">
+          <section className="v2-desk v2-surface">
+            <div className="v2-desk-head">
+              <div className="v2-file-tile">
+                <Gauge className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="v2-file-name">{submittedFile?.name ?? (pipelineId ? `解析任务 · ${pipelineId.slice(0, 8)}` : "管线状态")}</div>
+                <div className="v2-file-meta">
+                  {status
+                    ? `${status.source_type || "PIPELINE"} · ${status.pipeline_id}`
+                    : pipelineId
+                      ? `PIPELINE · ${pipelineId}`
+                      : "尚未提交解析任务"}
+                </div>
+              </div>
+              <div className="v2-desk-head-right">
+                {isPipelineRunning ? (
+                  <button type="button" className="v2-textlink" onClick={pipeline.refresh}>
+                    <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                    刷新
+                  </button>
+                ) : null}
+                {reportReady ? (
+                  <button type="button" className="v2-textlink" onClick={() => setActiveTab("quality")}>
+                    质量报告
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                ) : null}
               </div>
             </div>
-          ) : null}
 
-          {pipelineId && !status && !statusQuery.isError ? (
-            <div className="flex min-h-[320px] items-center justify-center gap-3 px-6 py-14 text-sm text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />正在获取导入进度
-            </div>
-          ) : null}
-
-          {status ? (
-            <div className="import-panel-swap">
-              <div className="border-b border-border/60 px-4 py-6 sm:px-6">
-                <div className="relative grid grid-cols-4 gap-2">
-                  <div className="absolute left-[12.5%] right-[12.5%] top-5 h-px overflow-hidden bg-border" aria-hidden="true">
-                    <span className="absolute inset-0 origin-left bg-primary import-progress-fill" style={{ transform: `scaleX(${stageRailProgress / 100})` }} />
+            {!pipelineId ? (
+              <div className="v2-blank">
+                <div className="v2-blank-orb">
+                  <Gauge className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                </div>
+                <p className="v2-blank-title">暂无导入任务</p>
+                <p className="v2-blank-text">先选择文件并提交，任务状态会在这里持续更新。</p>
+                <div className="v2-blank-actions">
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={openUpload}>前往上传</button>
+                  <span className="v2-label" style={{ alignSelf: "center" }}>尚未开始</span>
+                </div>
+              </div>
+            ) : statusError && !status ? (
+              <div className="v2-blank">
+                <div className="v2-blank-orb" style={{ color: "var(--v2-bad)", borderColor: "#e7cdc9" }}>
+                  <AlertCircle className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <p className="v2-blank-title">无法获取导入进度</p>
+                <p className="v2-blank-text">后端状态请求失败，刷新重试即可；已开始的解析任务不会中断。</p>
+                <div className="v2-blank-actions">
+                  <button type="button" className="v2-btn" onClick={pipeline.refresh}>刷新重试</button>
+                </div>
+              </div>
+            ) : !status ? (
+              <div className="v2-blank">
+                <div className="v2-blank-orb">
+                  <RefreshCw className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                </div>
+                <p className="v2-blank-title">正在获取导入进度</p>
+                <p className="v2-blank-text">任务已提交，正在读取后端状态。</p>
+              </div>
+            ) : (
+              <div className="v2-progress">
+                <div className="v2-canvas">
+                  <div className="v2-canvas-head">
+                    <span className="v2-hud-chip">
+                      <ScanLine className="h-3 w-3" aria-hidden="true" />
+                      {pageRangeLabel}
+                    </span>
+                    <OcrBackendMotion
+                      state={ocrBackendState}
+                      progress={status.ocr_progress ? `OCR ${status.ocr_progress}` : undefined}
+                    />
                   </div>
-                  {stages.map((stg, i) => (
-                    <div key={stg.name} className="relative z-10 flex min-w-0 flex-col items-center text-center">
-                      <div className={cn(
-                        "grid h-10 w-10 place-items-center rounded-full border-2 bg-card text-xs font-semibold import-interactive",
-                        stg.s === "done" && "border-success bg-success text-primary-foreground",
-                        stg.s === "active" && "border-warning bg-warning text-primary-foreground import-status-active",
-                        stg.s === "failed" && "border-destructive bg-destructive text-primary-foreground",
-                        stg.s === "pending" && "border-border text-muted-foreground/70",
-                      )}>
-                        {stg.s === "done" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : stg.s === "failed" ? <AlertCircle className="h-4 w-4" aria-hidden="true" /> : i + 1}
+
+                  <div className="v2-paper-wrap">
+                    <div className="v2-paper" data-empty={!rawPreview && !submittedImage ? "true" : undefined}>
+                      <div className="v2-paper-head">
+                        <span>识别内容预览</span>
+                        <span>{submittedImage ? "原始图片" : rawPreview ? "已提取文本" : "等待识别"}</span>
                       </div>
-                      <span className={cn(
-                        "mt-2 text-[10px] font-semibold sm:text-[11px]",
-                        stg.s === "done" ? "text-success" : stg.s === "active" ? "text-foreground" : stg.s === "failed" ? "text-destructive" : "text-muted-foreground/70",
-                      )}>{stg.name}</span>
+                      {submittedImage ? (
+                        <div className="v2-paper-image">
+                          <button type="button" className="v2-preview-trigger" onClick={() => setPreviewFile(submittedImage)} aria-label={`放大预览 ${submittedImage.name}`}><ImportFileThumb file={submittedImage} /></button>
+                        </div>
+                      ) : rawPreview ? (
+                        <div className="v2-paper-text">{rawPreview}</div>
+                      ) : (
+                        <div className="v2-paper-empty">
+                          <div className="v2-skel" aria-hidden="true"><i /><i /><i /><i /></div>
+                          <span>等待 OCR 文本</span>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="v2-canvas-status">
+                    <div className="v2-status-stage">
+                      <span
+                        className="v2-dot"
+                        data-tone={statusToneValue}
+                        data-pulse={isPipelineRunning ? "true" : undefined}
+                        aria-hidden="true"
+                      />
+                      <span>{stageLabel(status.current_stage)}</span>
+                    </div>
+                    <div className="v2-status-pages">
+                      {pageCount > 0 ? `共 ${pageCount} 页` : "全文"}
+                    </div>
+                    <div className="v2-status-bar">
+                      <i
+                        style={{
+                          width: `${parsePct}%`,
+                          background: ["failed", "error"].includes(status.status)
+                            ? "var(--v2-bad)"
+                            : isSuccessfulPipeline(status.status)
+                              ? "var(--v2-ok)"
+                              : undefined,
+                        }}
+                      />
+                    </div>
+                    <div className="v2-status-pct">{parsePct}%</div>
+                    <div className="v2-status-eta">{formatElapsed(status.started_at, status.finished_at)}</div>
+                  </div>
                 </div>
               </div>
+            )}
+          </section>
 
-              <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border-b border-border/60 bg-card/55 sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
-                {progressItems.map(([label, value]) => (
-                  <ImportMetric
-                    key={String(label)}
-                    label={String(label)}
-                    value={label === "当前状态" ? <StatusBadge tone={statusTone(String(value || ""))}>{String(value || "—")}</StatusBadge> : String(value || "—")}
-                    tone={label === "题目数量" ? "primary" : "neutral"}
-                  />
-                ))}
-              </div>
+          <aside className="v2-insp v2-surface">
+            <div className="v2-insp-head">
+              <span className="v2-insp-title">运行详情</span>
+              {status ? (
+                <span className="v2-chip" data-tone={statusToneValue}>
+                  <span className="v2-dot" data-tone={statusToneValue} data-pulse={isPipelineRunning ? "true" : undefined} aria-hidden="true" />
+                  {STATUS_LABELS[status.status] ?? status.status}
+                </span>
+              ) : (
+                <span className="v2-label">等待状态</span>
+              )}
+            </div>
 
-              <div className="space-y-5 p-4 sm:p-5">
-                <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3.5">
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className={cn("h-1.5 w-1.5 rounded-full", isPipelineRunning ? "import-status-active bg-warning" : ["failed", "error"].includes(status.status) ? "bg-destructive" : "bg-success")} aria-hidden="true" />
-                      <span className="font-semibold text-muted-foreground">{status.current_stage || "等待阶段信息"}</span>
+            <div className="v2-insp-body">
+              {status ? (
+                <>
+                  <div className="v2-group">
+                    <div className="v2-group-title">运行概况</div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">状态</div>
+                        <div className="v2-kv-value">{STATUS_LABELS[status.status] ?? status.status ?? "—"}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">当前阶段</div>
+                        <div className="v2-kv-value" title={stageLabel(status.current_stage)}>{stageLabel(status.current_stage)}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">OCR 进度</div>
+                        <div className="v2-kv-value">{status.ocr_progress || "0%"}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">用时</div>
+                        <div className="v2-kv-value">{formatElapsed(status.started_at, status.finished_at)}</div>
+                      </div>
                     </div>
-                    <span className="font-mono text-[10px] text-muted-foreground/70">{pipelineId}</span>
+
+                    <div className="v2-event">
+                      {stages.map((stage, index) => (
+                        <div key={stage.name} className="v2-event-item">
+                          <span
+                            className="v2-dot"
+                            data-tone={stage.s === "done" ? "ok" : stage.s === "failed" ? "bad" : stage.s === "active" ? "accent" : "idle"}
+                            data-pulse={stage.s === "active" ? "true" : undefined}
+                            aria-hidden="true"
+                          />
+                          <span>
+                            <strong>{stage.name}</strong>
+                            <span style={{ marginLeft: 6 }}>{stage.hint}</span>
+                          </span>
+                          <span className="v2-event-time">{String(index + 1).padStart(2, "0")}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground/70">解析进度</span>
-                    <span className="font-mono font-semibold tabular-nums text-foreground">{status.ocr_progress || "0%"}</span>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">产物</span>
+                      <span className="v2-big">{status.question_count ?? 0}<span>题</span></span>
+                    </div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">批次 ID</div>
+                        <div className="v2-kv-value" title={status.batch_id || undefined}>{status.batch_id || "—"}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">来源类型</div>
+                        <div className="v2-kv-value">{status.source_type || "—"}</div>
+                      </div>
+                    </div>
+                    {status.batch_id ? (
+                      <div className="v2-chips">
+                        <Link className="v2-textlink" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}>
+                          待审核队列
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
-                  <ImportProgressBar
-                    value={parseProgressPercent(status.ocr_progress)}
-                    label="解析进度"
-                    active={isPipelineRunning}
-                    tone={["failed", "error"].includes(status.status) ? "danger" : isTerminalStatus(status.status) ? "success" : "primary"}
-                    className="mt-2"
-                  />
+
+                  {status.page_range ? (
+                    <div className="v2-group">
+                      <div className="v2-group-title">页码范围</div>
+                      <div className="v2-kv">
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">有效范围</div>
+                          <div className="v2-kv-value">{status.page_range.effective_start} – {status.page_range.effective_end}</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">总页数</div>
+                          <div className="v2-kv-value">{status.page_range.total_pages}</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">选中页数</div>
+                          <div className="v2-kv-value">{status.page_range.selected_page_count}</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">预览内容</div>
+                          <div className="v2-kv-value">{rawPreview ? "已提取文本" : "等待识别"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">锁定参数</span>
+                      <span className="v2-label">本次配置</span>
+                    </div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">目标题库</div>
+                        <div className="v2-kv-value" title={subjectLabel}>{subjectLabel}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">解析方式</div>
+                        <div className="v2-kv-value">{importModeLabel}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">置信度</div>
+                        <div className="v2-kv-value">{confidenceSliderValue.toFixed(2)}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">AI 修复</div>
+                        <div className="v2-kv-value">{enableAiRepair ? "开启" : "关闭"}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">事件与诊断</span>
+                      {Array.isArray(status.errors) && status.errors.length > 0 ? (
+                        <span className="v2-chip" data-tone="bad">{status.errors.length} 条错误</span>
+                      ) : (
+                        <span className="v2-label">暂无错误</span>
+                      )}
+                    </div>
+                    {Array.isArray(status.errors) && status.errors.length > 0 ? (
+                      <div className="v2-error-list">
+                        {status.errors.map((error, index) => (
+                          <span key={`${index}-${error}`}>{importErrorMessage(error)}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="v2-group-hint">暂无错误</div>
+                    )}
+                    <details className="v2-details">
+                      <summary>
+                        统计数据
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      </summary>
+                      <pre>{renderJson(status.stats)}</pre>
+                    </details>
+                    <details className="v2-details">
+                      <summary>
+                        诊断信息
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      </summary>
+                      <pre>{renderJson(status.diagnostics)}</pre>
+                    </details>
+                  </div>
+                </>
+              ) : (
+                <div className="v2-blank" style={{ minHeight: 320 }}>
+                  <div className="v2-blank-orb">
+                    <Gauge className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                  </div>
+                  <p className="v2-blank-title">等待任务状态</p>
+                  <p className="v2-blank-text">提交后这里会显示阶段、页数与实时识别结果。</p>
                 </div>
+              )}
+            </div>
 
-                {status.page_range ? (
-                  <div className="grid gap-3 rounded-xl border border-border/60 bg-card/60 p-4 sm:grid-cols-3 import-panel-swap">
-                    <div><p className="text-[10px] font-medium text-muted-foreground/70">有效范围</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.effective_start} – {status.page_range.effective_end}</p></div>
-                    <div><p className="text-[10px] font-medium text-muted-foreground/70">总页数</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.total_pages}</p></div>
-                    <div><p className="text-[10px] font-medium text-muted-foreground/70">选中页数</p><p className="mt-1 text-sm font-semibold text-foreground">{status.page_range.selected_page_count}</p></div>
-                  </div>
+            <div className="v2-insp-foot">
+              {statusError && status ? <p className="v2-group-hint" role="status">进度连接暂不可用，保留上次状态。</p> : null}
+              <div className="v2-actions">
+                {isPipelineRunning ? (
+                  <button type="button" className="v2-btn" onClick={pipeline.refresh}>
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    刷新状态
+                  </button>
                 ) : null}
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                      <span>统计数据</span><ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" />
-                    </summary>
-                    <pre className="max-h-48 overflow-auto border-t import-details-body border-border/60 px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-muted-foreground">{renderJson(status.stats)}</pre>
-                  </details>
-                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                      <span className="flex items-center gap-2">错误日志{Array.isArray(status.errors) && status.errors.length > 0 ? <span className="rounded-full bg-destructive-light px-2 py-0.5 text-[9px] text-destructive">{status.errors.length}</span> : null}</span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" />
-                    </summary>
-                    {Array.isArray(status.errors) && status.errors.length > 0 ? <pre className="max-h-48 overflow-auto border-t import-details-body border-border/60 px-4 py-3 whitespace-pre-wrap text-[10px] leading-5 text-destructive">{status.errors.map((e) => `• ${e}`).join("\n")}</pre> : <p className="border-t border-border/60 px-4 py-3 text-[11px] import-details-body text-muted-foreground/70">暂无错误</p>}
-                  </details>
-                </div>
-
-                {status.batch_id ? (
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />待审核</a>
-                    <Button variant="secondary" className="h-11 import-interactive" onClick={() => setActiveTab("quality")}>质量报告</Button>
-                  </div>
-                ) : null}
+                {reportReady ? (
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={() => setActiveTab("quality")}>
+                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    质量报告
+                  </button>
+                ) : (
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={openUpload} disabled={isBusy}>
+                    <FileUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    新建导入
+                  </button>
+                )}
               </div>
             </div>
-          ) : null}
-
-          {statusQuery.isError ? (
-            <div role="alert" className="m-4 flex items-start gap-2.5 rounded-xl border border-destructive/30 import-feedback-in bg-destructive-light px-4 py-3 text-xs leading-5 text-destructive sm:m-5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />无法获取导入进度，请刷新重试。</div>
-          ) : null}
-        </section>
+          </aside>
+        </div>
       ) : null}
 
       {activeTab === "quality" ? (
-        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[var(--shadow-card)] import-panel-swap">
-          <ImportPanelHeader
-            title="质量报告"
-            description={status?.quality_report ? `批次 ${status.batch_id || "—"} · 共 ${status.quality_report.total_questions ?? "—"} 题` : "导入完成后自动汇总风险、结构与性能指标。"}
-          />
-
-          {!status?.quality_report ? (
-            <div className="flex min-h-[430px] items-center justify-center px-6 py-14">
-              <div className="max-w-sm text-center import-panel-swap">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-border bg-muted text-accent-foreground import-soft-pop"><FileText className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" /></div>
-                <p className="mt-4 text-sm font-semibold text-foreground">暂无质量报告</p>
-                <p className="mt-1.5 text-xs leading-5 text-muted-foreground/70">{pipelineId ? "任务完成后会在这里生成质量分析。" : "先提交导入任务，完成后即可查看风险与质量指标。"}</p>
-                {!pipelineId ? <Button variant="secondary" className="mt-5 h-11 import-interactive" onClick={() => setActiveTab("upload")}>前往上传</Button> : null}
+        <div className="v2-layout">
+          <section className="v2-desk v2-surface">
+            <div className="v2-desk-head">
+              <div className="v2-file-tile">
+                <ShieldCheck className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="v2-file-name">质量报告</div>
+                <div className="v2-file-meta">
+                  {report ? `批次 ${status?.batch_id || "—"} · 共 ${report.total_questions ?? "—"} 题` : "导入完成后自动汇总风险、结构与性能指标"}
+                </div>
+              </div>
+              <div className="v2-desk-head-right">
+                {reportReady ? (
+                  <span className="v2-chip" data-tone="ok">
+                    <span className="v2-dot" data-tone="ok" aria-hidden="true" />
+                    报告已生成
+                  </span>
+                ) : (
+                  <span className="v2-label">等待报告</span>
+                )}
               </div>
             </div>
-          ) : null}
 
-          {status?.quality_report ? (
-            <div className="import-panel-swap">
-              <div className="grid grid-cols-2 divide-x divide-y divide-border/60 border-b border-border/60 bg-card/55 sm:grid-cols-4 sm:divide-y-0">
-                <ImportMetric label="总题数" value={status.quality_report.total_questions} />
-                <ImportMetric label="低风险" value={status.quality_report.low_risk ?? "—"} tone="success" />
-                <ImportMetric label="需检查" value={status.quality_report.medium_risk ?? "—"} tone="warning" />
-                <ImportMetric label="高风险" value={status.quality_report.high_risk ?? "—"} tone="danger" />
+            {!report ? (
+              <div className="v2-blank">
+                <div className="v2-blank-orb">
+                  <ShieldCheck className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                </div>
+                <p className="v2-blank-title">暂无质量报告</p>
+                <p className="v2-blank-text">
+                  {pipelineId ? "任务完成后会在这里生成风险与质量分析。" : "先提交导入任务，完成后即可查看风险与质量指标。"}
+                </p>
+                <div className="v2-blank-actions">
+                  {pipelineId ? (
+                    <button type="button" className="v2-btn" onClick={() => setActiveTab("progress")}>返回进度</button>
+                  ) : null}
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={openUpload}>前往上传</button>
+                </div>
               </div>
-
-              <div className="space-y-5 p-4 sm:p-5">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/60 bg-border/60 sm:grid-cols-4 import-panel-swap">
-                  {status.quality_report.ai_answer_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">AI 答案</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.ai_answer_count}</p></div> : null}
-                  {status.quality_report.math_image_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">公式截图</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.math_image_count}</p></div> : null}
-                  {status.quality_report.table_markdown_count !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">表格</p><p className="mt-1.5 text-lg font-semibold tabular-nums text-foreground">{status.quality_report.table_markdown_count}</p></div> : null}
-                  {status.quality_report.estimated_manual_check_rate !== undefined ? <div className="bg-card/80 p-4"><p className="text-[10px] font-medium text-muted-foreground/70">人工检查率</p><p className={cn("mt-1.5 text-lg font-semibold tabular-nums", status.quality_report.estimated_manual_check_rate > 0.4 ? "text-warning-foreground" : "text-foreground")}>{(status.quality_report.estimated_manual_check_rate * 100).toFixed(0)}%</p></div> : null}
+            ) : (
+              <div className="v2-report">
+                <div className="v2-risk-grid">
+                  <div className="v2-risk" data-tone="accent">
+                    <div className="v2-risk-value">{report.total_questions ?? "—"}</div>
+                    <div className="v2-risk-label">总题数</div>
+                  </div>
+                  <div className="v2-risk" data-tone="ok">
+                    <div className="v2-risk-value">{report.low_risk ?? "—"}</div>
+                    <div className="v2-risk-label">低风险</div>
+                  </div>
+                  <div className="v2-risk" data-tone="warn">
+                    <div className="v2-risk-value">{report.medium_risk ?? "—"}</div>
+                    <div className="v2-risk-label">需检查</div>
+                  </div>
+                  <div className="v2-risk" data-tone="bad">
+                    <div className="v2-risk-value">{report.high_risk ?? "—"}</div>
+                    <div className="v2-risk-label">高风险</div>
+                  </div>
                 </div>
 
-                {status.quality_report.performance_summary ? (
-                  <details className="group overflow-hidden rounded-xl border border-border/60 bg-card/60">
-                    <summary className="flex min-h-12 cursor-pointer items-center justify-between px-4 text-xs font-semibold text-foreground import-interactive hover:bg-card/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span>性能概览</span><ChevronDown className="h-4 w-4 text-muted-foreground/70 import-chevron group-open:rotate-180" aria-hidden="true" /></summary>
-                    <div className="grid gap-px border-t border-border/60 bg-border/60 sm:grid-cols-3 import-details-body">
-                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">总耗时</span><strong className="ml-2 text-foreground">{(status.quality_report.performance_summary.total_duration_ms / 1000).toFixed(1)}s</strong></div>
-                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">AI 调用</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.total_ai_calls} 次</strong></div>
-                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">Token</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.total_tokens_used}</strong></div>
-                      <div className="bg-card/80 p-4 text-xs"><span className="text-muted-foreground/70">OCR 缓存命中</span><strong className="ml-2 text-foreground">{(status.quality_report.performance_summary.cache_hit_rate * 100).toFixed(0)}%</strong></div>
-                      <div className="bg-card/80 p-4 text-xs sm:col-span-2"><span className="text-muted-foreground/70">最慢阶段</span><strong className="ml-2 text-foreground">{status.quality_report.performance_summary.slowest_stage} · {(status.quality_report.performance_summary.slowest_duration_ms / 1000).toFixed(1)}s</strong></div>
+                {hasSubMetrics ? (
+                  <div className="v2-sub-grid">
+                    {report.ai_answer_count !== undefined ? (
+                      <div className="v2-sub-metric">
+                        <p>AI 答案</p>
+                        <strong>{report.ai_answer_count}</strong>
+                      </div>
+                    ) : null}
+                    {report.math_image_count !== undefined ? (
+                      <div className="v2-sub-metric">
+                        <p>公式截图</p>
+                        <strong>{report.math_image_count}</strong>
+                      </div>
+                    ) : null}
+                    {report.table_markdown_count !== undefined ? (
+                      <div className="v2-sub-metric">
+                        <p>表格</p>
+                        <strong>{report.table_markdown_count}</strong>
+                      </div>
+                    ) : null}
+                    {report.estimated_manual_check_rate !== undefined ? (
+                      <div className="v2-sub-metric">
+                        <p>人工检查率</p>
+                        <strong style={{ color: report.estimated_manual_check_rate > 0.4 ? "var(--v2-warn)" : undefined }}>
+                          {(report.estimated_manual_check_rate * 100).toFixed(0)}%
+                        </strong>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="v2-group" style={{ padding: 0, border: 0 }}>
+                  <div className="v2-group-head">
+                    <span className="v2-group-title">风险分布</span>
+                    <span className="v2-label">按风险分级</span>
+                  </div>
+                  <div className="v2-bar-row">
+                    <span>低风险</span>
+                    <div className="v2-bar"><i data-tone="ok" style={{ width: `${riskPercent(report.low_risk)}%` }} /></div>
+                    <span className="mono" style={{ textAlign: "right" }}>{riskPercent(report.low_risk)}%</span>
+                  </div>
+                  <div className="v2-bar-row">
+                    <span>需检查</span>
+                    <div className="v2-bar"><i data-tone="warn" style={{ width: `${riskPercent(report.medium_risk)}%` }} /></div>
+                    <span className="mono" style={{ textAlign: "right" }}>{riskPercent(report.medium_risk)}%</span>
+                  </div>
+                  <div className="v2-bar-row">
+                    <span>高风险</span>
+                    <div className="v2-bar"><i data-tone="bad" style={{ width: `${riskPercent(report.high_risk)}%` }} /></div>
+                    <span className="mono" style={{ textAlign: "right" }}>{riskPercent(report.high_risk)}%</span>
+                  </div>
+                </div>
+
+                {report.performance_summary ? (
+                  <details className="v2-details" style={{ marginTop: 0 }}>
+                    <summary>
+                      性能概览
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    </summary>
+                    <div className="v2-kv" style={{ margin: 10, border: 0, gap: 0 }}>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">总耗时</div>
+                        <div className="v2-kv-value">{(report.performance_summary.total_duration_ms / 1000).toFixed(1)}s</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">AI 调用</div>
+                        <div className="v2-kv-value">{report.performance_summary.total_ai_calls} 次</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">Token</div>
+                        <div className="v2-kv-value">{report.performance_summary.total_tokens_used}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">OCR 缓存命中</div>
+                        <div className="v2-kv-value">{(report.performance_summary.cache_hit_rate * 100).toFixed(0)}%</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">最慢阶段</div>
+                        <div className="v2-kv-value">{report.performance_summary.slowest_stage}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">最慢耗时</div>
+                        <div className="v2-kv-value">{(report.performance_summary.slowest_duration_ms / 1000).toFixed(1)}s</div>
+                      </div>
                     </div>
                   </details>
                 ) : null}
 
-                {status.batch_id ? (
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-border/60 pt-4">
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-destructive/30 bg-destructive-light px-4 text-xs font-semibold text-destructive import-interactive hover:border-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}&risk_filter=high`}><AlertCircle className="h-4 w-4" aria-hidden="true" />查看高风险题</a>
-                    <a className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-xs font-semibold text-muted-foreground import-interactive hover:border-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}><FileText className="h-4 w-4" aria-hidden="true" />进入审核区</a>
+                {status?.batch_id ? (
+                  <div className="v2-actions" style={{ marginTop: "auto", justifyContent: "flex-end" }}>
+                    <Link
+                      className="v2-btn"
+                      style={{ flex: "none", color: "var(--v2-bad)", borderColor: "#e7cdc9" }}
+                      href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}&risk_filter=high`}
+                    >
+                      <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                      查看高风险题
+                    </Link>
+                    <Link
+                      className="v2-btn v2-btn-primary"
+                      style={{ flex: "none" }}
+                      href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      进入审核区
+                    </Link>
                   </div>
                 ) : null}
               </div>
+            )}
+          </section>
+
+          <aside className="v2-insp v2-surface">
+            <div className="v2-insp-head">
+              <span className="v2-insp-title">报告摘要</span>
+              {reportReady ? (
+                <span className="v2-chip" data-tone="ok"><span className="v2-dot" data-tone="ok" aria-hidden="true" />已生成</span>
+              ) : (
+                <span className="v2-label">等待状态</span>
+              )}
             </div>
-          ) : null}
-        </section>
+
+            <div className="v2-insp-body">
+              {report ? (
+                <>
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">题量与风险</span>
+                      <span className="v2-label">MIX</span>
+                    </div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">总题数</div>
+                        <div className="v2-kv-value">{report.total_questions ?? "—"}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">需人工复核</div>
+                        <div className="v2-kv-value">{report.requires_manual_review ?? "—"}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">重复跳过</div>
+                        <div className="v2-kv-value">{report.review_duplicates_skipped ?? 0}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">人工检查率</div>
+                        <div className="v2-kv-value">
+                          {report.estimated_manual_check_rate !== undefined ? `${(report.estimated_manual_check_rate * 100).toFixed(0)}%` : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">解析质量</span>
+                      <span className="v2-label">STRUCTURE</span>
+                    </div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">AI 修复调用</div>
+                        <div className="v2-kv-value">{report.repair_called ?? 0}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">修复跳过</div>
+                        <div className="v2-kv-value">{report.repair_skipped ?? 0}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">表格结构化</div>
+                        <div className="v2-kv-value">{report.table_structured_count ?? 0}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">表格待复核</div>
+                        <div className="v2-kv-value">{report.table_review_count ?? 0}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="v2-group">
+                    <div className="v2-group-head">
+                      <span className="v2-group-title">OCR 缓存</span>
+                      <span className="v2-label">CACHE</span>
+                    </div>
+                    <div className="v2-kv">
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">命中</div>
+                        <div className="v2-kv-value">{report.ocr_cache_hit ?? 0}</div>
+                      </div>
+                      <div className="v2-kv-item">
+                        <div className="v2-kv-label">未命中</div>
+                        <div className="v2-kv-value">{report.ocr_cache_miss ?? 0}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {report.performance_summary ? (
+                    <div className="v2-group">
+                      <div className="v2-group-head">
+                        <span className="v2-group-title">处理性能</span>
+                        <span className="v2-label">PERF</span>
+                      </div>
+                      <div className="v2-kv">
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">总耗时</div>
+                          <div className="v2-kv-value">{(report.performance_summary.total_duration_ms / 1000).toFixed(1)}s</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">AI 调用</div>
+                          <div className="v2-kv-value">{report.performance_summary.total_ai_calls} 次</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">Token</div>
+                          <div className="v2-kv-value">{report.performance_summary.total_tokens_used}</div>
+                        </div>
+                        <div className="v2-kv-item">
+                          <div className="v2-kv-label">最慢阶段</div>
+                          <div className="v2-kv-value">{report.performance_summary.slowest_stage}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="v2-blank" style={{ minHeight: 320 }}>
+                  <div className="v2-blank-orb">
+                    <ShieldCheck className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+                  </div>
+                  <p className="v2-blank-title">等待质量报告</p>
+                  <p className="v2-blank-text">任务结束后，风险分布、结构与性能指标会在这里汇总。</p>
+                </div>
+              )}
+            </div>
+
+            <div className="v2-insp-foot">
+              <div className="v2-actions">
+                <button type="button" className="v2-btn" onClick={() => setActiveTab("progress")}>返回进度</button>
+                {status?.batch_id ? (
+                  <Link className="v2-btn v2-btn-primary" href={`/imports/review?batch_id=${encodeURIComponent(status.batch_id)}`}>
+                    <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                    进入审核区
+                  </Link>
+                ) : (
+                  <button type="button" className="v2-btn v2-btn-primary" onClick={openUpload}>新建导入</button>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
       ) : null}
+
+      <div className="sr-only" aria-live="polite">
+        {status ? `阶段 ${stageLabel(status.current_stage)}，进度 ${parsePct}%` : ""}
+      </div>
+      <ImportContentDialog open={contentOpen} onOpenChange={setContentOpen} batchId={status?.batch_id || null} />
+      <ImportImagePreview file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }

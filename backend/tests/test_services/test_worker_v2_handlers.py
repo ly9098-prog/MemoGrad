@@ -175,6 +175,7 @@ def assert_batch_arguments(state, payload, kwargs):
         subject_id=payload.get("subject_id"),
         options=payload.get("options", {}),
         concurrency=payload.get("concurrency", 2),
+        execution_fence=("task-test", "owner-test", 7),
     )
 
 
@@ -210,3 +211,66 @@ async def test_unknown_type_is_dead_lettered_without_handler(harness):
         await worker._process_task_v2(task)
     assert task.max_retries == 0 and harness.events == ["version"]
     assert harness.logger.warning.call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_type", ["image", "excel"])
+async def test_admin_resume_uses_original_media_executor(harness, source_type):
+    payload = {
+        "pipeline_id": "original-run",
+        "staging_object_id": "stage1",
+        "source_type": source_type,
+        "source_file": f"original.{source_type}",
+        "subject": "DS",
+        "subject_id": 3,
+        "created_by": "admin:1",
+        "options": {"enable_ai_repair": False, "image_fast_mode": False},
+    }
+    await harness.run("admin_resume", payload)
+    target = f"handler.{source_type}_pipeline"
+    kwargs = harness.call(target)[1]
+    assert kwargs["pipeline_id"] == "original-run"
+    assert kwargs["source_file"] == payload["source_file"]
+    assert kwargs["created_by"] == "admin:1"
+    if source_type == "image":
+        assert kwargs["options"] == payload["options"]
+        assert kwargs["subject_id"] == 3
+    assert "handler.admin_resume" not in harness.events
+    assert harness.events.index("verify") < harness.events.index(target)
+    assert "post" in harness.events and checkpoint._fencing_ctx.get() is None
+
+
+@pytest.mark.asyncio
+async def test_batch_retry_preserves_original_sequence_and_filename(harness):
+    await harness.run(
+        "batch_image",
+        {
+            "job_id": "same-job",
+            "staging_object_ids": ["stage3"],
+            "source_seqs": [3],
+            "source_files": ["original-third.png"],
+            "options": {"batch_fast_mode": False},
+        },
+    )
+    kwargs = harness.call("handler.batch_image")[1]
+    assert kwargs["job_id"] == "same-job"
+    assert [(item.seq, item.source_file) for item in kwargs["sources"]] == [
+        (3, "original-third.png")
+    ]
+    assert kwargs["options"] == {"batch_fast_mode": False}
+    assert "post" in harness.events
+
+
+@pytest.mark.asyncio
+async def test_batch_retry_invalid_source_metadata_fails_before_processing(harness):
+    with pytest.raises(ValueError, match="metadata length"):
+        await harness.run(
+            "batch_image",
+            {
+                "job_id": "same-job",
+                "staging_object_ids": ["stage3"],
+                "source_seqs": [2, 3],
+                "source_files": ["third.png"],
+            },
+        )
+    assert "handler.batch_image" not in harness.events and "post" not in harness.events

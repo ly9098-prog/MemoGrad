@@ -2,25 +2,29 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 import logging
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
+from app.services.import_image_ocr_stage import (
+    ImageOcrStageRequest,
+    run_image_ocr_stage,
+)
 from app.services.import_image_stages import (
-    ImagePipelineExecutionRequest,
-    ImageOcrStage,
     ImageCompletionPersistence,
     ImageFailurePersistence,
+    ImageOcrStage,
+    ImagePipelineExecutionRequest,
     ImagePipelineStage,
     ImageStageCheckpointRequest,
     ensure_image_checkpoint,
-    run_image_pipeline_stage,
-    run_prepared_image_ocr,
     execute_image_pipeline_stages,
     persist_image_completion,
     persist_image_failure,
+    run_image_pipeline_stage,
+    run_prepared_image_ocr,
 )
 
 
@@ -48,6 +52,104 @@ def execution_request(**overrides):
     }
     values.update(overrides)
     return ImagePipelineExecutionRequest(**values)
+
+
+def ocr_stage_request(**overrides):
+    values = {
+        "pipeline_id": "img-1",
+        "source_file": "source.png",
+        "image_bytes": b"image-bytes",
+        "build_runtime_diagnostics": lambda: {
+            "execution_backend": "paddle",
+        },
+        "run_ocr": AsyncMock(
+            return_value={
+                "text": "raw",
+                "engine_fingerprint": "paddle-v1",
+            }
+        ),
+        "clean_text": lambda value: value,
+        "build_diagnostics": lambda raw, clean: {
+            "raw_text_length": len(raw),
+            "cleaned_text_length": len(clean),
+            "raw_line_count": 1,
+            "cleaned_line_count": 1,
+        },
+        "build_blocks": lambda **_kwargs: [{"boxes": [{"text": "raw"}]}],
+        "set_status": AsyncMock(return_value={}),
+    }
+    values.update(overrides)
+    return ImageOcrStageRequest(**values)
+
+
+@pytest.mark.asyncio
+async def test_ocr_stage_reports_actual_cpu_backend_after_fallback():
+    request = ocr_stage_request(run_ocr=AsyncMock(return_value={
+        "text": "CPU text", "execution_backend": "local_process",
+        "fallback_from": "paddlex_http", "engine_fingerprint": "cpu-v1",
+    }))
+    result = await run_image_ocr_stage(request)
+    assert result.diagnostics["execution_backend"] == "local_process"
+    assert result.diagnostics["fallback_from"] == "paddlex_http"
+    assert result.diagnostics["engine_fingerprint"] == "cpu-v1"
+
+
+@pytest.mark.asyncio
+async def test_ocr_stage_publishes_live_cpu_fallback_state():
+    async def run_with_fallback(_image_bytes, notify):
+        await notify({
+            "backend": "local_process",
+            "fallback_from": "paddlex_http",
+            "fallback_reason": "ocr.remote_connect_error",
+        })
+        return {
+            "text": "CPU text",
+            "execution_backend": "local_process",
+            "fallback_from": "paddlex_http",
+        }
+
+    request = ocr_stage_request(run_ocr_with_fallback=run_with_fallback)
+    await run_image_ocr_stage(request)
+
+    fallback_call = next(
+        call for call in request.set_status.await_args_list
+        if call.kwargs.get("diagnostics", {}).get("ocr_runtime", {}).get("fallback_state")
+        == "running"
+    )
+    runtime = fallback_call.kwargs["diagnostics"]["ocr_runtime"]
+    assert runtime["active_backend"] == "local_process"
+    assert runtime["fallback_reason"] == "ocr.remote_connect_error"
+    assert fallback_call.kwargs["stages"]["ocr"]["backend"] == "local_process"
+
+
+@pytest.mark.asyncio
+async def test_ocr_stage_publishes_status_with_pipeline_id():
+    request = ocr_stage_request()
+
+    result = await run_image_ocr_stage(request)
+
+    assert result.cleaned_text == "raw"
+    assert result.pre_extracted_blocks == [{"boxes": [{"text": "raw"}]}]
+    assert [call.args for call in request.set_status.await_args_list] == [
+        ("img-1",),
+        ("img-1",),
+    ]
+    assert request.set_status.await_args_list[0].kwargs["status"] == "ocr_running"
+    assert request.set_status.await_args_list[1].kwargs["status"] == "parsing"
+
+
+@pytest.mark.asyncio
+async def test_ocr_stage_publishes_empty_result_failure_with_pipeline_id():
+    request = ocr_stage_request(clean_text=lambda _value: "")
+
+    with pytest.raises(ValueError, match="图片 OCR 未识别到可导入文本"):
+        await run_image_ocr_stage(request)
+
+    assert [call.args for call in request.set_status.await_args_list] == [
+        ("img-1",),
+        ("img-1",),
+    ]
+    assert request.set_status.await_args_list[-1].kwargs["status"] == "failed"
 
 
 @pytest.mark.asyncio
@@ -173,6 +275,7 @@ async def test_prepared_ocr_reads_bytes_sets_tags_and_delegates(monkeypatch, tmp
         "build_diagnostics": stage.build_diagnostics,
         "build_blocks": stage.build_blocks,
         "set_status": stage.set_status,
+        "run_ocr_with_fallback": None,
     }
     assert fields["image_bytes"] == b"image-bytes"
 

@@ -1,12 +1,10 @@
 @import '../../styles/brand-shell.wxss';
 
-/* MemoGrad login — mint glass edition.
-   Palette follows the practice setup page (subpackages/study/practice):
-   pine #23483C / mint #7ED8B5 / surface #F8FDFB. */
+/* Native glass approximation: water light stays inside one quiet focal disc. */
 
 page {
   min-height: 100vh;
-  background: #F8FDFB;
+  background: #FAFCFB;
   color: #23483C;
 }
 
@@ -16,7 +14,7 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F8FDFB;
+  background: #FAFCFB;
 }
 .entry-pending-content {
   display: flex;
@@ -53,26 +51,20 @@ page {
   to { transform: rotate(360deg); }
 }
 
-/* ── Brand shell overrides: cream -> mint, lime -> mint accent ── */
 .login-root {
   min-height: 100vh;
-  background: #F8FDFB;
+  background: #FAFCFB;
 }
 .memo-nav {
-  background: rgba(248, 253, 251, .90);
-  border-bottom-color: rgba(216, 238, 230, .80);
+  background: rgba(250, 252, 251, .94);
+  border-bottom: 0;
 }
 .memo-brand-mark {
   background: #23483C;
-  box-shadow: 0 8rpx 20rpx rgba(35, 72, 60, .16);
-}
-.memo-brand-line.line-two { background: #7ED8B5; }
-.memo-brand-dot {
-  background: #7ED8B5;
-  box-shadow: 0 0 0 6rpx rgba(126, 216, 181, .14);
+  box-shadow: none;
 }
 .memo-brand-name { color: #23483C; }
-.memo-brand-caption { color: #76968B; }
+.memo-brand-caption { color: #507568; }
 
 /* ── Page backdrop ── */
 .login-page {
@@ -80,7 +72,7 @@ page {
   min-height: 100vh;
   overflow: hidden;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #FBFEFD 0%, #F1FAF6 100%);
+  background: #FAFCFB;
 }
 .ambient-glow {
   position: absolute;
@@ -88,79 +80,116 @@ page {
   pointer-events: none;
 }
 .glow-top {
-  width: 720rpx;
-  height: 720rpx;
-  left: -260rpx;
-  top: -120rpx;
-  background: radial-gradient(circle, rgba(126, 216, 181, .18), rgba(126, 216, 181, 0) 68%);
+  width: 860rpx;
+  height: 860rpx;
+  left: -360rpx;
+  top: 100rpx;
+  background: radial-gradient(circle, rgba(186, 221, 204, 0) 25%, rgba(186, 221, 204, .28) 42%, rgba(186, 221, 204, .08) 56%, rgba(186, 221, 204, 0) 70%);
 }
 .glow-bottom {
-  width: 820rpx;
-  height: 820rpx;
+  width: 740rpx;
+  height: 740rpx;
   right: -300rpx;
-  bottom: 180rpx;
-  background: radial-gradient(circle, rgba(126, 216, 181, .14), rgba(126, 216, 181, 0) 66%);
+  top: 440rpx;
+  background: radial-gradient(circle, rgba(181, 218, 198, .17), rgba(181, 218, 198, .07) 38%, rgba(181, 218, 198, 0) 68%);
 }
 
 .login-shell {
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  min-height: calc(100vh - env(safe-area-inset-bottom));
-  padding: 0 48rpx calc(28rpx + env(safe-area-inset-bottom));
+  padding: 0 40rpx calc(32rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 }
 
-/* ── Centred emblem on a frosted glass disc ── */
+/* Page light passes behind a clear lens with slowly expanding water highlights. */
 .brand-stage {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 56rpx 0 72rpx;
+  padding: 48rpx 0 56rpx;
+}
+.disc-scene {
+  position: relative;
+  width: 376rpx;
+  height: 376rpx;
+  flex-shrink: 0;
+  margin-bottom: 80rpx;
+  pointer-events: none;
 }
 .glass-disc {
   position: relative;
-  width: 380rpx;
-  height: 380rpx;
-  margin-bottom: 88rpx;
-  border: 1rpx solid rgba(126, 216, 181, .42);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 1rpx solid rgba(111, 150, 129, .12);
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, .92) 0%, rgba(255, 255, 255, 0) 46%),
-    radial-gradient(circle at 72% 84%, rgba(126, 216, 181, .22) 0%, rgba(126, 216, 181, 0) 58%),
-    linear-gradient(155deg, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .30) 100%);
+  background: linear-gradient(138deg, rgba(255, 255, 255, .50), rgba(255, 255, 255, .04) 46%, rgba(239, 250, 244, .18) 72%, rgba(255, 255, 255, .42));
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
   box-shadow:
-    0 26rpx 60rpx rgba(43, 117, 91, .10),
-    inset 0 2rpx 8rpx rgba(255, 255, 255, .80),
-    inset 0 -14rpx 30rpx rgba(126, 216, 181, .10);
+    inset 1rpx 2rpx 6rpx rgba(255, 255, 255, .68),
+    inset -1rpx -2rpx 8rpx rgba(95, 137, 115, .06),
+    0 12rpx 40rpx -26rpx rgba(38, 65, 49, .12);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-/* The mark keeps the brand-shell geometry, scaled 50rpx -> 124rpx. */
-.hero-mark {
-  width: 124rpx;
-  height: 124rpx;
-  border-radius: 32rpx;
-  box-shadow: 0 14rpx 30rpx rgba(35, 72, 60, .20);
+.glass-disc::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 1rpx solid rgba(255,255,255,.44);
+  border-radius: 50%;
+  pointer-events: none;
 }
-.hero-mark .memo-brand-line { height: 10rpx; }
-.hero-mark .line-one { left: 27rpx; top: 74rpx; width: 60rpx; }
-.hero-mark .line-two { left: 67rpx; top: 42rpx; width: 45rpx; }
-.hero-mark .memo-brand-dot {
-  width: 22rpx;
-  height: 22rpx;
-  right: 17rpx;
-  top: 22rpx;
+.glass-disc::after {
+  content: '';
+  position: absolute;
+  inset: 12rpx;
+  border-radius: 50%;
+  background: linear-gradient(132deg, rgba(255,255,255,.42), rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,.20));
+  pointer-events: none;
+}
+.disc-water { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }
+.water-wave {
+  position: absolute;
+  left: 44%;
+  top: 52%;
+  width: 74%;
+  height: 68%;
+  border: 2rpx solid rgba(255,255,255,.80);
+  border-radius: 46% 54% 51% 49%;
+  box-shadow: inset 0 2rpx 3rpx rgba(107, 160, 132, .14), 0 2rpx 3rpx rgba(107, 160, 132, .10);
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-18deg) scale(.60);
+  animation: disc-water-ripple 9s cubic-bezier(.25, .55, .35, 1) infinite;
+  animation-play-state: paused;
+}
+.wave-two { animation-delay: -3s; }
+.wave-three { animation-delay: -6s; }
+.disc-motion-active .water-wave { animation-play-state: running; }
+@keyframes disc-water-ripple {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-18deg) scale(.48); }
+  20% { opacity: .72; }
+  72% { opacity: .46; }
+  100% { opacity: 0; transform: translate(-46%, -54%) rotate(8deg) scale(1.78); }
+}
+.hero-mark {
+  position: relative;
+  z-index: 1;
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 30rpx;
+  box-shadow: 0 12rpx 20rpx -12rpx rgba(34, 52, 43, .24);
 }
 .hero-brand-name {
   padding-left: 10rpx; /* optically recentre the trailing letter-spacing */
   color: #23483C;
-  font-family: Arial, sans-serif;
-  font-size: 54rpx;
+  font-size: 50rpx;
   font-weight: 600;
   letter-spacing: 10rpx;
   line-height: 1.2;
@@ -176,22 +205,23 @@ page {
 }
 .hero-subline {
   margin-top: 20rpx;
-  color: #76968B;
+  color: #617268;
   font-size: 24rpx;
   letter-spacing: 2rpx;
   line-height: 1.4;
 }
 
-/* ── Dual-line primary action ── */
 .login-panel { flex-shrink: 0; }
 .wechat-login-btn {
+  position: relative;
+  box-sizing: border-box;
   width: 100%;
-  height: 132rpx;
-  padding: 0 24rpx;
+  min-height: 108rpx;
+  padding: 20rpx 32rpx;
   border: none;
-  border-radius: 28rpx;
-  background: #23483C;
-  box-shadow: 0 12rpx 28rpx rgba(35, 72, 60, .16);
+  border-radius: 999rpx;
+  background: #253D32;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -202,63 +232,106 @@ page {
 }
 .wechat-login-btn::after { border: none; }
 .wechat-login-btn-pressed { transform: scale(.985); opacity: .92; }
-.wechat-login-btn[disabled] { opacity: .62; }
+.wechat-login-btn[disabled] { background: #253D32; opacity: .68; }
 .wechat-login-title {
   color: #FFFFFF;
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
   line-height: 1.25;
 }
-.wechat-login-sub {
-  color: rgba(255, 255, 255, .60);
+.wechat-login-subtitle {
+  color: #DBE8E0;
   font-size: 22rpx;
   font-weight: 400;
-  line-height: 1.25;
+  line-height: 1.4;
 }
 
-/* ── Consent row: one quiet centred line, links stay independent taps ── */
+/* Keep consent on one central axis, with document links outside the check label. */
 .agreement-box {
-  margin-top: 24rpx;
+  width: 100%;
+  margin: 12rpx auto 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.agreement-group { display: flex; }
+.agreement-check {
+  position: relative;
+  display: flex;
+  min-height: 44px;
+  padding: 0 20rpx;
   align-items: center;
   justify-content: center;
-  row-gap: 8rpx;
+  gap: 12rpx;
 }
-.agreement-group { display: inline-flex; align-items: center; }
-.agreement-check { display: inline-flex; align-items: center; }
-.agreement-check checkbox {
-  transform: scale(.72);
-  transform-origin: center;
+.agreement-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
 }
-.agreement-text {
-  color: #76968B;
-  font-size: 22rpx;
-  line-height: 1.4;
+.agreement-indicator {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 28rpx;
+  height: 28rpx;
+  border: 2rpx solid #748B7D;
+  border-radius: 8rpx;
+  background: #FFFFFF;
+}
+.agreement-indicator.is-checked { background: #305F48; border-color: #305F48; }
+.agreement-indicator.is-checked::after {
+  content: '';
+  display: block;
+  width: 12rpx;
+  height: 6rpx;
+  margin: 6rpx 0 0 5rpx;
+  border-left: 3rpx solid #FFFFFF;
+  border-bottom: 3rpx solid #FFFFFF;
+  transform: rotate(-45deg);
+}
+.agreement-text { color: #617268; }
+.agreement-links {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+  column-gap: 16rpx;
 }
 .agreement-link {
-  color: #23483C;
-  font-size: 22rpx;
-  font-weight: 500;
-  line-height: 1.4;
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  color: #415D4D;
   text-decoration: underline;
-  text-decoration-color: rgba(35, 72, 60, .30);
-  text-underline-offset: 4rpx;
+  text-underline-offset: 5rpx;
+  text-decoration-color: rgba(65, 93, 77, .32);
+  white-space: nowrap;
 }
+.agreement-separator { color: #748B7D; }
 .agreement-link-pressed { opacity: .58; }
 
 .guest-browse {
-  margin-top: 24rpx;
-  min-height: 64rpx;
+  margin-top: 0;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: #507568;
+  color: #4F6156;
   font-size: 26rpx;
   transition: opacity .16s ease;
 }
 .guest-browse-pressed { opacity: .6; }
+.login-panel > .guest-browse { margin-top: 24rpx; }
+.guest-hint { color: #617268; }
+.guest-action { color: #305F48; font-weight: 500; }
 
 .dev-entry {
   margin-top: 12rpx;
@@ -267,7 +340,7 @@ page {
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  color: #8AA399;
+  color: #617268;
   font-size: 20rpx;
 }
 .dev-entry-pressed { opacity: .6; }
@@ -286,16 +359,34 @@ page {
 }
 
 .footer {
-  margin-top: 28rpx;
+  margin-top: 40rpx;
   text-align: center;
 }
 .footer-text {
   display: block;
-  color: #9AB3A8;
-  font-size: 20rpx;
+  color: #617268;
+  font-size: 22rpx;
   line-height: 1.6;
 }
 
+@media (max-height: 720px) {
+  .brand-stage { padding: 36rpx 0 40rpx; }
+  .disc-scene { width: 300rpx; height: 300rpx; margin-bottom: 44rpx; }
+  .hero-brand-name { font-size: 46rpx; letter-spacing: 8rpx; }
+  .hero-slogan { font-size: 29rpx; }
+  .hero-subline { margin-top: 12rpx; }
+}
 @media (prefers-reduced-motion: reduce) {
   .entry-pending-indicator { animation: none; }
+  .water-wave { animation: none; opacity: .32; }
+  .wave-two { transform: translate(-50%, -50%) rotate(-8deg) scale(1.05); }
+  .wave-three { display: none; }
+  .wechat-login-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ambient-glow, .disc-water, .glass-disc::after { display: none; }
+  .glass-disc { background: #F1F7F3; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

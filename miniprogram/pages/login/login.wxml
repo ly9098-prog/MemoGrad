@@ -1,5 +1,5 @@
 <view wx:if="{{entryPending}}" class="entry-pending">
-    <view class="entry-pending-content route-enter-page" role="status" aria-live="polite">
+  <view class="entry-pending-content route-enter" role="status" aria-live="polite">
     <text class="entry-pending-brand">MemoGrad</text>
     <text class="entry-pending-title">正在打开学习空间</text>
     <text class="entry-pending-desc">同步你的学习进度</text>
@@ -7,15 +7,11 @@
     <view class="guest-browse" bindtap="onGuestBrowse" aria-role="button">暂不登录，先浏览体验</view>
   </view>
 </view>
-<view wx:else class="login-root">
+<view wx:else class="login-root {{discMotionActive && !loading ? 'disc-motion-active' : ''}}">
   <view class="memo-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
     <view class="memo-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="memo-brand-lockup">
-        <view class="memo-brand-mark">
-          <view class="memo-brand-line line-one"></view>
-          <view class="memo-brand-line line-two"></view>
-          <view class="memo-brand-dot"></view>
-        </view>
+        <image class="memo-brand-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" aria-hidden="true" />
         <view class="memo-brand-copy">
           <text class="memo-brand-name">MEMOGRAD</text>
           <text class="memo-brand-caption">STUDY DESK</text>
@@ -24,15 +20,18 @@
     </view>
   </view>
   <view class="login-page" style="padding-top: {{navHeight}}px;">
-    <view class="ambient-glow glow-top"></view>
-    <view class="ambient-glow glow-bottom"></view>
-    <view class="login-shell">
+    <view class="ambient-glow glow-top" aria-hidden="true"></view>
+    <view class="ambient-glow glow-bottom" aria-hidden="true"></view>
+    <view class="login-shell" style="min-height: calc(100vh - {{navHeight}}px);">
       <view class="brand-stage route-enter-page">
-        <view class="glass-disc" aria-hidden="true">
-          <view class="memo-brand-mark hero-mark">
-            <view class="memo-brand-line line-one"></view>
-            <view class="memo-brand-line line-two"></view>
-            <view class="memo-brand-dot"></view>
+        <view class="disc-scene" aria-hidden="true">
+          <view class="glass-disc">
+            <view class="disc-water">
+              <view class="water-wave wave-one"></view>
+              <view class="water-wave wave-two"></view>
+              <view class="water-wave wave-three"></view>
+            </view>
+            <image class="memo-brand-mark hero-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" />
           </view>
         </view>
         <text class="hero-brand-name">MEMOGRAD</text>
@@ -40,33 +39,38 @@
         <text class="hero-subline">408 刷题 · 错题复盘</text>
       </view>
       <view class="login-panel route-enter-page delay-one">
-        <button class="wechat-login-btn" hover-class="{{loading ? 'none' : 'wechat-login-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onWechatLogin" loading="{{loading}}" disabled="{{loading}}">
-          <text class="wechat-login-title">微信一键登录</text>
-          <text class="wechat-login-sub">同步错题、复习计划与打卡</text>
+        <button class="wechat-login-btn" hover-class="{{loading ? 'none' : 'wechat-login-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onWechatLogin" loading="{{loading}}" disabled="{{loading}}" aria-busy="{{loading}}">
+          <text class="wechat-login-title">{{loading ? '正在登录…' : '微信一键登录'}}</text>
+          <text class="wechat-login-subtitle">同步错题、复习计划与打卡</text>
         </button>
+        <view wx:if="{{error}}" class="error-msg" aria-role="alert">{{error}}</view>
         <view class="agreement-box">
           <checkbox-group class="agreement-group" bindchange="onAgreementChange">
             <label class="agreement-check">
-              <checkbox value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#3A6F5B" />
+              <checkbox id="login-agreement" class="agreement-native" value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#3A6F5B" aria-label="我已阅读并同意用户协议、隐私政策与AI免责声明" />
+              <view class="agreement-indicator {{agreed ? 'is-checked' : ''}}" aria-hidden="true"></view>
               <text class="agreement-text">我已阅读并同意</text>
             </label>
           </checkbox-group>
-          <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《用户协议》</text>
-          <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《隐私政策》</text>
-          <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement">《AI 免责声明》</text>
+          <view class="agreement-links">
+            <text class="agreement-link" data-type="user" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">用户协议</text>
+            <text class="agreement-separator" aria-hidden="true">·</text>
+            <text class="agreement-link" data-type="privacy" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">隐私政策</text>
+            <text class="agreement-separator" aria-hidden="true">·</text>
+            <text class="agreement-link" data-type="ai" hover-class="agreement-link-pressed" hover-start-time="20" hover-stay-time="80" bindtap="openAgreement" aria-role="link">AI 免责声明</text>
+          </view>
         </view>
         <view class="guest-browse" bindtap="onGuestBrowse" hover-class="guest-browse-pressed" aria-role="button" aria-label="暂不登录，先浏览体验">
-          <text>暂不登录，先浏览体验</text>
+          <text class="guest-hint">暂不登录，</text>
+          <text class="guest-action">先浏览体验</text>
         </view>
         <view wx:if="{{showDevLogin}}" class="dev-entry" hover-class="dev-entry-pressed" hover-start-time="20" hover-stay-time="80" bindtap="onDevLogin">
           <text class="dev-text">开发者模式</text>
           <text class="dev-arrow">→</text>
         </view>
-        <view wx:if="{{error}}" class="error-msg">{{error}}</view>
       </view>
       <view class="footer route-enter-page delay-two">
-        <text class="footer-text">学习数据用于错题记录与智能刷题服务</text>
-        <text class="footer-text">ICP备案号：桂ICP备2026003057号-2X</text>
+        <text class="footer-text">桂ICP备2026003057号-2X</text>
       </view>
     </view>
   </view>

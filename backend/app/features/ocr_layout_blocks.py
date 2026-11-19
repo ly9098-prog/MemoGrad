@@ -31,15 +31,19 @@ def build_pre_extracted_ocr_blocks(
             )
             if block is not None:
                 blocks.append(block)
-    if blocks:
-        return blocks
-    return _fallback_block(
-        cleaned_text,
-        ocr_result.get("boxes"),
-        width=width,
-        height=height,
-        fingerprint=engine_fingerprint,
-    )
+    if not blocks:
+        blocks = _fallback_block(
+            cleaned_text,
+            ocr_result.get("boxes"),
+            width=width,
+            height=height,
+            fingerprint=engine_fingerprint,
+        )
+    for block in blocks:
+        for key in ("execution_backend", "fallback_from", "fallback_reason"):
+            if key in ocr_result:
+                block[key] = ocr_result[key]
+    return blocks
 
 
 def _image_dimensions(image_bytes: bytes) -> tuple[int, int]:

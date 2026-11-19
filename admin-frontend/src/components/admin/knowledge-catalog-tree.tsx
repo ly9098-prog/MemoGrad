@@ -89,6 +89,8 @@ function CatalogBranch({
         data-root={level === 0}
         data-disabled={!active}
         data-selected={selectedSelf}
+        data-excluded={!controls.editable && !selectedSelf ? "true" : undefined}
+        title={!controls.editable && !selectedSelf ? "未纳入当前版本" : undefined}
       >
         {children.length ? (
           <button
@@ -108,26 +110,28 @@ function CatalogBranch({
         ) : (
           <span className={styles.knowledgeLeaf} aria-hidden="true" />
         )}
-        <CustomCheckbox
-          checked={controls.editable ? checked : selectedSelf}
-          indeterminate={controls.editable && mixed}
-          disabled={!controls.editable || controls.busy || !active}
-          aria-label={children.length ? `选择${name}及下级标签` : `选择${name}`}
-          title={
-            controls.editable
-              ? children.length
+        {controls.editable ? (
+          <CustomCheckbox
+            checked={checked}
+            indeterminate={mixed}
+            disabled={controls.busy || !active}
+            aria-label={children.length ? `选择${name}及下级标签` : `选择${name}`}
+            title={
+              children.length
                 ? "选择或取消此标签及当前目录显示的下级标签"
                 : "选择或取消此标签"
-              : "切换到草稿后可修改范围"
-          }
-          className={styles.knowledgeCheckbox}
-          onCheckedChange={(value) =>
-            controls.onSelect(
-              eligible.map((p) => p.knowledge_point_id),
-              value,
-            )
-          }
-        />
+            }
+            className={styles.knowledgeCheckbox}
+            onCheckedChange={(value) =>
+              controls.onSelect(
+                eligible.map((p) => p.knowledge_point_id),
+                value,
+              )
+            }
+          />
+        ) : (
+          <span aria-hidden="true" />
+        )}
         <div className={styles.knowledgeNodeLabel}>
           <strong>{name}</strong>
           <small>

@@ -6,6 +6,7 @@ const WORLD = { width: 800, height: 920 }
 const POINTS_PER_PAGE = 8
 const DEFAULT_FORCES = { center: 0.52, repel: 10, link: 1, distance: 250 }
 const MAX_FOCUS_NODES = 72
+const GROUPS_PER_PAGE = POINTS_PER_PAGE
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const directChildren = (group, id) => (Array.isArray(group && group.nodes) ? group.nodes : []).filter(item => Number(item.parentId) === Number(id))
@@ -44,8 +45,8 @@ function makeNode(id, kind, item, groupKey, extra) {
     groupKey: String(groupKey || ''),
     tone: (item && item.tone) || 'unseen',
     expandable: Boolean(item && item.hasChildren),
-    showLabel: kind === 'group',
     selected: false,
+    neighbor: false,
     pathActive: false,
     dimmed: false,
     caption: item && item.hasChildren ? `${Number(item.matchCount) || 0} 个知识点` : '',
@@ -70,11 +71,16 @@ function makeEdge(from, to, kind) {
   }
 }
 
-function simulate(nodes, links, forces, manualPositions, focused) {
+function simulate(nodes, links, forces, manualPositions, focused, cache) {
   if (!nodes.length) return
+  const cacheKey = JSON.stringify([nodes.map(node => [node.id, node.cx, node.cy]), links.map(link => [link.from, link.to]), forces, manualPositions])
+  if (cache && cache.key === cacheKey) {
+    nodes.forEach(node => Object.assign(node, cache.positions[node.id]))
+    return
+  }
   const byId = new Map(nodes.map(node => [node.id, node]))
   const center = { x: WORLD.width / 2, y: WORLD.height / 2 }
-  const ticks = nodes.length > 90 ? 170 : 210
+  const ticks = 110
   const velocity = new Map(nodes.map(node => [node.id, { x: 0, y: 0 }]))
   nodes.forEach((node) => {
     const manual = manualPositions && manualPositions[node.id]
@@ -134,18 +140,23 @@ function simulate(nodes, links, forces, manualPositions, focused) {
       node.cy = clamp(node.cy + speed.y, 26, WORLD.height - 26)
     })
   }
+  if (cache) {
+    cache.key = cacheKey
+    cache.positions = Object.fromEntries(nodes.map(node => [node.id, { cx: node.cx, cy: node.cy }]))
+  }
 }
 
-function buildOverview(groups, subject, forces) {
+function buildOverview(groups, subject, forces, requestedPage) {
   const nodes = []
   const edges = []
   const pointIds = []
   const core = makeNode('core', 'core', { name: (subject && subject.subject_name) || '知识图谱', tone: 'stable' }, '')
   nodes.push(core)
-  const roots = []
-  const firstLeaves = []
-  const list = (Array.isArray(groups) ? groups : []).filter(group => group && group.rootNode)
-  const perGroup = list.length > 10 ? 7 : 12
+  const allGroups = (Array.isArray(groups) ? groups : []).filter(group => group && group.rootNode)
+  const pageCount = Math.max(1, Math.ceil(allGroups.length / GROUPS_PER_PAGE))
+  const page = clamp(Math.floor(Number(requestedPage) || 0), 0, pageCount - 1)
+  const list = allGroups.slice(page * GROUPS_PER_PAGE, (page + 1) * GROUPS_PER_PAGE)
+  const perGroup = 10
   list.forEach((group, groupIndex) => {
     const root = group.rootNode
     const rootId = Number(root.knowledge_point_id)
@@ -153,24 +164,19 @@ function buildOverview(groups, subject, forces) {
     const rootNode = makeNode(`${root.hasChildren ? 'group' : 'point'}:${rootId}`, root.hasChildren ? 'group' : 'point', root, group.key, {
       cx: 400 + Math.cos(angle) * 250,
       cy: 460 + Math.sin(angle) * 250,
-      showLabel: true,
       r: root.hasChildren ? 12 : 6,
     })
     nodes.push(rootNode)
-    roots.push(rootNode)
     if (!root.hasChildren) pointIds.push(rootId)
     const coreEdge = makeEdge(core, rootNode, 'membership')
     coreEdge.distance = forces.distance
     coreEdge.strength = 0.85
     edges.push(coreEdge)
     const included = new Map([[rootId, rootNode]])
-    const lastSibling = new Map()
-    const siblingCount = new Map()
     const candidates = group.nodes
       .filter(item => Number(item.knowledge_point_id) !== rootId)
       .sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0))
       .slice(0, perGroup)
-    let firstLeaf = null
     candidates.forEach((item) => {
       const id = Number(item.knowledge_point_id)
       const parent = included.get(Number(item.parentId)) || rootNode
@@ -180,54 +186,22 @@ function buildOverview(groups, subject, forces) {
         cx: parent.cx + Math.cos(phase) * radius,
         cy: parent.cy + Math.sin(phase) * radius,
         r: item.hasChildren ? 9 : 6,
-        showLabel: false,
       })
       nodes.push(node)
       included.set(id, node)
       if (!item.hasChildren) {
         pointIds.push(id)
-        if (!firstLeaf) firstLeaf = node
       }
       const edge = makeEdge(parent, node, 'hierarchy')
       edge.distance = Number(item.parentId) === rootId ? Math.max(60, forces.distance * 0.38) : Math.max(42, forces.distance * 0.24)
       edges.push(edge)
-      const sibling = lastSibling.get(parent.id)
-      const siblingTotal = siblingCount.get(parent.id) || 0
-      if (sibling && siblingTotal < 4) {
-        const link = makeEdge(sibling, node, 'sibling')
-        link.distance = 52
-        link.strength = 0.32
-        edges.push(link)
-        siblingCount.set(parent.id, siblingTotal + 1)
-      }
-      lastSibling.set(parent.id, node)
     })
-    firstLeaves.push(firstLeaf)
   })
-  roots.forEach((root, index) => {
-    if (!index) return
-    const link = makeEdge(roots[index - 1], root, 'cross')
-    link.distance = forces.distance * 0.9
-    link.strength = 0.24
-    edges.push(link)
-    const leaf = firstLeaves[index - 1]
-    if (leaf && firstLeaves[index]) {
-      const bridge = makeEdge(leaf, firstLeaves[index], 'cross')
-      bridge.distance = forces.distance * 0.7
-      bridge.strength = 0.12
-      edges.push(bridge)
-    }
-  })
-  if (roots.length > 2) {
-    const link = makeEdge(roots[roots.length - 1], roots[0], 'cross')
-    link.distance = forces.distance * 0.9
-    link.strength = 0.2
-    edges.push(link)
-  }
-  return { nodes, edges, pointIds, core, focusNode: null, directChildCount: 0 }
+  return { nodes, edges, pointIds, core, focusNode: null, directChildCount: 0, page, pageCount, total: allGroups.length }
+
 }
 
-function buildFocused(group, focusNode, forces) {
+function buildFocused(group, focusNode, forces, requestedPage) {
   const nodes = []
   const edges = []
   const pointIds = []
@@ -236,9 +210,10 @@ function buildFocused(group, focusNode, forces) {
   nodes.push(core)
   const included = new Map([[focusId, core]])
   const firstLevel = directChildren(group, focusId)
-  const queue = firstLevel.map(item => ({ item, depth: 1 }))
-  const lastSibling = new Map()
-  const siblingCount = new Map()
+  const pageCount = Math.max(1, Math.ceil(firstLevel.length / POINTS_PER_PAGE))
+  const page = clamp(Math.floor(Number(requestedPage) || 0), 0, pageCount - 1)
+  const visibleChildren = firstLevel.slice(page * POINTS_PER_PAGE, (page + 1) * POINTS_PER_PAGE)
+  const queue = visibleChildren.map(item => ({ item, depth: 1 }))
   let cursor = 0
   let directIndex = 0
   while (cursor < queue.length && included.size < MAX_FOCUS_NODES) {
@@ -249,7 +224,7 @@ function buildFocused(group, focusNode, forces) {
     if (included.has(id)) continue
     const parent = included.get(Number(item.parentId)) || core
     const phase = current.depth === 1
-      ? -Math.PI / 2 + directIndex * Math.PI * 2 / Math.max(1, firstLevel.length)
+      ? -Math.PI / 2 + directIndex * Math.PI * 2 / Math.max(1, visibleChildren.length)
       : seeded(id) * Math.PI * 2
     if (current.depth === 1) directIndex += 1
     const radius = current.depth === 1 ? 225 : 72
@@ -257,7 +232,6 @@ function buildFocused(group, focusNode, forces) {
       cx: parent.cx + Math.cos(phase) * radius,
       cy: parent.cy + Math.sin(phase) * radius,
       r: item.hasChildren ? 9 : 6,
-      showLabel: current.depth === 1,
     })
     nodes.push(node)
     included.set(id, node)
@@ -265,21 +239,11 @@ function buildFocused(group, focusNode, forces) {
     const edge = makeEdge(parent, node, 'hierarchy')
     edge.distance = current.depth === 1 ? Math.max(150, forces.distance * 0.9) : Math.max(46, forces.distance * 0.28)
     edges.push(edge)
-    const sibling = lastSibling.get(parent.id)
-    const siblingTotal = siblingCount.get(parent.id) || 0
-    if (sibling && siblingTotal < 4) {
-      const link = makeEdge(sibling, node, 'sibling')
-      link.distance = 58
-      link.strength = 0.28
-      edges.push(link)
-      siblingCount.set(parent.id, siblingTotal + 1)
-    }
-    lastSibling.set(parent.id, node)
     if (item.hasChildren) {
       directChildren(group, id).forEach(child => queue.push({ item: child, depth: current.depth + 1 }))
     }
   }
-  return { nodes, edges, pointIds, core, focusNode, directChildCount: firstLevel.length }
+  return { nodes, edges, pointIds, core, focusNode, directChildCount: firstLevel.length, page, pageCount, total: firstLevel.length }
 }
 
 function resolveFocusNode(groups, options) {
@@ -305,7 +269,7 @@ function breadcrumbItems(group, focusNode, subject) {
   return items
 }
 
-function buildScene(groups, subject, options) {
+function buildScene(groups, subject, options = {}) {
   const source = Array.isArray(groups) ? groups : []
   if (!source.length) {
     return {
@@ -318,40 +282,18 @@ function buildScene(groups, subject, options) {
   const focusedGroup = focusNode ? source.find(group => String(group.key) === String(options.groupKey)) : null
   const forces = Object.assign({}, DEFAULT_FORCES, (options && options.forces) || {})
   const graph = focusNode && focusedGroup
-    ? buildFocused(focusedGroup, focusNode, forces)
-    : buildOverview(source, subject, forces)
-  simulate(graph.nodes, graph.edges, forces, (options && options.manualPositions) || {}, Boolean(focusNode))
-  const byId = new Map(graph.nodes.map(node => [node.id, node]))
-  const selectedId = Number(options && options.selectedId) || 0
-  const selectedNode = graph.nodes.find(node => node.kind === 'point' && node.pointId === selectedId)
-  const highlight = new Set()
-  if (selectedNode) {
-    highlight.add(selectedNode.id)
-    graph.edges.forEach((edge) => {
-      if (edge.from === selectedNode.id || edge.to === selectedNode.id) {
-        highlight.add(edge.from)
-        highlight.add(edge.to)
-        edge.active = true
-      }
-    })
-  } else if (options && options.activeGroupKey && !focusNode) {
-    graph.nodes.forEach((node) => {
-      if (node.kind === 'core' || node.groupKey === String(options.activeGroupKey)) highlight.add(node.id)
-    })
-    graph.edges.forEach((edge) => { if (highlight.has(edge.from) && highlight.has(edge.to)) edge.active = true })
-  }
-  const hasHighlight = highlight.size > 0
-  graph.nodes.forEach((node) => {
-    node.selected = Boolean(selectedNode && node.id === selectedNode.id)
-    node.pathActive = highlight.has(node.id)
-    node.dimmed = hasHighlight && !highlight.has(node.id)
-    if (node.selected) node.showLabel = true
-    node.style = dotStyle(node)
+    ? buildFocused(focusedGroup, focusNode, forces, options.page)
+    : buildOverview(source, subject, forces, options.page)
+  const degrees = new Map()
+  graph.edges.forEach(({ from, to }) => {
+    degrees.set(from, (degrees.get(from) || 0) + 1)
+    degrees.set(to, (degrees.get(to) || 0) + 1)
   })
-  graph.edges.forEach((edge) => {
-    edge.dimmed = hasHighlight && !edge.active
-    edge.style = edgeStyle(byId.get(edge.from), byId.get(edge.to))
+  graph.nodes.forEach(node => {
+    node.r = node.kind === 'core' ? 18 : clamp(4 + Math.sqrt(degrees.get(node.id) || 1) * 2, 6, 16)
   })
+  simulate(graph.nodes, graph.edges, forces, options.manualPositions || {}, Boolean(focusNode), options.layoutCache)
+  highlightScene(graph, options)
   const matchTotal = focusNode
     ? Number(focusNode.matchCount) || graph.pointIds.length
     : source.reduce((sum, group) => sum + (Number(group.matchCount) || 0), 0)
@@ -359,11 +301,11 @@ function buildScene(groups, subject, options) {
     nodes: graph.nodes,
     edges: graph.edges,
     pointIds: graph.pointIds,
-    page: 0,
-    pageCount: 1,
-    total: graph.pointIds.length,
+    page: graph.page,
+    pageCount: graph.pageCount,
+    total: graph.total,
     matchTotal,
-    rangeText: focusNode ? `${graph.nodes.length - 1} 个节点` : `${source.length} 个主题`,
+    rangeText: `${graph.page + 1} / ${graph.pageCount}`,
     focused: Boolean(focusNode),
     focusNodeId: focusNode ? Number(focusNode.knowledge_point_id) : 0,
     parentFocusId: focusNode ? Number(focusNode.parentId) || 0 : 0,
@@ -374,6 +316,53 @@ function buildScene(groups, subject, options) {
     scopeText: focusNode ? `${focusNode.name} · 局部图谱` : '全科知识图谱',
     breadcrumbs: focusNode ? breadcrumbItems(focusedGroup, focusNode, subject) : [],
   }
+}
+
+function highlightScene(graph, options = {}) {
+  const byId = new Map(graph.nodes.map(node => [node.id, node]))
+  const selectedId = Number(options && options.selectedId) || 0
+  const selectedNode = graph.nodes.find(node => node.kind === 'point' && node.pointId === selectedId)
+  const highlight = new Set()
+  const neighbors = new Set()
+  graph.edges.forEach(edge => { edge.active = false })
+  if (selectedNode) {
+    highlight.add(selectedNode.id)
+    graph.edges.forEach(edge => {
+      if (edge.from !== selectedNode.id && edge.to !== selectedNode.id) return
+      const neighborId = edge.from === selectedNode.id ? edge.to : edge.from
+      neighbors.add(neighborId)
+      highlight.add(neighborId)
+      edge.active = true
+    })
+    let ancestor = selectedNode.id
+    const visited = new Set()
+    while (!visited.has(ancestor)) {
+      visited.add(ancestor)
+      const edge = graph.edges.find(item => item.to === ancestor)
+      if (!edge) break
+      highlight.add(edge.from)
+      edge.active = true
+      ancestor = edge.from
+    }
+  } else if (options && options.activeGroupKey && !graph.focused) {
+    graph.nodes.forEach((node) => {
+      if (node.kind === 'core' || node.groupKey === String(options.activeGroupKey)) highlight.add(node.id)
+    })
+    graph.edges.forEach((edge) => { if (highlight.has(edge.from) && highlight.has(edge.to)) edge.active = true })
+  }
+  const hasHighlight = highlight.size > 0
+  graph.nodes.forEach((node) => {
+    node.selected = Boolean(selectedNode && node.id === selectedNode.id)
+    node.neighbor = neighbors.has(node.id)
+    node.pathActive = highlight.has(node.id)
+    node.dimmed = hasHighlight && !highlight.has(node.id)
+    node.style = dotStyle(node)
+  })
+  graph.edges.forEach((edge) => {
+    edge.dimmed = hasHighlight && !edge.active
+    edge.style = edgeStyle(byId.get(edge.from), byId.get(edge.to))
+  })
+  return graph
 }
 
 function fitCamera(frame) {
@@ -413,4 +402,39 @@ function zoomCamera(camera, factor, anchor, frame) {
 
 function cameraStyle(camera) { return `transform:translate3d(${camera.x}px,${camera.y}px,0) scale(${camera.scale});` }
 
-module.exports = { WORLD, POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle }
+function visibleLabels(nodes, fontSize, mode, scale) {
+  const visibility = {}
+  const occupied = []
+  const priority = node => node.selected ? 0 : node.neighbor ? 1 : node.kind === 'group' ? 2 : 3
+  const candidates = nodes.filter(node => node.kind !== 'core' && (
+    mode === 'detail' || node.kind === 'group' || node.selected || node.neighbor
+  )).sort((a, b) => priority(a) - priority(b) || Number(a.dimmed) - Number(b.dimmed) || a.id.localeCompare(b.id))
+  const gap = 4 / scale
+  candidates.forEach(node => {
+    // Estimate mixed CJK/Latin labels in world coordinates. Camera translation
+    // cannot change collisions, so panning keeps the same visible names.
+    const units = Array.from(node.label).reduce((sum, char) => sum + (/[^\u0000-\u00ff]/.test(char) ? 1 : 0.58), 0)
+    const width = Math.min(node.selected ? 320 : 240, units * fontSize)
+    const height = fontSize * 1.4
+    const box = { left: node.cx - width / 2, right: node.cx + width / 2, top: node.cy - node.r - 10 - height, bottom: node.cy - node.r - 10 }
+    const overlap = occupied.some(other => box.left < other.right + gap && box.right > other.left - gap && box.top < other.bottom + gap && box.bottom > other.top - gap)
+    if (node.selected || !overlap) {
+      visibility[node.id] = true
+      occupied.push(box)
+    }
+  })
+  return visibility
+}
+
+function labelDisplay(camera, frame, nodes) {
+  const ratio = camera.scale / fitCamera(frame).scale
+  const graphLabelMode = ratio >= 1.6 ? 'detail' : 'overview'
+  const graphLabelSize = Math.round(clamp(12 / camera.scale, 8, 48) * 10) / 10
+  return {
+    graphLabelMode,
+    graphLabelSize,
+    ...(nodes ? { graphLabelVisibility: visibleLabels(nodes, graphLabelSize, graphLabelMode, camera.scale) } : {}),
+  }
+}
+
+module.exports = { WORLD, POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay }

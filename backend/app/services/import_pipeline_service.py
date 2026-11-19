@@ -5,9 +5,9 @@ the existing database, cleanup, status and resource reservation behavior here.
 """
 
 import hashlib
-import io
 import logging
 import os
+from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -297,30 +297,31 @@ async def _shutdown_temporary_ocr_client(worker_client) -> None:
         logger.warning("Temporary OCR worker client shutdown failed: %s", exc)
 
 
-async def _run_ocr_via_configured_backend(image_bytes: bytes) -> dict:
-    """Run image OCR through the configured OCR worker backend.
-
-    The image-import path used to call ``ocr_executor`` directly, which is a
-    deprecated local-process compatibility service.  That silently bypassed
-    ``OCR_EXECUTION_BACKEND=paddlex_http`` and therefore used local PaddleOCR
-    even when the remote httpx/GPU service was configured.
-
-    This helper uses the application OCR Gateway when available.  For tooling
-    or tests where the lifespan Gateway has not been created yet, it creates a
-    short-lived worker client from the same runtime config.  Importantly, a
-    configured ``paddlex_http`` backend never falls back to local CPU OCR.
-
-    Returns the standard ``WorkerResult.result`` mapping so callers can retain
-    OCR boxes/geometry instead of reducing the first OCR pass to plain text.
-    """
+async def _run_ocr_via_configured_backend(
+    image_bytes: bytes,
+    *,
+    on_fallback: Callable[[dict], Awaitable[None]] | None = None,
+) -> dict:
+    """Run the configured OCR backend and preserve its complete result payload."""
     cfg, get_gateway, create_ocr_worker_client = _resolve_ocr_backend_ports()
 
     gateway = get_gateway()
     worker_client = None
     owns_worker_client = False
+    fallback_options = (
+        {"_ocr_fallback_notify": on_fallback}
+        if on_fallback is not None and cfg.execution_backend == "paddlex_http"
+        else None
+    )
     try:
         if gateway is not None and gateway.is_gateway:
-            results = await gateway.recognize_pages([(1, image_bytes)])
+            if fallback_options is None:
+                results = await gateway.recognize_pages([(1, image_bytes)])
+            else:
+                results = await gateway.recognize_pages(
+                    [(1, image_bytes)],
+                    options=fallback_options,
+                )
         else:
             worker_client = create_ocr_worker_client(cfg)
             if worker_client is None:
@@ -328,7 +329,13 @@ async def _run_ocr_via_configured_backend(image_bytes: bytes) -> dict:
                     f"OCR worker unavailable: execution_backend={cfg.execution_backend}"
                 )
             owns_worker_client = True
-            results = await worker_client.recognize_batch([(1, image_bytes)])
+            if fallback_options is None:
+                results = await worker_client.recognize_batch([(1, image_bytes)])
+            else:
+                results = await worker_client.recognize_batch(
+                    [(1, image_bytes)],
+                    options=fallback_options,
+                )
 
         return _validate_ocr_backend_result(_select_ocr_backend_result(results))
     except Exception as e:
@@ -443,6 +450,12 @@ def _image_lifecycle_request(
         clean_text=clean_ocr_text,
         build_runtime_diagnostics=_build_ocr_runtime_diagnostics,
         run_ocr=_run_ocr_via_configured_backend,
+        run_ocr_with_fallback=(
+            lambda image, notify: _run_ocr_via_configured_backend(
+                image,
+                on_fallback=notify,
+            )
+        ),
         build_diagnostics=_build_ocr_text_diagnostics,
         build_blocks=_build_pre_extracted_ocr_blocks,
         set_status=_set_image_pipeline_status,

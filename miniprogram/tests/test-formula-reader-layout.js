@@ -148,6 +148,21 @@ assert.equal(layout.expandedBlock.readingRows[0].lineItems.length, 1)
 assert.equal(layout.expandedBlock.hasWideRows, false)
 assert.equal('fullLineItem' in layout.expandedBlock.readingRows[0], false, 'panel payload excludes unused math trees')
 assert.ok(layout.expandedHeight < 200, 'small content remains compact')
+// Near the available-width boundary, the old 28→32 ratio would falsely split
+// these identities. Both current font pairs must retain complete fitting rows.
+for (const [windowWidth, fragmentWidth] of [[320, 130], [375, 151], [430, 174]]) {
+  const fontViewport = readingViewport({ windowWidth, windowHeight: 844 })
+  const dimensions = [[{ width: fragmentWidth, height: 40 }, { width: fragmentWidth, height: 40 }], { height: 22 }, null]
+  const fittingLayout = prepareReadingLayout(runtimeFixture, dimensions, fontViewport)
+  assert.equal(fittingLayout.expandedBlock.readingRows[0].lineItems.length, 1,
+    'fitting identities stay complete at ' + windowWidth + 'px')
+  assert.equal(fittingLayout.expandedBlock.hasWideRows, false)
+  dimensions[0].forEach(rect => { rect.width += 20 })
+  const wideLayout = prepareReadingLayout(runtimeFixture, dimensions, fontViewport)
+  assert.equal(wideLayout.expandedBlock.readingRows[0].lineItems.length, 2,
+    'genuinely wide identities still split safely at ' + windowWidth + 'px')
+  assert.equal(wideLayout.expandedBlock.hasWideRows, true)
+}
 layout = prepareReadingLayout(runtimeFixture,
   [[{ width: 200, height: 900 }, { width: 500, height: 900 }], { height: 18 }, null], viewport)
 assert.equal(layout.expandedBlock.readingRows[0].lineItems.length, 2)

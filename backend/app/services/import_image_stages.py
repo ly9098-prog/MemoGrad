@@ -59,6 +59,9 @@ class ImageOcrStage:
     build_diagnostics: Callable[[str, str], dict]
     build_blocks: Callable[..., list[dict]]
     set_status: Callable[..., Awaitable[dict]]
+    run_ocr_with_fallback: (
+        Callable[[bytes, Callable[[dict], Awaitable[None]]], Awaitable[dict]] | None
+    ) = None
 
 
 @dataclass(slots=True)
@@ -97,6 +100,9 @@ class ImagePipelineExecutionRequest:
     set_status: Callable[..., Awaitable[dict]]
     set_stage_tags: Callable[[str, str], None]
     apply_policy: Callable[[dict, bool], dict]
+    run_ocr_with_fallback: (
+        Callable[[bytes, Callable[[dict], Awaitable[None]]], Awaitable[dict]] | None
+    ) = None
 
 
 @dataclass(slots=True)
@@ -140,6 +146,7 @@ async def run_prepared_image_ocr(stage: ImageOcrStage) -> PreparedImageOcr:
             image_bytes=image_bytes,
             build_runtime_diagnostics=stage.build_runtime_diagnostics,
             run_ocr=stage.run_ocr,
+            run_ocr_with_fallback=stage.run_ocr_with_fallback,
             clean_text=stage.clean_text,
             build_diagnostics=stage.build_diagnostics,
             build_blocks=stage.build_blocks,
@@ -186,6 +193,7 @@ async def execute_image_pipeline_stages(
             set_stage_tags=request.set_stage_tags,
             build_runtime_diagnostics=request.build_runtime_diagnostics,
             run_ocr=request.run_ocr,
+            run_ocr_with_fallback=request.run_ocr_with_fallback,
             clean_text=request.clean_text,
             build_diagnostics=request.build_diagnostics,
             build_blocks=request.build_blocks,
