@@ -162,7 +162,7 @@
 
 .field label {
   color: #d7e7f0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -197,6 +197,10 @@
 .input::placeholder {
   color: #8da7b8;
   opacity: 1;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--login-error);
 }
 
 .codeInput {
@@ -342,6 +346,10 @@
   outline-offset: 3px;
 }
 
+.consentRow input[aria-invalid="true"] + .consentCheck {
+  border-color: var(--login-error);
+}
+
 .consentRow a {
   margin: 0 3px;
   color: #ccebff;
@@ -365,6 +373,11 @@
 
 .error[data-error="true"] {
   color: var(--login-error);
+}
+
+.error > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .error svg {

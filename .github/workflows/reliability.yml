@@ -160,7 +160,7 @@ jobs:
           STAGING_STORAGE_DIR: ${{ runner.temp }}/queue-recovery-staging
         run: python -m pytest tests/integration/test_queue_redis_recovery.py --run-integration -q
 
-      - name: Verify identity migration, SMTP delivery and Redis budgets
+      - name: Verify identity migration, auth transports and domain gate contracts
         working-directory: backend
         env:
           APP_ENV: test
@@ -171,6 +171,7 @@ jobs:
           STAGING_STORAGE_DIR: ${{ runner.temp }}/auth-migration-staging
         run: >-
           python -m pytest
+          tests/test_deploy_auth_domains.py
           tests/integration/test_multi_identity_postgres.py
           tests/integration/test_auth_transports.py
           --run-integration -q

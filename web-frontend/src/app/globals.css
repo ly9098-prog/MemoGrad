@@ -588,10 +588,19 @@ input:focus-visible {
 }
 
 .settings-header p {
-  margin: 5px 0 0;
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.settings-account-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .settings-logout {
@@ -644,6 +653,11 @@ input:focus-visible {
   border-color: #e4bebb;
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.settings-feedback > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .settings-feedback svg {

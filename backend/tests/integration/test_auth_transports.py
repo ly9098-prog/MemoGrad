@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import json
 import queue
 import socketserver
 import ssl
@@ -11,13 +14,15 @@ import threading
 import time
 from email import policy
 from email.parser import BytesParser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from redis.asyncio import Redis
 
 from app.core.cache import cache
 from app.core.config import settings
-from app.services import email_delivery, email_otp_service
+from app.services import email_delivery, email_otp_service, github_oauth_service
 from tests.integration.owned_redis import OwnedRedis
 
 pytestmark = pytest.mark.integration
@@ -29,12 +34,24 @@ class SmtpHandler(socketserver.StreamRequestHandler):
         self.wfile.close()
         self.request = self.server.tls.wrap_socket(self.connection, server_side=True)
         self.setup()
+        self.server.events.append("tls")
+
+    def authenticate(self, line):
+        credentials = base64.b64decode(line.split()[2]).decode().split("\0")[1:]
+        accepted = (
+            isinstance(self.request, ssl.SSLSocket)
+            and tuple(credentials) == self.server.credentials
+            and self.server.failure != "auth"
+        )
+        self.server.events.append("auth" if accepted else "auth_rejected")
+        return accepted
 
     def handle(self):
         def send(line):
             self.wfile.write(line + b"\r\n")
             self.wfile.flush()
 
+        authenticated = False
         try:
             if self.server.transport == "ssl":
                 self.start_tls()
@@ -45,11 +62,25 @@ class SmtpHandler(socketserver.StreamRequestHandler):
                     if self.server.failure == "timeout":
                         time.sleep(0.25)
                     send(b"250-localhost")
-                    send(b"250 STARTTLS")
+                    send(
+                        b"250 AUTH PLAIN"
+                        if isinstance(self.request, ssl.SSLSocket)
+                        else b"250 STARTTLS"
+                    )
                 elif command == b"STARTTLS":
                     send(b"220 Ready for TLS")
                     self.start_tls()
+                elif command == b"AUTH":
+                    authenticated = self.authenticate(line)
+                    send(
+                        b"235 Authenticated"
+                        if authenticated
+                        else b"535 Authentication failed"
+                    )
                 elif command == b"DATA":
+                    if self.server.auth_required and not authenticated:
+                        send(b"530 Authentication required")
+                        continue
                     if self.server.failure == "reject":
                         send(b"550 Delivery refused")
                         continue
@@ -58,6 +89,7 @@ class SmtpHandler(socketserver.StreamRequestHandler):
                     while (part := self.rfile.readline()) not in (b".\r\n", b""):
                         parts.append(part)
                     self.server.messages.put(b"".join(parts))
+                    self.server.events.append("data")
                     send(b"250 Accepted")
                 elif command == b"QUIT":
                     send(b"221 Bye")
@@ -101,6 +133,9 @@ def smtp(tmp_path, monkeypatch):
     server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), SmtpHandler)
     server.daemon_threads = True
     server.transport, server.failure, server.tls = "plain", "", tls
+    server.auth_required = False
+    server.credentials = ("smtp-test-user", "smtp-test-secret")
+    server.events = []
     server.messages = queue.Queue()
     thread = threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
@@ -163,6 +198,51 @@ def test_smtp_failure_is_reported_without_exposing_transport_details(
     assert smtp.messages.empty()
 
 
+@pytest.mark.parametrize("transport", ["ssl", "starttls"])
+@pytest.mark.parametrize("reject", [False, True])
+def test_smtp_account_authentication_happens_inside_tls(
+    smtp, transport, reject, monkeypatch
+):
+    smtp.transport, smtp.auth_required = transport, True
+    smtp.failure = "auth" if reject else ""
+    monkeypatch.setattr(settings, "SMTP_USE_SSL", transport == "ssl")
+    monkeypatch.setattr(settings, "SMTP_USE_STARTTLS", transport == "starttls")
+    monkeypatch.setattr(settings, "SMTP_USERNAME", smtp.credentials[0])
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", smtp.credentials[1])
+
+    async def deliver():
+        await email_delivery.send_auth_email(
+            to_email="reader@example.com", subject="Test", text="Synthetic content"
+        )
+
+    if reject:
+        with pytest.raises(email_delivery.EmailDeliveryError, match="邮件发送失败"):
+            asyncio.run(deliver())
+        assert smtp.events == ["tls", "auth_rejected"]
+        assert smtp.messages.empty()
+    else:
+        asyncio.run(deliver())
+        assert smtp.events == ["tls", "auth", "data"]
+        assert not smtp.messages.empty()
+
+
+@pytest.mark.parametrize("transport", ["ssl", "starttls"])
+def test_smtp_rejects_an_untrusted_certificate(smtp, transport, monkeypatch):
+    smtp.transport = transport
+    monkeypatch.setattr(settings, "SMTP_USE_SSL", transport == "ssl")
+    monkeypatch.setattr(settings, "SMTP_USE_STARTTLS", transport == "starttls")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_default_certs()
+    monkeypatch.setattr(email_delivery.ssl, "create_default_context", lambda: context)
+    with pytest.raises(email_delivery.EmailDeliveryError, match="邮件发送失败"):
+        asyncio.run(
+            email_delivery.send_auth_email(
+                to_email="reader@example.com", subject="Test", text="Synthetic content"
+            )
+        )
+    assert smtp.messages.empty()
+
+
 def test_real_redis_budget_denials_do_not_block_other_users(monkeypatch):
     server = OwnedRedis()
     client = Redis.from_url(server.url)
@@ -213,3 +293,112 @@ def test_real_redis_budget_denials_do_not_block_other_users(monkeypatch):
         asyncio.run(run())
     finally:
         server.stop()
+
+
+class GithubHandler(BaseHTTPRequestHandler):
+    def log_message(self, *_args):
+        pass
+
+    def respond(self, status, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        form = parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode())
+        self.server.requests.append({"method": "POST", "path": self.path, "form": form})
+        self.respond(*self.server.token_response)
+
+    def do_GET(self):
+        self.server.requests.append(
+            {
+                "method": "GET",
+                "path": self.path,
+                "authorization": self.headers.get("Authorization"),
+                "version": self.headers.get("X-GitHub-Api-Version"),
+            }
+        )
+        self.respond(200, self.server.user)
+
+
+@pytest.fixture()
+def github(monkeypatch):
+    server = ThreadingHTTPServer(("127.0.0.1", 0), GithubHandler)
+    server.daemon_threads = True
+    server.requests = []
+    server.token_response = (200, {"access_token": "provider-test-token"})
+    server.user = {"id": 424242, "login": "synthetic-reader"}
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+    )
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    monkeypatch.setattr(github_oauth_service, "_TOKEN_URL", f"{base}/token")
+    monkeypatch.setattr(github_oauth_service, "_USER_URL", f"{base}/user")
+    monkeypatch.setattr(cache, "_enabled", False)
+    monkeypatch.setattr(settings, "GITHUB_CLIENT_ID", "transport-test-client")
+    monkeypatch.setattr(settings, "GITHUB_CLIENT_SECRET", "transport-test-secret")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_github_code_exchange_uses_pkce_and_the_provider_http_contract(github):
+    async def exchange():
+        url, state = await github_oauth_service.start_github_oauth(
+            mode="login", user_id=None, return_to="/"
+        )
+        context = await github_oauth_service.consume_oauth_state(state)
+        query = parse_qs(urlsplit(url).query)
+        expected = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(context["code_verifier"].encode()).digest()
+            )
+            .rstrip(b"=")
+            .decode()
+        )
+        assert query["code_challenge"] == [expected]
+        assert "client_secret" not in query
+        user = await github_oauth_service.exchange_github_code(
+            "transport-code", code_verifier=context["code_verifier"]
+        )
+        assert user["id"] == 424242
+        form = github.requests[0]["form"]
+        assert form["code_verifier"] == [context["code_verifier"]]
+        assert form["code"] == ["transport-code"]
+        assert form["client_id"] == ["transport-test-client"]
+        assert form["client_secret"] == ["transport-test-secret"]
+        assert form["redirect_uri"] == [settings.GITHUB_OAUTH_CALLBACK_URL]
+        assert github.requests[1] == {
+            "method": "GET",
+            "path": "/user",
+            "authorization": "Bearer provider-test-token",
+            "version": "2022-11-28",
+        }
+
+    asyncio.run(exchange())
+
+
+@pytest.mark.parametrize("status, payload", [(401, {}), (200, {"error": "bad_code"})])
+def test_github_token_rejection_never_fetches_a_profile(github, status, payload):
+    github.token_response = (status, payload)
+    with pytest.raises(github_oauth_service.GithubOAuthError):
+        asyncio.run(
+            github_oauth_service.exchange_github_code("code", code_verifier="proof")
+        )
+    assert len(github.requests) == 1
+
+
+def test_github_rejects_a_profile_without_a_stable_id(github):
+    github.user = {"login": "synthetic-reader"}
+    with pytest.raises(github_oauth_service.GithubOAuthError, match="账号信息无效"):
+        asyncio.run(
+            github_oauth_service.exchange_github_code("code", code_verifier="proof")
+        )

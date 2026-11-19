@@ -28,6 +28,11 @@ const AUTH_ERRORS: Record<string, string> = {
   github_verification_failed: "请使用当前账号已绑定的 GitHub 完成验证",
 };
 
+type LoginError = {
+  message: string;
+  field?: "email" | "code" | "consent";
+};
+
 function messageFor(error: unknown) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError) return "网络连接异常，请检查后重试";
@@ -60,7 +65,9 @@ function ResendButton({
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const emailInput = useRef<HTMLInputElement>(null);
   const codeInput = useRef<HTMLInputElement>(null);
+  const consentInput = useRef<HTMLInputElement>(null);
   const applyAuth = useUserAuth((state) => state.applyAuth);
   const [agreed, setAgreed] = useState(false);
   const [email, setEmail] = useState("");
@@ -69,20 +76,28 @@ function LoginForm() {
   const [resendAfter, setResendAfter] = useState(0);
   const [sentEmail, setSentEmail] = useState("");
   const [pending, setPending] = useState<"email" | "github" | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<LoginError | null>(null);
   const authError = AUTH_ERRORS[params.get("auth_error") ?? ""] ?? "";
-  const visibleError = error || authError;
+  const visibleError = error?.message || authError;
   const notice = params.has("email_changed") ? "邮箱已更新，请重新登录"
     : params.has("identity_unlinked") ? "登录方式已解绑，请重新登录" : "";
   const busy = pending !== null;
 
   useEffect(() => {
     if (challengeId) codeInput.current?.focus();
-  }, [challengeId]);
+    else if (sentEmail) emailInput.current?.focus();
+  }, [challengeId, sentEmail]);
+
+  useEffect(() => {
+    if (busy || !error?.field) return;
+    const input = error.field === "consent" ? consentInput
+      : error.field === "code" ? codeInput : emailInput;
+    input.current?.focus();
+  }, [busy, error]);
 
   function requireConsent() {
     if (agreed) return true;
-    setError("请先阅读并同意用户协议和隐私政策");
+    setError({ message: "请先阅读并同意用户协议和隐私政策", field: "consent" });
     return false;
   }
 
@@ -90,10 +105,10 @@ function LoginForm() {
     if (!requireConsent() || busy) return;
     const normalized = email.trim();
     if (!normalized) {
-      setError("请输入邮箱地址");
+      setError({ message: "请输入邮箱地址", field: "email" });
       return;
     }
-    setError("");
+    setError(null);
     setPending("email");
     try {
       const response = await apiRequest<OtpStartResponse>("/auth/email/start", {
@@ -111,7 +126,7 @@ function LoginForm() {
       setCode("");
       setSentEmail(normalized);
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError({ message: messageFor(submitError) });
     } finally {
       setPending(null);
     }
@@ -124,7 +139,7 @@ function LoginForm() {
       return;
     }
     if (code.length !== 6 || busy || !requireConsent()) return;
-    setError("");
+    setError(null);
     setPending("email");
     try {
       const response = await apiRequest<WebAuthResponse>("/auth/email/verify", {
@@ -138,7 +153,10 @@ function LoginForm() {
       applyAuth(response);
       router.replace("/");
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError({
+        message: messageFor(submitError),
+        field: submitError instanceof ApiError && [400, 422].includes(submitError.status) ? "code" : undefined,
+      });
     } finally {
       setPending(null);
     }
@@ -146,7 +164,7 @@ function LoginForm() {
 
   async function startGithub() {
     if (!requireConsent() || busy) return;
-    setError("");
+    setError(null);
     setPending("github");
     try {
       const response = await apiRequest<GithubStartResponse>("/auth/github/start", {
@@ -160,7 +178,7 @@ function LoginForm() {
       });
       window.location.assign(response.authorization_url);
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError({ message: messageFor(submitError) });
       setPending(null);
     }
   }
@@ -208,19 +226,20 @@ function LoginForm() {
                   <label htmlFor="user-email">邮箱</label>
                   <input
                     id="user-email"
+                    ref={emailInput}
                     type="email"
                     className={styles.input}
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value);
-                      if (error) setError("");
+                      if (error) setError(null);
                     }}
                     placeholder="name@example.com"
                     autoComplete="email"
                     autoCapitalize="none"
                     spellCheck={false}
                     disabled={busy}
-                    aria-invalid={Boolean(visibleError) || undefined}
+                    aria-invalid={error?.field === "email" || undefined}
                     aria-describedby={visibleError ? "user-login-feedback" : undefined}
                     required
                   />
@@ -237,7 +256,7 @@ function LoginForm() {
                         setChallengeId("");
                         setCode("");
                         setResendAfter(0);
-                        if (error) setError("");
+                        if (error) setError(null);
                       }}
                     >
                       更换
@@ -257,12 +276,12 @@ function LoginForm() {
                       value={code}
                       onChange={(event) => {
                         setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-                        if (error) setError("");
+                        if (error) setError(null);
                       }}
                       placeholder="000000"
                       required
                       disabled={busy}
-                      aria-invalid={Boolean(visibleError) || undefined}
+                      aria-invalid={error?.field === "code" || undefined}
                       aria-describedby={visibleError ? "user-login-feedback" : undefined}
                     />
                   </div>
@@ -295,13 +314,16 @@ function LoginForm() {
 
             <label className={styles.consentRow}>
               <input
+                ref={consentInput}
                 type="checkbox"
                 checked={agreed}
                 disabled={busy}
                 onChange={(event) => {
                   setAgreed(event.target.checked);
-                  if (error) setError("");
+                  if (error) setError(null);
                 }}
+                aria-invalid={error?.field === "consent" || undefined}
+                aria-describedby={error?.field === "consent" ? "user-login-feedback" : undefined}
               />
               <span className={styles.consentCheck} aria-hidden="true" />
               <span>

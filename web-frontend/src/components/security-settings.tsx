@@ -109,11 +109,11 @@ export function SecuritySettings() {
   const stepUpInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (emailMode) {
+    if (emailMode && !busy && !stepUpChallenge) {
       emailPanel.current?.scrollIntoView({ block: "nearest" });
       emailPanel.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
     }
-  }, [emailMode, emailChallenge]);
+  }, [emailMode, emailChallenge, stepUpToken, stepUpChallenge, busy]);
 
   useEffect(() => {
     if (stepUpChallenge) stepUpInput.current?.focus();
@@ -357,7 +357,10 @@ export function SecuritySettings() {
           <div className="settings-avatar">{accountInitial(user)}</div>
           <div>
             <h1>账号安全</h1>
-            <p>{accountName(user)} · 用户 #{user.id}</p>
+            <p>
+              <span className="settings-account-name" title={accountName(user)}>{accountName(user)}</span>
+              <span>用户 #{user.id}</span>
+            </p>
           </div>
           <button type="button" className="settings-logout" disabled={busy} onClick={signOut}>
             <LogOut aria-hidden="true" />
@@ -537,7 +540,7 @@ export function SecuritySettings() {
               ) : (
                 <form className="inline-otp" onSubmit={verifyStepUp}>
                   <label>
-                    <span>6 位验证码</span>
+                    <span>当前邮箱的 6 位验证码</span>
                     <input
                       ref={stepUpInput}
                       type="text"
