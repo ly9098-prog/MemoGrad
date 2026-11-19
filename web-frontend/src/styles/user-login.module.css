@@ -1,7 +1,7 @@
 .surface {
   --login-background: #090f16;
   --login-text: #f3faff;
-  --login-muted: #a9bdcc;
+  --login-muted: #aabacb;
   --login-border: rgb(196 228 248 / 14%);
   --login-focus: #8fd4ff;
   --login-error: #ffc4c9;
@@ -22,8 +22,13 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 75% 55% at 50% -18%, rgb(44 116 147 / 42%), transparent 72%),
-    linear-gradient(180deg, #0e202c 0%, #08131c 58%, #090f16 100%);
+    radial-gradient(ellipse 75% 55% at 50% -18%, rgb(66 91 124 / 32%), transparent 72%),
+    linear-gradient(180deg, #101d2b 0%, #0c1520 58%, #090f16 100%);
+}
+
+.surface ::selection {
+  background: rgb(143 212 255 / 32%);
+  color: var(--login-text);
 }
 
 .header {
@@ -91,14 +96,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   border: 1px solid rgb(202 233 251 / 13%);
   border-radius: 10px;
   background: rgb(255 255 255 / 4%);
   color: var(--login-text);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
   transition: border-color 180ms, background-color 180ms;
 }
@@ -181,7 +186,9 @@
   border-color: rgb(202 233 251 / 22%);
 }
 
-.input:focus {
+.input:focus,
+.input:focus-visible {
+  outline: 0;
   border-color: var(--login-focus);
   background: rgb(255 255 255 / 4%);
   box-shadow: 0 0 0 3px rgb(143 212 255 / 10%);
@@ -257,11 +264,11 @@
 }
 
 .submit {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgb(229 247 255 / 58%);
   border-radius: 10px;
   background: #eaf5fb;
@@ -348,18 +355,23 @@
 
 .error {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 16px;
-  color: var(--login-error);
+  color: var(--login-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.error[data-error="true"] {
+  color: var(--login-error);
 }
 
 .error svg {
   flex: 0 0 auto;
   width: 14px;
   height: 14px;
+  margin-top: 3px;
 }
 
 @keyframes cardEnter {

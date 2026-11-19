@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -105,6 +105,19 @@ export function SecuritySettings() {
   const [emailChallenge, setEmailChallenge] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [emailResend, setEmailResend] = useState(0);
+  const emailPanel = useRef<HTMLElement>(null);
+  const stepUpInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (emailMode) {
+      emailPanel.current?.scrollIntoView({ block: "nearest" });
+      emailPanel.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    }
+  }, [emailMode, emailChallenge]);
+
+  useEffect(() => {
+    if (stepUpChallenge) stepUpInput.current?.focus();
+  }, [stepUpChallenge]);
 
   const [pendingUnlink, setPendingUnlink] = useState<UserIdentity | null>(null);
 
@@ -186,6 +199,11 @@ export function SecuritySettings() {
     }
     resetFeedback();
     setBusy(true);
+    const proof = stepUpToken;
+    if (emailMode === "change" && !emailChallenge) {
+      setStepUpToken("");
+      setStepUpProvider(null);
+    }
     try {
       const path = emailMode === "bind"
         ? "/users/me/identities/email/bind/start"
@@ -198,13 +216,12 @@ export function SecuritySettings() {
             ? { email: normalized }
             : { email: normalized, ...(emailChallenge
               ? { challenge_id: emailChallenge }
-              : { step_up_token: stepUpToken }) },
+              : { step_up_token: proof }) },
         ),
       });
       setEmailChallenge(response.challenge_id);
       setEmailResend(response.resend_after);
       setEmailCode("");
-      if (emailMode === "change") setStepUpToken("");
       setMessage(`验证码已发送至 ${normalized}`);
     } catch (submitError) {
       setError(actionError(submitError));
@@ -269,11 +286,14 @@ export function SecuritySettings() {
     }
     resetFeedback();
     setBusy(true);
+    const proof = stepUpToken;
+    setStepUpToken("");
+    setStepUpProvider(null);
     try {
       await apiRequest(`/users/me/identities/${identity.id}`, {
         method: "DELETE",
         token: accessToken,
-        body: JSON.stringify({ step_up_token: stepUpToken }),
+        body: JSON.stringify({ step_up_token: proof }),
       });
       useUserAuth.getState().clear();
       router.replace("/?identity_unlinked=1");
@@ -356,54 +376,134 @@ export function SecuritySettings() {
         ) : null}
 
         <div className="settings-layout">
-          <section className="identity-settings" aria-labelledby="identity-settings-title">
-            <header>
-              <div>
-                <h2 id="identity-settings-title">已连接身份</h2>
-                <p>所有可用身份指向同一个用户 ID 和学习记录。</p>
-              </div>
-              <span>{user.identities.length} 种</span>
-            </header>
+          <div className="identity-workspace">
+            <section className="identity-settings" aria-labelledby="identity-settings-title">
+              <header>
+                <div>
+                  <h2 id="identity-settings-title">已连接身份</h2>
+                  <p>所有可用身份指向同一个用户 ID 和学习记录。</p>
+                </div>
+                <span>{user.identities.length} 种</span>
+              </header>
 
-            <div className="settings-identity-list">
-              {user.identities.map((identity) => {
-                return (
-                  <article key={identity.id} className="settings-identity">
-                    <span className="settings-provider-icon"><ProviderIcon provider={identity.provider} /></span>
-                    <div>
-                      <h3>{providerLabel(identity.provider)}</h3>
-                      <p>{identityDescription(identity, user)}</p>
-                    </div>
-                    <div className="identity-actions">
-                      {identity.provider === "email" ? (
+              <div className="settings-identity-list">
+                {user.identities.map((identity) => {
+                  return (
+                    <article key={identity.id} className="settings-identity">
+                      <span className="settings-provider-icon"><ProviderIcon provider={identity.provider} /></span>
+                      <div>
+                        <h3>{providerLabel(identity.provider)}</h3>
+                        <p>{identityDescription(identity, user)}</p>
+                      </div>
+                      <div className="identity-actions">
+                        {identity.provider === "email" ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setEmailMode("change");
+                              setTargetEmail("");
+                              setEmailChallenge("");
+                              resetFeedback();
+                            }}
+                          >
+                            更换
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          disabled={busy}
-                          onClick={() => {
-                            setEmailMode("change");
-                            setTargetEmail("");
-                            setEmailChallenge("");
-                            resetFeedback();
-                          }}
+                          className="identity-remove"
+                          disabled={busy || !canRemove}
+                          onClick={() => void unlinkIdentity(identity)}
                         >
-                          更换
+                          <Unlink aria-hidden="true" />
+                          解绑
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="identity-remove"
-                        disabled={busy || !canRemove}
-                        onClick={() => void unlinkIdentity(identity)}
-                      >
-                        <Unlink aria-hidden="true" />
-                        解绑
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+            {emailMode ? (
+              <section ref={emailPanel} className="email-change-panel" aria-labelledby="email-flow-title">
+                <header>
+                  <div>
+                    <h2 id="email-flow-title">{emailMode === "bind" ? "绑定邮箱" : "更换邮箱"}</h2>
+                    <p>
+                      {emailMode === "bind"
+                        ? "验证完成后立即成为当前账号的邮箱登录方式。"
+                        : "先验证已有身份，再验证新邮箱；完成后需要重新登录"}
+                    </p>
+                  </div>
+                  <button type="button" disabled={busy} onClick={() => setEmailMode(null)}>关闭</button>
+                </header>
+                {!emailChallenge ? (
+                  <form
+                    className="email-change-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void startEmailFlow();
+                    }}
+                  >
+                    <label>
+                      <span>{emailMode === "bind" ? "要绑定的邮箱" : "新邮箱地址"}</span>
+                      <input
+                        type="email"
+                        disabled={busy}
+                        value={targetEmail}
+                        onChange={(event) => setTargetEmail(event.target.value)}
+                        placeholder="name@example.com"
+                        autoComplete="email"
+                        required
+                      />
+                    </label>
+                    <button
+                      type={emailMode === "change" && !stepUpToken ? "button" : "submit"}
+                      className="settings-primary"
+                      disabled={busy}
+                      onClick={emailMode === "change" && !stepUpToken ? () => void startStepUp() : undefined}
+                    >
+                      {busy ? <Loader2 className="spin" /> : emailMode === "change" && !stepUpToken ? <ShieldCheck /> : <Mail />}
+                      {emailMode === "change" && !stepUpToken ? "先验证当前邮箱" : "发送验证码"}
+                    </button>
+                  </form>
+                ) : (
+                  <form className="email-change-form" onSubmit={verifyEmailFlow}>
+                    <label>
+                      <span>发送至 {targetEmail} 的验证码</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        disabled={busy}
+                        value={emailCode}
+                        onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="000000"
+                        maxLength={6}
+                        required
+                      />
+                    </label>
+                    <div className="email-change-actions">
+                      <button type="button" className="settings-text-button" disabled={busy} onClick={() => setEmailChallenge("")}>
+                        修改邮箱
                       </button>
+                      <OtpCountdown
+                        key={emailChallenge}
+                        seconds={emailResend}
+                        busy={busy}
+                        onResend={() => void startEmailFlow()}
+                      />
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
+                    <button type="submit" className="settings-primary" disabled={busy || emailCode.length !== 6}>
+                      {busy ? <Loader2 className="spin" /> : <Check />}
+                      验证并完成
+                    </button>
+                  </form>
+                )}
+              </section>
+            ) : null}
+          </div>
 
           <aside className="settings-side">
             <section className="security-verify">
@@ -439,6 +539,7 @@ export function SecuritySettings() {
                   <label>
                     <span>6 位验证码</span>
                     <input
+                      ref={stepUpInput}
                       type="text"
                       inputMode="numeric"
                       autoComplete="one-time-code"
@@ -525,84 +626,6 @@ export function SecuritySettings() {
             <Link2 aria-hidden="true" />
             <p>要解绑 {providerLabel(pendingUnlink.provider)}，请先验证准备保留的登录方式，再点击解绑</p>
           </div>
-        ) : null}
-
-        {emailMode ? (
-          <section className="email-change-panel" aria-labelledby="email-flow-title">
-            <header>
-              <div>
-                <h2 id="email-flow-title">{emailMode === "bind" ? "绑定邮箱" : "更换邮箱"}</h2>
-                <p>
-                  {emailMode === "bind"
-                    ? "验证完成后立即成为当前账号的邮箱登录方式。"
-                    : "先验证已有身份，再验证新邮箱；完成后需要重新登录"}
-                </p>
-              </div>
-              <button type="button" disabled={busy} onClick={() => setEmailMode(null)}>关闭</button>
-            </header>
-            {!emailChallenge ? (
-              <form
-                className="email-change-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void startEmailFlow();
-                }}
-              >
-                <label>
-                  <span>{emailMode === "bind" ? "要绑定的邮箱" : "新邮箱地址"}</span>
-                  <input
-                    type="email"
-                    disabled={busy}
-                    value={targetEmail}
-                    onChange={(event) => setTargetEmail(event.target.value)}
-                    placeholder="name@example.com"
-                    autoComplete="email"
-                    required
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="settings-primary"
-                  disabled={busy || (emailMode === "change" && !stepUpToken)}
-                >
-                  {busy ? <Loader2 className="spin" /> : <Mail />}
-                  发送验证码
-                </button>
-              </form>
-            ) : (
-              <form className="email-change-form" onSubmit={verifyEmailFlow}>
-                <label>
-                  <span>发送至 {targetEmail} 的验证码</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    disabled={busy}
-                    value={emailCode}
-                    onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000"
-                    maxLength={6}
-                    required
-                  />
-                </label>
-                <div className="email-change-actions">
-                  <button type="button" className="settings-text-button" disabled={busy} onClick={() => setEmailChallenge("")}>
-                    修改邮箱
-                  </button>
-                  <OtpCountdown
-                    key={emailChallenge}
-                    seconds={emailResend}
-                    busy={busy}
-                    onResend={() => void startEmailFlow()}
-                  />
-                </div>
-                <button type="submit" className="settings-primary" disabled={busy || emailCode.length !== 6}>
-                  {busy ? <Loader2 className="spin" /> : <Check />}
-                  验证并完成
-                </button>
-              </form>
-            )}
-          </section>
         ) : null}
       </main>
       <footer className="site-footer">

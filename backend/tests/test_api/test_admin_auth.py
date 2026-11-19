@@ -103,6 +103,20 @@ def test_admin_me_rejects_app_token():
     assert resp.status_code == 401
 
 
+@pytest.mark.parametrize("operation", ["login", "recover"])
+def test_admin_email_rejects_oversized_normalized_address(operation):
+    email = "x@" + ".".join(["例" * 20] * 5) + ".com"
+    assert len(email) < 128
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        response = client.post(
+            f"/api/admin/v1/auth/email/{operation}/start", json={"email": email}
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 422
+
+
 def test_restricted_admin_token_is_only_accepted_by_all_scope_dependency():
     import asyncio
 

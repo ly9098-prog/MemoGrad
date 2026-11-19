@@ -85,6 +85,19 @@ end
 return 1
 """
 
+_RESERVE_RATE_LIMITS_SCRIPT = """
+for i, key in ipairs(KEYS) do
+    if tonumber(redis.call('GET', key) or '0') >= tonumber(ARGV[2 * i - 1]) then
+        return 0
+    end
+end
+for i, key in ipairs(KEYS) do
+    local value = redis.call('INCR', key)
+    if value == 1 then redis.call('EXPIRE', key, ARGV[2 * i]) end
+end
+return 1
+"""
+
 
 class CacheUnavailableError(RuntimeError):
     """Raised when a security-sensitive Redis operation cannot be completed."""
@@ -549,6 +562,45 @@ class CacheClient:
         """
         try:
             return int(await client.eval(script, 1, key, ttl))
+        except Exception as exc:
+            raise CacheUnavailableError("Redis unavailable") from exc
+
+    async def reserve_rate_limits_strict(
+        self, limits: list[tuple[str, int, int]]
+    ) -> bool:
+        """Charge all counters atomically, leaving every counter intact on denial."""
+        if not limits or any(limit <= 0 for _, limit, _ in limits):
+            raise ValueError("Rate limits must be positive")
+        if not self._enabled:
+            counts = [int(self._local_get(key) or 0) for key, _, _ in limits]
+            if any(
+                count >= limit
+                for count, (_, limit, _) in zip(counts, limits, strict=True)
+            ):
+                return False
+            for count, (key, _, ttl) in zip(counts, limits, strict=True):
+                expiry = (
+                    self._local[key][0]
+                    if count
+                    else __import__("time").time() + _safe_ttl(ttl)
+                )
+                self._local[key] = (expiry, count + 1)
+            return True
+        client = await self._ensure_client()
+        if client is None:
+            raise CacheUnavailableError("Redis unavailable")
+        arguments = [
+            value for _, limit, ttl in limits for value in (limit, _safe_ttl(ttl))
+        ]
+        try:
+            return bool(
+                await client.eval(
+                    _RESERVE_RATE_LIMITS_SCRIPT,
+                    len(limits),
+                    *(key for key, _, _ in limits),
+                    *arguments,
+                )
+            )
         except Exception as exc:
             raise CacheUnavailableError("Redis unavailable") from exc
 

@@ -80,16 +80,16 @@ async def _enforce_budgets(
         else settings.OTP_USER_DOMAIN_DAILY_LIMIT
     )
     try:
-        ip_count = await cache.increment_strict(ip_key, ttl=3600)
-        email_count = await cache.increment_strict(email_key, ttl=3600)
-        total_count = await cache.increment_strict(total_key, ttl=86400)
+        reserved = await cache.reserve_rate_limits_strict(
+            [
+                (ip_key, settings.OTP_IP_HOURLY_LIMIT, 3600),
+                (email_key, settings.OTP_EMAIL_HOURLY_LIMIT, 3600),
+                (total_key, daily_limit, 86400),
+            ]
+        )
     except CacheUnavailableError as exc:
         raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
-    if (
-        ip_count > settings.OTP_IP_HOURLY_LIMIT
-        or email_count > settings.OTP_EMAIL_HOURLY_LIMIT
-        or total_count > daily_limit
-    ):
+    if not reserved:
         raise OtpRateLimitError("验证码请求过于频繁，请稍后重试")
 
 
@@ -143,17 +143,23 @@ async def issue_otp(
 ) -> IssuedOtp:
     if domain not in DOMAINS or purpose not in PURPOSES:
         raise OtpError("验证码用途无效")
-    await _enforce_budgets(domain, purpose, email, client_ip)
+    resend_key = _resend_key(domain, purpose, email)
+    owner = uuid4().hex
     try:
         acquired = await cache.acquire_lock_strict(
-            _resend_key(domain, purpose, email),
-            uuid4().hex,
+            resend_key,
+            owner,
             ttl=settings.OTP_RESEND_SEC,
         )
     except CacheUnavailableError as exc:
         raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
     if not acquired:
         raise OtpRateLimitError("请稍后再获取验证码")
+    try:
+        await _enforce_budgets(domain, purpose, email, client_ip)
+    except OtpError:
+        await cache.release_lock(resend_key, owner)
+        raise
     code = f"{secrets.randbelow(1_000_000):06d}"
     challenge_id = uuid4().hex
     challenge = {

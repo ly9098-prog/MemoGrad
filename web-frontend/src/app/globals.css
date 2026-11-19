@@ -253,6 +253,7 @@ input:focus-visible {
   -webkit-line-clamp: 2;
   color: var(--ink-strong);
   font-size: 32px;
+  font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -308,6 +309,7 @@ input:focus-visible {
   margin: 0;
   color: var(--ink-strong);
   font-size: 19px;
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -370,6 +372,7 @@ input:focus-visible {
   margin: 0;
   color: var(--ink);
   font-size: 13px;
+  font-weight: 600;
 }
 
 .identity-copy p {
@@ -535,6 +538,7 @@ input:focus-visible {
 
 .back-link {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 6px;
   border-radius: 6px;
@@ -577,8 +581,10 @@ input:focus-visible {
 .settings-header h1 {
   margin: 0;
   color: var(--ink-strong);
-  font-size: 30px;
-  letter-spacing: -0.04em;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
 }
 
 .settings-header p {
@@ -652,6 +658,13 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1.25fr) minmax(310px, 0.85fr);
   gap: 22px;
   margin-top: 24px;
+  align-items: start;
+}
+
+.identity-workspace {
+  display: grid;
+  min-width: 0;
+  gap: 20px;
 }
 
 .identity-settings,
@@ -684,6 +697,7 @@ input:focus-visible {
   margin: 0;
   color: var(--ink-strong);
   font-size: 17px;
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -698,9 +712,11 @@ input:focus-visible {
 }
 
 .identity-settings > header > span {
+  flex-shrink: 0;
   color: var(--muted);
   font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .settings-identity-list {
@@ -743,6 +759,7 @@ input:focus-visible {
   margin: 0;
   color: var(--ink);
   font-size: 13px;
+  font-weight: 600;
 }
 
 .settings-identity p {
@@ -757,11 +774,12 @@ input:focus-visible {
 .identity-actions {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .identity-actions button {
   min-height: 44px;
+  min-width: 44px;
   padding: 0 9px;
   display: inline-flex;
   align-items: center;
@@ -885,6 +903,12 @@ input:focus-visible {
   background: #fcfdf9;
   color: var(--ink-strong);
   outline: 0;
+  min-width: 0;
+}
+
+.inline-otp label > span,
+.email-change-form label > span {
+  overflow-wrap: anywhere;
 }
 
 .inline-otp input:focus,
@@ -910,6 +934,7 @@ input:focus-visible {
 
 .settings-text-button {
   min-height: 44px;
+  min-width: 44px;
   padding: 0;
   background: transparent;
   color: var(--green);
@@ -1034,8 +1059,8 @@ input:focus-visible {
 }
 
 .email-change-panel {
-  margin-top: 20px;
   overflow: hidden;
+  scroll-margin-block: 24px;
 }
 
 .email-change-panel > header {
@@ -1050,6 +1075,7 @@ input:focus-visible {
 
 .email-change-panel > header button {
   min-height: 44px;
+  min-width: 44px;
   padding: 0 8px;
   border-radius: 7px;
   background: transparent;

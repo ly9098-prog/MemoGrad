@@ -70,9 +70,9 @@ async def start_admin_email_login(
     _enforce_trusted_browser_origin(request)
     try:
         email = normalize_email(data.email)
+        admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     return await _issue_admin_start(
         email=email,
         purpose="login",
@@ -207,9 +207,9 @@ async def start_admin_email_recovery(
     _enforce_trusted_browser_origin(request)
     try:
         email = normalize_email(data.email)
+        admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     return await _issue_admin_start(
         email=email,
         purpose="recover",

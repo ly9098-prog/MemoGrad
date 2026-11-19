@@ -174,30 +174,33 @@ function LoginForm() {
       <main className={styles.main}>
         <div className={styles.stage}>
           <section className={styles.card} aria-labelledby="user-login-title">
-            <h1 id="user-login-title">登录</h1>
+            <h1 id="user-login-title">{challengeId ? "验证邮箱" : "登录"}</h1>
 
-            <button
-              type="button"
-              className={styles.githubButton}
-              onClick={() => void startGithub()}
-              disabled={busy}
-              aria-busy={pending === "github"}
-            >
-              {pending === "github" ? (
-                <Loader2 className={styles.spinner} aria-hidden="true" />
-              ) : (
-                <Image
-                  className={styles.githubIcon}
-                  src="/github-invertocat-white.svg"
-                  alt=""
-                  width={18}
-                  height={18}
-                />
-              )}
-              <span>{pending === "github" ? "正在跳转" : "使用 GitHub 继续"}</span>
-            </button>
-
-            <div className={styles.divider}><span>或</span></div>
+            {!challengeId && (
+              <>
+                <button
+                  type="button"
+                  className={styles.githubButton}
+                  onClick={() => void startGithub()}
+                  disabled={busy}
+                  aria-busy={pending === "github"}
+                >
+                  {pending === "github" ? (
+                    <Loader2 className={styles.spinner} aria-hidden="true" />
+                  ) : (
+                    <Image
+                      className={styles.githubIcon}
+                      src="/github-invertocat-white.svg"
+                      alt=""
+                      width={18}
+                      height={18}
+                    />
+                  )}
+                  <span>{pending === "github" ? "正在跳转" : "使用 GitHub 继续"}</span>
+                </button>
+                <div className={styles.divider}><span>或</span></div>
+              </>
+            )}
 
             <form onSubmit={submitEmail} className={styles.form} aria-busy={pending === "email"}>
               {!challengeId ? (
@@ -294,6 +297,7 @@ function LoginForm() {
               <input
                 type="checkbox"
                 checked={agreed}
+                disabled={busy}
                 onChange={(event) => {
                   setAgreed(event.target.checked);
                   if (error) setError("");
@@ -308,7 +312,7 @@ function LoginForm() {
             </label>
 
             {(visibleError || notice) && (
-              <div id="user-login-feedback" className={styles.error} role={visibleError ? "alert" : "status"}>
+              <div id="user-login-feedback" className={styles.error} data-error={Boolean(visibleError)} role={visibleError ? "alert" : "status"}>
                 {visibleError ? <AlertCircle aria-hidden="true" /> : <Check aria-hidden="true" />}
                 <span>{visibleError || notice}</span>
               </div>

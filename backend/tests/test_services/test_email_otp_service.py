@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -123,3 +124,104 @@ async def test_resend_invalidates_the_previous_challenge(monkeypatch):
         purpose="login",
     )
     assert challenge["email"] == "resend@example.com"
+
+
+@pytest.mark.asyncio
+async def test_rejected_resends_do_not_exhaust_the_domain_budget(monkeypatch):
+    async def deliver(**_kwargs):
+        return None
+
+    monkeypatch.setattr(email_otp_service, "send_auth_email", deliver)
+    monkeypatch.setattr(email_otp_service.settings, "OTP_USER_DOMAIN_DAILY_LIMIT", 3)
+    for _ in range(5):
+        try:
+            await email_otp_service.issue_otp(
+                domain="user",
+                email="first@example.com",
+                purpose="login",
+                client_ip="first",
+            )
+        except email_otp_service.OtpRateLimitError:
+            pass
+    issued = await email_otp_service.issue_otp(
+        domain="user", email="other@example.com", purpose="login", client_ip="other"
+    )
+    assert issued.challenge_id
+    total_key = email_otp_service._budget_keys(
+        "user", "login", "first@example.com", "first"
+    )[1]
+    assert await cache.get_strict(total_key) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("limited_dimension", ["ip", "email"])
+async def test_local_limit_rejections_do_not_charge_the_domain(
+    monkeypatch, limited_dimension
+):
+    async def deliver(**_kwargs):
+        return None
+
+    monkeypatch.setattr(email_otp_service, "send_auth_email", deliver)
+    monkeypatch.setattr(email_otp_service.settings, "OTP_USER_DOMAIN_DAILY_LIMIT", 3)
+    monkeypatch.setattr(
+        email_otp_service.settings,
+        "OTP_IP_HOURLY_LIMIT",
+        1 if limited_dimension == "ip" else 20,
+    )
+    monkeypatch.setattr(
+        email_otp_service.settings,
+        "OTP_EMAIL_HOURLY_LIMIT",
+        1 if limited_dimension == "email" else 5,
+    )
+    for index in range(5):
+        email = (
+            f"reader{index}@example.com"
+            if limited_dimension == "ip"
+            else "same@example.com"
+        )
+        await cache.delete_strict(email_otp_service._resend_key("user", "login", email))
+        try:
+            await email_otp_service.issue_otp(
+                domain="user", email=email, purpose="login", client_ip="first"
+            )
+        except email_otp_service.OtpRateLimitError:
+            pass
+    issued = await email_otp_service.issue_otp(
+        domain="user", email="other@example.com", purpose="login", client_ip="other"
+    )
+    assert issued.challenge_id
+    total_key = email_otp_service._budget_keys(
+        "user", "login", "other@example.com", "other"
+    )[1]
+    assert await cache.get_strict(total_key) == 2
+
+
+@pytest.mark.asyncio
+async def test_parallel_sends_reserve_the_domain_budget_atomically(monkeypatch):
+    messages = []
+
+    async def deliver(**kwargs):
+        messages.append(kwargs)
+
+    monkeypatch.setattr(email_otp_service, "send_auth_email", deliver)
+    monkeypatch.setattr(email_otp_service.settings, "OTP_USER_DOMAIN_DAILY_LIMIT", 3)
+    results = await asyncio.gather(
+        *(
+            email_otp_service.issue_otp(
+                domain="user",
+                email=f"reader{index}@example.com",
+                purpose="login",
+                client_ip=str(index),
+            )
+            for index in range(12)
+        ),
+        return_exceptions=True,
+    )
+    assert (
+        sum(isinstance(result, email_otp_service.IssuedOtp) for result in results) == 3
+    )
+    assert len(messages) == 3
+    total_key = email_otp_service._budget_keys(
+        "user", "login", "unused@example.com", "unused"
+    )[1]
+    assert await cache.get_strict(total_key) == 3
