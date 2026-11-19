@@ -286,7 +286,7 @@
 
   <view class="growth-note route-enter-page delay-three">
     <view class="growth-note-copy">
-      <text class="growth-note-label">今日寄语</text>
+      <view class="growth-note-heading"><image class="growth-note-icon" src="/assets/icons/practice/notebook-tabs.svg" mode="aspectFit" aria-hidden="true" /><text class="growth-note-label">今日寄语</text></view>
       <text class="growth-note-text">{{dailyBoostText}}</text>
     </view>
   </view>

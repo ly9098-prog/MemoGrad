@@ -42,85 +42,46 @@ function createHarness(overrides = {}) {
   return { controller: createDurationAnimationController(options), options, state }
 }
 
-function flushTimers(state) {
-  for (let timer = takeTimer(state); timer; timer = takeTimer(state)) timer.callback()
-}
-
-function takeTimer(state) {
-  const timer = state.timer
-  state.timer = null
-  return timer
-}
-
-test('cancel invalidates the old timer and optionally resets view state', () => {
+test('cancel clears any pending legacy timer and resets the session view state', () => {
   const h = createHarness()
-  h.controller.animate(0, 600, 0, 1)
-  const oldTimer = h.state.timer
+  const pending = { callback() {} }
+  h.state.timer = pending
   h.controller.cancel(true)
-
-  assert.equal(h.state.token, 2)
-  assert.ok(h.state.timers.some(entry => entry[0] === 'clear' && entry[1] === oldTimer))
+  assert.equal(h.state.token, 1)
+  assert.ok(h.state.timers.some(entry => entry[0] === 'clear' && entry[1] === pending))
   assert.equal(h.state.timer, null)
-  assert.deepEqual(h.state.data.at(-1), { durationValueAnimating: false })
+  assert.deepEqual(h.state.data, [{ durationValueAnimating: false }])
 })
 
-test('equal formatted values commit immediately without animation', () => {
+test('duration publishes the final value once with digit reveal and no count-up timer', () => {
   const h = createHarness()
-  h.controller.animate(60, 61, 2, 2)
-
-  assert.equal(h.state.displayDurationSec, 61)
+  h.controller.animate(0, 1200, 1, 3)
+  assert.equal(h.state.displayDurationSec, 1200)
   assert.deepEqual(h.state.data, [{
-    _dispTodaySessions: 2,
-    _dispTodayDurationText: '1分钟',
-    _dispTodayDurationSegments: [{ type: 'num', text: '1分钟', reveal: true }],
+    _dispTodaySessions: 3,
+    _dispTodayDurationText: '20分钟',
+    _dispTodayDurationSegments: [{ type: 'num', text: '20分钟', reveal: true }],
     durationValueAnimating: false,
   }])
   assert.equal(h.state.timer, null)
+  assert.deepEqual(h.state.timers, [])
 })
 
-test('animation ends at the target and updates only changed display ticks', () => {
+test('successive dates never emit intermediate durations', () => {
   const h = createHarness()
-  h.controller.animate(0, 1200, 1, 3)
-  flushTimers(h.state)
+  h.controller.animate(0, 7200, 0, 4)
+  h.controller.animate(7200, 60, 4, 1)
+  assert.deepEqual(h.state.data.map(patch => patch._dispTodayDurationText), ['2时0分', '1分钟'])
+  assert.equal(h.state.displayDurationSec, 60)
+  assert.equal(h.state.timer, null)
+})
 
-  assert.equal(h.state.displayDurationSec, 1200)
-  assert.equal(h.state.data[0].durationValueAnimating, true)
-  assert.equal(h.state.data.at(-1).durationValueAnimating, false)
-  assert.equal(h.state.data.at(-1)._dispTodaySessions, 3)
-  assert.equal(h.state.data.at(-1)._dispTodayDurationText, '20分钟')
-  assert.deepEqual(h.state.data.at(-1)._dispTodayDurationSegments, [{ type: 'num', text: '20分钟', reveal: true }])
-  for (let index = 1; index < h.state.data.length - 1; index += 1) {
-    assert.equal(h.state.data[index]._dispTodayDurationSegments.reveal, undefined)
+test('hidden or dead pages do not publish a digit entrance', () => {
+  for (const key of ['visible', 'alive']) {
+    const h = createHarness()
+    h.state[key] = false
+    h.controller.animate(0, 600, 0, 1)
+    assert.deepEqual(h.state.data, [])
+    assert.equal(h.state.timer, null)
   }
-  assert.equal(h.state.timer, null)
-  assert.equal(h.state.data.length, 13)
-})
-
-test('late ticks are ignored after token cancellation', () => {
-  const h = createHarness()
-  h.controller.animate(0, 600, 0, 1)
-  const first = takeTimer(h.state)
-  h.controller.cancel(false)
-  const dataCount = h.state.data.length
-  first.callback()
-
-  assert.equal(h.state.data.length, dataCount)
-  assert.equal(h.state.timer, null)
-})
-
-test('hidden or dead pages stop future ticks', () => {
-  const hidden = createHarness()
-  hidden.controller.animate(0, 600, 0, 1)
-  hidden.state.visible = false
-  const before = hidden.state.data.length
-  takeTimer(hidden.state).callback()
-
-  assert.equal(hidden.state.data.length, before)
-  assert.equal(hidden.state.timer, null)
-
-  const dead = createHarness()
-  dead.controller.animate(0, 600, 0, 1)
-  dead.state.alive = false
-  takeTimer(dead.state).callback()
-  assert.equal(dead.state.timer, null)
 })

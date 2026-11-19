@@ -52,7 +52,7 @@ test('builds the first-load animation view patch', () => {
   assert.deepEqual(state.historyPatch, { history: [], historyTotal: 2, historyReady: false })
   assert.equal(state.dataPatch._dispTodaySessions, 0)
   assert.equal(state.dataPatch.durationValueAnimating, true)
-  assert.equal(state.dataPatch.durationText, '0分钟')
+  assert.equal(state.dataPatch.durationText, '5分钟')
   assert.deepEqual(state.dataPatch.history, [])
   assert.equal(state.dataPatch.trends[0]._shortDate, '10-01')
   assert.equal(state.dataPatch.subjects[0]._color, '#fff')

@@ -51,7 +51,7 @@ function createHarness(overrides = {}) {
       return timer
     },
     setData: patch => state.data.push(patch),
-    getDurationDisplayPatch: text => ({ display: text }),
+    getDurationDisplayPatch: (text, options) => ({ display: text, reveal: options.reveal }),
     formatMin: sec => `${Math.floor(sec / 60)}分钟`,
     renderPie: (progress, includeLabels) => state.renders.push({ progress, includeLabels }),
     revealPieLabelsIncrementally: () => { state.revealed += 1 },
@@ -107,7 +107,7 @@ test('does not start outside the live, visible, current pie request', () => {
   }
 })
 
-test('runs the seven-step number animation and pie frames to completion', () => {
+test('reveals final duration once while session count and pie frames animate', () => {
   const h = createHarness()
   h.controller.start(1)
 
@@ -122,7 +122,8 @@ test('runs the seven-step number animation and pie frames to completion', () => 
   drainNumberAnimation(h.state)
   assert.equal(h.state.data.length, 7)
   assert.equal(h.state.data.at(-1)._dispTodaySessions, 7)
-  assert.equal(h.state.data.at(-1).display, '20分钟')
+  assert.deepEqual(h.state.data.filter(patch => patch.display !== undefined).map(patch => [patch.display, patch.reveal]), [['20分钟', true]])
+  assert.equal(h.state.displayDurationSec, 1200)
   assert.equal(h.state.data.at(-1).durationValueAnimating, false)
   assert.equal(h.state.animTimer, null)
   assert.equal(h.state.timers.filter(timer => timer.delay === 60).length, 6)

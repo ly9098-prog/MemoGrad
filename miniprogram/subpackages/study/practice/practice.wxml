@@ -177,13 +177,18 @@
 </view>
 <view class="reward-strip-items">
 <view class="reward-strip-item">
+<image class="reward-strip-icon" src="/assets/icons/practice/target.svg" mode="aspectFit" aria-hidden="true" />
+<view class="reward-strip-detail">
 <text class="reward-strip-label">成长值</text>
 <text class="reward-strip-value reward-strip-text">完成后结算</text>
 </view>
-<view class="reward-strip-divider"></view>
+</view>
 <view class="reward-strip-item reward-strip-output">
+<image class="reward-strip-icon" src="/assets/icons/practice/notebook-tabs.svg" mode="aspectFit" aria-hidden="true" />
+<view class="reward-strip-detail">
 <text class="reward-strip-label">学习产出</text>
 <text class="reward-strip-value reward-strip-text">本组复盘</text>
+</view>
 </view>
 </view>
 </view>

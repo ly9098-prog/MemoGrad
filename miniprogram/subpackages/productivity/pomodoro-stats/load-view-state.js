@@ -59,7 +59,7 @@ function buildDataPatch(options, stats, trends, lifetime, subjectBreakdown, ctx)
     _crossDayBleedIn: options.hasCrossDayBleedInSubjects(subjectBreakdown),
     pieLoading: false, loading: false, contentReady: true, errorText: '',
     _dispTodaySessions: willAnimate ? 0 : selectedSessionCount,
-    ...options.getDurationDisplayPatch(willAnimate ? '0分钟' : options.formatMin(selectedDurationSec)),
+    ...options.getDurationDisplayPatch(options.formatMin(selectedDurationSec)),
     durationValueAnimating: willAnimate,
     _dispWeekSessions: willAnimate ? 0 : (stats.week_sessions || 0),
     _dispWeekDurationText: willAnimate ? '0分钟' : options.formatMin(stats.week_duration_sec || 0),

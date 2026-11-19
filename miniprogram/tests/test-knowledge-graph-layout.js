@@ -65,7 +65,7 @@ test('overview scene stays bounded with finite node and edge geometry', () => {
 
   assert.equal(scene.focused, false)
   assert.ok(scene.nodes.length <= 72, 'overview scene must remain within the focus-node cap')
-  assert.ok(scene.edges.length > groups.length)
+  assert.equal(scene.edges.length, groups.length, 'overview connects chapter roots without packing descendants')
   assertFiniteScene(scene)
 })
 

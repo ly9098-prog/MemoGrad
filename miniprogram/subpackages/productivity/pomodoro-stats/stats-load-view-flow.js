@@ -119,9 +119,12 @@ function _getTodayDurationDisplayPatch(page, text, options) {
 }
 
 function _getTodayDurationDisplayPatchWithOptions(page, text, { reveal = false } = {}) {
+  const revision = reveal ? (page._durationRevealRevision = (page._durationRevealRevision || 0) + 1) : 0
   return {
     _dispTodayDurationText: text,
-    _dispTodayDurationSegments: page._buildDurationSegments(text, reveal),
+    _dispTodayDurationSegments: page._buildDurationSegments(text, reveal).map(segment => (
+      reveal && segment.type === 'num' ? { ...segment, key: `${segment.key}-reveal-${revision}` } : segment
+    )),
   }
 }
 

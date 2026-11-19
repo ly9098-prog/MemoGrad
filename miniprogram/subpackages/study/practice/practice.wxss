@@ -242,19 +242,17 @@ to{transform:translateY(36rpx);opacity:.76}
 .subject-sheet .child-subject-wrap{background:#F3FBF8;border-color:#D8EEE6}
 .subject-sheet .child-select-mark{background:#55C89B}
 .subject-sheet .parent-arrow{color:#3A6F5B;font-size:0}
-.reward-strip{margin-top:22rpx;padding:22rpx 24rpx;border:1rpx solid #DDE2DA;border-radius:30rpx;background:rgba(255,255,255,.82);display:flex;align-items:center;justify-content:space-between;gap:20rpx;box-shadow:none}
-.reward-strip-copy{min-width:0;flex:1}
-.reward-strip-title{display:block;color:#17251B;font-size:26rpx;line-height:1.3;font-weight:600}
-.reward-strip-desc{display:block;margin-top:6rpx;color:#7B867E;font-size:20rpx;line-height:1.4}
-.reward-strip-items{flex-shrink:0;display:flex;align-items:center;min-width:250rpx}
-.reward-strip-item{flex:1;min-width:0;text-align:center}
-.reward-strip-label{display:block;color:#617268;font-size:22rpx;font-weight:400}
-.reward-strip-value{display:block;margin-top:4rpx;color:#173426;font-size:25rpx;line-height:1.2;font-weight:600}
-.reward-strip-text{font-size:24rpx;font-weight:500;white-space:nowrap}
-.reward-strip-divider{width:1rpx;height:44rpx;margin:0 14rpx;background:#DDE2DA}
-.reward-strip{align-items:flex-start}
-.reward-strip-desc{display:none}
-.reward-strip-items{min-width:226rpx}
+.reward-strip{margin-top:24rpx;padding:28rpx;border:1rpx solid #DFE8E2;border-radius:24rpx;background:#F3F8F5;box-shadow:none}
+.reward-strip-copy{min-width:0}
+.reward-strip-title{display:block;color:#23483C;font-size:26rpx;line-height:1.4;font-weight:600}
+.reward-strip-desc{display:block;margin-top:8rpx;color:#507568;font-size:22rpx;line-height:1.5}
+.reward-strip-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24rpx;margin-top:24rpx;padding-top:24rpx;border-top:1rpx solid #DFE8E2}
+.reward-strip-item{display:flex;align-items:flex-start;gap:12rpx;min-width:0;text-align:left}
+.reward-strip-icon{width:32rpx;height:32rpx;flex-shrink:0;margin-top:4rpx}
+.reward-strip-detail{min-width:0}
+.reward-strip-label{display:block;color:#507568;font-size:22rpx;line-height:1.5;font-weight:400}
+.reward-strip-value{display:block;margin-top:8rpx;color:#23483C;font-size:26rpx;line-height:1.4;font-weight:500}
+.reward-strip-text{white-space:normal}
 .recent-section .surface-title{color:#23483C;font-size:30rpx;line-height:1.3}
 .recent-scroll{margin-top:14rpx;width:100%;white-space:nowrap;overflow:hidden}
 .recent-list{display:inline-flex;gap:14rpx;padding:2rpx 2rpx 16rpx}

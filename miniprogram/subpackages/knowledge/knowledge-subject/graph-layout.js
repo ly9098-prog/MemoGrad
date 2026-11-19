@@ -5,8 +5,7 @@
 const WORLD = { width: 800, height: 920 }
 const POINTS_PER_PAGE = 8
 const DEFAULT_FORCES = { center: 0.18, repel: 18, link: 0.8, distance: 270 }
-const MAX_FOCUS_NODES = 72
-const GROUPS_PER_PAGE = POINTS_PER_PAGE
+const GROUPS_PER_PAGE = 6
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const directChildren = (group, id) => (Array.isArray(group && group.nodes) ? group.nodes : []).filter(item => Number(item.parentId) === Number(id))
@@ -164,7 +163,6 @@ function buildOverview(groups, subject, forces, requestedPage) {
   const pageCount = Math.max(1, Math.ceil(allGroups.length / GROUPS_PER_PAGE))
   const page = clamp(Math.floor(Number(requestedPage) || 0), 0, pageCount - 1)
   const list = allGroups.slice(page * GROUPS_PER_PAGE, (page + 1) * GROUPS_PER_PAGE)
-  const perGroup = 10
   list.forEach((group, groupIndex) => {
     const root = group.rootNode
     const rootId = Number(root.knowledge_point_id)
@@ -181,30 +179,7 @@ function buildOverview(groups, subject, forces, requestedPage) {
     coreEdge.distance = forces.distance
     coreEdge.strength = 0.85
     edges.push(coreEdge)
-    const included = new Map([[rootId, rootNode]])
-    const candidates = group.nodes
-      .filter(item => Number(item.knowledge_point_id) !== rootId)
-      .sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0))
-      .slice(0, perGroup)
-    candidates.forEach((item) => {
-      const id = Number(item.knowledge_point_id)
-      const parent = included.get(Number(item.parentId)) || rootNode
-      const phase = seeded(id) * Math.PI * 2
-      const radius = Number(item.parentId) === rootId ? 96 : 68
-      const node = makeNode(`${item.hasChildren ? 'group' : 'point'}:${id}`, item.hasChildren ? 'group' : 'point', item, group.key, {
-        cx: parent.cx + Math.cos(phase) * radius,
-        cy: parent.cy + Math.sin(phase) * radius,
-        r: item.hasChildren ? 9 : 6,
-      })
-      nodes.push(node)
-      included.set(id, node)
-      if (!item.hasChildren) {
-        pointIds.push(id)
-      }
-      const edge = makeEdge(parent, node, 'hierarchy')
-      edge.distance = Number(item.parentId) === rootId ? Math.max(60, forces.distance * 0.38) : Math.max(42, forces.distance * 0.24)
-      edges.push(edge)
-    })
+
   })
   return { nodes, edges, pointIds, core, focusNode: null, directChildCount: 0, page, pageCount, total: allGroups.length }
 
@@ -217,41 +192,25 @@ function buildFocused(group, focusNode, forces, requestedPage) {
   const focusId = Number(focusNode.knowledge_point_id)
   const core = makeNode('core', 'core', focusNode, group.key, { tone: focusNode.tone })
   nodes.push(core)
-  const included = new Map([[focusId, core]])
   const firstLevel = directChildren(group, focusId)
   const pageCount = Math.max(1, Math.ceil(firstLevel.length / POINTS_PER_PAGE))
   const page = clamp(Math.floor(Number(requestedPage) || 0), 0, pageCount - 1)
   const visibleChildren = firstLevel.slice(page * POINTS_PER_PAGE, (page + 1) * POINTS_PER_PAGE)
-  const queue = visibleChildren.map(item => ({ item, depth: 1 }))
-  let cursor = 0
-  let directIndex = 0
-  while (cursor < queue.length && included.size < MAX_FOCUS_NODES) {
-    const current = queue[cursor]
-    cursor += 1
-    const item = current.item
+  // A phone shows one real hierarchy level at a time. Branch nodes remain
+  // expandable, so every descendant is reachable without packing it into this scene.
+  visibleChildren.forEach((item, index) => {
     const id = Number(item.knowledge_point_id)
-    if (included.has(id)) continue
-    const parent = included.get(Number(item.parentId)) || core
-    const phase = current.depth === 1
-      ? -Math.PI / 2 + directIndex * Math.PI * 2 / Math.max(1, visibleChildren.length)
-      : seeded(id) * Math.PI * 2
-    if (current.depth === 1) directIndex += 1
-    const radius = current.depth === 1 ? 225 : 72
+    const phase = -Math.PI / 2 + index * Math.PI * 2 / Math.max(1, visibleChildren.length)
     const node = makeNode(`${item.hasChildren ? 'group' : 'point'}:${id}`, item.hasChildren ? 'group' : 'point', item, group.key, {
-      cx: parent.cx + Math.cos(phase) * radius,
-      cy: parent.cy + Math.sin(phase) * radius,
-      r: item.hasChildren ? 9 : 6,
+      cx: core.cx + Math.cos(phase) * 265,
+      cy: core.cy + Math.sin(phase) * 265,
     })
     nodes.push(node)
-    included.set(id, node)
     if (!item.hasChildren) pointIds.push(id)
-    const edge = makeEdge(parent, node, 'hierarchy')
-    edge.distance = current.depth === 1 ? Math.max(150, forces.distance * 0.9) : Math.max(46, forces.distance * 0.28)
+    const edge = makeEdge(core, node, 'hierarchy')
+    edge.distance = Math.max(200, forces.distance)
     edges.push(edge)
-    if (item.hasChildren) {
-      directChildren(group, id).forEach(child => queue.push({ item: child, depth: current.depth + 1 }))
-    }
-  }
+  })
   return { nodes, edges, pointIds, core, focusNode, directChildCount: firstLevel.length, page, pageCount, total: firstLevel.length }
 }
 
@@ -316,7 +275,7 @@ function buildScene(groups, subject, options = {}) {
     groupKey: focusNode ? String(focusedGroup.key) : '',
     title: focusNode ? focusNode.name : '知识图谱',
     hint: '拖动节点整理布局 · 双指缩放',
-    countText: focusNode ? `${graph.directChildCount} 个直接子节点` : `${matchTotal} 个知识点`,
+    countText: focusNode ? `${graph.directChildCount} 个直接子节点` : `${source.length} 个主题 · ${matchTotal} 个知识点`,
     scopeText: focusNode ? `${focusNode.name} · 局部图谱` : '全科知识图谱',
     breadcrumbs: focusNode ? breadcrumbItems(focusedGroup, focusNode, subject) : [],
   }
@@ -411,6 +370,7 @@ function cameraStyle(camera) {
 
 function visibleLabels(nodes, fontSize, scale) {
   const visibility = {}
+  const layouts = {}
   const occupied = new Map()
   const obstacles = new Map()
   const cellSize = Math.max(48, fontSize * 6)
@@ -429,31 +389,50 @@ function visibleLabels(nodes, fontSize, scale) {
       obstacles.set(key, entries)
     })
   })
-  const priority = node => node.selected ? 0 : node.neighbor ? 1 : node.kind === 'group' ? 2 : 3
-  const candidates = nodes.filter(node => node.kind !== 'core')
-    .sort((a, b) => priority(a) - priority(b) || Number(a.dimmed) - Number(b.dimmed) || a.id.localeCompare(b.id))
+  const priority = node => node.selected ? 0 : node.kind === 'core' ? 1 : node.neighbor ? 2 : node.kind === 'group' ? 3 : 4
+  const candidates = [...nodes].sort((a, b) => priority(a) - priority(b) || Number(a.dimmed) - Number(b.dimmed) || a.id.localeCompare(b.id))
   const gap = 4 / scale
+  const units = text => Array.from(text).reduce((sum, char) => sum + (/[^\u0000-\u00ff]/.test(char) ? 1 : 0.58), 0)
+  const shorten = (text, maxWidth) => {
+    if (units(text) * fontSize <= maxWidth) return text
+    let result = ''
+    for (const char of Array.from(text)) {
+      if (units(result + char + '…') * fontSize > maxWidth) break
+      result += char
+    }
+    return result + '…'
+  }
   candidates.forEach(node => {
-    // Estimate mixed CJK/Latin labels in world coordinates. Camera translation
-    // cannot change collisions, so panning keeps the same visible names.
-    const units = Array.from(node.label).reduce((sum, char) => sum + (/[^\u0000-\u00ff]/.test(char) ? 1 : 0.58), 0)
-    const width = Math.min(node.selected ? 320 : 240, units * fontSize)
     const height = fontSize * 1.4
-    const box = { left: node.cx - width / 2, right: node.cx + width / 2, top: node.cy + node.r + 10, bottom: node.cy + node.r + 10 + height }
-    const nearby = cells({ left: box.left - gap, right: box.right + gap, top: box.top - gap, bottom: box.bottom + gap })
-    const intersects = other => box.left < other.right + gap && box.right > other.left - gap && box.top < other.bottom + gap && box.bottom > other.top - gap
-    const obscuresNode = nearby.some(key => (obstacles.get(key) || []).some(other => other.id !== node.id && intersects(other)))
-    const overlap = nearby.some(key => (occupied.get(key) || []).some(intersects))
-    if (!obscuresNode && (node.selected || !overlap)) {
-      visibility[node.id] = true
-      cells(box).forEach(key => {
-        const entries = occupied.get(key) || []
-        entries.push(box)
-        occupied.set(key, entries)
-      })
+    const variants = [...new Set([node.selected ? 340 : 280, 220, 160].map(width => shorten(node.label, width)))]
+    for (const text of variants) {
+      const width = units(text) * fontSize
+      const positions = [
+        { left: node.cx - width / 2, top: node.cy + node.r + 10 },
+        { left: node.cx - width / 2, top: node.cy - node.r - 10 - height },
+        { left: node.cx + node.r + 10, top: node.cy - height / 2 },
+        { left: node.cx - node.r - 10 - width, top: node.cy - height / 2 },
+      ]
+      for (const position of positions) {
+        const box = { ...position, right: position.left + width, bottom: position.top + height }
+        if (box.left < 8 || box.right > WORLD.width - 8 || box.top < 8 || box.bottom > WORLD.height - 8) continue
+        const nearby = cells({ left: box.left - gap, right: box.right + gap, top: box.top - gap, bottom: box.bottom + gap })
+        const intersects = other => box.left < other.right + gap && box.right > other.left - gap && box.top < other.bottom + gap && box.bottom > other.top - gap
+        if (nearby.some(key => (obstacles.get(key) || []).some(other => other.id !== node.id && intersects(other)))) continue
+        if (nearby.some(key => (occupied.get(key) || []).some(intersects))) continue
+        visibility[node.id] = true
+        // Explicit world-space offsets keep rendered labels and collision boxes aligned.
+        layouts[node.id] = { text, style: `left:${box.left - (node.cx - node.r)}px;top:${box.top - (node.cy - node.r)}px;width:${width}px;max-width:none;bottom:auto;transform:none;` }
+        cells(box).forEach(key => {
+          const entries = occupied.get(key) || []
+          entries.push(box)
+          occupied.set(key, entries)
+        })
+        return
+      }
     }
   })
-  return visibility
+  return { graphLabelVisibility: visibility, graphLabelLayouts: layouts }
 }
 
 function labelDisplay(camera, frame, nodes) {
@@ -463,8 +442,8 @@ function labelDisplay(camera, frame, nodes) {
   return {
     graphLabelMode,
     graphLabelSize,
-    ...(nodes ? { graphLabelVisibility: visibleLabels(nodes, graphLabelSize, camera.scale) } : {}),
+    ...(nodes ? visibleLabels(nodes, graphLabelSize, camera.scale) : {}),
   }
 }
 
-module.exports = { WORLD, POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay }
+module.exports = { WORLD, POINTS_PER_PAGE, GROUPS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay }

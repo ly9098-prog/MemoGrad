@@ -91,7 +91,7 @@
 <view class="force-hit" aria-hidden="true"></view>
 <view class="force-dot" aria-hidden="true"></view>
 <view class="force-ring" wx:if="{{item.selected || item.kind === 'core'}}" aria-hidden="true"></view>
-<text class="force-label">{{item.label}}</text>
+<text class="force-label" style="{{graphLabelLayouts[item.id].style}}">{{graphLabelLayouts[item.id].text || item.label}}</text>
 </view>
 </view>
 <view class="atlas-empty graph-empty" wx:else>
@@ -100,12 +100,14 @@
 <text class="atlas-empty-note">{{filters[0].count ? '更换关键词、主题或掌握状态后再试' : '知识点就绪后会在这里建立关系'}}</text>
 <button wx:if="{{filters[0].count}}" class="empty-reset" bindtap="resetFilters">查看全部知识点</button>
 </view>
-<view class="graph-controls" wx:if="{{scene.nodes.length}}">
+</view>
+<view class="graph-toolbar" wx:if="{{scene.nodes.length}}">
+<view class="graph-toolbar-copy"><text class="graph-scope-hint">{{scene.focused ? '当前层级 · 点击节点查看' : '章节总览 · 点击主题展开'}}</text><text class="graph-zoom-text">{{zoomText}} · 拖动 / 双指缩放</text></view>
+<view class="graph-controls">
 <button class="graph-control" data-step="1" catchtap="zoomGraph" disabled="{{zoomInDisabled}}" aria-label="放大图谱">+</button>
 <button class="graph-control graph-control-out" data-step="-1" catchtap="zoomGraph" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱">−</button>
 <button class="graph-control graph-control-reset" catchtap="resetView" aria-label="复位图谱"><view aria-hidden="true"></view></button>
 </view>
-<view class="graph-zoom-text" wx:if="{{scene.nodes.length}}">{{zoomText}}</view>
 </view>
 <view class="force-panel" wx:if="{{forcePanelOpen}}">
 <view class="force-panel-head"><text>图谱设置</text><button class="force-panel-close" catchtap="closeForcePanel" aria-label="关闭图谱设置">×</button></view>
@@ -116,7 +118,6 @@
 </view>
 <button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">恢复默认力度</button>
 </view>
-<view class="graph-help" wx:if="{{scene.nodes.length}}">拖动移动 · 双指缩放，点击节点查看</view>
 <view class="graph-page-navigation" wx:if="{{scene.pageCount > 1}}">
 <button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" bindtap="changeGraphPage" aria-label="上一页知识节点">上一页</button>
 <text>{{scene.page + 1}} / {{scene.pageCount}}</text>

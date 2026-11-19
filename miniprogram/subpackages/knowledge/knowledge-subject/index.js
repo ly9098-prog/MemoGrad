@@ -1,7 +1,7 @@
 const api = require('../../../utils/api')
 const { knowledgePracticeSync } = require('../../../utils/storage')
 const { buildKnowledgeGroups, summarizeGroups } = require('./tree-groups')
-const { POINTS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay } = require('./graph-layout')
+const { POINTS_PER_PAGE, GROUPS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay } = require('./graph-layout')
 const STATUS_TEXT = { no_data: '未开始', insufficient: '数据不足', weak: '薄弱', developing: '提升中', good: '良好', mastered: '已掌握' }
 const FILTERS = [
 { id: 'all', label: '全部' }, { id: 'weak', label: '需强化', statuses: ['weak', 'developing'] },
@@ -262,7 +262,7 @@ scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
 pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphInteracting: false,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
 forcePanelOpen: false, forceControls: [],
-showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {},
+showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
 indexNodes: [], indexCount: 0, indexDisplayCount: 0, hasMore: false, indexSearchOpen: false, indexSearchFocused: false,
 indexQuery: '', indexSearchDraft: '', indexSearchPending: false, indexSearchResultCount: 0, indexNavigatingId: 0,
@@ -1767,7 +1767,7 @@ _resolveIndexNavigationFocus(point, pointId, sourceGroup, targetConfig, targetGr
         return pointSearchMatch(item, targetGraphQuery).matched
       }))
       const groupIndex = Math.max(0, visibleGroups.findIndex(group => String(group.key) === String(point.groupKey)))
-      this._graphPage = Math.floor(groupIndex / POINTS_PER_PAGE)
+      this._graphPage = Math.floor(groupIndex / GROUPS_PER_PAGE)
     }
   }
   return { activeGroupKey }
@@ -1825,7 +1825,7 @@ const availableGroups = (this._filteredGroups || []).filter(item => item.matchCo
 const groupIndex = availableGroups.findIndex(item => String(item.key) === String(point.groupKey))
 if (groupIndex < 0) { finish(); return }
 this._focusNodeId = 0
-this._graphPage = Math.floor(groupIndex / POINTS_PER_PAGE)
+this._graphPage = Math.floor(groupIndex / GROUPS_PER_PAGE)
 const nextData = { activeGroupKey: '' }
 if (options.syncIndexScope) nextData.indexScopeGroupKey = ''
 this.setData(nextData, () => this.applyView(true, options.scrollToGraph !== false, finish))
@@ -2006,7 +2006,7 @@ const changed = !cache || cache.nodes !== nodes || cache.frame !== this._frame |
 const labels = changed ? labelDisplay(this._camera, this._frame, nodes) : cache.labels
 if (changed) this._cameraLabelCache = { nodes, frame: this._frame, scale: this._camera.scale, labels }
 const payload = { ...extra, graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
-...(changed ? { graphLabelVisibility: labels.graphLabelVisibility } : {}), stageStyle: cameraStyle(this._camera) }
+...(changed ? { graphLabelVisibility: labels.graphLabelVisibility, graphLabelLayouts: labels.graphLabelLayouts } : {}), stageStyle: cameraStyle(this._camera) }
 if (!includeMetrics) return payload
 const fit = fitCamera(this._frame)
 const limits = cameraLimits(this._frame)

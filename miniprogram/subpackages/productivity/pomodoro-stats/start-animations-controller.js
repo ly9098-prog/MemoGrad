@@ -26,11 +26,13 @@ function startNumberAnimation(options, reqId) {
     step += 1
     const progress = Math.min(1, step / totalSteps)
     const eased = viewHelpers.easeOutCubic(progress)
-    const displayDurationSec = Math.round(options.getRawTodayDurationSec() * eased)
-    options.setDisplayDurationSec(displayDurationSec)
+    const durationPatch = step === 1
+      ? options.getDurationDisplayPatch(options.formatMin(options.getRawTodayDurationSec()), { reveal: true })
+      : {}
+    if (step === 1) options.setDisplayDurationSec(options.getRawTodayDurationSec())
     options.setData({
       _dispTodaySessions: Math.round(targetSessions * eased),
-      ...options.getDurationDisplayPatch(options.formatMin(displayDurationSec), { reveal: progress >= 1 }),
+      ...durationPatch,
       durationValueAnimating: progress < 1,
     })
     if (step < totalSteps) {

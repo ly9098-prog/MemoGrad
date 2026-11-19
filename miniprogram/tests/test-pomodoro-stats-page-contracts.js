@@ -142,14 +142,16 @@ test('cumulative customized branch retains lifetimeStart only and skips summary 
 test('duration display patch uses current segments hook and reveal option', () => {
   const f = fixture(), value = {}
   const calls = []
-  f.page._buildDurationSegments = (input, reveal) => { calls.push([input, reveal]); return { input, reveal } }
+  f.page._buildDurationSegments = (input, reveal) => { calls.push([input, reveal]); return [{ type: 'num', key: 'pos-0', input, reveal }] }
   const patch = f.page._getTodayDurationDisplayPatch(value)
   assert.equal(patch._dispTodayDurationText, value)
-  assert.deepEqual(patch._dispTodayDurationSegments, { input: value, reveal: false })
+  assert.deepEqual(plain(patch._dispTodayDurationSegments), [{ type: 'num', key: 'pos-0', input: value, reveal: false }])
   const revealPatch = f.page._getTodayDurationDisplayPatch(value, { reveal: true })
   assert.equal(revealPatch._dispTodayDurationText, value)
-  assert.deepEqual(revealPatch._dispTodayDurationSegments, { input: value, reveal: true })
-  assert.deepEqual(calls, [[value, false], [value, true]])
+  assert.deepEqual(plain(revealPatch._dispTodayDurationSegments), [{ type: 'num', key: 'pos-0-reveal-1', input: value, reveal: true }])
+  const again = f.page._getTodayDurationDisplayPatch(value, { reveal: true })
+  assert.notEqual(again._dispTodayDurationSegments[0].key, revealPatch._dispTodayDurationSegments[0].key)
+  assert.deepEqual(calls, [[value, false], [value, true], [value, true]])
 })
 
 test('initial duration segments match the formatter contract', () => {
