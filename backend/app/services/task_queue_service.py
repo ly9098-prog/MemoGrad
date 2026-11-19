@@ -2252,7 +2252,6 @@ class DurableTaskQueue:
         client = await self._get_script_client()
         if client is None:
             raise QueueHealthError("Cannot obtain Redis client")
-        removed = 0
         try:
             pipeline = client.pipeline(transaction=True)
             pipeline.lrem(_v2_q_key(task_type), 0, task_id)
@@ -2261,23 +2260,18 @@ class DurableTaskQueue:
             pipeline.lrem(_v2_dead_key(task_type), 0, task_id)
             pipeline.lrem(_v2_corrupt_key(task_type), 0, task_id)
             pipeline.delete(
-                _v2_task_hash_key(task_id),
-                _v2_heartbeat_key(task_id),
+                _v2_task_hash_key(task_id), _v2_heartbeat_key(task_id),
                 _v2_fencing_key(task_id),
                 _v2_idempotent_key(task_id),
             )
-            results = await pipeline.execute()
-            removed = sum(int(value or 0) for value in results)
+            return sum(int(value or 0) for value in await pipeline.execute())
         except redis_exc.RedisError as exc:
-            raise QueueHealthError(
-                f"Redis error purging task {task_id}: {exc}"
-            ) from exc
+            raise QueueHealthError(f"Redis error purging task {task_id}: {exc}") from exc
         finally:
             try:
                 await client.aclose()
             except Exception:
                 pass
-        return removed
 
     async def has_idempotency_v2(self, task_id: str) -> bool:
         """Return whether Redis still remembers an accepted v2 task id.

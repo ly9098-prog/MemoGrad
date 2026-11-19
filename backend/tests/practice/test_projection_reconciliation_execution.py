@@ -25,6 +25,7 @@ def reconciliation(monkeypatch):
         failure_at="create",
         events=[],
         statements=[],
+        owner_user_id=7,
     )
 
     class Savepoint:
@@ -45,6 +46,9 @@ def reconciliation(monkeypatch):
 
     async def scalar(stmt):
         state.statements.append(stmt)
+        if [column.key for column in stmt.selected_columns] == ["user_id"]:
+            state.events.append("owner")
+            return state.owner_user_id
         task_id = stmt.compile().params["task_id_1"]
         original = task_id.startswith("answer_projection:")
         state.events.append("original" if original else "existing-repair")
@@ -110,6 +114,7 @@ async def test_repair_uses_narrow_unlocked_scan_and_versioned_outbox(reconciliat
         "scan",
         "original",
         "existing-repair",
+        "owner",
         "savepoint-enter",
         "create",
         ("savepoint-exit", None),
@@ -126,6 +131,7 @@ async def test_repair_uses_narrow_unlocked_scan_and_versioned_outbox(reconciliat
             "task_id": expected_id,
             "task_type": "answer_projection",
             "schema_version": 2,
+            "owner_user_id": 7,
             "payload": {
                 "practice_record_id": 11,
                 "request_id": "42",
@@ -137,6 +143,18 @@ async def test_repair_uses_narrow_unlocked_scan_and_versioned_outbox(reconciliat
             },
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_missing_owner_does_not_schedule_unowned_repair(reconciliation):
+    state = reconciliation
+    state.owner_user_id = None
+    assert await run(state) == stats(errors=1)
+    assert state.calls == []
+    assert "savepoint-enter" not in state.events
+    state.logger.warning.assert_called_once_with(
+        "answer projection repair owner disappeared: record_id=%s", 11
+    )
 
 
 @pytest.mark.asyncio

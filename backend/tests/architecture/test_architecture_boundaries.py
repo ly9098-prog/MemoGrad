@@ -159,12 +159,22 @@ def test_practice_get_route_only_adapts_protocol_and_inputs():
         node for node in ast.parse(source).body
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "get_practice_questions"
     )
-    assert route.end_lineno - route.lineno + 1 <= 50
+    # Input admission belongs at the protocol boundary. Pin that validation
+    # exactly, then retain the original size budget for the request adapter.
+    admission = route.body[0]
+    expected_admission = ast.parse(
+        'require_bounded_csv(knowledge_point, field="knowledge_point", '
+        'max_items=20, max_length=2048)'
+    ).body[0]
+    assert ast.dump(admission) == ast.dump(expected_admission)
+    admission_lines = admission.end_lineno - admission.lineno + 1
+    assert route.end_lineno - route.lineno + 1 - admission_lines <= 50
     calls = [node.func for stmt in route.body for node in ast.walk(stmt)
              if isinstance(node, ast.Call)]
     assert all(isinstance(call, ast.Name) for call in calls)
     assert {call.id for call in calls} == {
         "PracticeQuestionsRequest", "_issue_questions_response",
+        "require_bounded_csv",
     }
 
 

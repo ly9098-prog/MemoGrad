@@ -178,7 +178,7 @@ async def test_cancel_without_reason_defaults_to_empty_string(ports):
 
 
 @pytest.mark.asyncio
-async def test_missing_task_hash_is_non_fatal(ports):
+async def test_missing_task_hash_revokes_owner_without_counting_lease_failure(ports):
     task = make_task(600)
     owner_lost = asyncio.Event()
     ports.cancel_outcomes = [None]
@@ -186,10 +186,15 @@ async def test_missing_task_hash_is_non_fatal(ports):
 
     await worker._v2_heartbeat_loop_with_lease_window(task, 60, owner_lost)
 
-    assert ports.sleeps == [20]
-    assert owner_lost.is_set() is False
+    assert ports.sleeps == []
+    assert owner_lost.is_set() is True
     assert ports.metrics == {"lease_renewal_failure": 0}
-    assert ports.logs == []
+    assert ports.logs == [
+        (
+            "warning",
+            ("v2 Task payload disappeared, stopping owner: task_id=%s", "task-1"),
+        )
+    ]
 
 
 @pytest.mark.asyncio

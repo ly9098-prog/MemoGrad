@@ -54,7 +54,7 @@ async def test_actual_task_cancellation_does_not_finish_or_commit(
 
     monkeypatch.setattr(behavior_service, "record_answer_behavior", behavior)
     task = asyncio.create_task(project_answer(projection))
-    await started.wait()
+    await asyncio.wait_for(started.wait(), timeout=2)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -97,7 +97,7 @@ async def test_actual_task_cancellation_exits_savepoint_without_commit(
 
     monkeypatch.setattr(service, "create_outbox", create)
     task = asyncio.create_task(reconcile(state))
-    await started.wait()
+    await asyncio.wait_for(started.wait(), timeout=2)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
