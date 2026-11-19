@@ -23,6 +23,23 @@ async def _app_user():
     return User(id=1, openid="dev_test_user")
 
 
+async def _unbound_app_user():
+    return User(id=2, openid="wx_unbound_import_user")
+
+
+class _NoPermissionDb:
+    async def execute(self, _statement):
+        class _Result:
+            def scalar_one_or_none(self):
+                return None
+
+        return _Result()
+
+
+async def _no_permission_db():
+    yield _NoPermissionDb()
+
+
 def test_app_import_management_endpoints_are_forbidden():
     """Management import endpoints have been moved to admin router (return 404 at old paths)."""
     app.dependency_overrides[get_current_user] = _app_user
@@ -91,3 +108,22 @@ def test_app_ai_import_generate_remains_available(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["batch_id"] == "batch-1"
+
+
+def test_app_ai_import_generate_requires_import_write(monkeypatch):
+    from app.api.v1 import ai_import
+
+    generate = AsyncMock(side_effect=AssertionError("provider work must not start"))
+    monkeypatch.setattr(ai_import.question_draft_generator, "generate_drafts", generate)
+    app.dependency_overrides[get_current_user] = _unbound_app_user
+    app.dependency_overrides[get_db] = _no_permission_db
+    try:
+        response = client.post(
+            "/api/v1/ai-import/generate",
+            json={"subject": "math", "knowledge_points": ["函数"], "count": 1},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    generate.assert_not_awaited()

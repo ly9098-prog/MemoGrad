@@ -43,6 +43,10 @@ function _normalizeExpiresAt(value) {
 
 async function _refreshToken(traceId = '') {
   const refreshToken = storage.get(KEYS.REFRESH_TOKEN)
+  const previousUser = storage.get(KEYS.USER) || {}
+  const previousOwner = String(
+    previousUser.id || previousUser.user_id || previousUser.uid || previousUser.openid || ''
+  )
   if (!refreshToken) {
     // No refresh token → must re-login at login page
     _clearAuthAndRedirect()
@@ -56,6 +60,18 @@ async function _refreshToken(traceId = '') {
   }
   const res = await _rawRequest('POST', '/auth/refresh', { refresh_token: refreshToken }, header)
   if (res.statusCode === 200 && res.data && res.data.access_token) {
+    const nextUser = res.data.user || {}
+    const nextOwner = String(
+      nextUser.id || nextUser.user_id || nextUser.uid || nextUser.openid || ''
+    )
+    if (previousOwner && nextOwner && previousOwner !== nextOwner) {
+      _clearAuthAndRedirect()
+      throw new ApiError('账号会话已变化，请重新登录', {
+        code: 'AUTH_REQUIRED',
+        statusCode: 401,
+        traceId,
+      })
+    }
     try {
       storage.setStrict(KEYS.TOKEN, res.data.access_token)
       storage.setStrict(KEYS.TOKEN_EXPIRES_AT, _normalizeExpiresAt(res.data.expires_at))
@@ -63,6 +79,7 @@ async function _refreshToken(traceId = '') {
       if (res.data.user) {
         storage.setStrict(KEYS.USER, res.data.user)
       }
+      if (nextOwner) storage.setStrict(KEYS.LAST_AUTH_OWNER, nextOwner)
     } catch (e) {
       throw new ApiError('写入认证信息失败', { code: 'STORAGE_ERROR' })
     }
@@ -76,9 +93,10 @@ async function _refreshToken(traceId = '') {
 
 function _clearAuthAndRedirect() {
   _authInvalidationSeq += 1
-  // 自动失效场景不清除协议同意记录，避免用户在登录页被强制重新同意
+  // Consent is bound to the authenticated principal. Clearing identity must
+  // also clear the account-neutral acceptance copy before another login.
   storage.clearSession({
-    preservePrivacyAcceptance: true, includeDebugSnapshots: true, preserveLaunchResume: true,
+    preservePrivacyAcceptance: false, includeDebugSnapshots: true, preserveLaunchResume: true,
   })
 }
 

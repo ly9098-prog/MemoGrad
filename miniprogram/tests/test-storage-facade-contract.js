@@ -54,12 +54,13 @@ function reset(entries = {}) {
 test('facade exports keep their names and order', () => {
   assert.deepEqual(Object.keys(storage), [
     'KEYS', 'get', 'set', 'setStrict', 'remove', 'clearSession',
+    'currentSessionGeneration', 'ownerFingerprint',
     'BUSINESS_CACHE_KEYS', 'PROTECTED_KEYS', 'SESSION_DYNAMIC_KEY_PREFIXES',
     'studyStrategy', 'pomodoroTaskTypes', 'knowledgePracticeSync',
   ])
   assert.deepEqual(storage.KEYS, {
     TOKEN: 'token', USER: 'user', TOKEN_EXPIRES_AT: 'token_expires_at',
-    REFRESH_TOKEN: 'refresh_token',
+    REFRESH_TOKEN: 'refresh_token', LAST_AUTH_OWNER: 'last_auth_owner',
   })
   assert.deepEqual(storage.PROTECTED_KEYS, ['privacy_acceptance'])
   assert.deepEqual(storage.SESSION_DYNAMIC_KEY_PREFIXES, [
@@ -108,7 +109,8 @@ test('session cleanup keeps protected, unrelated and opt-in debug keys', () => {
   })
   storage.clearSession()
   assert.deepEqual(Array.from(memory.keys()).sort(),
-    ['other_screen_cache', 'privacy_acceptance'])
+    ['last_auth_owner', 'other_screen_cache'])
+  assert.equal(memory.get('last_auth_owner'), '1')
   reset({ token: 'a', privacy_acceptance: true, 'ai_cache:1': 1, 'debug_snapshot:a': 1 })
   storage.clearSession({ preservePrivacyAcceptance: true, includeDebugSnapshots: false })
   assert.deepEqual(Array.from(memory.keys()).sort(), ['debug_snapshot:a', 'privacy_acceptance'])
@@ -167,13 +169,13 @@ test('study strategy owner isolation, rounding and validation stay stable', () =
   const saved = strategy.saveProfile(strategy.getProfile())
   assert.equal(memory.get('study_strategy_v1').owner, '1001')
   memory.set('user', { username: 'someone-else' })
-  assert.equal(strategy.getProfile().owner, 'someone-else')
+  assert.equal(strategy.getProfile().owner, '')
   assert.deepEqual(strategy.getProfile().subjects.map(item => item.weight), [15, 35, 35, 15])
   memory.set('user', {})
-  assert.equal(strategy.getProfile().owner, 'anonymous')
+  assert.equal(strategy.getProfile().owner, '')
   assert.equal(strategy.normalizeProfile(undefined).subjects.length, 4)
   const rounded = strategy.normalizeProfile({
-    owner: 'anonymous',
+    owner: '',
     subjects: [
       { code: 'data_structure', stage: 'nope', weight: 12.4 },
       { code: 'data_structure', stage: 'exam', weight: 12.6 },
@@ -364,7 +366,7 @@ test('next best action keeps candidate scoring, routes and cleanup rules', () =>
 })
 
 test('pomodoro task typing keeps keys, classification and record cap rules', () => {
-  reset()
+  reset({ user: { id: 1001 } })
   const types = storage.pomodoroTaskTypes
   assert.deepEqual(Object.keys(types), ['STORAGE_KEY', 'SELECTION_KEY', 'TYPES', 'TYPE_MAP',
     'DEFAULT_TYPE', 'normalize', 'label', 'getSelected', 'setSelected', 'recordSession',
@@ -402,7 +404,7 @@ test('pomodoro task typing keeps keys, classification and record cap rules', () 
   assert.equal(types.typeForSession({ client_start_id: 'c12' }), 'lecture')
   assert.equal(types.typeForSession({ id: 999, client_start_id: 'c999' }), '')
   assert.equal(types.typeForSession({ id: 11, client_start_id: 'missing' }), 'exam')
-  const bulk = { version: 1, records: {} }
+  const bulk = { version: 2, owner: '1001', records: {} }
   for (let index = 0; index < 650; index += 1) {
     bulk.records[`id:${index}`] = { type: 'exam', savedAt: index }
   }

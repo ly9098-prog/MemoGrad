@@ -104,8 +104,20 @@ async def read_user_nbf(user_id: int) -> int | None:
     return int(value) if value else None
 
 
-async def issue_user_token(user_id: int) -> tuple[str, int]:
-    """Issue a token that is newer than any account-wide invalidation marker."""
+_UNSET_NBF = object()
+
+
+async def issue_user_token(
+    user_id: int,
+    *,
+    expected_nbf: int | None | object = _UNSET_NBF,
+) -> tuple[str, int]:
+    """Issue a token that is newer than any account-wide invalidation marker.
+
+    Security-sensitive callers that already authorized a rotation can pin the
+    marker they observed. A concurrent logout then causes issuance to fail
+    instead of being silently converted into a post-logout credential.
+    """
     try:
         user_nbf = await cache.get_strict(f"user:jwt:nbf:{user_id}")
     except CacheUnavailableError as exc:
@@ -114,6 +126,15 @@ async def issue_user_token(user_id: int) -> tuple[str, int]:
             detail="Authentication service temporarily unavailable",
         ) from exc
     minimum_iat = int(user_nbf) if user_nbf else None
+    if (
+        expected_nbf is not _UNSET_NBF
+        and minimum_iat is not None
+        and minimum_iat != expected_nbf
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="会话已失效，请重新登录",
+        )
     return create_token(user_id, issued_at=minimum_iat)
 
 
@@ -123,10 +144,11 @@ async def set_user_nbf(user_id: int, timestamp: int | None = None) -> None:
     Production requires Redis, so this invalidation is shared by all web
     workers. The local cache fallback remains useful for development.
     """
+    candidate = timestamp or (int(unix_timestamp(utcnow())) + 1)
     try:
-        await cache.set_strict(
+        await cache.advance_integer_marker_strict(
             f"user:jwt:nbf:{user_id}",
-            timestamp or (int(unix_timestamp(utcnow())) + 1),
+            candidate,
             ttl=max(settings.JWT_EXPIRE_DAYS, 1) * 24 * 60 * 60,
         )
     except CacheUnavailableError as exc:

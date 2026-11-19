@@ -69,6 +69,9 @@ def ports(monkeypatch):
             for name in ("execute", "commit", "refresh", "rollback", "delete")
         }
     )
+    db.get_bind = Mock(
+        return_value=SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    )
     user = SimpleNamespace(id=3)
     monkeypatch.setattr(api, "utcnow", lambda: NOW)
     monkeypatch.setattr(api, "_preview_count", AsyncMock(return_value=5))
@@ -125,8 +128,22 @@ async def test_create_limit_locks_before_count_and_stops(ports):
         )
     assert caught.value.status_code == 429
     query = str(ports.db.execute.call_args.args[0])
-    assert "FOR UPDATE" in query and "LIMIT" in query and "user_id" in query
+    assert "FOR UPDATE" in query and "users.id" in query
     api._create_export_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_limit_locks_stable_user_row_before_count(ports):
+    ports.processor.get_user_pending_count.return_value = 2
+    with pytest.raises(HTTPException) as caught:
+        await api.create_export(
+            CreateExportTaskRequest(range_type="all"), ports.db, ports.user
+        )
+
+    assert caught.value.status_code == 429
+    query = str(ports.db.execute.call_args.args[0]).lower()
+    assert "from users" in query and "for update" in query
+    assert "export_tasks" not in query
 
 
 @pytest.mark.asyncio
@@ -339,6 +356,8 @@ async def test_retry_reads_config_twice_and_preserves_source(ports):
     assert api._create_export_task.call_args.args[2]["title"] == "changed during await"
     assert new.total_count == 5
     ports.db.commit.assert_awaited_once()
+    lock_query = str(ports.db.execute.call_args_list[0].args[0]).lower()
+    assert "from users" in lock_query and "for update" in lock_query
 
 
 @pytest.mark.asyncio

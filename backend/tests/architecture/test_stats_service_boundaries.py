@@ -182,6 +182,11 @@ def test_statistics_service_budget_and_frozen_ceiling():
     assert ownership_violations(source) == []
 
 
+def test_stats_ai_billing_stays_within_new_module_budget():
+    source = (APP / "services/stats_ai_billing.py").read_text(encoding="utf-8")
+    assert budget_violations(source, NEW_MODULE_CEILING) == []
+
+
 def test_statistics_query_and_projection_modules_stay_small_and_pure():
     for path in (QUERY, GROWTH, RECOMMENDATION):
         source = path.read_text(encoding="utf-8")

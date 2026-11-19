@@ -33,7 +33,6 @@ ENTRIES = (
 )
 
 HELPERS = (
-    "_latest_revision_candidates",
     "_latest_revision_view",
     "_log_missing_review_revision",
     "_lock_and_rebind_latest_revision",
@@ -65,6 +64,7 @@ HELPERS = (
     "_batch_review_error_payload",
     "_batch_review_prewarm_candidate",
     "_grade_batch_review_item",
+    "_authorized_review_schedules",
     "_prewarm_review_wrong_answers",
     "_ordered_review_items",
     "_grade_batch_review_loop",
@@ -235,6 +235,7 @@ def check_delegation(tree):
         batch,
         "if not reviews:",
         "raise ValueError(",
+        "authorized_items, preflight_results = await _authorized_review_schedules(",
         "version_ids = [int(item['question_version_id']) for item in reviews]",
         "views = await load_revision_views(db, version_ids)",
         "results_by_index, prewarm_candidates = await _grade_batch_review_loop(",
@@ -394,7 +395,7 @@ def check_delegation(tree):
         "if not schedules:",
         "return []",
         "latest_ids = await load_latest_question_revision_ids(",
-        "latest_views = await load_revision_views(db, _latest_revision_candidates(",
+        "latest_views = await load_revision_views(db, latest_ids.values())",
         "changed = False",
         "for schedule in schedules:",
         "revision = _latest_revision_view(latest_views, latest_version_id, schedule)",
@@ -561,6 +562,7 @@ def check_single_source(tree):
 
     # Batch insert order and prewarm stay in their own helpers.
     assert count_of(tree, "grade_batch_review", "await db.commit()") == 1
+    assert count_of(tree, "_authorized_review_schedules", "select(") == 1
     assert count_of(tree, "grade_batch_review", "await _grade_batch_review_loop(") == 1
     assert count_of(tree, "grade_batch_review", "_prewarm_review_wrong_answers(") == 1
     assert count_of(tree, "_prewarm_review_wrong_answers", "enqueue_prewarm(") == 1

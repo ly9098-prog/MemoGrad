@@ -747,7 +747,7 @@ async def backfill_question_embeddings(
 
 
 async def _ensure_source_embedding(
-    db: AsyncSession, question: Question
+    db: AsyncSession, question: Question, *, user_id: int
 ) -> list[float] | None:
     """确保源题有 embedding，如果没有则尝试现场生成。"""
     model_config_id = _vs.emb.model_config_id
@@ -774,18 +774,50 @@ async def _ensure_source_embedding(
             logger.warning("解析 pgvector 向量文本失败 question_id=%d", question.id)
             return None
 
+    from app.features.token_budget import estimate_tokens
+    from app.services.ai_learning_service import (
+        cancel_token_reservation,
+        record_token_usage,
+        reserve_token_budget,
+        settle_token_reservation,
+    )
+
+    content_text = embedding_service.build_question_embedding_text(question)
+    estimated_tokens = max(1, estimate_tokens(content_text))
+    reservation = await reserve_token_budget(db, user_id, estimated_tokens)
+    if reservation is None:
+        return None
+
     # 不存在，尝试生成。用 SAVEPOINT 隔离现场写入失败，确保后续规则
     # fallback 仍可继续使用当前 Session。
     try:
         async with db.begin_nested():
             res = await upsert_question_embedding(db, question)
     except SQLAlchemyError:
+        # The provider may already have billed the request before a local
+        # persistence failure. Retain the hold when its cost is uncertain.
         logger.warning(
             "现场生成源题 embedding 失败 question_id=%d",
             question.id,
             exc_info=True,
         )
         return None
+    if res["status"] == "skipped":
+        await cancel_token_reservation(reservation)
+    if res["status"] in ("created", "updated"):
+        await record_token_usage(
+            db,
+            user_id,
+            "vector_source_embedding",
+            content_text[:500],
+            "",
+            {
+                "tokens_used": estimated_tokens,
+                "model": str(_vs.emb.model or "embedding"),
+                "duration_ms": 0,
+            },
+        )
+        await settle_token_reservation(reservation, estimated_tokens)
     if res["status"] in ("created", "updated"):
         result = await db.execute(
             text(
@@ -913,7 +945,11 @@ async def search_similar_questions(
     # 获取源题
     source = await db.execute(
         select(Question)
-        .where(Question.id == question_id, Question.is_active)
+        .where(
+            Question.id == question_id,
+            Question.is_active,
+            Question.review_status == "approved",
+        )
         .options(selectinload(Question.subject_ref))
     )
     source_q = source.scalar_one_or_none()
@@ -924,7 +960,9 @@ async def search_similar_questions(
 
     # 确保源题有 embedding
     try:
-        source_embedding = await _ensure_source_embedding(db, source_q)
+        source_embedding = await _ensure_source_embedding(
+            db, source_q, user_id=user_id
+        )
     except SQLAlchemyError:
         logger.warning(
             "源题 embedding 读取或生成失败 question_id=%d",
@@ -1209,13 +1247,39 @@ async def vector_recall_by_text(
     if not subject_ids:
         return []
 
+    from app.features.token_budget import estimate_tokens
+    from app.services.ai_learning_service import (
+        cancel_token_reservation,
+        record_token_usage,
+        reserve_token_budget,
+        settle_token_reservation,
+    )
+
+    estimated_tokens = max(1, estimate_tokens(query_text))
+    reservation = await reserve_token_budget(db, user_id, estimated_tokens)
+    if reservation is None:
+        return []
     query_embedding = await embedding_service.get_embedding(
         query_text,
         config=_vs.emb,
     )
     if query_embedding is None:
+        await cancel_token_reservation(reservation)
         logger.warning("smart 模式 query embedding 生成失败")
         return []
+    await record_token_usage(
+        db,
+        user_id,
+        "vector_text_embedding",
+        query_text[:500],
+        "",
+        {
+            "tokens_used": estimated_tokens,
+            "model": str(_vs.emb.model or "embedding"),
+            "duration_ms": 0,
+        },
+    )
+    await settle_token_reservation(reservation, estimated_tokens)
 
     try:
         query_embedding = validate_embedding(query_embedding, _vs.emb.dim)

@@ -18,6 +18,7 @@ class Ports:
         self.kp_map: dict = {}
         self.subject = SimpleNamespace(code="408", name="计算机学科专业基础综合")
         self.token_limit = True
+        self.reservation = service.TokenReservation(7, 1, "day-key", "month-key")
         self.ai_result = None
         self.fallback_report = {
             "weak_points": [
@@ -64,6 +65,19 @@ def ports(monkeypatch):
         ports.calls.append(("check_token_limit", user_id, tokens_needed))
         return ports.token_limit
 
+    async def fake_reserve_token_budget(db, user_id, tokens_needed):
+        ports.calls.append(("reserve_token_budget", user_id, tokens_needed))
+        if not ports.token_limit:
+            return None
+        ports.reservation.active = True
+        return ports.reservation
+
+    async def fake_settle_token_reservation(reservation, actual_tokens):
+        ports.calls.append(("settle_token_reservation", actual_tokens))
+
+    async def fake_cancel_token_reservation(reservation):
+        ports.calls.append(("cancel_token_reservation", reservation.user_id))
+
     async def fake_call_ai(messages, db=None):
         ports.calls.append(("_call_ai", messages))
         return ports.ai_result
@@ -82,7 +96,7 @@ def ports(monkeypatch):
 
     def fake_build_report_prompt(subject_code, days, total, accuracy, kp_list):
         ports.prompt_args = (subject_code, days, total, accuracy, kp_list)
-        return ["report-prompt"]
+        return [{"role": "user", "content": "report-prompt"}]
 
     def fake_get_fallback_report():
         ports.calls.append(("get_fallback_report",))
@@ -90,6 +104,13 @@ def ports(monkeypatch):
 
     monkeypatch.setattr(service, "load_question_kps", fake_load_question_kps)
     monkeypatch.setattr(service, "check_token_limit", fake_check_token_limit)
+    monkeypatch.setattr(service, "reserve_token_budget", fake_reserve_token_budget)
+    monkeypatch.setattr(
+        service, "settle_token_reservation", fake_settle_token_reservation
+    )
+    monkeypatch.setattr(
+        service, "cancel_token_reservation", fake_cancel_token_reservation
+    )
     monkeypatch.setattr(service, "_call_ai", fake_call_ai)
     monkeypatch.setattr(service, "record_token_usage", fake_record_token_usage)
     monkeypatch.setattr(service, "build_report_prompt", fake_build_report_prompt)
@@ -183,7 +204,16 @@ async def test_low_volume_report_uses_rule_copy_without_ai(ports):
     assert result["from_fallback"] is False
     assert result["tokens_used"] == 0
     assert not [
-        call for call in ports.calls if call[0] in {"_call_ai", "check_token_limit"}
+        call
+        for call in ports.calls
+        if call[0]
+        in {
+            "_call_ai",
+            "check_token_limit",
+            "reserve_token_budget",
+            "settle_token_reservation",
+            "cancel_token_reservation",
+        }
     ]
 
 
@@ -257,7 +287,12 @@ async def test_five_records_crosses_into_ai_path(ports):
     result = await service.generate_learning_report(db, user_id=7, subject_id=3)
 
     assert result["total_answered"] == 5
-    assert ("check_token_limit", 7, 1000) in ports.calls
+    assert any(
+        call[0] == "reserve_token_budget"
+        and call[1] == 7
+        and call[2] >= 1000
+        for call in ports.calls
+    )
     assert [call[0] for call in ports.calls].count("_call_ai") == 1
 
 

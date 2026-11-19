@@ -11,6 +11,7 @@ ENTRY = "generate_learning_report"
 DETAIL_ENTRIES = ("ai_explain", "ai_analyze_mistake", "recommend_similar_questions")
 HELPERS = (
     "_load_active_question",
+    "_call_ai_reserved",
     "_question_stem",
     "_explain_unavailable_payload",
     "_explain_success_payload",
@@ -34,6 +35,7 @@ HELPERS = (
     "_low_volume_learning_report",
     "_token_limited_learning_report",
     "_ai_fallback_learning_report",
+    "_complete_learning_report",
     "_project_parsed_report_points",
     "_ai_learning_report",
     "_learning_report_metrics",
@@ -72,11 +74,13 @@ def check_detail_entries(tree):
         "q = await _load_active_question(db, question_id)",
         "kp_map = await load_question_kps(db, [q.id])",
         "messages = _build_explain_messages(",
-        "if not await check_token_limit(db, user_id, 500):",
+        "reservation = await reserve_token_budget(",
+        "if reservation is None:",
         "return _explain_unavailable_payload(",
-        "result = await _call_ai(messages, db)",
+        "result = await _call_ai_reserved(messages, db, reservation)",
         "if result is None:",
         "await record_token_usage(",
+        "await settle_token_reservation(",
         "return _explain_success_payload(",
     )
     for forbidden in ("db.execute", "select(", "build_explain_prompt("):
@@ -87,11 +91,13 @@ def check_detail_entries(tree):
         mistake,
         "q = await _load_active_question(db, question_id)",
         "messages = _build_mistake_messages(",
-        "if not await check_token_limit(db, user_id, 300):",
+        "reservation = await reserve_token_budget(",
+        "if reservation is None:",
         "return _mistake_unavailable_payload(",
-        "result = await _call_ai(messages, db)",
+        "result = await _call_ai_reserved(messages, db, reservation)",
         "if result is None:",
         "await record_token_usage(",
+        "await settle_token_reservation(",
         "return _mistake_success_payload(",
     )
     for forbidden in ("db.execute", "select(", "build_mistake_analysis_prompt("):
@@ -214,12 +220,13 @@ def check_entry(tree):
         "if total < 5:",
         "return _low_volume_learning_report(",
         "messages = build_report_prompt(subject_code, days, total, accuracy, kp_list)",
-        "if not await check_token_limit(db, user_id, 1000):",
+        "reservation = await reserve_token_budget(",
+        "if reservation is None:",
         "return _token_limited_learning_report(",
-        "result = await _call_ai(messages, db)",
+        "result = await _call_ai_reserved(messages, db, reservation)",
         "if result is None:",
         "return _ai_fallback_learning_report(",
-        "return await _ai_learning_report(",
+        "return await _complete_learning_report(",
     )
     for forbidden in (
         "db.get(",

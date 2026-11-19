@@ -27,6 +27,7 @@ async def list_formulas(
     *,
     ports,
 ):
+    ports("require_bounded_csv")(tags, field="tags", max_items=20, max_length=1024)
     if chapter_id is not None:
         await ports("_validate_chapter")(db, chapter_id, subject_code)
     base_query = ports("select")(ports("FormulaCard")).where(
@@ -67,6 +68,7 @@ async def list_favorite_formulas(
     *,
     ports,
 ):
+    ports("require_bounded_csv")(tags, field="tags", max_items=20, max_length=1024)
     fav_q = ports("select")(ports("UserFormulaFavorite").formula_card_id).where(
         ports("UserFormulaFavorite").user_id == current_user.id
     )

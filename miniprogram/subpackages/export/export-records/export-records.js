@@ -12,6 +12,8 @@ const requestApi = require('../../../utils/api')
 const { ExportStatusSyncManager } = require('../services/export_status_sync')
 const previewTempFiles = require('../../../utils/preview-temp-files')
 const config = require('../../../config')
+const auth = require('../../../utils/auth')
+const storage = require('../../../utils/storage')
 
 const STATUS_MAP = {
   pending: {
@@ -234,6 +236,7 @@ Page({
   _pageDestroyed: false,
   _capabilityPromise: null,
   _capabilityRequestId: 0,
+  _owner: '',
 
   onLoad(options) {
     if (options && String(options.guest) === '1') {
@@ -248,6 +251,7 @@ Page({
     this._previewFileCache = new Map()
     this._previewDownloadPromises = new Map()
     this._suppressNextShowRefresh = false
+    this._owner = auth.isLoggedIn() ? this._previewOwner() : ''
     if (options.highlight) {
       this.setData({ highlightId: parseInt(options.highlight, 10) })
     }
@@ -258,6 +262,12 @@ Page({
   onShow() {
     this._pageAlive = true
     if (this._guestMode) return
+    const owner = auth.isLoggedIn() ? this._previewOwner() : ''
+    if (owner !== this._owner) {
+      this._clearPrivateState()
+      this._owner = owner
+    }
+    if (!owner) return
 
     // wx.openDocument hides the page while the document viewer is active.
     // Always clear the transient button state when the page becomes visible
@@ -661,12 +671,38 @@ Page({
       return res
     } catch (err) {
       if (this._pageDestroyed || requestId !== this._listRequestId) return null
-      this.setData({ loading: false })
+      if (err && err.code === 'AUTH_REQUIRED') {
+        this._clearPrivateState()
+      } else {
+        this.setData({ loading: false })
+      }
       if (this._pageAlive) {
         wx.showToast({ title: '加载失败', icon: 'none' })
       }
       return null
     }
+  },
+
+  _clearPrivateState() {
+    this._listRequestId++
+    this._hasLoadedOnce = false
+    this._loadPromise = null
+    this._loadPromiseReset = false
+    this._suppressNextShowRefresh = false
+    if (this._previewFileCache) this._previewFileCache.clear()
+    if (this._previewDownloadPromises) this._previewDownloadPromises.clear()
+    previewTempFiles.purgeAll().catch(function(err) {
+      console.warn('[PREVIEW_TEMP] purge failed', err && (err.errMsg || err.message || err))
+    })
+    this.setData({
+      list: [],
+      totalRecords: 0,
+      page: 1,
+      hasMore: false,
+      loading: false,
+      previewingTaskId: null,
+      expandedActionId: null,
+    })
   },
 
   _buildMergedList(res, reset) {
@@ -1015,9 +1051,20 @@ Page({
 
   // ── Preview (wx.openDocument) ──
 
+  _previewOwner() {
+    try {
+      return storage.ownerFingerprint()
+    } catch (_) {
+      return ''
+    }
+  },
+
   _previewCacheVersion(task) {
     if (!task) return ''
+    const owner = this._previewOwner()
+    if (!owner) return ''
     return [
+      owner,
       Number(task.id) || 0,
       task.completed_at || '',
       Number(task.file_size) || 0,
@@ -1054,15 +1101,18 @@ Page({
     })
   },
 
-  async _getPreviewFile(task) {
+  async _getPreviewFile(task, owner) {
     const taskId = Number(task && task.id)
     const cacheKey = this._previewCacheVersion(task)
-    const cachedPath = await this._resolveCachedPreviewFile(cacheKey)
+    if (!cacheKey || !owner) {
+      throw Object.assign(new Error('登录状态已变化'), { code: 'AUTH_REQUIRED' })
+    }
+    const cachedPath = await this._resolveCachedPreviewFile(cacheKey, owner)
     if (cachedPath) return cachedPath
     if (this._previewDownloadPromises && this._previewDownloadPromises.has(cacheKey)) {
       return this._previewDownloadPromises.get(cacheKey)
     }
-    const downloadPromise = this._downloadPreviewFile(taskId, cacheKey, task)
+    const downloadPromise = this._downloadPreviewFile(taskId, cacheKey, task, owner)
     if (this._previewDownloadPromises) {
       this._previewDownloadPromises.set(cacheKey, downloadPromise)
     }
@@ -1073,7 +1123,7 @@ Page({
     }
   },
 
-  async _resolveCachedPreviewFile(cacheKey) {
+  async _resolveCachedPreviewFile(cacheKey, owner) {
     const cachedPath = this._previewFileCache && this._previewFileCache.get(cacheKey)
     if (cachedPath) {
       try {
@@ -1087,7 +1137,7 @@ Page({
     }
     // Restore a still-valid temp path tracked by a previous page instance.
     // The host may have removed it already, so always verify with fs.access.
-    const trackedPath = previewTempFiles.findByCacheKey(cacheKey)
+    const trackedPath = previewTempFiles.findByCacheKey(cacheKey, owner)
     if (trackedPath) {
       try {
         await this._accessFile(trackedPath)
@@ -1101,7 +1151,7 @@ Page({
     return null
   },
 
-  async _downloadPreviewFile(taskId, cacheKey, task) {
+  async _downloadPreviewFile(taskId, cacheKey, task, owner) {
     const info = await exportApi.getDownloadInfo(taskId)
     const version = cacheKey
     const useApiStream = info.method === 'stream'
@@ -1116,8 +1166,13 @@ Page({
     const filePath = useApiStream
       ? await this._requestStreamFile(url, task, cacheKey)
       : await this._downloadFile(url, false)
+    if (!auth.isLoggedIn() || this._previewOwner() !== owner) {
+      await previewTempFiles.remove(filePath)
+      throw Object.assign(new Error('账号会话已变化'), { code: 'AUTH_REQUIRED' })
+    }
     if (this._previewFileCache) this._previewFileCache.set(cacheKey, filePath)
     previewTempFiles.register(filePath, {
+      owner: owner,
       taskId: taskId,
       cacheKey: cacheKey,
     })
@@ -1127,13 +1182,30 @@ Page({
   async onPreview(e) {
     const taskId = Number(e.currentTarget.dataset.id)
     if (!taskId || this.data.previewingTaskId) return
+    const owner = auth.isLoggedIn() ? this._previewOwner() : ''
+    if (!owner || owner !== this._owner) {
+      this._clearPrivateState()
+      this._owner = owner
+      await this._showDialog({
+        title: '登录已过期',
+        content: '请重新登录后再打开导出文件。',
+        confirmText: '知道了',
+        showCancel: false,
+        tone: 'danger',
+      })
+      return
+    }
     const task = this.data.list.find(function(item) { return Number(item.id) === taskId })
     if (!task) return
 
     this.setData({ previewingTaskId: taskId })
     try {
-      const filePath = await this._getPreviewFile(task)
+      const filePath = await this._getPreviewFile(task, owner)
       if (this._pageDestroyed) return
+      if (!auth.isLoggedIn() || this._previewOwner() !== owner) {
+        await previewTempFiles.remove(filePath)
+        throw Object.assign(new Error('账号会话已变化'), { code: 'AUTH_REQUIRED' })
+      }
       const fileType = task.file_format === 'docx' ? 'docx' : 'pdf'
       // wx.openDocument briefly hides and shows the page. Set the flag only
       // after the existing server file has been downloaded successfully, so a
@@ -1150,6 +1222,18 @@ Page({
       })
     } catch (err) {
       this._suppressNextShowRefresh = false
+      if (err && err.code === 'AUTH_REQUIRED') {
+        this._clearPrivateState()
+        this._owner = auth.isLoggedIn() ? this._previewOwner() : ''
+        await this._showDialog({
+          title: '登录已过期',
+          content: '账号状态已变化，请重新登录后再打开导出文件。',
+          confirmText: '知道了',
+          showCancel: false,
+          tone: 'danger',
+        })
+        return
+      }
       this._invalidatePreviewCache(taskId)
       const content = task.file_format === 'docx'
         ? 'Word 文件暂时无法预览，可稍后重试或在支持 Word 的设备上打开。'

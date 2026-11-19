@@ -353,14 +353,21 @@ def test_task_flow_bucket_priority_chain():
 
 
 def test_task_flow_groups_keep_titles_and_preview_slices():
-    buckets = {
+    counts = {
+        "today_due": 5,
+        "high_frequency": 2,
+        "recent_added": 0,
+        "to_consolidate": 1,
+        "mastered": 3,
+    }
+    previews = {
         "today_due": list(range(5)),
         "high_frequency": [10, 11],
         "recent_added": [],
         "to_consolidate": [20],
         "mastered": [30, 31, 32],
     }
-    groups = wqs._task_flow_groups(buckets, 2)
+    groups = wqs._task_flow_groups(counts, previews, 2)
     assert [(g["key"], g["title"], g["total"]) for g in groups] == [
         ("today_due", "今日应复习", 5),
         ("high_frequency", "高频错题", 2),
@@ -378,13 +385,13 @@ def test_task_flow_groups_keep_titles_and_preview_slices():
 
 
 def test_task_flow_summary_counters_are_non_exclusive():
-    items = [
-        task_flow_item(is_mastered=True),
-        task_flow_item(is_mastered=True, wrong_count=4),
-        task_flow_item(wrong_count=3),
-        task_flow_item(wrong_count=2),
-    ]
-    summary = wqs._task_flow_summary(items, total_count=99, today_due_count=1)
+    aggregate = {
+        "total_count": 99,
+        "mastered_count": 2,
+        "high_frequency_count": 1,
+        "today_due_count": 1,
+    }
+    summary = wqs._task_flow_summary(aggregate)
     assert summary == {
         "total_count": 99,
         "mastered_count": 2,
@@ -706,6 +713,9 @@ async def test_list_wrong_enriched_projects_full_item(monkeypatch):
     assert (
         "order by wrong_questions.updated_at desc, wrong_questions.id desc" in page_sql
     )
+    assert "questions.is_active" in page_sql
+    assert "questions.review_status" in page_sql
+    assert "approved" in db.params(1).values()
     assert "left outer join subjects" in page_sql
     assert "review_records.question_version_id" in page_sql
     assert "review_schedules.mastered" in page_sql
@@ -1080,35 +1090,86 @@ async def test_batch_operate_dedupes_and_processes_in_lock_order(monkeypatch):
 def install_task_flow_seams(monkeypatch, pages):
     calls = []
 
-    async def loader(db, user_id, **kwargs):
-        calls.append(dict(kwargs))
-        index = kwargs.get("page", 1) - 1
-        if index >= len(pages):
-            return [], pages[-1][1] if pages else 0
-        return pages[index]
+    async def aggregate_loader(db, scope_query, today_end):
+        calls.append(("aggregate", scope_query, today_end))
+        return pages["aggregate"]
 
-    monkeypatch.setattr(wqs, "list_wrong_enriched", loader)
+    async def counts_loader(db, scope_query, today_end, fourteen_days_ago):
+        calls.append(("counts", scope_query, today_end, fourteen_days_ago))
+        return pages["counts"]
+
+    async def preview_loader(
+        db,
+        scope_query,
+        group_key,
+        today_end,
+        fourteen_days_ago,
+        preview_size,
+    ):
+        calls.append(("preview", group_key, preview_size))
+        return pages["preview_ids"][group_key]
+
+    async def items_loader(db, user_id, preview_ids):
+        calls.append(("items", user_id, preview_ids))
+        return pages["items_by_id"]
+
+    monkeypatch.setattr(wqs, "_task_flow_aggregate", aggregate_loader)
+    monkeypatch.setattr(wqs, "_task_flow_group_counts", counts_loader)
+    monkeypatch.setattr(wqs, "_task_flow_preview_ids", preview_loader)
+    monkeypatch.setattr(
+        wqs, "_load_task_flow_preview_items", items_loader
+    )
+    monkeypatch.setattr(wqs, "_task_flow_scope_query", lambda conditions: conditions)
     monkeypatch.setattr(wqs, "utcnow", lambda: NOW)
     monkeypatch.setattr(wqs, "shanghai_today_boundaries", lambda: (None, TODAY_END))
     return calls
 
 
 @pytest.mark.asyncio
-async def test_task_flow_paginates_until_total_reached(monkeypatch):
-    first_page = [task_flow_item(id=index, question_id=index) for index in range(500)]
-    second_page = [task_flow_item(id=999, question_id=999)]
+async def test_task_flow_uses_bounded_queries_not_500_pages(monkeypatch):
+    items_by_id = {
+        index: task_flow_item(id=index, question_id=index)
+        for index in range(100, 103)
+    }
+    preview_ids = {
+        "today_due": [],
+        "high_frequency": [],
+        "recent_added": list(items_by_id),
+        "to_consolidate": [],
+        "mastered": [],
+    }
     calls = install_task_flow_seams(
-        monkeypatch, [(first_page, 501), (second_page, 501)]
+        monkeypatch,
+        {
+            "aggregate": {
+                "total_count": 501,
+                "mastered_count": 0,
+                "high_frequency_count": 0,
+                "today_due_count": 0,
+            },
+            "counts": {
+                "today_due": 0,
+                "high_frequency": 0,
+                "recent_added": 501,
+                "to_consolidate": 0,
+                "mastered": 0,
+            },
+            "preview_ids": preview_ids,
+            "items_by_id": items_by_id,
+        },
     )
 
     flow = await wqs.get_task_flow(FakeDb(), USER)
 
-    assert [call["page"] for call in calls] == [1, 2]
-    assert all(call["page_size"] == 500 for call in calls)
+    assert [call[0] for call in calls] == ["aggregate", "counts", *["preview"] * 5, "items"]
+    assert [call[1:] for call in calls if call[0] == "preview"] == [
+        (key, 3) for key, _ in wqs._TASK_FLOW_GROUPS
+    ]
     assert flow["summary"]["total_count"] == 501
     assert flow["summary"]["mastered_count"] == 0
     groups = {group["key"]: group for group in flow["groups"]}
     assert groups["recent_added"]["total"] == 501
+    assert [item["id"] for item in groups["recent_added"]["items"]] == list(items_by_id)
     assert all(
         groups[key]["total"] == 0
         for key in ("today_due", "high_frequency", "to_consolidate", "mastered")
@@ -1116,13 +1177,34 @@ async def test_task_flow_paginates_until_total_reached(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_task_flow_stops_on_empty_page(monkeypatch):
-    calls = install_task_flow_seams(monkeypatch, [([], 9)])
+async def test_task_flow_empty_book(monkeypatch):
+    calls = install_task_flow_seams(
+        monkeypatch,
+        {
+            "aggregate": {
+                "total_count": 0,
+                "mastered_count": 0,
+                "high_frequency_count": 0,
+                "today_due_count": 0,
+            },
+            "counts": {
+                "today_due": 0,
+                "high_frequency": 0,
+                "recent_added": 0,
+                "to_consolidate": 0,
+                "mastered": 0,
+            },
+            "preview_ids": {
+                key: [] for key, _ in wqs._TASK_FLOW_GROUPS
+            },
+            "items_by_id": {},
+        },
+    )
 
     flow = await wqs.get_task_flow(FakeDb(), USER)
 
-    assert [call["page"] for call in calls] == [1]
-    assert flow["summary"]["total_count"] == 9
+    assert [call[1:] for call in calls if call[0] == "items"] == [(USER, [])]
+    assert flow["summary"]["total_count"] == 0
     assert all(group["total"] == 0 for group in flow["groups"])
 
 
@@ -1131,16 +1213,41 @@ async def test_task_flow_groups_and_preview_and_summary(monkeypatch):
     due = TODAY_END - timedelta(hours=1)
     fresh = NOW - timedelta(days=1)
     old = NOW - timedelta(days=60)
-    items = [
-        task_flow_item(id=1, next_review_at=due),
-        task_flow_item(id=2, next_review_at=due),
-        task_flow_item(id=3, next_review_at=due, wrong_count=7, is_mastered=True),
-        task_flow_item(id=4, wrong_count=3),
-        task_flow_item(id=5, created_at=fresh),
-        task_flow_item(id=6, created_at=old),
-        task_flow_item(id=7, is_mastered=True, created_at=old),
-    ]
-    install_task_flow_seams(monkeypatch, [(items, len(items))])
+    items_by_id = {
+        1: task_flow_item(id=1, next_review_at=due),
+        2: task_flow_item(id=2, next_review_at=due),
+        3: task_flow_item(id=3, next_review_at=due, wrong_count=7, is_mastered=True),
+        4: task_flow_item(id=4, wrong_count=3),
+        5: task_flow_item(id=5, created_at=fresh),
+        6: task_flow_item(id=6, created_at=old),
+        7: task_flow_item(id=7, is_mastered=True, created_at=old),
+    }
+    install_task_flow_seams(
+        monkeypatch,
+        {
+            "aggregate": {
+                "total_count": 7,
+                "mastered_count": 2,
+                "high_frequency_count": 1,
+                "today_due_count": 2,
+            },
+            "counts": {
+                "today_due": 2,
+                "high_frequency": 1,
+                "recent_added": 1,
+                "to_consolidate": 1,
+                "mastered": 2,
+            },
+            "preview_ids": {
+                "today_due": [1, 2],
+                "high_frequency": [4],
+                "recent_added": [5],
+                "to_consolidate": [6],
+                "mastered": [3, 7],
+            },
+            "items_by_id": items_by_id,
+        },
+    )
 
     flow = await wqs.get_task_flow(FakeDb(), USER, preview_size=1)
 
@@ -1162,11 +1269,53 @@ async def test_task_flow_groups_and_preview_and_summary(monkeypatch):
 @pytest.mark.asyncio
 async def test_task_flow_passes_filters_and_recent_window(monkeypatch):
     fresh_boundary = NOW - timedelta(days=14)
-    items = [
-        task_flow_item(id=1, created_at=fresh_boundary),
-        task_flow_item(id=2, created_at=fresh_boundary - timedelta(microseconds=1)),
-    ]
-    calls = install_task_flow_seams(monkeypatch, [(items, 2)])
+    items_by_id = {
+        1: task_flow_item(id=1, created_at=fresh_boundary),
+        2: task_flow_item(id=2, created_at=fresh_boundary - timedelta(microseconds=1)),
+    }
+    optional_calls = []
+    real_optional = wqs._wrong_list_optional_conditions
+
+    def optional_spy(error_type, date_from, date_to):
+        optional_calls.append((error_type, date_from, date_to))
+        return real_optional(error_type, date_from, date_to)
+
+    subject_calls = []
+    topic_calls = []
+
+    async def subject_scope(db, scope_query, subject_id):
+        subject_calls.append(subject_id)
+        return scope_query
+
+    monkeypatch.setattr(wqs, "_wrong_list_optional_conditions", optional_spy)
+    monkeypatch.setattr(wqs, "_apply_wrong_subject_scope", subject_scope)
+    monkeypatch.setattr(wqs, "_apply_wrong_topic_scope", lambda scope, topic: topic_calls.append(topic) or scope)
+    calls = install_task_flow_seams(
+        monkeypatch,
+        {
+            "aggregate": {
+                "total_count": 2,
+                "mastered_count": 0,
+                "high_frequency_count": 0,
+                "today_due_count": 0,
+            },
+            "counts": {
+                "today_due": 0,
+                "high_frequency": 0,
+                "recent_added": 1,
+                "to_consolidate": 1,
+                "mastered": 0,
+            },
+            "preview_ids": {
+                "today_due": [],
+                "high_frequency": [],
+                "recent_added": [1],
+                "to_consolidate": [2],
+                "mastered": [],
+            },
+            "items_by_id": items_by_id,
+        },
+    )
 
     flow = await wqs.get_task_flow(
         FakeDb(),
@@ -1183,12 +1332,11 @@ async def test_task_flow_passes_filters_and_recent_window(monkeypatch):
     groups = {group["key"]: group for group in flow["groups"]}
     assert groups["recent_added"]["total"] == 1
     assert groups["to_consolidate"]["total"] == 1
-    kwargs = calls[0]
-    assert kwargs["subject_id"] == 2
-    assert kwargs["error_type"] == "careless"
-    assert kwargs["topic"] == "极限"
-    assert kwargs["allowed_subject_ids"] == {1}
-    assert kwargs["date_from"] == date(2026, 10, 1)
-    assert kwargs["date_to"] == date(2026, 10, 20)
-    assert kwargs["page"] == 1
-    assert kwargs["page_size"] == 500
+    assert subject_calls == [2]
+    assert topic_calls == ["极限"]
+    assert optional_calls == [
+        ("careless", date(2026, 10, 1), date(2026, 10, 20))
+    ]
+    assert [call[1:] for call in calls if call[0] == "preview"] == [
+        (key, 3) for key, _ in wqs._TASK_FLOW_GROUPS
+    ]

@@ -3,12 +3,18 @@ const KEYS = {
   USER: 'user',
   TOKEN_EXPIRES_AT: 'token_expires_at',
   REFRESH_TOKEN: 'refresh_token',
+  LAST_AUTH_OWNER: 'last_auth_owner',
 }
 
 /** 业务缓存键列表 — 会话切换或注销时需清除 */
 const BUSINESS_CACHE_KEYS = [
   'lastPracticeResult',
   'practice_recent_subjects_v1',
+  'guest_trial_draft_v1',
+  'guestPracticeResult',
+  'reader_sequence',
+  'pomodoro_task_type_records_v1',
+  'pomodoro_task_type_selection_v1',
   'wrong_detail_nav',
   'pomodoro_running_state',
   'pomodoro_pause',
@@ -76,20 +82,37 @@ function remove(key) {
   }
 }
 
+function removeDebugSnapshots() {
+  try {
+    var keys = wx.getStorageInfoSync().keys || []
+    for (var index = 0; index < keys.length; index++) {
+      if (keys[index].indexOf('debug_snapshot:') === 0) remove(keys[index])
+    }
+  } catch (_) {}
+}
+
 function clearSession(options) {
   var opts = options || {}
   var preservePrivacy = opts.preservePrivacyAcceptance === true
+  var previousOwner = ownerFingerprint()
 
   // 1. 清除认证信息
   remove(KEYS.TOKEN)
   remove(KEYS.TOKEN_EXPIRES_AT)
   remove(KEYS.REFRESH_TOKEN)
   remove(KEYS.USER)
+  if (opts.rememberAuthOwner !== true && previousOwner) {
+    set(KEYS.LAST_AUTH_OWNER, previousOwner)
+  }
 
   // 2. 清除业务缓存
   for (var bi = 0; bi < BUSINESS_CACHE_KEYS.length; bi++) {
     if (opts.preserveLaunchResume && BUSINESS_CACHE_KEYS[bi] === 'pomodoro_running_state') continue
+    if (preservePrivacy && PROTECTED_KEYS.indexOf(BUSINESS_CACHE_KEYS[bi]) >= 0) continue
     remove(BUSINESS_CACHE_KEYS[bi])
+  }
+  if (!preservePrivacy) {
+    for (var pi = 0; pi < PROTECTED_KEYS.length; pi++) remove(PROTECTED_KEYS[pi])
   }
 
   // 3. 清除动态会话缓存（AI 诊断 + 待确认刷题提交）
@@ -108,21 +131,19 @@ function clearSession(options) {
 
   // 4. 清除调试快照
   if (opts.includeDebugSnapshots !== false) {
-    try {
-      var keys2 = wx.getStorageInfoSync().keys || []
-      for (var ki2 = 0; ki2 < keys2.length; ki2++) {
-        if (keys2[ki2].indexOf('debug_snapshot:') === 0) {
-          remove(keys2[ki2])
-        }
-      }
-    } catch (_) {}
+    removeDebugSnapshots()
   }
 }
 
 function ownerFingerprint() {
   const user = get(KEYS.USER) || {}
-  const raw = user.id || user.user_id || user.uid || user.openid || user.username || user.nickname || user.nickName || ''
-  return raw ? String(raw) : 'anonymous'
+  const raw = user.id || user.user_id || user.uid || user.openid || ''
+  return raw ? String(raw) : ''
+}
+
+function currentSessionGeneration() {
+  const token = get(KEYS.TOKEN)
+  return token ? String(token).slice(-24) : ''
 }
 
 module.exports = {

@@ -404,7 +404,21 @@ async def process_task(
                 )
 
             # 9. Store the file
+            from app.models.user import User
             from app.services.storage_backend import get_export_storage
+
+            owner = await db.scalar(
+                select(User)
+                .where(User.id == task.user_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            if owner is None or owner.deleted_at is not None:
+                raise ExportDomainError(
+                    status_code=410,
+                    error_code=ExportErrorCode.ACCESS_DENIED,
+                    message="账号已注销，导出文件已丢弃",
+                )
 
             storage = get_export_storage()
             file_key = f"{task.id}/{task.file_name}"

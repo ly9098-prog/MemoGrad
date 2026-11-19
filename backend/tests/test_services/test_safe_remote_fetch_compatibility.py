@@ -5,10 +5,22 @@ from __future__ import annotations
 import pytest
 
 from app.services.safe_remote_fetch import (
+    RemoteFetchTimeoutError,
     UnsafeRemoteURLError,
     is_safe_remote_url,
+    request_remote_bytes,
     validate_remote_url,
 )
+
+
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.safe_remote_fetch.socket.getaddrinfo",
+        lambda *args, **kwargs: [
+            (2, 1, 6, "", ("93.184.216.34", 443))
+        ],
+    )
 
 
 class TestValidateRemoteUrl:
@@ -57,3 +69,57 @@ class TestIsSafeRemoteUrl:
 
     def test_empty_returns_false(self):
         assert is_safe_remote_url("") is False
+
+
+def test_many_short_reads_cannot_extend_shared_deadline(monkeypatch):
+    now = {"value": 100.0}
+    reads = []
+
+    class FakeSocket:
+        def settimeout(self, _timeout):
+            return None
+
+    class FakeResponse:
+        status = 200
+
+        def getheader(self, name, default=""):
+            return default
+
+        def read(self, _size):
+            reads.append(now["value"])
+            now["value"] += 0.04
+            return b"x"
+
+    class FakeConnection:
+        def __init__(self, *args, **kwargs):
+            self.sock = FakeSocket()
+
+        def connect(self):
+            return None
+
+        def request(self, *args, **kwargs):
+            return None
+
+        def getresponse(self):
+            return FakeResponse()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        "app.services.safe_remote_fetch.time.monotonic",
+        lambda: now["value"],
+    )
+    monkeypatch.setattr(
+        "app.services.safe_remote_fetch._PinnedHTTPSConnection",
+        FakeConnection,
+    )
+
+    with pytest.raises(RemoteFetchTimeoutError, match="timed out"):
+        request_remote_bytes(
+            "https://example.com/stream",
+            max_bytes=1024,
+            timeout=0.1,
+        )
+
+    assert len(reads) <= 3

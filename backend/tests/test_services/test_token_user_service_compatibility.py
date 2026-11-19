@@ -158,7 +158,8 @@ async def test_refresh_consumes_before_issuing_access_token(monkeypatch):
         calls.append("rotate")
         return "new-refresh"
 
-    async def issue(user_id):
+    async def issue(user_id, *, expected_nbf=None):
+        assert expected_nbf is None
         calls.append("issue")
         return "new-access", 456
 
@@ -243,6 +244,7 @@ async def test_avatar_commit_failure_rolls_back_and_removes_only_new_object(
         commit=AsyncMock(side_effect=ValueError("commit")),
         refresh=AsyncMock(),
         rollback=AsyncMock(),
+        scalar=AsyncMock(return_value=user),
     )
     storage = SimpleNamespace(
         upload=AsyncMock(return_value="new-avatar"), delete=AsyncMock()
@@ -277,13 +279,43 @@ async def test_avatar_old_object_cleanup_follows_durable_profile(monkeypatch):
         assert url == "old-avatar"
         calls.append("old-delete")
 
-    db = SimpleNamespace(commit=commit, refresh=refresh)
+    db = SimpleNamespace(
+        commit=commit,
+        refresh=refresh,
+        scalar=AsyncMock(return_value=user),
+    )
     storage = SimpleNamespace(upload=AsyncMock(return_value="new-avatar"))
     monkeypatch.setattr(user_service, "_normalize_avatar_bytes", lambda raw: b"jpeg")
     monkeypatch.setattr(user_service, "get_user_avatar_storage", lambda: storage)
     monkeypatch.setattr(user_service, "delete_user_avatar_file", delete)
     assert await user_service.replace_user_avatar(db, user, b"synthetic") is user
     assert calls == ["commit", "refresh", "old-delete"]
+
+
+@pytest.mark.asyncio
+async def test_avatar_upload_rechecks_deleted_account_under_row_lock(monkeypatch):
+    stale_user = _user(avatar_url="old-avatar")
+    deleted_user = _user(avatar_url="old-avatar")
+    deleted_user.deleted_at = object()
+    db = SimpleNamespace(
+        scalar=AsyncMock(return_value=deleted_user),
+        commit=AsyncMock(),
+        refresh=AsyncMock(),
+        rollback=AsyncMock(),
+    )
+    storage = SimpleNamespace(
+        upload=AsyncMock(return_value="new-avatar"),
+        delete=AsyncMock(),
+    )
+    monkeypatch.setattr(user_service, "_normalize_avatar_bytes", lambda raw: b"jpeg")
+    monkeypatch.setattr(user_service, "get_user_avatar_storage", lambda: storage)
+
+    with pytest.raises(RuntimeError, match="account is unavailable"):
+        await user_service.replace_user_avatar(db, stale_user, b"synthetic")
+
+    db.rollback.assert_awaited_once()
+    db.commit.assert_not_awaited()
+    storage.delete.assert_awaited_once_with("new-avatar")
 
 
 @pytest.mark.asyncio

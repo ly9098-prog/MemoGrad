@@ -51,6 +51,7 @@ async def admit_pipeline_record(
         "subject": request.subject,
         "subject_id": request.subject_id,
         "created_by": request.created_by,
+        "owner_user_id": request.owner_user_id,
         "source_sha256": source_sha256,
         "options": {
             "enable_ai_repair": request.enable_ai_repair,

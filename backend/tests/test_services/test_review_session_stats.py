@@ -406,6 +406,13 @@ class TestRecordReviewSession:
             captured["args"] = (user_id, session_meta, results)
 
         class _DB:
+            async def execute(self, _statement):
+                class _Rows:
+                    def all(self):
+                        return []
+
+                return _Rows()
+
             async def commit(self):
                 pass
 

@@ -20,6 +20,12 @@ function normalizeUser(user) {
   }
 }
 
+function stableOwner(user) {
+  const source = user || {}
+  const raw = source.id || source.user_id || source.uid || source.openid || ''
+  return raw ? String(raw) : ''
+}
+
 async function syncCurrentUser() {
   if (!getToken()) return null
   const user = normalizeUser(await api.get('/users/me'))
@@ -56,6 +62,19 @@ async function updateProfile({ nickname, avatarPath } = {}) {
 /** 严格写入认证信息，失败时回滚并抛出异常 */
 function saveAuthSession(data, user) {
   try {
+    const previousUser = storage.get(KEYS.USER) || {}
+    const nextUser = user || {}
+    const previousOwner = stableOwner(previousUser) || String(storage.get(KEYS.LAST_AUTH_OWNER) || '')
+    const nextOwner = stableOwner(nextUser)
+    if (!nextOwner) throw new Error('登录信息缺少稳定账号标识')
+    if (previousOwner && previousOwner !== nextOwner) {
+      storage.clearSession({
+        preservePrivacyAcceptance: false,
+        includeDebugSnapshots: true,
+        rememberAuthOwner: true,
+      })
+      try { wx.removeStorageSync('privacy_acceptance') } catch (_) {}
+    }
     storage.setStrict(KEYS.TOKEN, data.access_token)
     storage.setStrict(
       KEYS.TOKEN_EXPIRES_AT,
@@ -63,6 +82,7 @@ function saveAuthSession(data, user) {
     )
     storage.setStrict(KEYS.REFRESH_TOKEN, data.refresh_token)
     storage.setStrict(KEYS.USER, user || {})
+    storage.setStrict(KEYS.LAST_AUTH_OWNER, nextOwner)
   } catch (error) {
     // 回滚已写入的认证信息
     try { wx.removeStorageSync(KEYS.TOKEN) } catch (_) {}

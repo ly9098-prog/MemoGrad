@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import cache
 from app.core.database import get_db
 from app.core.runtime_paths import API_V1_PREFIX
-from app.core.security import get_current_user, require_app_permission
-from app.models.admin import Subject
+from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.tag import TagCreate, TagResponse, TagSubjectGroup
 from app.services import knowledge_point_service as svc
@@ -73,17 +72,12 @@ async def get_knowledge_tree(
 async def create_knowledge_point(
     data: TagCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_app_permission("question:write")),
+    _: User = Depends(get_current_user),
 ):
-    tag = await svc.create_tag(db, data.name, data.subject_id, data.parent_id)
-    subj = await db.get(Subject, data.subject_id) if data.subject_id else None
-    return TagResponse(
-        id=tag.id,
-        name=tag.name,
-        subject_id=tag.subject_id,
-        subject_name=subj.name if subj else "",
-        parent_id=tag.parent_id,
-        sort_order=tag.sort_order,
+    """Reject app-side writes to the shared knowledge-point catalog."""
+    raise HTTPException(
+        status_code=403,
+        detail="知识点写入必须通过管理端审核流程",
     )
 
 
@@ -91,9 +85,10 @@ async def create_knowledge_point(
 async def delete_knowledge_point(
     tag_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_app_permission("question:write")),
+    _: User = Depends(get_current_user),
 ):
-    ok = await svc.delete_tag(db, tag_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="知识点不存在")
-    return {"status": "deleted"}
+    """Reject app-side deletion of shared knowledge-point data."""
+    raise HTTPException(
+        status_code=403,
+        detail="知识点写入必须通过管理端审核流程",
+    )

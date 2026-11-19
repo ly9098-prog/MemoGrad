@@ -37,6 +37,7 @@ from app.core.runtime_paths import STATIC_PREFIX
 from app.models.admin import QuestionVersion
 from app.models.ai_chat import AiChat
 from app.models.question import Question
+from app.models.user import User
 from app.models.wrong_question import WrongQuestion
 from app.services.ai.advice_snapshot import (
     advice_fallback_response,
@@ -130,7 +131,12 @@ from app.services.ai.visual_cache import (
     ai_analysis_generated_at,
     is_ai_analysis_fresh,  # noqa: F401 — historical public import
 )
-from app.services.ai_learning_service import check_token_limit
+from app.services.ai_learning_service import (
+    cancel_token_reservation,
+    estimate_chat_token_reservation,
+    reserve_token_budget,
+    settle_token_reservation,
+)
 from app.services.knowledge_point_service import load_question_kps
 from app.services.safe_remote_fetch import request_remote_bytes
 
@@ -146,8 +152,9 @@ def _analysis_timeout_sec(effective_force: bool) -> int:
 
 
 # 与 ai_learning_service 的同类入口一致：先按预估额度做准入，实际用量事后记入 AiChat。
-_ERROR_ANALYSIS_QUOTA_ESTIMATE = 900
-_ADVICE_QUOTA_ESTIMATE = 1000
+# Include the output cap, bounded text context and a conservative per-image
+# allowance so admission cannot reserve less than the provider can consume.
+_ERROR_ANALYSIS_QUOTA_ESTIMATE = 800 + 5000 + 4 * 1024
 
 
 async def _analyze_error_with_lease(
@@ -684,10 +691,16 @@ async def analyze_error(
     if preparation.response is not None:
         return preparation.response
 
-    if not await check_token_limit(db, user_id, _ERROR_ANALYSIS_QUOTA_ESTIMATE):
+    reservation = await reserve_token_budget(
+        db, user_id, _ERROR_ANALYSIS_QUOTA_ESTIMATE
+    )
+    if reservation is None:
         return quota_exceeded_response()
 
-    return await _analyze_error_with_lease(db, user_id, preparation)
+    response = await _analyze_error_with_lease(db, user_id, preparation)
+    actual_tokens = int(response.get("tokens_used") or 0)
+    await settle_token_reservation(reservation, actual_tokens)
+    return response
 
 
 async def prewarm_wrong_question_analysis(
@@ -732,12 +745,17 @@ async def prewarm_wrong_question_analysis(
 async def generate_advice(
     db: AsyncSession, user_id: int, subject_id: int | None = None
 ) -> dict:
+    user = await db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+    )
+    if user is None or user.deleted_at is not None:
+        return advice_fallback_response(get_fallback_advice())
+
     runtime = await resolve_llm_runtime_config(db, feature="analysis")
 
     if runtime is None:
-        return advice_fallback_response(get_fallback_advice())
-
-    if not await check_token_limit(db, user_id, _ADVICE_QUOTA_ESTIMATE):
         return advice_fallback_response(get_fallback_advice())
 
     # Collect user's wrong question stats
@@ -753,12 +771,21 @@ async def generate_advice(
         snapshot["weak_points"],
         snapshot["recent_wrong"],
     )
+    reservation = await reserve_token_budget(
+        db,
+        user_id,
+        estimate_chat_token_reservation(messages),
+    )
+    if reservation is None:
+        return advice_fallback_response(get_fallback_advice())
 
     try:
         result = await chat_with_db_model(db, messages, feature="analysis")
-        if result is None:
-            raise RuntimeError("AI分析模型未配置")
     except Exception:
+        # A failed response can still be billed; keep the reservation.
+        return advice_fallback_response(get_fallback_advice())
+    if result is None:
+        await cancel_token_reservation(reservation)
         return advice_fallback_response(get_fallback_advice())
 
     parsed = parse_advice_content(result["content"])
@@ -775,5 +802,6 @@ async def generate_advice(
         )
     )
     await db.commit()
+    await settle_token_reservation(reservation, result["tokens_used"])
 
     return advice_success_response(parsed, result)

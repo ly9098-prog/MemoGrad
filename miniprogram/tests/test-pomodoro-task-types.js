@@ -13,7 +13,7 @@ const syntax = spawnSync(process.execPath, ['--input-type=module', '--check'], {
 })
 assert.equal(syntax.status, 0, syntax.stderr)
 
-const records = new Map()
+const records = new Map([['user', { id: 17 }]])
 const context = {
   module: { exports: {} },
   require(name) {
@@ -21,6 +21,7 @@ const context = {
     return {
       get: key => records.get(key),
       set: (key, value) => records.set(key, value),
+      KEYS: { USER: 'user' },
     }
   },
 }
@@ -40,6 +41,8 @@ assert.equal(types.labelForSession({ id: 1 }), '错题')
 types.recordSession({ id: 1 }, '')
 assert.equal(types.typeForSession({ id: 1 }), 'wrong_questions')
 assert.equal(types.typeForSession({ id: 1, task_type: 'exam' }), 'exam')
+assert.equal(types.typeForSession({ id: 1, record_type: 'practice' }), '')
+assert.equal(types.typeForSession({ id: 1, record_type: 'pomodoro' }), 'wrong_questions')
 types.recordSession({ id: 2 }, 'invalid')
 assert.equal(types.typeForSession({ id: 2 }), '')
 assert.equal(types.labelForSession(null), '')

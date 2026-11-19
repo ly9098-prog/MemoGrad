@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.query_limits import require_bounded_csv
 from app.core.database import get_db
 from app.core.runtime_paths import API_V1_PREFIX
-from app.core.security import get_current_user, require_app_permission
+from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.common import paginated_response
 from app.schemas.question import (
@@ -51,24 +52,17 @@ def _public_question(question, kps=None) -> QuestionPublicResponse:
 async def create_question(
     data: QuestionCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_app_permission("question:write")),
+    _: User = Depends(get_current_user),
 ):
-    q = await svc.create(
-        db=db,
-        subject_id=data.subject_id,
-        question_type=data.question_type,
-        content=data.content,
-        options=data.options,
-        answer=data.answer,
-        analysis=data.analysis,
-        knowledge_points=data.knowledge_points,
-        difficulty=data.difficulty,
-        source=data.source,
-        year=data.year,
+    """Reject direct app writes; question publication belongs to admin review.
+
+    The endpoint remains registered for protocol compatibility, but an app JWT
+    must not create a published question outside the import/review/audit flow.
+    """
+    raise HTTPException(
+        status_code=403,
+        detail="题目写入必须通过管理端审核流程",
     )
-    kp_map = await load_question_kps(db, [q.id])
-    payload = QuestionResponse.model_validate(q)
-    return payload.model_copy(update={"knowledge_points": kp_map.get(q.id, [])})
 
 
 @router.get("")
@@ -96,10 +90,11 @@ async def list_questions(
 async def random_question(
     subject_id: int | None = Query(None),
     question_type: str | None = Query(None),
-    exclude_ids: str | None = Query(None),
+    exclude_ids: str | None = Query(None, max_length=4096),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    require_bounded_csv(exclude_ids, field="exclude_ids", max_items=200, max_length=4096)
     exclude = []
     if exclude_ids:
         exclude = [int(x.strip()) for x in exclude_ids.split(",") if x.strip()]
@@ -136,25 +131,75 @@ async def get_question_detail(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from sqlalchemy import func, select
+    from sqlalchemy import select
 
+    from app.models.admin import QuestionVersion
     from app.models.practice_record import PracticeRecord
 
-    result = await db.execute(
-        select(func.count(PracticeRecord.id)).where(
-            PracticeRecord.user_id == current_user.id,
-            PracticeRecord.question_id == question_id,
+    record = (
+        await db.execute(
+            select(PracticeRecord.question_version_id)
+            .where(
+                PracticeRecord.user_id == current_user.id,
+                PracticeRecord.question_id == question_id,
+            )
+            .order_by(PracticeRecord.answered_at.desc(), PracticeRecord.id.desc())
+            .limit(1)
         )
-    )
-    if result.scalar() == 0:
+    ).scalar_one_or_none()
+    if record is None:
         raise HTTPException(
             status_code=403,
             detail="请先完成答题后再查看答案",
         )
 
+    from app.services.ai_teacher_408_service import (
+        AIExamInProgressError,
+        assert_ai_answer_access_allowed,
+    )
+
+    try:
+        await assert_ai_answer_access_allowed(
+            db,
+            user_id=current_user.id,
+            question_id=question_id,
+        )
+    except AIExamInProgressError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "exam_in_progress_answer_blocked",
+                "message": str(exc),
+            },
+        ) from exc
+
     q = await svc.get_by_id(db, question_id)
     if not q:
         raise HTTPException(status_code=404, detail="题目不存在")
+
+    revision = await db.get(QuestionVersion, int(record))
+    if (
+        revision is None
+        or int(revision.question_id) != int(q.id)
+        or revision.is_active is not True
+        or int(revision.subject_id or 0) != int(q.subject_id)
+        or str(revision.question_type or "") != str(q.question_type or "")
+    ):
+        raise HTTPException(status_code=404, detail="题目版本不可用")
+
+    latest = (
+        await db.execute(
+            select(QuestionVersion)
+            .where(QuestionVersion.question_id == q.id)
+            .order_by(QuestionVersion.version.desc(), QuestionVersion.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if latest is None or int(latest.id) != int(revision.id):
+        raise HTTPException(
+            status_code=409,
+            detail="题目已更新，请重新作答后查看解析",
+        )
 
     kp_map = await load_question_kps(db, [q.id])
     return {

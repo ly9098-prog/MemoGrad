@@ -259,7 +259,10 @@ async def test_upsert_revision_and_commit_refresh_order(db, monkeypatch, mode):
         revision=None if mode == "missing_revision" else 4,
         is_active=mode not in {"inactive", "missing_revision"},
     )
-    db.scalar.return_value = plan
+    db.scalar.side_effect = [
+        SimpleNamespace(deleted_at=None),
+        plan,
+    ]
     monkeypatch.setattr(service, "shanghai_today", lambda: date(2026, 10, 30))
 
     async def commit():
@@ -293,7 +296,9 @@ async def test_upsert_create_race_reloads_locked_winner(db, monkeypatch):
         revision=1,
         is_active=True,
     )
-    db.scalar = AsyncMock(side_effect=[None, winner])
+    db.scalar = AsyncMock(
+        side_effect=[SimpleNamespace(deleted_at=None), None, winner]
+    )
     monkeypatch.setattr(service, "shanghai_today", lambda: date(2026, 10, 30))
     monkeypatch.setattr(service, "_start_explicit_transaction", AsyncMock())
 
@@ -315,7 +320,7 @@ async def test_upsert_create_race_reloads_locked_winner(db, monkeypatch):
     # Losing the create race returns the reloaded winner, not the failed candidate.
     result = await service.upsert_study_plan(db, 7, data)
     assert result is winner
-    assert db.scalar.await_count == 2
+    assert db.scalar.await_count == 3
     db.commit.assert_awaited_once()
     db.refresh.assert_awaited_once_with(winner)
 

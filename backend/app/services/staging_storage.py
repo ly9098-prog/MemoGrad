@@ -24,7 +24,7 @@ import stat
 import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from threading import Lock
 
@@ -573,6 +573,8 @@ class StagingObject:
     # object. Cleanup uses it in addition to created_at, so reusing an older
     # object cannot race the hourly retention sweep before a worker claims it.
     last_referenced_at: float | None = None
+    # Content-addressed objects can be reused by multiple app accounts.
+    owner_user_ids: list[int] = field(default_factory=list)
 
 
 def _ensure_dir(path: Path) -> None:
@@ -634,6 +636,7 @@ def store_file(
     source_path: str | Path,
     original_name: str = "",
     mime: str = "application/octet-stream",
+    owner_user_id: int | None = None,
 ) -> StagingObject:
     """Copy a file into staging storage and return its object metadata.
 
@@ -651,8 +654,12 @@ def store_file(
     dest = _object_path(object_id)
 
     if dest.exists():
+        existing = _load_metadata(object_id)
+        if owner_user_id is not None and int(owner_user_id) not in existing.owner_user_ids:
+            existing.owner_user_ids.append(int(owner_user_id))
+            _write_metadata(object_id, asdict(existing))
         touch_object(object_id)
-        return _load_metadata(object_id)
+        return existing
 
     src_size = os.path.getsize(source_path)
     _check_disk_quota(_staging_object_dir(), src_size)
@@ -689,6 +696,7 @@ def store_file(
         "created_at": time.time(),
         "staging_path": str(dest),
         "last_referenced_at": time.time(),
+        "owner_user_ids": [int(owner_user_id)] if owner_user_id is not None else [],
     }
     _write_metadata(object_id, meta)
     logger.info(
@@ -746,6 +754,37 @@ def get_metadata(object_id: str) -> StagingObject | None:
         return None
 
 
+def purge_owned_objects(owner_user_id: int) -> tuple[int, int]:
+    """Remove one account's ownership of staged content.
+
+    Shared content remains available to the other owners.  An object with no
+    remaining owner is deleted immediately.  Returns ``(updated, deleted)``.
+    """
+    owner = int(owner_user_id)
+    updated = 0
+    deleted = 0
+    obj_dir = _staging_object_dir()
+    if not obj_dir.is_dir():
+        return updated, deleted
+    for entry in list(obj_dir.iterdir()):
+        if not entry.is_file() or not entry.name.endswith(_METADATA_SUFFIX):
+            continue
+        object_id = entry.name[: -len(_METADATA_SUFFIX)]
+        validate_object_id(object_id)
+        with _object_lifecycle_guard(object_id):
+            metadata = _load_metadata(object_id)
+            if owner not in metadata.owner_user_ids:
+                continue
+            remaining = [item for item in metadata.owner_user_ids if item != owner]
+            if remaining:
+                metadata.owner_user_ids = remaining
+                _write_metadata(object_id, asdict(metadata))
+                updated += 1
+            elif _delete_object_unlocked(object_id):
+                deleted += 1
+    return updated, deleted
+
+
 def _delete_object_unlocked(object_id: str) -> bool:
     removed = False
     for p in (
@@ -775,6 +814,7 @@ def _load_metadata(object_id: str) -> StagingObject:
     mp = _metadata_path(object_id)
     with open(mp) as f:
         data = json.load(f)
+    data.setdefault("owner_user_ids", [])
     return StagingObject(**data)
 
 
@@ -1008,9 +1048,21 @@ async def async_store_file(
     source_path: str | Path,
     original_name: str = "",
     mime: str = "application/octet-stream",
+    owner_user_id: int | None = None,
 ) -> StagingObject:
     """Async wrapper for store_file — runs in executor to avoid blocking."""
-    return await asyncio.to_thread(store_file, source_path, original_name, mime)
+    return await asyncio.to_thread(
+        store_file,
+        source_path,
+        original_name,
+        mime,
+        owner_user_id,
+    )
+
+
+async def async_purge_owned_objects(owner_user_id: int) -> tuple[int, int]:
+    """Erase one account's staging references without breaking shared files."""
+    return await asyncio.to_thread(purge_owned_objects, owner_user_id)
 
 
 async def async_touch_object(object_id: str) -> bool:

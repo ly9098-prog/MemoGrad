@@ -423,3 +423,18 @@ def build_rule_based_dashboard_analysis(
         "model": "rule-based",
         "generated": False,
     }
+def build_ai_diagnosis_messages(
+    subject_rows,
+    total_q: int,
+    accuracy: float,
+    knowledge_point_stats: list[dict],
+) -> list[dict]:
+    from app.ai.prompts_learning import build_report_prompt
+
+    return build_report_prompt(
+        subject=subject_rows[0][0] if subject_rows else "全科",
+        days=60,
+        total=total_q,
+        accuracy=accuracy,
+        knowledge_point_stats=knowledge_point_stats,
+    )

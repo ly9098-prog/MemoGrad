@@ -1228,6 +1228,13 @@ async def _v2_heartbeat_cancel_requested(
         task_data = await task_queue.get_task_v2(task.task_id)
     except Exception:
         return False  # Cancel check failure is non-fatal for heartbeat
+    if task_data is None:
+        logger.warning(
+            "v2 Task payload disappeared, stopping owner: task_id=%s", task.task_id
+        )
+        if owner_lost is not None:
+            owner_lost.set()
+        return True
     if task_data and task_data.get("cancel_requested") == "1":
         logger.warning(
             "v2 Cancel requested, stopping: task_id=%s reason=%s",

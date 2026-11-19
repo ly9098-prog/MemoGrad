@@ -30,6 +30,7 @@ class Ports:
         self.vector_result = {"enabled": False, "recommendations": []}
         self.vector_error = None
         self.token_limit = True
+        self.reservation = service.TokenReservation(7, 1, "day-key", "month-key")
         self.ai_result = None
         self.fallback_explain = {"explanation": "讲解回退"}
         self.fallback_mistake = {
@@ -112,6 +113,19 @@ def ports(monkeypatch):
         ports.calls.append(("check_token_limit", user_id, tokens_needed))
         return ports.token_limit
 
+    async def fake_reserve_token_budget(db, user_id, tokens_needed):
+        ports.calls.append(("reserve_token_budget", user_id, tokens_needed))
+        if not ports.token_limit:
+            return None
+        ports.reservation.active = True
+        return ports.reservation
+
+    async def fake_settle_token_reservation(reservation, actual_tokens):
+        ports.calls.append(("settle_token_reservation", actual_tokens))
+
+    async def fake_cancel_token_reservation(reservation):
+        ports.calls.append(("cancel_token_reservation", reservation.user_id))
+
     async def fake_call_ai(messages, db=None):
         ports.calls.append(("_call_ai", messages))
         return ports.ai_result
@@ -137,6 +151,13 @@ def ports(monkeypatch):
 
     monkeypatch.setattr(service, "load_question_kps", fake_load_question_kps)
     monkeypatch.setattr(service, "check_token_limit", fake_check_token_limit)
+    monkeypatch.setattr(service, "reserve_token_budget", fake_reserve_token_budget)
+    monkeypatch.setattr(
+        service, "settle_token_reservation", fake_settle_token_reservation
+    )
+    monkeypatch.setattr(
+        service, "cancel_token_reservation", fake_cancel_token_reservation
+    )
     monkeypatch.setattr(service, "_call_ai", fake_call_ai)
     monkeypatch.setattr(service, "record_token_usage", fake_record_token_usage)
     monkeypatch.setattr(service, "get_fallback_explain", fake_get_fallback_explain)
@@ -184,10 +205,12 @@ async def test_explain_success_preserves_prompt_usage_and_payload(ports):
     }
     assert ports.calls == [
         ("load_question_kps", (11,)),
-        ("check_token_limit", 7, 500),
+        ("reserve_token_budget", 7, ports.calls[1][2]),
         ("_call_ai", ports.calls[2][1]),
         ("record_token_usage", 7, "ai_explain"),
+        ("settle_token_reservation", 123),
     ]
+    assert ports.calls[1][2] >= 2000
     assert "题目：源题" in ports.calls[2][1][1]["content"]
 
 
@@ -239,10 +262,12 @@ async def test_mistake_analysis_success_and_limit_copy(ports):
         "from_fallback": False,
     }
     assert ports.calls == [
-        ("check_token_limit", 7, 300),
+        ("reserve_token_budget", 7, ports.calls[0][2]),
         ("_call_ai", ports.calls[1][1]),
         ("record_token_usage", 7, "mistake_analysis"),
+        ("settle_token_reservation", 88),
     ]
+    assert ports.calls[0][2] >= 2000
     assert "题目：源题" in ports.calls[1][1][1]["content"]
 
     ports.token_limit = False

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time_utils import serialize_utc_datetime, shanghai_today, utcnow
-from app.services import stats_query_service
+from app.services import stats_ai_billing, stats_query_service
 from app.services.learning_time_projection import (
     china_date_expr as _china_date_expr,  # noqa: F401 - compatibility alias
 )
@@ -19,6 +19,9 @@ from app.services.learning_time_projection import (
 )
 from app.services.learning_time_projection import (
     today_utc as _today_utc,
+)
+from app.services.stats_ai_projection import (
+    build_ai_diagnosis_messages as _build_ai_diagnosis_messages,
 )
 from app.services.stats_ai_projection import (
     build_dashboard_ai_payload,
@@ -51,9 +54,8 @@ from app.services.stats_recommendation_projection import (
 
 logger = logging.getLogger(__name__)
 
-# Synchronous AI endpoints are called directly from the mini-program. Keep the
-# provider budget below the client transport timeout so a slow reasoning model
-# can degrade to a deterministic local diagnosis instead of failing at wx.request.
+# Keep synchronous provider calls below the mini-program request timeout so
+# slow models can return a local diagnosis before wx.request fails.
 _SYNC_AI_PROVIDER_TIMEOUT_SEC = 42.0
 _AI_DIAGNOSIS_MAX_TOKENS = 900
 _DASHBOARD_AI_MAX_TOKENS = 1000
@@ -369,19 +371,17 @@ async def _dashboard_yearly(db: AsyncSession, user_id: int, *, include: bool):
 
 async def get_ai_diagnosis(db: AsyncSession, user_id: int) -> dict:
     """AI 错题诊断：优先使用后台模型，超时/异常时快速降级为数据诊断。"""
+    if not await stats_ai_billing.lock_active_user(db, user_id):
+        return stats_ai_billing.unavailable_diagnosis()
     today = shanghai_today()
     since = _date_utc_range(today - timedelta(days=60))[0]
     subject_rows = await stats_query_service.load_ai_diagnosis_subject_rows(
         db, user_id, since
     )
     if not subject_rows:
-        return {
-            "weak_points": [],
-            "strong_points": [],
-            "learning_suggestions": [],
-            "summary": "暂无足够错题数据生成诊断。继续练习后会自动触发分析。",
-            "generated": False,
-        }
+        return stats_ai_billing.unavailable_diagnosis(
+            "暂无足够错题数据生成诊断。继续练习后会自动触发分析。"
+        )
 
     overview = await get_overview(db, user_id)
     total_q = overview["total_questions"]
@@ -393,16 +393,20 @@ async def get_ai_diagnosis(db: AsyncSession, user_id: int) -> dict:
         return local(provider_failed=True)
     if runtime is None:
         return local()
-
+    diagnosis_messages = _build_ai_diagnosis_messages(
+        subject_rows,
+        total_q,
+        accuracy,
+        knowledge_point_stats,
+    )
     try:
-        ai_resp = await _call_ai_diagnosis_provider(
-            db,
-            runtime,
-            subject_rows,
-            total_q,
-            accuracy,
-            knowledge_point_stats,
+        ai_resp = await stats_ai_billing.call_metered_stats_ai(
+            db, user_id, diagnosis_messages,
+            lambda: _call_ai_diagnosis_provider(db, runtime, diagnosis_messages),
+            max_tokens=_AI_DIAGNOSIS_MAX_TOKENS, session_type="stats_ai_diagnosis",
         )
+        if ai_resp is None:
+            return local()
         return _parse_ai_diagnosis_or_local(
             ai_resp, user_id, runtime.model_name, local, len(subject_rows)
         )
@@ -451,22 +455,10 @@ def _local_ai_diagnosis(
 async def _call_ai_diagnosis_provider(
     db: AsyncSession,
     runtime,
-    subject_rows,
-    total_q: int,
-    accuracy: float,
-    knowledge_point_stats: list[dict],
+    messages: list[dict],
 ):
     from app.ai.client import llm
-    from app.ai.prompts_learning import build_report_prompt
 
-    subj_label = subject_rows[0][0] if subject_rows else "全科"
-    messages = build_report_prompt(
-        subject=subj_label,
-        days=60,
-        total=total_q,
-        accuracy=accuracy,
-        knowledge_point_stats=knowledge_point_stats,
-    )
     # This endpoint is synchronous: cap provider time/output so a reasoning
     # model cannot occupy the whole wx.request timeout window.
     return await llm.chat(
@@ -526,12 +518,20 @@ async def get_dashboard_llm_analysis(
     db: AsyncSession, user_id: int, *, trend_days: int = 7
 ) -> dict:
     """Generate a bounded dashboard diagnosis with deterministic fallback."""
+    if not await stats_ai_billing.lock_active_user(db, user_id):
+        return _rule_based_dashboard_analysis(
+            stats_ai_billing.empty_dashboard_payload(trend_days), trend_days
+        )
     data_payload = await _load_dashboard_ai_payload(db, user_id, trend_days)
     prompt_messages = build_dashboard_ai_prompt(data_payload, trend_days)
     from app.ai.gateway import chat_with_db_model
 
     try:
-        ai_resp = await _call_dashboard_ai(db, chat_with_db_model, prompt_messages)
+        ai_resp = await stats_ai_billing.call_metered_stats_ai(
+            db, user_id, prompt_messages,
+            lambda: _call_dashboard_ai(db, chat_with_db_model, prompt_messages),
+            max_tokens=_DASHBOARD_AI_MAX_TOKENS, session_type="stats_dashboard_analysis",
+        )
         if ai_resp is None:
             return _rule_based_dashboard_analysis(data_payload, trend_days)
         return _parse_dashboard_ai_response(ai_resp, data_payload, trend_days, user_id)

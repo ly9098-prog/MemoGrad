@@ -2011,6 +2011,7 @@ async def _create_answer_projection_outbox(
     *,
     practice_record_id: int,
     request_id: str | None,
+    owner_user_id: int,
 ) -> None:
     """Persist one immutable-revision projection event with the answer row."""
     from app.services.outbox_service import create_outbox
@@ -2024,6 +2025,7 @@ async def _create_answer_projection_outbox(
             "request_id": _normalize_practice_request_id(request_id),
         },
         schema_version=ANSWER_PROJECTION_TASK_SCHEMA_VERSION,
+        owner_user_id=owner_user_id,
     )
 
 

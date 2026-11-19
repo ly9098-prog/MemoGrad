@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.wrong_question import WrongQuestion
 from app.services import ai_prewarm_worker, ai_service, ai_teacher_408_service
 from app.services.ai import analysis_availability
+from app.services.ai_learning_service import TokenReservation
 from app.services.ai_service import analyze_error as real_analyze_error
 from tests.test_services.test_ai_analysis_execution import Cache
 from tests.test_services.test_exam_attempt_semantics import _make_database
@@ -150,8 +151,8 @@ async def ai_client(tmp_path, monkeypatch):
         enqueue = AsyncMock(side_effect=AssertionError("unexpected queue submission"))
         monkeypatch.setattr(ai_service, "analyze_error", analyze)
         monkeypatch.setattr(ai_prewarm_worker, "enqueue_prewarm", enqueue)
-        quota = AsyncMock(return_value=False)
-        monkeypatch.setattr(ai_teacher_408_service, "check_token_limit", quota)
+        quota = AsyncMock(return_value=None)
+        monkeypatch.setattr(ai_teacher_408_service, "reserve_token_budget", quota)
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
@@ -227,6 +228,49 @@ async def test_active_exam_blocks_all_answer_bearing_ai_routes(ai_client, endpoi
 
 
 @pytest.mark.asyncio
+async def test_completed_attempt_cannot_bypass_another_active_attempt(ai_client):
+    state = ai_client
+    async with state.factory() as db:
+        db.add_all(
+            [
+                ExamAttempt(
+                    id=10,
+                    paper_id=1,
+                    paper_version=1,
+                    user_id=1,
+                    status="submitted",
+                    request_id="completed-attempt",
+                    duration_sec=600,
+                ),
+                ExamAttempt(
+                    id=11,
+                    paper_id=1,
+                    paper_version=1,
+                    user_id=1,
+                    status="in_progress",
+                    request_id="active-retake",
+                    duration_sec=600,
+                ),
+            ]
+        )
+        await db.commit()
+
+    response = await state.client.post(
+        "/api/v1/ai/408-teacher",
+        json={
+            "question_id": 1,
+            "question_version_id": 1,
+            "action": "explain_correct",
+            "exam_attempt_id": 10,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "exam_in_progress_ai_blocked"
+    state.quota.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("endpoint", ["generate", "status", "recover"])
 async def test_wrong_ai_routes_reject_other_users_rows(ai_client, endpoint):
     client = ai_client.client
@@ -295,6 +339,38 @@ async def test_analysis_status_recovery_generation_and_feedback(ai_client, monke
     async with state.factory() as db:
         row = await db.scalar(select(AiFeedbackLog))
         assert (row.user_id, row.question_id, row.detail) == (1, 1, "test")
+
+
+@pytest.mark.asyncio
+async def test_feedback_rejects_erased_account_and_rate_limits_21st_request(
+    ai_client,
+):
+    from app.core.cache import cache
+
+    async with ai_client.factory() as db:
+        user = await db.get(User, 1)
+        original_deleted_at = user.deleted_at
+    cache._local.clear()
+    payload = {
+        "source": "dashboard",
+        "feedback_type": "inaccurate",
+        "detail": "synthetic",
+    }
+    for _ in range(20):
+        response = await ai_client.client.post("/api/v1/ai/feedback", json=payload)
+        assert response.status_code == 200
+    limited = await ai_client.client.post("/api/v1/ai/feedback", json=payload)
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == "60"
+
+    cache._local.clear()
+    async with ai_client.factory() as db:
+        user = await db.get(User, 1)
+        assert user.deleted_at == original_deleted_at
+        user.deleted_at = __import__("datetime").datetime.now()
+        await db.commit()
+    erased = await ai_client.client.post("/api/v1/ai/feedback", json=payload)
+    assert erased.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -379,7 +455,16 @@ async def test_provider_failures_return_typed_http_response_through_real_analysi
     monkeypatch.setattr(ai_service, "_resolve_healthy_analysis_runtime", resolver)
     monkeypatch.setattr(ai_service, "_analysis_model_signature", lambda _: "synthetic")
     monkeypatch.setattr(ai_service, "_quarantine_analysis_runtime_auth", quarantine)
-    monkeypatch.setattr(ai_service, "check_token_limit", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        ai_service,
+        "reserve_token_budget",
+        AsyncMock(
+            return_value=TokenReservation(
+                1, 1, "day-key", "month-key"
+            )
+        ),
+    )
+    monkeypatch.setattr(ai_service, "settle_token_reservation", AsyncMock())
     monkeypatch.setattr(ai_service, "_generating", set())
     monkeypatch.setattr(ai_service.llm, "chat", chat)
     monkeypatch.setattr("app.core.cache.cache", cache)
@@ -474,3 +559,29 @@ async def test_teacher_unavailable_returns_structured_503(ai_client, monkeypatch
         "code": "ai_service_unavailable",
         **state,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ids", [[], [0], list(range(1, 52))])
+async def test_prewarm_rejects_invalid_or_excessive_work_before_enqueue(
+    ai_client, monkeypatch, ids
+):
+    enqueue = AsyncMock(return_value=True)
+    monkeypatch.setattr("app.services.ai_prewarm_worker.enqueue_prewarm", enqueue)
+    response = await ai_client.client.post(
+        "/api/v1/ai/error-analysis/prewarm", json={"wrong_question_ids": ids}
+    )
+    assert response.status_code == 422
+    enqueue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_prewarm_enqueues_each_owned_wrong_question_once(ai_client, monkeypatch):
+    enqueue = AsyncMock(return_value=True)
+    monkeypatch.setattr("app.services.ai_prewarm_worker.enqueue_prewarm", enqueue)
+    response = await ai_client.client.post(
+        "/api/v1/ai/error-analysis/prewarm", json={"wrong_question_ids": [1, 1]}
+    )
+    assert response.status_code == 200
+    assert response.json()["queued"] == [1]
+    enqueue.assert_awaited_once()

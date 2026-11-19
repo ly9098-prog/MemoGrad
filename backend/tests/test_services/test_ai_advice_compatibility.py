@@ -104,6 +104,26 @@ async def test_no_model_returns_fallback_without_persistence(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_deleted_account_returns_fallback_without_persistence(tmp_path):
+    """A stale in-flight advice call cannot recreate data after account deletion."""
+    engine, session_factory, user_id = await _seed(tmp_path)
+    async with session_factory() as db:
+        user = await db.get(User, user_id)
+        user.deleted_at = __import__("datetime").datetime.now()
+        await db.commit()
+
+    async with session_factory() as db:
+        result = await ai_service.generate_advice(db, user_id)
+
+    assert result["from_fallback"] is True
+    assert result["tokens_used"] == 0
+    async with session_factory() as db:
+        chats = (await db.execute(select(AiChat))).scalars().all()
+    assert chats == []
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_no_model_with_wrong_questions_still_fallback(tmp_path):
     """Active wrong questions exist but no model → still fallback, no AiChat."""
     engine, session_factory, user_id = await _seed(tmp_path, with_wrong=True)

@@ -65,6 +65,18 @@ def prepared_teacher(monkeypatch):
         state.trace.append("quota")
         return True
 
+    async def reserve(*args):
+        state.trace.append("quota")
+        from app.services.ai_learning_service import TokenReservation
+
+        return TokenReservation(3, 1, "day-key", "month-key")
+
+    async def settle(*args):
+        state.trace.append("settle")
+
+    async def cancel(*args):
+        state.trace.append("cancel")
+
     async def provider(*args, **kwargs):
         state.trace.append("provider")
         return {
@@ -76,11 +88,16 @@ def prepared_teacher(monkeypatch):
         state.trace.append("usage")
 
     state.quota = AsyncMock(side_effect=quota)
+    state.reserve = AsyncMock(side_effect=reserve)
+    state.settle = AsyncMock(side_effect=settle)
+    state.cancel = AsyncMock(side_effect=cancel)
     state.provider = AsyncMock(side_effect=provider)
     state.usage = AsyncMock(side_effect=usage)
     state.runtime = object()
     monkeypatch.setattr(svc, "build_408_teacher_prompt", prompt)
-    monkeypatch.setattr(svc, "check_token_limit", state.quota)
+    monkeypatch.setattr(svc, "reserve_token_budget", state.reserve)
+    monkeypatch.setattr(svc, "settle_token_reservation", state.settle)
+    monkeypatch.setattr(svc, "cancel_token_reservation", state.cancel)
     monkeypatch.setattr(svc, "chat_with_db_model", state.provider)
     monkeypatch.setattr(svc, "record_token_usage", state.usage)
     monkeypatch.setattr(
@@ -108,8 +125,10 @@ async def test_teacher_uses_server_fact_and_records_usage_before_parsing(
     result = await svc.run_teacher_action(
         state.db, user_id=3, question_id=7, action="core_concept", user_answer="client"
     )
-    assert state.trace[:4] == ["quota", "provider", "usage", "parse"]
-    state.quota.assert_awaited_once_with(state.db, 3, 900)
+    assert state.trace[:5] == ["quota", "provider", "usage", "settle", "parse"]
+    state.reserve.assert_awaited_once()
+    assert state.reserve.await_args.args[:2] == (state.db, 3)
+    assert state.reserve.await_args.args[2] >= 900
     svc.note_success.assert_awaited_once()
     kwargs = state.provider.await_args.kwargs
     assert kwargs == {
@@ -149,8 +168,8 @@ async def test_teacher_fallbacks_preserve_usage_and_action_boundaries(
         "similar_question" if scenario == "invalid_question" else "high_frequency_traps"
     )
     if scenario == "quota":
-        state.quota.side_effect = None
-        state.quota.return_value = False
+        state.reserve.side_effect = None
+        state.reserve.return_value = None
     elif scenario == "unavailable":
         state.provider.side_effect = None
         state.provider.return_value = None
@@ -176,6 +195,10 @@ async def test_teacher_fallbacks_preserve_usage_and_action_boundaries(
     else:
         state.usage.assert_not_awaited()
         assert result["tokens_used"] == 0
+    if scenario == "unavailable":
+        state.cancel.assert_awaited_once()
+    elif scenario in {"quota", "exception"}:
+        state.cancel.assert_not_awaited()
     assert svc.note_failure.await_count == (1 if scenario == "exception" else 0)
 
 

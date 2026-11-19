@@ -210,27 +210,18 @@ async def _sync_schedule_to_wq(
     return wq
 
 
-def _latest_revision_candidates(
-    schedules: list[ReviewSchedule], latest_ids: dict
-) -> list[int]:
-    revision_ids = list(latest_ids.values())
-    revision_ids.extend(
-        int(schedule.question_version_id)
-        for schedule in schedules
-        if int(schedule.question_version_id) not in revision_ids
-    )
-    return revision_ids
-
-
 def _latest_revision_view(latest_views: dict, latest_version_id, schedule):
-    """Newest view for one schedule, falling back to its pinned immutable revision.
-
-    A legacy schedule may predate the newest-revision index or run against a
-    database where that index is temporarily unavailable. If its pinned
-    immutable revision is still present, keep the task usable and pinned rather
-    than silently dropping it.
-    """
-    return latest_views.get(int(latest_version_id or int(schedule.question_version_id)))
+    """Return the current approved revision view, or ``None`` if withdrawn."""
+    if latest_version_id is None:
+        return None
+    view = latest_views.get(
+        int(latest_version_id or int(schedule.question_version_id))
+    )
+    if view is None:
+        return None
+    if "is_active" in vars(view) and view.is_active is not True:
+        return None
+    return view
 
 
 def _log_missing_review_revision(
@@ -319,9 +310,7 @@ async def _prepare_latest_review_revisions(
     latest_ids = await load_latest_question_revision_ids(
         db, [int(schedule.question_id) for schedule in schedules]
     )
-    latest_views = await load_revision_views(
-        db, _latest_revision_candidates(schedules, latest_ids)
-    )
+    latest_views = await load_revision_views(db, latest_ids.values())
     prepared: list[tuple[ReviewSchedule, object]] = []
     changed = False
 
@@ -668,6 +657,19 @@ async def _load_locked_review_schedule(
         raise ValueError("复习题版本已更新，请刷新后重试")
     if int(schedule.occurrence_seq) != int(request["occurrence_seq"]):
         raise ValueError("本次复习任务已经提交或已失效，请刷新任务")
+    visible_revision_id = await db.scalar(
+        select(QuestionVersion.id)
+        .join(Question, Question.id == QuestionVersion.question_id)
+        .where(
+            QuestionVersion.id == schedule.question_version_id,
+            QuestionVersion.question_id == schedule.question_id,
+            QuestionVersion.is_active.is_(True),
+            Question.is_active.is_(True),
+            Question.review_status == "approved",
+        )
+    )
+    if visible_revision_id is None:
+        raise ValueError("该复习任务已下线，请刷新任务")
     return schedule
 
 
@@ -1146,7 +1148,9 @@ def _batch_review_error_payload(
         "retryable": retryable,
         "refresh_required": refresh_required,
         "is_correct": False,
-        "correct_answer": revision.answer or "",
+        # A failed ownership/state/version check must not turn a caller-supplied
+        # revision tuple into an answer oracle.
+        "correct_answer": "",
         "rating": rating,
         "interval_after": 0,
         "ease_factor_after": 0.0,
@@ -1166,8 +1170,55 @@ def _batch_review_prewarm_candidate(result: dict) -> tuple[int, int, str] | None
     )
 
 
+async def _authorized_review_schedules(
+    db: AsyncSession,
+    user_id: int,
+    reviews: list[dict],
+) -> tuple[list[dict], dict[int, dict]]:
+    """Preflight ownership without loading caller-selected answer revisions."""
+    schedule_ids = {int(item["schedule_id"]) for item in reviews}
+    owned_rows = await db.execute(
+        select(
+            ReviewSchedule.id,
+            ReviewSchedule.question_id,
+            ReviewSchedule.question_version_id,
+        ).where(
+            ReviewSchedule.user_id == user_id,
+            ReviewSchedule.id.in_(schedule_ids),
+        )
+    )
+    owned = {
+        int(schedule_id): (int(question_id), int(version_id))
+        for schedule_id, question_id, version_id in owned_rows.all()
+    }
+    authorized_items: list[dict] = []
+    failures: dict[int, dict] = {}
+    for index, item in enumerate(reviews):
+        schedule_id = int(item["schedule_id"])
+        expected = owned.get(schedule_id)
+        if expected == (
+            int(item["question_id"]),
+            int(item["question_version_id"]),
+        ):
+            authorized_items.append(item)
+            continue
+        version_id = int(item["question_version_id"])
+        occurrence_seq = int(item["occurrence_seq"])
+        request_id = str(item["request_id"])
+        failures[index] = _batch_review_missing_payload(
+            item, version_id, occurrence_seq, request_id
+        )
+        failures[index]["error"] = "复习记录不存在或题目版本不匹配"
+        failures[index]["error_code"] = "REVIEW_TASK_NOT_AUTHORIZED"
+    return authorized_items, failures
+
+
 async def _grade_batch_review_item(
-    db: AsyncSession, user_id: int, original_index: int, item: dict, revision
+    db: AsyncSession,
+    user_id: int,
+    original_index: int,
+    item: dict,
+    revision,
 ) -> tuple[int, dict, tuple[int, int, str] | None]:
     version_id = int(item["question_version_id"])
     request_id = str(item["request_id"])
@@ -1193,7 +1244,12 @@ async def _grade_batch_review_item(
         )
         return original_index, payload, None
     payload = _batch_review_success_payload(
-        item, revision, version_id, occurrence_seq, request_id, result
+        item,
+        revision,
+        version_id,
+        occurrence_seq,
+        request_id,
+        result,
     )
     return original_index, payload, _batch_review_prewarm_candidate(result)
 
@@ -1237,7 +1293,10 @@ def _ordered_review_items(reviews: list[dict]) -> list[tuple[int, dict]]:
 
 
 async def _grade_batch_review_loop(
-    db: AsyncSession, user_id: int, ordered: list[tuple[int, dict]], views: dict
+    db: AsyncSession,
+    user_id: int,
+    ordered: list[tuple[int, dict]],
+    views: dict,
 ) -> tuple[list[tuple[int, dict]], list[tuple[int, int, str]]]:
     results_by_index: list[tuple[int, dict]] = []
     prewarm_candidates: list[tuple[int, int, str]] = []
@@ -1283,14 +1342,20 @@ async def grade_batch_review(
     if not reviews:
         raise ValueError("复习列表不能为空")
 
-    # Preload immutable revisions once.  schedule ownership/version is still
-    # checked under the per-question transaction lock in submit_review.
+    # Preflight ownership before loading caller-selected answer revisions.
+    authorized_items, preflight_results = await _authorized_review_schedules(
+        db, user_id, reviews
+    )
     version_ids = [int(item["question_version_id"]) for item in reviews]
     views = await load_revision_views(db, version_ids)
 
     results_by_index, prewarm_candidates = await _grade_batch_review_loop(
-        db, user_id, _ordered_review_items(reviews), views
+        db,
+        user_id,
+        _ordered_review_items(authorized_items),
+        views,
     )
+    results_by_index.extend(preflight_results.items())
     await db.commit()
 
     await _prewarm_review_wrong_answers(prewarm_candidates, user_id)

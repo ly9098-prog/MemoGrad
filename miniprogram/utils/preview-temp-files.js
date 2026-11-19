@@ -73,12 +73,15 @@ function unlinkFile(filePath) {
 function register(filePath, metadata) {
   if (!filePath) return
   const meta = metadata || {}
+  const owner = String(meta.owner || '')
+  if (!owner) return
   const timestamp = now()
   const records = readRecords().filter(function(item) {
     return item.path !== filePath && (!meta.cacheKey || item.cacheKey !== meta.cacheKey)
   })
   records.push({
     path: filePath,
+    owner: owner,
     cacheKey: meta.cacheKey ? String(meta.cacheKey) : '',
     taskId: meta.taskId == null ? null : Number(meta.taskId),
     createdAt: timestamp,
@@ -101,12 +104,15 @@ function touch(filePath) {
   if (changed) writeRecords(records)
 }
 
-function findByCacheKey(cacheKey) {
-  if (!cacheKey) return ''
+function findByCacheKey(cacheKey, owner) {
+  const normalizedOwner = String(owner || '')
+  if (!cacheKey || !normalizedOwner) return ''
   const key = String(cacheKey)
   const records = readRecords()
   for (var i = records.length - 1; i >= 0; i -= 1) {
-    if (records[i].cacheKey === key) return records[i].path
+    if (records[i].cacheKey === key && records[i].owner === normalizedOwner) {
+      return records[i].path
+    }
   }
   return ''
 }
@@ -140,6 +146,15 @@ async function removeByTaskId(taskId) {
   await Promise.all(removed.map(function(item) {
     return unlinkFile(item.path)
   }))
+}
+
+async function purgeAll() {
+  const records = readRecords()
+  writeRecords([])
+  await Promise.all(records.map(function(item) {
+    return unlinkFile(item.path)
+  }))
+  return records.length
 }
 
 async function cleanupIfDue(options) {
@@ -181,5 +196,6 @@ module.exports = {
   forget: forget,
   remove: remove,
   removeByTaskId: removeByTaskId,
+  purgeAll: purgeAll,
   cleanupIfDue: cleanupIfDue,
 }

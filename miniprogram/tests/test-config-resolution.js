@@ -92,6 +92,12 @@ assertEqual(
   'Trial real device → trial'
 )
 
+assertEqual(
+  resolveRuntimeConfig({ envVersion: 'trial', platform: 'devtools', localDebug: true }),
+  'trial',
+  'Trial devtools + localDebug=true → trial (never localhost)'
+)
+
 // 5. Release → release
 assertEqual(
   resolveRuntimeConfig({ envVersion: 'release', platform: 'devtools', localDebug: false }),
@@ -103,6 +109,12 @@ assertEqual(
   resolveRuntimeConfig({ envVersion: 'release', platform: 'ios', localDebug: false }),
   'release',
   'Release real device → release'
+)
+
+assertEqual(
+  resolveRuntimeConfig({ envVersion: 'release', platform: 'devtools', localDebug: true }),
+  'release',
+  'Release devtools + localDebug=true → release (never localhost)'
 )
 
 // 6. Unknown env → release (safe default)
@@ -127,35 +139,41 @@ assertEqual(
 )
 
 // ══════════════════════════════════════════════
-// Test module-level config (LOCAL_DEBUG=true — current default for local dev)
+// Test module-level config (LOCAL_DEBUG=false — secure release default)
 // ══════════════════════════════════════════════
 //
-// NOTE: config.js has LOCAL_DEBUG=true for local development.
-// The module-level config always routes to localhost in this mode.
-// Production scenarios (LOCAL_DEBUG=false) are covered by the
-// resolveRuntimeConfig pure-function tests above.
+// Production scenarios are covered by the resolveRuntimeConfig pure-function
+// tests above. The checked-in default must never force localhost.
 
-console.log('\n--- Module-level config (LOCAL_DEBUG=true) ---')
+console.log('\n--- Module-level config (LOCAL_DEBUG=false) ---')
 
 var config
 
-// Any env → localhost (because LOCAL_DEBUG=true)
+// Any environment resolves through the runtime selector after the secure default.
 global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'release' } })
 global.wx.getSystemInfoSync = () => ({ platform: 'ios' })
 config = freshConfig()
-assertEqual(config.DEV, true, 'LOCAL_DEBUG=true → DEV=true')
-assertEqual(config.BASE_URL, 'http://localhost:8000/api/v1', 'LOCAL_DEBUG=true → localhost')
-assertEqual(config.BASE_URL.includes('localhost'), true, 'LOCAL_DEBUG=true URL must contain localhost')
+assertEqual(config.DEV, false, 'release → DEV=false')
+assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'release → HTTPS release URL')
+assertEqual(config.BASE_URL.includes('localhost'), false, 'release URL must not contain localhost')
 
 global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'trial' } })
 config = freshConfig()
-assertEqual(config.DEV, true, 'LOCAL_DEBUG=true trial → DEV=true')
-assertEqual(config.BASE_URL, 'http://localhost:8000/api/v1', 'LOCAL_DEBUG=true trial → localhost')
+assertEqual(config.DEV, false, 'trial → DEV=false')
+assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'trial → HTTPS trial URL')
 
 global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'develop' } })
+global.wx.getSystemInfoSync = () => ({ platform: 'devtools' })
 config = freshConfig()
-assertEqual(config.DEV, true, 'LOCAL_DEBUG=true develop → DEV=true')
-assertEqual(config.BASE_URL, 'http://localhost:8000/api/v1', 'LOCAL_DEBUG=true develop → localhost')
+assertEqual(config.DEV, false, 'devtools without opt-in → DEV=false')
+assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'devtools without opt-in → HTTPS release URL')
+
+global.wx.getAccountInfoSync = () => {
+  throw new Error('account info unavailable')
+}
+config = freshConfig()
+assertEqual(config.DEV, false, 'account info failure → DEV=false')
+assertEqual(config.BASE_URL, 'https://xzshub.top/api/v1', 'account info failure → HTTPS release URL')
 
 // ══════════════════════════════════════════════
 // Results

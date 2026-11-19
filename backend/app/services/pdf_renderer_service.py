@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import os
 import tempfile
 import warnings
@@ -96,6 +97,81 @@ def _validate_pdf(pdf_source: bytes | str, is_path: bool) -> None:
         raise ValueError("文件不是有效的 PDF（magic bytes 不匹配）")
 
 
+def _estimate_page_pixels(page, dpi: int) -> tuple[int, int] | None:
+    """Estimate get_pixmap(dpi=...) dimensions before allocating the pixmap.
+
+    ``page.rect`` already reflects the page rotation in PyMuPDF and the pixel
+    count is invariant under 90-degree swaps, so a single rect is enough here.
+    Scaling uses ``ceil(dim * dpi / 72)`` before allocating the pixmap.
+    Non-finite or non-positive
+    dimensions return None and the caller fails closed before rendering.
+    """
+    try:
+        scale = float(dpi) / 72.0
+        width = float(page.rect.width)
+        height = float(page.rect.height)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if (
+        not math.isfinite(scale)
+        or scale <= 0
+        or not math.isfinite(width)
+        or not math.isfinite(height)
+        or width <= 0
+        or height <= 0
+    ):
+        return None
+    scaled_width, scaled_height = width * scale, height * scale
+    if not math.isfinite(scaled_width) or not math.isfinite(scaled_height):
+        return None
+    return (
+        math.ceil(scaled_width),
+        math.ceil(scaled_height),
+    )
+
+
+def _enforce_page_pixel_budget(
+    page,
+    page_num: int,
+    dpi: int,
+    *,
+    decoded_limit: int = _MAX_DECODED_BYTES,
+) -> None:
+    """Reject an estimated render before get_pixmap allocates the page."""
+    estimated = _estimate_page_pixels(page, dpi)
+    if estimated is None:
+        raise PdfResourceLimitError(
+            "page_pixel_limit",
+            details={
+                "page": page_num,
+                "actual_pixels": None,
+                "limit": _MAX_PAGE_PIXELS,
+                "message": "页面尺寸异常，无法安全估算渲染像素",
+            },
+        )
+    est_w, est_h = estimated
+    pixel_count = est_w * est_h
+    if pixel_count > _MAX_PAGE_PIXELS:
+        raise PdfResourceLimitError(
+            "page_pixel_limit",
+            details={
+                "page": page_num,
+                "actual_pixels": pixel_count,
+                "limit": _MAX_PAGE_PIXELS,
+            },
+        )
+    decoded_bytes = pixel_count * 4
+    if decoded_bytes > decoded_limit:
+        raise PdfResourceLimitError(
+            "decoded_memory_limit",
+            details={
+                "page": page_num,
+                "actual_decoded_bytes": decoded_bytes,
+                "limit": decoded_limit,
+            },
+        )
+
+
 def _render_sync(
     pdf_source: bytes | str,
     is_path: bool,
@@ -143,6 +219,10 @@ def _render_sync(
         for i in range(start_idx, end_idx):
             page = doc[i]
             try:
+                # Reject page pixel / decoded budgets before any pixmap
+                # allocation: page.rect already carries page rotation and
+                # ceil(dim * dpi / 72) matches get_pixmap rounding.
+                _enforce_page_pixel_budget(page, i + 1, dpi)
                 pix = page.get_pixmap(dpi=dpi)
 
                 # Decompression bomb protection: pixel budget
@@ -270,6 +350,12 @@ def _render_one_page(
                 details={"page": page_num, "total": len(doc)},
             )
         page = doc[page_num - 1]
+        _enforce_page_pixel_budget(
+            page,
+            page_num,
+            dpi,
+            decoded_limit=settings.PDF_MAX_DECODED_BYTES,
+        )
         pix = page.get_pixmap(dpi=dpi)
 
         # Decompression bomb protection

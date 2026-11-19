@@ -45,6 +45,8 @@ async def stage_recovery_file(
     file: UploadFile,
     source_type: str,
     expected_sha256: str | None,
+    *,
+    owner_user_id: int | None = None,
 ) -> StagingObject:
     suffix = os.path.splitext(file.filename or "")[1].lower()
     allowed = {
@@ -80,6 +82,7 @@ async def stage_recovery_file(
                 tmp.path,
                 original_name=file.filename or "",
                 mime=file.content_type or "",
+                owner_user_id=owner_user_id,
             )
     except ImportRecoveryError:
         raise
@@ -230,7 +233,12 @@ async def resume_import(
     row, previous, checkpoint, inputs = await _load_resume_inputs(
         db, pipeline_id, overrides
     )
-    staging = await stage_recovery_file(file, row.source_type, row.source_sha256)
+    staging = await stage_recovery_file(
+        file,
+        row.source_type,
+        row.source_sha256,
+        owner_user_id=int(row.created_by) if str(row.created_by or "").isdigit() else None,
+    )
     retry_token = uuid.uuid4().hex
     await _claim_resume(db, row, retry_token)
     snapshot = {

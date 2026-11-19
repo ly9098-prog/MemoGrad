@@ -3,6 +3,7 @@
 import json
 import logging
 import random
+from dataclasses import dataclass
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -21,8 +22,10 @@ from app.ai.prompts_learning import (
     build_mistake_analysis_prompt,
     build_report_prompt,
 )
+from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
 from app.core.time_utils import shanghai_date_utc_range, shanghai_today, utcnow
+from app.features.token_budget import estimate_tokens
 from app.models.ai_chat import AiChat
 from app.models.practice_record import PracticeRecord
 from app.models.question import Question
@@ -32,6 +35,70 @@ from app.services.subject_resolution import resolve_subject_ids
 # ============================================================
 # Token 用量控制
 # ============================================================
+
+
+@dataclass(slots=True)
+class TokenReservation:
+    user_id: int
+    reserved_tokens: int
+    day_key: str
+    month_key: str
+    active: bool = True
+
+
+def _token_period_keys(user_id: int) -> tuple[str, str]:
+    today_date = shanghai_today()
+    today = today_date.strftime("%Y-%m-%d")
+    month = today_date.strftime("%Y-%m")
+    env = str(settings.APP_ENV or "unknown").strip().lower()
+    return (
+        f"memograd:{env}:ai:budget:day:{today}:user:{user_id}",
+        f"memograd:{env}:ai:budget:month:{month}:user:{user_id}",
+    )
+
+
+def estimate_chat_token_reservation(
+    messages: list[dict], max_output_tokens: int | None = None
+) -> int:
+    """Bound one chat call by estimated prompt tokens plus its output cap."""
+    prompt_parts: list[str] = []
+    image_count = 0
+
+    def collect(content) -> None:
+        nonlocal image_count
+        if isinstance(content, str):
+            prompt_parts.append(content)
+            return
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    image_count += 1
+                else:
+                    collect(item)
+            return
+        if isinstance(content, dict):
+            if content.get("type") == "image_url":
+                image_count += 1
+                return
+            for key in ("text", "content", "value"):
+                if key in content:
+                    collect(content[key])
+                    return
+
+    for message in messages:
+        if isinstance(message, dict):
+            collect(message.get("content", ""))
+        else:
+            collect(message)
+    output_cap = (
+        int(max_output_tokens)
+        if max_output_tokens is not None
+        else int(settings.AI_SINGLE_MAX_TOKENS)
+    )
+    prompt_tokens = max(1, estimate_tokens("\n".join(prompt_parts)))
+    # OpenAI-compatible vision endpoints charge image tokens separately. This
+    # conservative allowance prevents a near-limit request from under-reserving.
+    return prompt_tokens + max(1, output_cap) + image_count * 1024
 
 
 async def check_token_limit(
@@ -75,6 +142,119 @@ async def check_token_limit(
     return True
 
 
+async def reserve_token_budget(
+    db: AsyncSession, user_id: int, tokens_needed: int
+) -> TokenReservation | None:
+    """Atomically reserve estimated tokens before invoking a paid provider."""
+    tokens = max(1, int(tokens_needed))
+    daily_limit = int(settings.AI_DAILY_TOKEN_LIMIT)
+    monthly_limit = int(settings.AI_MONTHLY_TOKEN_LIMIT)
+    day_key, month_key = _token_period_keys(user_id)
+    if daily_limit <= 0 and monthly_limit <= 0:
+        return TokenReservation(user_id, 0, day_key, month_key)
+
+    today_date = shanghai_today()
+    today = shanghai_date_utc_range(today_date)[0]
+    first_of_month = shanghai_date_utc_range(today_date.replace(day=1))[0]
+    used_today, used_monthly = await _load_token_usage(
+        db,
+        user_id,
+        today=today,
+        first_of_month=first_of_month,
+    )
+    try:
+        reserved = await cache.reserve_token_budget_strict(
+            day_key=day_key,
+            month_key=month_key,
+            used_daily=int(used_today or 0),
+            used_monthly=int(used_monthly or 0),
+            tokens=tokens,
+            daily_limit=daily_limit,
+            monthly_limit=monthly_limit,
+            daily_ttl=3 * 24 * 60 * 60,
+            monthly_ttl=40 * 24 * 60 * 60,
+        )
+    except CacheUnavailableError:
+        return None
+    if not reserved:
+        return None
+    return TokenReservation(user_id, tokens, day_key, month_key)
+
+
+async def settle_token_reservation(
+    reservation: TokenReservation | None,
+    actual_tokens: int,
+) -> None:
+    """Keep the actual charge and refund only the unused part of a hold."""
+    if reservation is None or not reservation.active:
+        return
+    reservation.active = False
+    if reservation.reserved_tokens <= 0:
+        return
+    try:
+        await cache.release_token_budget_strict(
+            day_key=reservation.day_key,
+            month_key=reservation.month_key,
+            tokens=reservation.reserved_tokens,
+            actual_tokens=actual_tokens,
+        )
+    except CacheUnavailableError:
+        logger.warning(
+            "AI token reservation settlement failed user_id=%s reserved=%s actual=%s",
+            reservation.user_id,
+            reservation.reserved_tokens,
+            actual_tokens,
+        )
+
+
+async def cancel_token_reservation(
+    reservation: TokenReservation | None,
+) -> None:
+    """Release the full reservation when the provider is not billed."""
+    if reservation is None or not reservation.active:
+        return
+    reservation.active = False
+    if reservation.reserved_tokens <= 0:
+        return
+    try:
+        await cache.release_token_budget_strict(
+            day_key=reservation.day_key,
+            month_key=reservation.month_key,
+            tokens=reservation.reserved_tokens,
+        )
+    except CacheUnavailableError:
+        logger.warning(
+            "AI token reservation cancel failed user_id=%s tokens=%s",
+            reservation.user_id,
+            reservation.reserved_tokens,
+        )
+
+
+async def _load_token_usage(
+    db: AsyncSession,
+    user_id: int,
+    *,
+    today,
+    first_of_month,
+) -> tuple[int, int]:
+    result = await db.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    case((AiChat.created_at >= today, AiChat.tokens_used), else_=0)
+                ),
+                0,
+            ),
+            func.coalesce(func.sum(AiChat.tokens_used), 0),
+        ).where(
+            AiChat.user_id == user_id,
+            AiChat.created_at >= first_of_month,
+        )
+    )
+    used_today, used_monthly = result.one()
+    return int(used_today or 0), int(used_monthly or 0)
+
+
 async def record_token_usage(
     db: AsyncSession,
     user_id: int,
@@ -99,13 +279,23 @@ async def record_token_usage(
 
 
 async def _call_ai(messages: list, db: AsyncSession | None = None) -> dict | None:
-    """调用后台配置的 OpenAI-compatible 分析模型，失败返回 None。"""
+    """调用配置模型；未配置返回 None，已尝试调用的失败交给配额边界处理。"""
     if db is None:
         return None
+    return await chat_with_db_model(db, messages, feature="analysis")
+
+
+async def _call_ai_reserved(
+    messages: list, db: AsyncSession, reservation: TokenReservation
+) -> dict | None:
+    """Preserve a hold on uncertain provider failure while retaining fallback."""
     try:
-        return await chat_with_db_model(db, messages, feature="analysis")
+        result = await _call_ai(messages, db)
     except RuntimeError:
         return None
+    if result is None:
+        await cancel_token_reservation(reservation)
+    return result
 
 
 def _parse_json_response(content: str) -> dict | None:
@@ -209,38 +399,21 @@ async def ai_explain(
     q_kps = kp_map.get(q.id, [])
 
     messages = _build_explain_messages(q, q_kps, user_answer, is_correct, focus)
-
-    # 检查 token 限额
-    if not await check_token_limit(db, user_id, 500):
+    reservation = await reserve_token_budget(db, user_id, estimate_chat_token_reservation(messages))
+    if reservation is None:
         return _explain_unavailable_payload(question_id, q_kps, _EXPLAIN_LIMIT_COPY)
 
-    result = await _call_ai(messages, db)
-
+    result = await _call_ai_reserved(messages, db, reservation)
     if result is None:
         fallback = get_fallback_explain()
-        return _explain_unavailable_payload(
-            question_id,
-            q_kps,
-            fallback["explanation"],
-        )
+        return _explain_unavailable_payload(question_id, q_kps, fallback["explanation"])
 
     parsed = _parse_json_response(result["content"])
     if parsed is None:
-        parsed = {
-            "explanation": result["content"],
-            "solution_steps": [],
-            "key_knowledge_points": [],
-            "common_mistakes": [],
-        }
+        parsed = {"explanation": result["content"], "solution_steps": [], "key_knowledge_points": [], "common_mistakes": []}
 
-    await record_token_usage(
-        db,
-        user_id,
-        "ai_explain",
-        f"question_id={question_id} focus={focus}",
-        result["content"],
-        result,
-    )
+    await record_token_usage(db, user_id, "ai_explain", f"question_id={question_id} focus={focus}", result["content"], result)
+    await settle_token_reservation(reservation, result["tokens_used"])
 
     return _explain_success_payload(question_id, parsed, result["tokens_used"])
 
@@ -330,22 +503,15 @@ async def ai_analyze_mistake(
     """AI 错因分析。"""
 
     q = await _load_active_question(db, question_id)
-
     messages = _build_mistake_messages(q, correct_answer, user_answer)
-
-    if not await check_token_limit(db, user_id, 300):
+    reservation = await reserve_token_budget(db, user_id, estimate_chat_token_reservation(messages))
+    if reservation is None:
         return _mistake_unavailable_payload(*_MISTAKE_LIMIT_PAYLOAD)
 
-    result = await _call_ai(messages, db)
-
+    result = await _call_ai_reserved(messages, db, reservation)
     if result is None:
         fallback = get_fallback_mistake_analysis()
-        return _mistake_unavailable_payload(
-            fallback["error_type"],
-            fallback["error_type_label"],
-            fallback["analysis"],
-            fallback["suggestion"],
-        )
+        return _mistake_unavailable_payload(fallback["error_type"], fallback["error_type_label"], fallback["analysis"], fallback["suggestion"])
 
     parsed = _parse_json_response(result["content"])
     if parsed is None:
@@ -357,14 +523,8 @@ async def ai_analyze_mistake(
 
     error_type = parsed.get("error_type", "unknown")
 
-    await record_token_usage(
-        db,
-        user_id,
-        "mistake_analysis",
-        f"question_id={question_id}",
-        result["content"],
-        result,
-    )
+    await record_token_usage(db, user_id, "mistake_analysis", f"question_id={question_id}", result["content"], result)
+    await settle_token_reservation(reservation, result["tokens_used"])
 
     return _mistake_success_payload(error_type, parsed, result["tokens_used"])
 
@@ -834,23 +994,33 @@ async def generate_learning_report(
 
     # 数据太少时不调用 AI
     if total < 5:
-        return _low_volume_learning_report(
-            subject_id, subject_code, subject_name, days, total, accuracy, kp_list
-        )
+        return _low_volume_learning_report(subject_id, subject_code, subject_name, days, total, accuracy, kp_list)
 
     messages = build_report_prompt(subject_code, days, total, accuracy, kp_list)
-    if not await check_token_limit(db, user_id, 1000):
-        return _token_limited_learning_report(
-            subject_id, subject_code, subject_name, days, total, accuracy, kp_list
-        )
+    reservation = await reserve_token_budget(db, user_id, estimate_chat_token_reservation(messages))
+    if reservation is None:
+        return _token_limited_learning_report(subject_id, subject_code, subject_name, days, total, accuracy, kp_list)
 
-    result = await _call_ai(messages, db)
+    result = await _call_ai_reserved(messages, db, reservation)
     if result is None:
-        return _ai_fallback_learning_report(
-            subject_id, subject_code, subject_name, days, total, accuracy
-        )
+        return _ai_fallback_learning_report(subject_id, subject_code, subject_name, days, total, accuracy)
 
-    return await _ai_learning_report(
+    return await _complete_learning_report(db, user_id, subject_id, subject_code, subject_name, days, total, accuracy, result, reservation)
+
+
+async def _complete_learning_report(
+    db: AsyncSession,
+    user_id: int,
+    subject_id: int,
+    subject_code: str,
+    subject_name: str,
+    days: int,
+    total: int,
+    accuracy: float,
+    result: dict,
+    reservation: TokenReservation,
+) -> dict:
+    response = await _ai_learning_report(
         db,
         user_id,
         subject_id,
@@ -861,3 +1031,5 @@ async def generate_learning_report(
         accuracy,
         result,
     )
+    await settle_token_reservation(reservation, result["tokens_used"])
+    return response

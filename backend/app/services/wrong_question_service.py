@@ -1,7 +1,7 @@
 import logging
 from datetime import date, timedelta
 
-from sqlalchemy import and_, case, delete, func, select
+from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time_utils import shanghai_today_boundaries, study_day_utc_range, utcnow
@@ -160,7 +160,16 @@ async def update_wrong(
 
 def _wrong_book_conditions(user_id: int, allowed_subject_ids: set[int] | None) -> list:
     """错题本基础过滤：本人 + 生效中（+ 允许科目范围）。"""
-    conditions = [WrongQuestion.user_id == user_id, WrongQuestion.is_active]
+    conditions = [
+        WrongQuestion.user_id == user_id,
+        WrongQuestion.is_active,
+        WrongQuestion.question_id.in_(
+            select(Question.id).where(
+                Question.is_active.is_(True),
+                Question.review_status == "approved",
+            )
+        ),
+    ]
     if allowed_subject_ids is not None:
         conditions.append(
             WrongQuestion.question_id.in_(
@@ -406,7 +415,7 @@ def _wrong_list_base_query(conditions: list):
             _wrong_last_reviewed_subquery().label("last_reviewed"),
             _wrong_mastery_pct_subquery().label("mastery_pct"),
         )
-        .outerjoin(Question, WrongQuestion.question_id == Question.id)
+        .join(Question, WrongQuestion.question_id == Question.id)
         .outerjoin(Subject, Question.subject_id == Subject.id)
         .where(and_(*conditions))
     )
@@ -824,7 +833,6 @@ async def batch_operate(
 
 _TASK_FLOW_HIGH_FREQUENCY_MIN = 3
 _TASK_FLOW_RECENT_DAYS = 14
-_TASK_FLOW_PAGE_SIZE = 500
 _TASK_FLOW_GROUPS: tuple[tuple[str, str], ...] = (
     ("today_due", "今日应复习"),
     ("high_frequency", "高频错题"),
@@ -834,41 +842,181 @@ _TASK_FLOW_GROUPS: tuple[tuple[str, str], ...] = (
 )
 
 
-async def _load_all_task_flow_items(
+def _task_flow_scope_query(conditions: list):
+    """Lean task-flow scope shared by summary, counts and preview IDs."""
+    return (
+        select(
+            WrongQuestion.id.label("wq_id"),
+            WrongQuestion.mastered.label("mastered"),
+            WrongQuestion.review_count.label("review_count"),
+            WrongQuestion.created_at.label("created_at"),
+            WrongQuestion.updated_at.label("updated_at"),
+            _wrong_next_review_subquery().label("next_review"),
+        )
+        .join(Question, WrongQuestion.question_id == Question.id)
+        .where(and_(*conditions))
+    )
+
+
+def _task_flow_group_condition(group_key: str, today_end, fourteen_days_ago):
+    """SQL predicate that mirrors the priority-deduplicated bucket keys."""
+    next_review = _wrong_next_review_subquery()
+    not_due = or_(next_review.is_(None), next_review > today_end)
+    not_mastered = ~WrongQuestion.mastered
+    high_frequency = WrongQuestion.review_count >= _TASK_FLOW_HIGH_FREQUENCY_MIN
+    recent_added = WrongQuestion.created_at >= fourteen_days_ago
+    if group_key == "today_due":
+        return and_(not_mastered, next_review <= today_end)
+    if group_key == "high_frequency":
+        return and_(not_mastered, not_due, high_frequency)
+    if group_key == "recent_added":
+        return and_(not_mastered, not_due, ~high_frequency, recent_added)
+    if group_key == "to_consolidate":
+        return and_(
+            not_mastered,
+            not_due,
+            ~high_frequency,
+            or_(
+                WrongQuestion.created_at.is_(None),
+                WrongQuestion.created_at < fourteen_days_ago,
+            ),
+        )
+    return WrongQuestion.mastered
+
+
+def _task_flow_summary_statement(scope_query, today_end):
+    """One aggregate SQL statement for the whole filtered wrong book."""
+    scope = scope_query.subquery()
+    return (
+        select(
+            func.count().label("total_count"),
+            func.coalesce(
+                func.sum(case((scope.c.mastered, 1), else_=0)), 0
+            ).label("mastered_count"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                ~scope.c.mastered,
+                                scope.c.review_count
+                                >= _TASK_FLOW_HIGH_FREQUENCY_MIN,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("high_frequency_count"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                ~scope.c.mastered,
+                                scope.c.next_review <= today_end,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("today_due_count"),
+        )
+        .select_from(scope)
+    )
+
+
+async def _task_flow_aggregate(db: AsyncSession, scope_query, today_end) -> dict:
+    row = (
+        await db.execute(_task_flow_summary_statement(scope_query, today_end))
+    ).one()
+    return {
+        "total_count": int(row.total_count or 0),
+        "mastered_count": int(row.mastered_count or 0),
+        "high_frequency_count": int(row.high_frequency_count or 0),
+        "today_due_count": int(row.today_due_count or 0),
+    }
+
+
+async def _task_flow_group_counts(
+    db: AsyncSession, scope_query, today_end, fourteen_days_ago
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for key, _title in _TASK_FLOW_GROUPS:
+        condition = _task_flow_group_condition(
+            key, today_end, fourteen_days_ago
+        )
+        subquery = scope_query.where(condition).subquery()
+        value = (await db.execute(select(func.count()).select_from(subquery))).scalar()
+        counts[key] = int(value or 0)
+    return counts
+
+
+async def _task_flow_preview_ids(
+    db: AsyncSession,
+    scope_query,
+    group_key: str,
+    today_end,
+    fourteen_days_ago,
+    preview_size: int,
+) -> list[int]:
+    if preview_size <= 0:
+        return []
+    condition = _task_flow_group_condition(group_key, today_end, fourteen_days_ago)
+    subquery = scope_query.where(condition).subquery()
+    q = (
+        select(subquery.c.wq_id)
+        .select_from(subquery)
+        .order_by(subquery.c.updated_at.desc(), subquery.c.wq_id.desc())
+        .limit(preview_size)
+    )
+    rows = (await db.execute(q)).all()
+    return [int(row[0]) for row in rows]
+
+
+async def _load_task_flow_preview_items(
+    db: AsyncSession, user_id: int, preview_ids: list[int]
+) -> dict[int, dict]:
+    if not preview_ids:
+        return {}
+    base = _wrong_list_base_query(
+        _wrong_book_conditions(user_id, None) + [WrongQuestion.id.in_(preview_ids)]
+    )
+    rows = (await db.execute(base)).all()
+    question_ids = [int(row[1].id) for row in rows if row[1] is not None]
+    kp_map = await load_question_kps(db, question_ids)
+    return {int(row[0].id): _wrong_list_item(row, kp_map) for row in rows}
+
+
+async def _task_flow_preview_lists(
     db: AsyncSession,
     user_id: int,
-    subject_id: int | None = None,
-    error_type: str | None = None,
-    topic: str | None = None,
-    allowed_subject_ids: set[int] | None = None,
-    date_from: date | None = None,
-    date_to: date | None = None,
-) -> tuple[list[dict], int]:
-    # Task-flow totals must describe the whole filtered wrong book, not only
-    # the first page.  The previous hard 500-row cap silently dropped older
-    # rows for heavy users and made group totals/summary disagree with the
-    # list view.
-    all_items: list[dict] = []
-    total_count = 0
-    page = 1
-    while True:
-        page_items, total_count = await list_wrong_enriched(
+    scope_query,
+    today_end,
+    fourteen_days_ago,
+    preview_size: int,
+) -> dict[str, list[dict]]:
+    preview_ids: dict[str, list[int]] = {}
+    ordered_ids: list[int] = []
+    for key, _title in _TASK_FLOW_GROUPS:
+        ids = await _task_flow_preview_ids(
             db,
-            user_id,
-            subject_id=subject_id,
-            error_type=error_type,
-            topic=topic,
-            page=page,
-            page_size=_TASK_FLOW_PAGE_SIZE,
-            allowed_subject_ids=allowed_subject_ids,
-            date_from=date_from,
-            date_to=date_to,
+            scope_query,
+            key,
+            today_end,
+            fourteen_days_ago,
+            preview_size,
         )
-        all_items.extend(page_items)
-        if not page_items or len(all_items) >= total_count:
-            break
-        page += 1
-    return all_items, total_count
+        preview_ids[key] = ids
+        ordered_ids.extend(ids)
+    items_by_id = await _load_task_flow_preview_items(db, user_id, ordered_ids)
+    return {
+        key: [items_by_id[item_id] for item_id in ids if item_id in items_by_id]
+        for key, ids in preview_ids.items()
+    }
 
 
 def _task_flow_bucket(item: dict, today_end, fourteen_days_ago) -> str:
@@ -893,34 +1041,29 @@ def _task_flow_bucket(item: dict, today_end, fourteen_days_ago) -> str:
     return "mastered"
 
 
-def _task_flow_groups(buckets: dict[str, list[dict]], preview_size: int) -> list[dict]:
+def _task_flow_groups(
+    counts: dict[str, int],
+    previews: dict[str, list[dict]],
+    preview_size: int,
+) -> list[dict]:
     return [
         {
             "key": key,
             "title": title,
-            "total": len(buckets[key]),
-            "items": buckets[key][:preview_size],
+            "total": counts[key],
+            "items": previews[key][:preview_size],
         }
         for key, title in _TASK_FLOW_GROUPS
     ]
 
 
-def _task_flow_summary(
-    all_items: list[dict], total_count: int, today_due_count: int
-) -> dict:
-    # Summary counters are non-exclusive headline metrics.  Group buckets are
-    # priority-deduplicated, so using len(high_freq) would exclude high-
-    # frequency questions that also happen to be due today.
+def _task_flow_summary(aggregate: dict) -> dict:
+    """Non-exclusive headline counters from the aggregate SQL statement."""
     return {
-        "total_count": total_count,
-        "mastered_count": sum(1 for item in all_items if item["is_mastered"]),
-        "high_frequency_count": sum(
-            1
-            for item in all_items
-            if item["wrong_count"] >= _TASK_FLOW_HIGH_FREQUENCY_MIN
-            and not item["is_mastered"]
-        ),
-        "today_due_count": today_due_count,
+        "total_count": int(aggregate["total_count"]),
+        "mastered_count": int(aggregate["mastered_count"]),
+        "high_frequency_count": int(aggregate["high_frequency_count"]),
+        "today_due_count": int(aggregate["today_due_count"]),
     }
 
 
@@ -940,24 +1083,29 @@ async def get_task_flow(
     _, today_end = shanghai_today_boundaries()
     fourteen_days_ago = utcnow() - timedelta(days=_TASK_FLOW_RECENT_DAYS)
 
-    all_items, total_count = await _load_all_task_flow_items(
+    conditions = _wrong_book_conditions(user_id, allowed_subject_ids)
+    conditions.extend(
+        _wrong_list_optional_conditions(error_type, date_from, date_to)
+    )
+    scope = _task_flow_scope_query(conditions)
+    if subject_id:
+        scope = await _apply_wrong_subject_scope(db, scope, subject_id)
+    if topic:
+        scope = _apply_wrong_topic_scope(scope, topic)
+
+    aggregate = await _task_flow_aggregate(db, scope, today_end)
+    counts = await _task_flow_group_counts(
+        db, scope, today_end, fourteen_days_ago
+    )
+    previews = await _task_flow_preview_lists(
         db,
         user_id,
-        subject_id=subject_id,
-        error_type=error_type,
-        topic=topic,
-        allowed_subject_ids=allowed_subject_ids,
-        date_from=date_from,
-        date_to=date_to,
+        scope,
+        today_end,
+        fourteen_days_ago,
+        preview_size,
     )
-
-    buckets: dict[str, list[dict]] = {key: [] for key, _ in _TASK_FLOW_GROUPS}
-    for item in all_items:
-        buckets[_task_flow_bucket(item, today_end, fourteen_days_ago)].append(item)
-
     return {
-        "summary": _task_flow_summary(
-            all_items, total_count, len(buckets["today_due"])
-        ),
-        "groups": _task_flow_groups(buckets, preview_size),
+        "summary": _task_flow_summary(aggregate),
+        "groups": _task_flow_groups(counts, previews, preview_size),
     }

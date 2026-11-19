@@ -54,6 +54,11 @@ async def _ensure_revision(session, question_id: int) -> int:
     from app.models.admin import QuestionVersion
 
     revision_id = _REVISION_ID_BASE + int(question_id)
+    if await session.get(Question, question_id) is None:
+        session.add(Question(
+            id=question_id, subject_id=1, content={"text": "seed"}, answer="A",
+            is_active=True, review_status="approved", current_version_id=revision_id,
+        ))
     if await session.get(QuestionVersion, revision_id) is None:
         session.add(
             QuestionVersion(

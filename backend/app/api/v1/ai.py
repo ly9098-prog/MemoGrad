@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import CacheUnavailableError, cache
 from app.core.database import get_db
 from app.core.runtime_paths import API_V1_PREFIX
 from app.core.security import get_current_user
@@ -227,11 +228,12 @@ async def prewarm_analysis(
 
     queued: list[int] = []
     skipped: list[int] = []
+    wrong_question_ids = list(dict.fromkeys(data.wrong_question_ids))
 
     # Batch load all wrong questions in one query to avoid N+1
     result = await db.execute(
         select(WrongQuestion).where(
-            WrongQuestion.id.in_(data.wrong_question_ids),
+            WrongQuestion.id.in_(wrong_question_ids),
             WrongQuestion.user_id == current_user.id,
         )
     )
@@ -244,7 +246,7 @@ async def prewarm_analysis(
         )
     )
 
-    for wq_id in data.wrong_question_ids:
+    for wq_id in wrong_question_ids:
         wq = wq_map.get(wq_id)
         if not wq:
             skipped.append(wq_id)
@@ -462,6 +464,32 @@ async def ai_feedback(
     反馈内容记录到 ai_feedback_logs 表，用于后续模型改进和质量监控。
     """
     from app.models.ai_feedback_log import AiFeedbackLog
+
+    user = await db.scalar(
+        select(User)
+        .where(User.id == current_user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=401, detail="账号已注销")
+
+    try:
+        count = await cache.increment_strict(
+            f"ai:feedback:requests:{current_user.id}",
+            ttl=60,
+        )
+    except CacheUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="反馈服务暂时不可用，请稍后重试",
+        ) from exc
+    if count > 20:
+        raise HTTPException(
+            status_code=429,
+            detail="反馈提交过于频繁，请稍后重试",
+            headers={"Retry-After": "60"},
+        )
 
     log = AiFeedbackLog(
         user_id=current_user.id,

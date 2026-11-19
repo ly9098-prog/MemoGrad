@@ -1,5 +1,6 @@
 const api = require('../../../utils/api')
 const auth = require('../../../utils/auth')
+const storage = require('../../../utils/storage')
 const { resolveGraphImageUrl, resolveGraphThumbnailUrl } = require('../utils/formula-graph')
 const { parseServerUtc, getChinaWallParts } = require('../../../utils/china-time')
 
@@ -17,7 +18,7 @@ function formatChinaDateTime(value) {
 }
 
 const MAX_RANDOM_HISTORY = 24
-const READER_SEQUENCE_KEY = 'formula_reader_sequence_v2'
+const READER_SEQUENCE_KEY = 'reader_sequence'
 const SEQUENCE_TTL = 30 * 60 * 1000
 const TRANSITION_OUT_MS = 150
 const TRANSITION_IN_DELAY_MS = 36
@@ -95,7 +96,9 @@ Page({
         const cached = wx.getStorageSync(READER_SEQUENCE_KEY) || {}
         const cachedIds = normalizeSequence(cached.ids)
         const fresh = formulaNowMs() - Number(cached.savedAt || 0) < SEQUENCE_TTL
-        if (fresh && cachedIds.some((id) => sameId(id, formulaId))) sequenceIds = cachedIds
+        const ownerMatches = String(cached.owner || '') === storage.ownerFingerprint()
+        const generationMatches = String(cached.sessionGeneration || '') === storage.currentSessionGeneration()
+        if (fresh && ownerMatches && generationMatches && cachedIds.some((id) => sameId(id, formulaId))) sequenceIds = cachedIds
       } catch (_) {}
     }
 
@@ -333,15 +336,18 @@ Page({
 
   async _getFavoriteIds() {
     if (!auth.isLoggedIn()) return []
-    if (Array.isArray(this._favoriteIds)) return this._favoriteIds
+    const owner = storage.ownerFingerprint()
+    if (Array.isArray(this._favoriteIds) && this._favoriteIdsOwner === owner) return this._favoriteIds
 
     try {
       const data = await api.request('GET', '/formulas/favorites/list', { page: 1, page_size: 200 })
       this._favoriteIds = (data && data.items ? data.items : [])
         .map((item) => normalizeId(item.id))
         .filter((id) => id !== null)
+      this._favoriteIdsOwner = owner
     } catch (_) {
       this._favoriteIds = []
+      this._favoriteIdsOwner = owner
     }
     return this._favoriteIds
   },

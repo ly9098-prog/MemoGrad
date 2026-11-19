@@ -81,6 +81,14 @@ async def _ensure_day_snapshot(
 
 
 async def upsert_study_plan(db: Any, user_id: int, data: Any, *, ports):
+    user = await db.scalar(
+        ports("select")(ports("User"))
+        .where(ports("User").id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if user is None or user.deleted_at is not None:
+        raise ValueError("账号已注销")
     today = ports("shanghai_today")()
     if data.target_date < today:
         raise ValueError("目标日期不能早于今天")

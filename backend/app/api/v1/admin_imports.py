@@ -1520,7 +1520,10 @@ async def batch_image_upload(
         from app.services.task_queue_worker import enqueue_batch_image_job
 
         await save_recovery_context(job_id, {
-            "subject": subject, "subject_id": subject_id, "options": options,
+            "subject": subject,
+            "subject_id": subject_id,
+            "options": options,
+            "created_by": f"admin:{current_admin.id}",
         })
 
         from functools import partial

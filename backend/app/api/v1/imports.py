@@ -502,6 +502,7 @@ async def resume_pipeline(
             tmp.path,
             original_name=f"resume_{pipeline_id}",
             mime="application/octet-stream",
+            owner_user_id=current_user.id,
         )
 
         await submit_public_resume(

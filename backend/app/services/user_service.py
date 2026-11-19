@@ -163,9 +163,13 @@ async def get_user_response(db: AsyncSession, user: User) -> UserResponse:
 async def update_user(
     db: AsyncSession, user_id: int, nickname: str | None
 ) -> User | None:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
+    user = await db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if not user or user.deleted_at is not None:
         return None
     if nickname is not None:
         user.nickname = " ".join(nickname.strip().split())
@@ -229,12 +233,19 @@ async def replace_user_avatar(db: AsyncSession, user: User, data: bytes) -> User
         new_url = await storage.upload(key, normalized)
     except Exception as exc:
         raise RuntimeError("avatar storage upload failed") from exc
-    previous_url = user.avatar_url
-
-    user.avatar_url = new_url
     try:
+        current = await db.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if current is None or current.deleted_at is not None:
+            raise RuntimeError("account is unavailable")
+        previous_url = current.avatar_url
+        current.avatar_url = new_url
         await db.commit()
-        await db.refresh(user)
+        await db.refresh(current)
     except Exception:
         await db.rollback()
         try:
@@ -248,7 +259,7 @@ async def replace_user_avatar(db: AsyncSession, user: User, data: bytes) -> User
     if previous_url and previous_url != new_url:
         await delete_user_avatar_file(previous_url, storage=storage)
 
-    return user
+    return current
 
 
 async def delete_user_avatar_file(avatar_url: str | None, *, storage=None) -> None:

@@ -196,6 +196,11 @@ async def _get_image_pipeline_status(pipeline_id: str) -> dict | None:
 
 
 def _validate_image_path(path: str) -> tuple[int, int, str]:
+    from app.services.streaming_upload_handler import validate_image
+
+    validation_error = validate_image(path)
+    if validation_error:
+        raise ValueError(validation_error)
     try:
         from PIL import Image, UnidentifiedImageError
     except ImportError as exc:

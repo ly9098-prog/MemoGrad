@@ -8,6 +8,32 @@ from typing import Any
 
 logger = logging.getLogger("postgraduate-ai.sentry_utils")
 
+_SENSITIVE_KEYS = {
+    "authorization",
+    "cookie",
+    "detail",
+    "filename",
+    "openid",
+    "password",
+    "prompt",
+    "refresh_token",
+    "source_file",
+    "token",
+    "user_id",
+}
+
+
+def _safe_tag_value(value: Any) -> str:
+    text = str(value)
+    return text[:200]
+
+
+def _safe_context(value: dict[str, Any]) -> dict[str, Any]:
+    return {
+        str(key): "[REDACTED]" if str(key).lower() in _SENSITIVE_KEYS else value
+        for key, value in value.items()
+    }
+
 
 def _is_sentry_available() -> bool:
     try:
@@ -27,7 +53,9 @@ def capture_exception(exc: BaseException, tags: dict[str, Any] | None = None) ->
     with sentry_sdk.push_scope() as scope:
         if tags:
             for k, v in tags.items():
-                scope.set_tag(str(k), v)
+                if str(k).lower() in _SENSITIVE_KEYS:
+                    continue
+                scope.set_tag(str(k), _safe_tag_value(v))
         sentry_sdk.capture_exception(exc)
 
 
@@ -43,7 +71,9 @@ def capture_message(
         scope.set_level(level)
         if tags:
             for k, v in tags.items():
-                scope.set_tag(str(k), v)
+                if str(k).lower() in _SENSITIVE_KEYS:
+                    continue
+                scope.set_tag(str(k), _safe_tag_value(v))
         sentry_sdk.capture_message(msg)
 
 
@@ -53,7 +83,8 @@ def set_tag(key: str, value: Any) -> None:
         return
     import sentry_sdk
 
-    sentry_sdk.set_tag(key, value)
+    if str(key).lower() not in _SENSITIVE_KEYS:
+        sentry_sdk.set_tag(key, _safe_tag_value(value))
 
 
 def set_context(key: str, value: dict[str, Any]) -> None:
@@ -62,7 +93,7 @@ def set_context(key: str, value: dict[str, Any]) -> None:
         return
     import sentry_sdk
 
-    sentry_sdk.set_context(key, value)
+    sentry_sdk.set_context(key, _safe_context(value))
 
 
 def start_span(op: str, description: str = ""):

@@ -1,4 +1,4 @@
-const { get, set } = require('./storage-core')
+const { get, set, KEYS } = require('./storage-core')
 
 const POMODORO_TASK_RECORDS_STORAGE_KEY = 'pomodoro_task_type_records_v1'
 const SELECTION_KEY = 'pomodoro_task_type_selection_v1'
@@ -18,6 +18,12 @@ function normalize(type) {
   return TYPE_MAP[type] ? type : DEFAULT_TYPE
 }
 
+function currentOwner() {
+  const user = get(KEYS.USER) || {}
+  const raw = user.id || user.user_id || user.uid || user.openid || ''
+  return raw == null ? '' : String(raw)
+}
+
 function label(type) {
   return TYPE_MAP[normalize(type)].label
 }
@@ -34,12 +40,15 @@ function setSelected(type) {
 
 function loadRecords() {
   const raw = get(POMODORO_TASK_RECORDS_STORAGE_KEY)
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { version: 1, records: {} }
-  return { version: 1, records: raw.records && typeof raw.records === 'object' ? raw.records : {} }
+  const owner = currentOwner()
+  if (!owner || !raw || typeof raw !== 'object' || Array.isArray(raw) || raw.owner !== owner) {
+    return { version: 2, owner, records: {} }
+  }
+  return { version: 2, owner, records: raw.records && typeof raw.records === 'object' ? raw.records : {} }
 }
 
 function saveRecords(payload) {
-  set(POMODORO_TASK_RECORDS_STORAGE_KEY, payload)
+  set(POMODORO_TASK_RECORDS_STORAGE_KEY, { ...payload, version: 2, owner: currentOwner() })
 }
 
 function recordSession(session, type) {
@@ -65,6 +74,8 @@ function recordSession(session, type) {
 
 function typeForSession(session) {
   if (!session) return ''
+  const recordType = String(session.record_type || session.recordType || '').trim().toLowerCase()
+  if (recordType && recordType !== 'pomodoro') return ''
   // Only a valid type is classified. Invalid/legacy sessions stay unclassified
   // instead of inheriting whatever the current default happens to be.
   if (TYPE_MAP[session.task_type]) return session.task_type

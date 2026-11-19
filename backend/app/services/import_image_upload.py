@@ -53,6 +53,7 @@ async def _stage_image(
         request.file_path,
         original_name=request.filename,
         mime=request.content_type or "image/png",
+        owner_user_id=request.owner_user_id,
     )
     options = {
         "enable_ai_repair": request.enable_ai_repair,
@@ -66,6 +67,7 @@ async def _stage_image(
     await runtime._set_image_pipeline_status(
         pipeline_id,
         status="queued",
+        created_by=request.created_by,
         stats={
             "image_bytes": file_size,
             "image_width": image_width,

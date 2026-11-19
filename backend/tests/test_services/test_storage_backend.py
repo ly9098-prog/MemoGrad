@@ -16,6 +16,11 @@ from app.services.storage_backend import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_storage_root(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.storage_backend._BACKEND_ROOT", str(tmp_path))
+
+
 def _make_image(fmt: str = "JPEG", size: tuple[int, int] = (200, 150), color: tuple[int, int, int] = (255, 0, 0)):
     """Create a minimal test image and return its bytes.
 
@@ -198,6 +203,44 @@ class TestCOSStorage:
 
         url = await storage.upload("test/noconfig.png", b"data")
         assert "localhost" in url
+
+    @pytest.mark.asyncio
+    @patch("app.services.storage_backend.settings")
+    @patch("app.services.storage_backend.COSStorage._get_client")
+    async def test_delete_local_fallback_when_cos_is_unavailable(
+        self, mock_get_client, mock_settings, tmp_path
+    ):
+        """Delete a local copy but retain ambiguous remote ownership for retry."""
+        mock_get_client.return_value = None
+        mock_settings.COS_ALLOW_LOCAL_FALLBACK = True
+        mock_settings.PUBLIC_BASE_URL = "https://example.test"
+
+        storage = COSStorage()
+        storage._prefix = str(tmp_path)
+        path = tmp_path / "avatar.jpg"
+        path.write_bytes(b"avatar")
+
+        assert await storage.delete(str(path)) is False
+        assert not path.exists()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("client_available", [False, True])
+    async def test_delete_fallback_avatar_url_without_cos_request(
+        self, monkeypatch, client_available
+    ):
+        monkeypatch.setattr(settings, "COS_ALLOW_LOCAL_FALLBACK", True)
+        monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://example.test")
+        storage = COSStorage()
+        storage._prefix = "static/avatars"
+        client = MagicMock() if client_available else None
+        monkeypatch.setattr(storage, "_get_client", lambda: client)
+        local = LocalFileStorage(storage._prefix)
+        url = await local.upload("avatar.jpg", b"avatar")
+        assert await local.exists(url)
+        assert await storage.delete(url)
+        assert not await local.exists(url)
+        if client is not None:
+            client.delete_object.assert_not_called()
 
     def test_build_key_with_prefix(self):
         """_build_key prepends the configured prefix."""

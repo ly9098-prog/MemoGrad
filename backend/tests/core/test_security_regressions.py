@@ -170,6 +170,45 @@ def test_new_user_token_is_not_blocked_by_same_second_logout_marker() -> None:
     asyncio.run(run())
 
 
+def test_repeated_same_second_logout_marker_strictly_advances() -> None:
+    user_id = 987654322
+
+    async def run() -> None:
+        key = f"user:jwt:nbf:{user_id}"
+        await cache.delete_strict(key)
+        first = await cache.advance_integer_marker_strict(
+            key, 1_700_000_000, ttl=60
+        )
+        second = await cache.advance_integer_marker_strict(
+            key, 1_700_000_000, ttl=60
+        )
+        assert first == 1_700_000_000
+        assert second == 1_700_000_001
+        await cache.delete_strict(key)
+
+    asyncio.run(run())
+
+
+def test_token_issuance_rejects_marker_changed_after_refresh_preflight() -> None:
+    user_id = 987654323
+
+    async def run() -> None:
+        key = f"user:jwt:nbf:{user_id}"
+        await cache.delete_strict(key)
+        await cache.advance_integer_marker_strict(
+            key, 1_700_000_000, ttl=60
+        )
+        await cache.advance_integer_marker_strict(
+            key, 1_700_000_000, ttl=60
+        )
+        with pytest.raises(HTTPException) as exc:
+            await issue_user_token(user_id, expected_nbf=1_700_000_000)
+        assert exc.value.status_code == 401
+        await cache.delete_strict(key)
+
+    asyncio.run(run())
+
+
 def test_revoked_refresh_token_has_no_grace_window(monkeypatch: pytest.MonkeyPatch) -> None:
     record = SimpleNamespace(
         expires_at=utcnow() + timedelta(days=1),

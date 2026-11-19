@@ -38,6 +38,53 @@ end
 return 0
 """
 
+_ADVANCE_INTEGER_MARKER_SCRIPT = """
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+local candidate = tonumber(ARGV[1])
+local ttl = tonumber(ARGV[2])
+if candidate <= current then
+    candidate = current + 1
+end
+redis.call("SET", KEYS[1], candidate, "EX", ttl)
+return candidate
+"""
+
+_RESERVE_TOKEN_BUDGET_SCRIPT = """
+local charged_daily = math.max(tonumber(redis.call("GET", KEYS[1]) or "0"), tonumber(ARGV[1]))
+local charged_monthly = math.max(tonumber(redis.call("GET", KEYS[2]) or "0"), tonumber(ARGV[2]))
+local requested = tonumber(ARGV[3])
+local daily_limit = tonumber(ARGV[4])
+local monthly_limit = tonumber(ARGV[5])
+local daily_ttl = tonumber(ARGV[6])
+local monthly_ttl = tonumber(ARGV[7])
+if daily_limit > 0 and charged_daily + requested > daily_limit then
+    return 0
+end
+if monthly_limit > 0 and charged_monthly + requested > monthly_limit then
+    return 0
+end
+if daily_limit > 0 then
+    redis.call("SET", KEYS[1], charged_daily + requested, "EX", daily_ttl)
+end
+if monthly_limit > 0 then
+    redis.call("SET", KEYS[2], charged_monthly + requested, "EX", monthly_ttl)
+end
+return 1
+"""
+
+_RELEASE_TOKEN_BUDGET_SCRIPT = """
+local requested = tonumber(ARGV[1])
+local daily = tonumber(redis.call("GET", KEYS[1]) or "0")
+local monthly = tonumber(redis.call("GET", KEYS[2]) or "0")
+if daily > 0 then
+    redis.call("DECRBY", KEYS[1], math.min(daily, requested))
+end
+if monthly > 0 then
+    redis.call("DECRBY", KEYS[2], math.min(monthly, requested))
+end
+return 1
+"""
+
 
 class CacheUnavailableError(RuntimeError):
     """Raised when a security-sensitive Redis operation cannot be completed."""
@@ -73,6 +120,7 @@ class CacheClient:
         return value
 
     def _local_set(self, key: str, value: Any, ttl: int | None = 300) -> None:
+        self.purge_expired_local()
         if len(self._local) >= self._local_max_size:
             # 简单清理：清空过期条目
             now = __import__("time").time()
@@ -103,6 +151,18 @@ class CacheClient:
         n = len(self._local)
         self._local.clear()
         return n
+
+    def purge_expired_local(self) -> int:
+        """Drop expired process-local entries even when their keys are idle."""
+        now = __import__("time").time()
+        stale = [
+            key
+            for key, (expiry, _value) in self._local.items()
+            if expiry is not None and expiry < now
+        ]
+        for key in stale:
+            self._local.pop(key, None)
+        return len(stale)
 
     @property
     def is_enabled(self) -> bool:
@@ -181,6 +241,7 @@ class CacheClient:
         if not self._enabled:
             self._local_set(key, value, ttl)
             return
+        self.purge_expired_local()
         try:
             client = await self._ensure_client()
             if client is None:
@@ -196,6 +257,7 @@ class CacheClient:
         if not self._enabled:
             self._local_set(key, value, ttl)
             return
+        self.purge_expired_local()
         client = await self._ensure_client()
         if client is None:
             raise CacheUnavailableError("Redis unavailable")
@@ -233,6 +295,132 @@ class CacheClient:
                     json.dumps(value, default=str),
                     ttl,
                 )
+            )
+        except Exception as exc:
+            raise CacheUnavailableError("Redis unavailable") from exc
+
+    async def advance_integer_marker_strict(
+        self, key: str, candidate: int, *, ttl: int
+    ) -> int:
+        """Atomically raise a monotonic integer marker and return its value."""
+        candidate = int(candidate)
+        ttl = _safe_ttl(ttl)
+        if not self._enabled:
+            current = int(self._local_get(key) or 0)
+            value = candidate if candidate > current else current + 1
+            self._local_set(key, value, ttl)
+            return value
+        client = await self._ensure_client()
+        if client is None:
+            raise CacheUnavailableError("Redis unavailable")
+        try:
+            return int(
+                await client.eval(
+                    _ADVANCE_INTEGER_MARKER_SCRIPT,
+                    1,
+                    key,
+                    candidate,
+                    ttl,
+                )
+            )
+        except Exception as exc:
+            raise CacheUnavailableError("Redis unavailable") from exc
+
+    async def reserve_token_budget_strict(
+        self,
+        *,
+        day_key: str,
+        month_key: str,
+        used_daily: int,
+        used_monthly: int,
+        tokens: int,
+        daily_limit: int,
+        monthly_limit: int,
+        daily_ttl: int,
+        monthly_ttl: int,
+    ) -> bool:
+        """Charge a hold against a ledger containing settled and pending usage.
+
+        A concurrent SQL read may predate another caller's settlement. Keeping
+        actual charges here prevents that stale read from reusing spent budget.
+        SQL totals seed a missing ledger and never add the same usage twice.
+        """
+        tokens = max(1, int(tokens))
+        used_daily = max(0, int(used_daily))
+        used_monthly = max(0, int(used_monthly))
+        daily_limit = max(0, int(daily_limit))
+        monthly_limit = max(0, int(monthly_limit))
+        if daily_limit <= 0 and monthly_limit <= 0:
+            return True
+        if not self._enabled:
+            charged_daily = max(int(self._local_get(day_key) or 0), used_daily)
+            charged_monthly = max(int(self._local_get(month_key) or 0), used_monthly)
+            if (
+                daily_limit > 0
+                and charged_daily + tokens > daily_limit
+            ):
+                return False
+            if (
+                monthly_limit > 0
+                and charged_monthly + tokens > monthly_limit
+            ):
+                return False
+            if daily_limit > 0:
+                self._local_set(day_key, charged_daily + tokens, daily_ttl)
+            if monthly_limit > 0:
+                self._local_set(month_key, charged_monthly + tokens, monthly_ttl)
+            return True
+        client = await self._ensure_client()
+        if client is None:
+            raise CacheUnavailableError("Redis unavailable")
+        try:
+            return bool(
+                await client.eval(
+                    _RESERVE_TOKEN_BUDGET_SCRIPT,
+                    2,
+                    day_key,
+                    month_key,
+                    used_daily,
+                    used_monthly,
+                    tokens,
+                    daily_limit,
+                    monthly_limit,
+                    _safe_ttl(daily_ttl),
+                    _safe_ttl(monthly_ttl),
+                )
+            )
+        except Exception as exc:
+            raise CacheUnavailableError("Redis unavailable") from exc
+
+    async def release_token_budget_strict(
+        self,
+        *,
+        day_key: str,
+        month_key: str,
+        tokens: int,
+        actual_tokens: int = 0,
+    ) -> None:
+        """Refund unused tokens, keeping settled usage and the period's expiry."""
+        refund = max(0, int(tokens)) - max(0, int(actual_tokens))
+        if not refund:
+            return
+        if not self._enabled:
+            for key in (day_key, month_key):
+                current = int(self._local_get(key) or 0)
+                if current > 0:
+                    expiry = self._local[key][0]
+                    self._local[key] = (expiry, max(0, current - refund))
+            return
+        client = await self._ensure_client()
+        if client is None:
+            raise CacheUnavailableError("Redis unavailable")
+        try:
+            await client.eval(
+                _RELEASE_TOKEN_BUDGET_SCRIPT,
+                2,
+                day_key,
+                month_key,
+                refund,
             )
         except Exception as exc:
             raise CacheUnavailableError("Redis unavailable") from exc
@@ -369,6 +557,7 @@ class CacheClient:
 
         Uses SCAN for safe iteration instead of KEYS (which blocks Redis).
         """
+        self.purge_expired_local()
         if not self._enabled:
             return self._local_delete(pattern)
         try:

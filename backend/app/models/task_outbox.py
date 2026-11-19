@@ -83,6 +83,12 @@ class TaskOutbox(Base):
         nullable=False,
         comment="Queue task type (import_pipeline, image_pipeline, etc.)",
     )
+    owner_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        index=True,
+        comment="App account whose deletion must revoke this task",
+    )
     payload: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,

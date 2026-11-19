@@ -146,7 +146,19 @@ async def retry_batch_image_item(
             409,
             "IMPORT_RECOVERY_CONTEXT_EXPIRED",
         )
-    staged = await stage_recovery_file(file, "image", item.source_sha256)
+    owner = job.created_by
+    owner_user_id = (
+        int(owner.removeprefix("user:"))
+        if str(owner or "").startswith("user:")
+        and str(owner).removeprefix("user:").isdigit()
+        else None
+    )
+    staged = await stage_recovery_file(
+        file,
+        "image",
+        item.source_sha256,
+        owner_user_id=owner_user_id,
+    )
     retry_token = uuid.uuid4().hex
     await _claim_item(db, item, job, retry_token)
     try:
