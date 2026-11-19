@@ -371,9 +371,24 @@ class COSStorage(StorageBackend):
         is unavailable: deleting only the local copy could orphan an unknown
         remote object while allowing the owning DB row to disappear.
         """
+        # A public local URL identifies the fallback backend unambiguously.
+        # Stable export keys do not: those must still confirm remote deletion.
+        local_storage = LocalFileStorage(self._prefix)
+        local_url_prefix = (
+            f"{settings.PUBLIC_BASE_URL.rstrip('/')}/{self._prefix.strip('/')}/"
+        )
+        if (
+            settings.COS_ALLOW_LOCAL_FALLBACK
+            and not os.path.isabs(self._prefix)
+            and url_or_key.startswith(local_url_prefix)
+        ):
+            return await local_storage.delete(url_or_key)
+
         client = self._get_client()
         if client is None:
             logger.warning("COS delete skipped: backend not configured/observable")
+            if settings.COS_ALLOW_LOCAL_FALLBACK:
+                await local_storage.delete(url_or_key)
             return False
 
         key = self._normalize_key(url_or_key)
@@ -391,6 +406,8 @@ class COSStorage(StorageBackend):
             )
         except Exception as e:
             logger.error("COS delete failed for %s: %s", key, e)
+            if settings.COS_ALLOW_LOCAL_FALLBACK:
+                await local_storage.delete(url_or_key)
             return False
 
         if settings.COS_ALLOW_LOCAL_FALLBACK:

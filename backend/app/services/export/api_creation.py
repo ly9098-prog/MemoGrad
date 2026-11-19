@@ -36,20 +36,16 @@ async def create_export(req, db, current_user, *, ports):
 async def check_creation_capacity(db, current_user, *, ports):
     from app.services.export.processor import _MAX_PER_USER, get_user_pending_count
 
-    await db.execute(
-        ports("select")(ports("ExportTask").id)
-        .where(
-            ports("ExportTask").user_id == current_user.id,
-            ports("ExportTask").status.in_(
-                [
-                    ports("ExportTaskStatus").PENDING,
-                    ports("ExportTaskStatus").PROCESSING,
-                ]
-            ),
+    bind = db.get_bind()
+    if getattr(getattr(bind, "dialect", None), "name", "") == "postgresql":
+        # The user row is a stable lock target even when the user has no export
+        # rows yet. Serialize count + insert so concurrent first requests cannot
+        # all observe zero pending tasks.
+        await db.execute(
+            ports("select")(ports("User").id)
+            .where(ports("User").id == current_user.id)
+            .with_for_update()
         )
-        .limit(_MAX_PER_USER)
-        .with_for_update()
-    )
     pending_count = await get_user_pending_count(db, current_user.id)
     if pending_count >= _MAX_PER_USER:
         ports("raise_export_error")(

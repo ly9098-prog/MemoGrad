@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.runtime_paths import API_V1_PREFIX
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_app_permission
 from app.features import question_draft_generator, question_pipeline
 from app.models.user import User
 from app.schemas.ai_import import (
@@ -26,13 +26,13 @@ router = APIRouter(prefix=f"{API_V1_PREFIX}/ai-import")
 async def generate(
     data: GenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_app_permission("import:write")),
 ):
     """AI 批量生成草稿题目，进入暂存区。绝不直接进入正式题库。"""
     try:
         result = await question_draft_generator.generate_drafts(
             db,
-            current_user.id,
+            _current_user.id,
             knowledge_points=data.knowledge_points,
             difficulty=data.difficulty,
             count=data.count,

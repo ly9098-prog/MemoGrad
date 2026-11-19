@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.query_limits import require_bounded_csv
 from app.core.cache import cache
 from app.core.database import get_db
 from app.core.log_context import get_log_context, normalize_trace_id  # noqa: F401
@@ -68,7 +69,7 @@ async def get_practice_questions(
     include_children: bool = Query(True),
     count: int = Query(20, ge=1, le=50),
     mode: PracticeMode = Query("random"),
-    knowledge_point: str | None = Query(None),
+    knowledge_point: str | None = Query(None, max_length=2048),
     knowledge_point_id: int | None = Query(None, ge=1),
     include_descendants: bool = Query(False),
     exclude_answered: bool = Query(False),
@@ -85,6 +86,9 @@ async def get_practice_questions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_bounded_csv(
+        knowledge_point, field="knowledge_point", max_items=20, max_length=2048
+    )
     # Personalized practice batches contain a signed immutable-revision token.
     # Never let a WebView/proxy reuse an older GET response after a question edit.
     response.headers["Cache-Control"] = "private, no-store, max-age=0"

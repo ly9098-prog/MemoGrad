@@ -281,7 +281,7 @@ test('request maps errors and never forces a login redirect', async () => {
   await assert.rejects(api.get('/secret'), error => error.code === 'AUTH_REQUIRED')
   assert.equal(calls.relaunches.length, 0)
   assert.equal(memory.has('token'), false)
-  assert.equal(memory.get('privacy_acceptance'), 'accepted')
+  assert.equal(memory.has('privacy_acceptance'), false)
   await assert.rejects(api.get('/secret'), error => error.code === 'AUTH_REQUIRED')
   // Without a stored token the client fails fast and stays on the current page.
   assert.equal(calls.relaunches.length, 0)
@@ -291,6 +291,76 @@ test('request maps errors and never forces a login redirect', async () => {
   await assert.rejects(api.get('/secret'), error => error.code === 'AUTH_REQUIRED')
   // Login is an explicit, cancellable user action now; requests never navigate.
   assert.equal(calls.relaunches.length, 0)
+})
+
+test('account changes clear previous-account local derived caches', () => {
+  reset({
+    token: 'account-a-token',
+    user: { id: 101 },
+    'guest_trial_draft_v1': { questions: ['a'] },
+    guestPracticeResult: { results: ['a'] },
+    reader_sequence: { ids: [1, 2] },
+    'pomodoro_task_type_records_v1': { version: 2, owner: '101', records: { 'id:1': { type: 'exam' } } },
+    privacy_acceptance: { privacy_version: '1.1', accepted_items: ['user_agreement', 'privacy_policy', 'ai_service'] },
+    unrelated: 'keep',
+  })
+  auth.loginDirect('account-b-token', { id: 202 }, 1900000000, 'account-b-refresh')
+  for (const key of ['guest_trial_draft_v1', 'guestPracticeResult', 'reader_sequence',
+    'pomodoro_task_type_records_v1', 'pomodoro_task_type_selection_v1', 'privacy_acceptance']) {
+    assert.equal(memory.has(key), false, key)
+  }
+  assert.equal(memory.get('user').id, 202)
+  assert.equal(memory.get('unrelated'), 'keep')
+})
+
+test('account switch remains isolated after an auth-cleared previous owner', () => {
+  reset({
+    token: 'account-a-token',
+    refresh_token: 'account-a-refresh',
+    user: { id: 101 },
+    'guest_trial_draft_v1': { questions: ['a'], answerMap: { 1: 'A' } },
+    'practice_resume_v1:101': { owner: '101', questions: [{ id: 1 }] },
+    unrelated: 'keep',
+  })
+  storage.clearSession({
+    preservePrivacyAcceptance: false,
+    includeDebugSnapshots: true,
+    preserveLaunchResume: true,
+  })
+  assert.equal(memory.has('user'), false)
+  assert.equal(memory.has('guest_trial_draft_v1'), false)
+  assert.equal(memory.has('practice_resume_v1:101'), true)
+
+  auth.loginDirect('account-b-token', { id: 202 }, 1900000000, 'account-b-refresh')
+  assert.equal(memory.has('practice_resume_v1:101'), false)
+  assert.equal(memory.get('user').id, 202)
+  assert.equal(memory.get('unrelated'), 'keep')
+})
+
+test('refresh cannot silently switch the local account identity', async () => {
+  reset(authed({ user: { id: 101 } }), {
+    routes: { 'POST /auth/refresh': { statusCode: 200, data: {
+      access_token: 'account-b-token',
+      refresh_token: 'account-b-refresh',
+      expires_at: 1900000000,
+      user: { id: 202 },
+    }, header: {} } },
+  })
+
+  await assert.rejects(
+    api.forceRefreshToken(),
+    error => error.code === 'AUTH_REQUIRED' && error.statusCode === 401
+  )
+  assert.equal(memory.has('token'), false)
+  assert.equal(memory.has('user'), false)
+  assert.equal(memory.has('refresh_token'), false)
+})
+
+test('owner fingerprint requires a stable identifier', () => {
+  reset({ user: { nickname: 'same display name' } })
+  assert.equal(storage.ownerFingerprint(), '')
+  reset({ user: { id: 17, nickname: 'same display name' } })
+  assert.equal(storage.ownerFingerprint(), '17')
 })
 
 test('anonymous and optional reads work without a session', async () => {

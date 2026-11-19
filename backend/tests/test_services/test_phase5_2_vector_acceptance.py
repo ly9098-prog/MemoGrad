@@ -109,7 +109,9 @@ def _reset_cache():
 
 
 @contextmanager
-def _vector_enabled_config(*, api_key="test-key", enabled=True, mode="all", dim=1024):
+def _vector_enabled_config(
+    *, api_key="test-key", enabled=True, mode="all", dim=1024, model_config_id=None
+):
     """模拟 DB 已启用向量配置（_vs.emb / _vs.vec 走 DB-first 缓存路径）。"""
     from app.services.vector_config_service import EmbeddingConfig, VectorSearchConfig
     from app.services.vector_retrieval_service import _vs
@@ -127,7 +129,7 @@ def _vector_enabled_config(*, api_key="test-key", enabled=True, mode="all", dim=
             timeout=30,
             batch_size=16,
             provider="openai_compatible",
-            model_config_id=None,
+            model_config_id=model_config_id,
         ),
     }
     try:
@@ -541,7 +543,7 @@ class TestFaultInjection:
                    new_callable=AsyncMock, return_value=None):
             db.execute = AsyncMock(return_value=mock_no_emb)
             q = _make_question(id=1)
-            result = _run(_ensure_source_embedding(db, q))
+            result = _run(_ensure_source_embedding(db, q, user_id=1))
             assert result is None
 
     def test_fault_5_empty_candidates(self):
@@ -574,6 +576,83 @@ class TestFaultInjection:
             result = _run(search_similar_questions(db, 1, 1, 5))
             assert result["enabled"] is True
             assert result["recommendations"] == []
+
+    def test_unpublished_source_never_reaches_embedding_provider(self):
+        """An active but unreviewed source question is not a search input."""
+        from app.services import vector_retrieval_service
+
+        db = _make_pgvector_db()
+        provider = AsyncMock(return_value=_fake_embedding("must not run"))
+        with _vector_enabled_config(), patch.object(
+            vector_retrieval_service,
+            "upsert_question_embedding",
+            provider,
+        ), patch.object(
+            vector_retrieval_service,
+            "is_vector_enabled",
+            AsyncMock(return_value=True),
+        ):
+            result = _run(
+                vector_retrieval_service.search_similar_questions(db, 1, 1, 5)
+            )
+
+        assert result["strategy"] == "fallback"
+        provider.assert_not_awaited()
+        source_query = str(db.execute.await_args_list[-1].args[0]).lower()
+        assert "questions.is_active" in source_query
+        assert "questions.review_status" in source_query
+
+    def test_source_embedding_respects_user_budget_before_provider(self):
+        from app.services import vector_retrieval_service
+
+        db = _make_mock_db("postgresql")
+        missing_embedding = MagicMock()
+        missing_embedding.first.return_value = None
+        db.execute.return_value = missing_embedding
+        provider = AsyncMock(return_value={"status": "created"})
+        with _vector_enabled_config(model_config_id=17), patch.object(
+            vector_retrieval_service,
+            "upsert_question_embedding",
+            provider,
+        ), patch(
+            "app.services.ai_learning_service.reserve_token_budget",
+            AsyncMock(return_value=None),
+        ) as reserve:
+            result = _run(
+                vector_retrieval_service._ensure_source_embedding(
+                    db, _make_question(id=9), user_id=7
+                )
+            )
+
+        assert result is None
+        reserve.assert_awaited_once()
+        provider.assert_not_awaited()
+
+    def test_failed_source_embedding_keeps_budget_when_provider_may_be_billed(self):
+        from app.services import vector_retrieval_service
+
+        db = _make_mock_db("postgresql")
+        missing_embedding = MagicMock()
+        missing_embedding.first.return_value = None
+        db.execute.return_value = missing_embedding
+        reservation = object()
+        with _vector_enabled_config(model_config_id=17), patch.object(
+            vector_retrieval_service,
+            "upsert_question_embedding",
+            AsyncMock(return_value={"status": "failed", "reason": "invalid_embedding"}),
+        ) as provider, patch(
+            "app.services.ai_learning_service.reserve_token_budget",
+            AsyncMock(return_value=reservation),
+        ), patch(
+            "app.services.ai_learning_service.cancel_token_reservation", AsyncMock()
+        ) as cancel:
+            assert _run(
+                vector_retrieval_service._ensure_source_embedding(
+                    db, _make_question(id=9), user_id=7
+                )
+            ) is None
+        provider.assert_awaited_once()
+        cancel.assert_not_awaited()
 
     def test_fault_6_config_error(self):
         """故障 6: 配置错误（EMBEDDING_API_KEY 为空）→ is_vector_enabled=False。"""
@@ -628,11 +707,11 @@ def _make_batch_token(user_id=1, pairs=((42, 900001),), subject_id=1, mode="rand
     import time
     import uuid
 
-    import app.services.practice_service as ps
+    from app.services.practice import batch_token
 
     rid = f"practice_{uuid.uuid4().hex}"
     payload = {
-        "v": ps._PRACTICE_BATCH_TOKEN_VERSION,
+        "v": batch_token._PRACTICE_BATCH_TOKEN_VERSION,
         "uid": user_id,
         "rid": rid,
         "rec_rid": None,
@@ -642,11 +721,15 @@ def _make_batch_token(user_id=1, pairs=((42, 900001),), subject_id=1, mode="rand
         "exp": int(time.time()) + 3600,
         "questions": [list(pair) for pair in pairs],
     }
-    body = ps._urlsafe_b64encode(
+    body = batch_token._urlsafe_b64encode(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     )
-    signature = ps._urlsafe_b64encode(
-        hmac.new(ps._practice_batch_signing_key(), body.encode("ascii"), hashlib.sha256).digest()
+    signature = batch_token._urlsafe_b64encode(
+        hmac.new(
+            batch_token._practice_batch_signing_key(),
+            body.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
     )
     return body + "." + signature, rid
 

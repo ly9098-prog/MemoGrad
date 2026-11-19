@@ -26,7 +26,11 @@ async def _load_current_question_view(db, wq, *, ports):
     result = await db.execute(
         ports("select")(ports("Question"))
         .options(ports("joinedload")(ports("Question").subject_ref))
-        .where(ports("Question").id == wq.question_id)
+        .where(
+            ports("Question").id == wq.question_id,
+            ports("Question").is_active.is_(True),
+            ports("Question").review_status == "approved",
+        )
     )
     question = result.scalar_one_or_none()
     if question is None:
@@ -55,6 +59,8 @@ async def _load_wrong_detail_view(db, user_id, wq_id, *, ports):
                 ports("WrongQuestion").id == wq_id,
                 ports("WrongQuestion").user_id == user_id,
                 ports("WrongQuestion").is_active,
+                ports("Question").is_active,
+                ports("Question").review_status == "approved",
             )
         )
     ).one_or_none()

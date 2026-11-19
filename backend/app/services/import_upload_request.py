@@ -18,3 +18,10 @@ class UploadRequest:
     page_end: int | None = None
     created_by: str | None = None
     source_sha256: str | None = None
+
+    @property
+    def owner_user_id(self) -> int | None:
+        value = str(self.created_by or "").strip()
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+        return None

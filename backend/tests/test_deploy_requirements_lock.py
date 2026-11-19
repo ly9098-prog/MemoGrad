@@ -28,3 +28,12 @@ def test_lock_pins_every_direct_requirement_with_hashes():
     entries = len(re.findall(r"^[A-Za-z0-9_.-]+==", lock.read_text(), re.M))
     hashes = lock.read_text().count("--hash=sha256:")
     assert entries and hashes >= entries
+
+
+def test_lock_matches_direct_exact_versions():
+    pattern = r"^([A-Za-z0-9_.-]+)(?:\[[^\]]+\])?==([^\s;\\]+)"
+    direct = dict(re.findall(pattern, (ROOT / "requirements.txt").read_text(), re.M))
+    locked = dict(re.findall(pattern, (ROOT / "requirements.lock").read_text(), re.M))
+    assert direct
+    for name, version in direct.items():
+        assert locked.get(name) == version, f"{name}: required {version}, locked {locked.get(name)}"

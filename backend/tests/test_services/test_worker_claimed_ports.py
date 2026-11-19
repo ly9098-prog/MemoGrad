@@ -45,6 +45,27 @@ async def test_context_imports_are_bound_before_identity_generation(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"owner_user_id": 9}, 9),
+        ({"user_id": "9"}, 9),
+        ({"created_by": "9"}, 9),
+        ({"created_by": "user:9"}, 9),
+        ({"created_by": "admin:9"}, None),
+        ({"owner_user_id": True}, None),
+        ({}, None),
+    ],
+)
+async def test_claimed_work_binds_its_own_app_principal(harness, payload, expected):
+    task = harness.task()
+    task.payload.update(payload)
+    await harness.run(task)
+    assert harness.call("bind")[1]["user_id"] == expected
+    assert log_context.get_log_context() == {"user_id": "outer"}
+
+
+@pytest.mark.asyncio
 async def test_request_id_is_read_after_trace_generator_mutates_task(
     monkeypatch, harness
 ):

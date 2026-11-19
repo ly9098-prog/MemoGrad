@@ -90,17 +90,23 @@ def check_mastery(tree):
     fetch = source_of(tree, "_fetch_subject_mastery_rows")
     ordered(
         fetch,
-        "select(UserKnowledgeState.subject_id, "
+        "evidence_confidence = case(",
+        "(UserKnowledgeState.confidence > 0, UserKnowledgeState.confidence)",
+        "(UserKnowledgeState.attempt_count >= 10, 1.0)",
+        "else_=UserKnowledgeState.attempt_count / 10.0",
+        "select(KnowledgePoint.subject_id, "
         "func.avg(UserKnowledgeState.mastery_score)",
-        "func.avg(UserKnowledgeState.confidence)",
+        "func.avg(evidence_confidence)",
         "func.coalesce(func.sum(UserKnowledgeState.attempt_count), 0)",
         "func.coalesce(func.sum(UserKnowledgeState.correct_count), 0)",
         "func.coalesce(func.sum(UserKnowledgeState.wrong_count), 0)",
         "func.count(UserKnowledgeState.id)",
+        "join(KnowledgePoint, KnowledgePoint.id == UserKnowledgeState.knowledge_point_id)",
         "UserKnowledgeState.user_id == user_id",
-        "UserKnowledgeState.subject_id.in_(core_ids)",
+        "KnowledgePoint.subject_id.in_(core_ids)",
+        "KnowledgePoint.is_active.is_(True)",
         "UserKnowledgeState.attempt_count > 0",
-        "group_by(UserKnowledgeState.subject_id)",
+        "group_by(KnowledgePoint.subject_id)",
         "return {int(row[0]): row for row in rows.all()}",
     )
     entry = source_of(tree, "_subject_mastery_entry")
@@ -111,9 +117,17 @@ def check_mastery(tree):
         "'mastery_score': None",
         "attempts = int(row[3] or 0)",
         "correct = int(row[4] or 0)",
+        "raw_score = float(row[1]) if row[1] is not None and attempts > 0 else None",
+        "raw_confidence = min(1.0, max(0.0, float(row[2] or 0.0)))",
+        "confidence = round(raw_confidence, 3)",
+        "status = 'no_data' if attempts <= 0 else 'insufficient'",
+        "if raw_score is not None and raw_confidence >= 0.3:",
+        "label = get_mastery_label(raw_score, raw_confidence)",
+        "score = round(raw_score, 1) if raw_score is not None "
+        "and status != 'insufficient' else None",
         "'data_available': bool(row[6] and attempts > 0)",
-        "'mastery_score': round(float(row[1] or 0.0), 1)",
-        "'confidence': round(float(row[2] or 0.0), 3)",
+        "'mastery_score': score",
+        "'confidence': confidence",
         "'accuracy': round(correct / attempts, 4) if attempts > 0 else None",
     )
 
@@ -344,6 +358,27 @@ def test_recommendation_delegation_and_query_semantics():
     check_chapter(tree)
     check_weak_point(tree)
     check_path(tree)
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [
+        ("KnowledgePoint.subject_id", "UserKnowledgeState.subject_id"),
+        ("KnowledgePoint.is_active.is_(True)", "KnowledgePoint.is_active.is_(False)"),
+        ("func.avg(evidence_confidence)", "func.avg(UserKnowledgeState.confidence)"),
+        ("UserKnowledgeState.attempt_count > 0", "UserKnowledgeState.attempt_count >= 0"),
+    ],
+)
+def test_gate_rejects_mastery_ownership_and_evidence_regressions(original, replacement):
+    class ReplaceExpression(ast.NodeTransformer):
+        def visit(self, node):
+            if isinstance(node, ast.expr) and ast.unparse(node) == original:
+                return ast.copy_location(ast.parse(replacement, mode="eval").body, node)
+            return super().visit(node)
+
+    tree = ReplaceExpression().visit(load())
+    with pytest.raises(AssertionError):
+        check_mastery(tree)
 
 
 def test_gate_rejects_widened_chapter_probe_and_reordered_blockers():

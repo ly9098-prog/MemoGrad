@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 //  true  → 本地开发（localhost:8000），仅开发者工具可用
 //  false → 正式/体验/真机（https://xzshub.top）
-const LOCAL_DEBUG = true
+const LOCAL_DEBUG = false
 
 // ══════════════════════════════════════════════════════════════
 //  以下代码无需手动修改
@@ -31,16 +31,17 @@ function resolveRuntimeConfig({ envVersion, platform, localDebug }) {
 }
 
 // ── 根据 LOCAL_DEBUG 确定目标环境 ──
-var runtimeEnv
-if (LOCAL_DEBUG) {
-  runtimeEnv = 'local'
-} else {
-  try {
-    const info = wx.getAccountInfoSync()
-    runtimeEnv = info.miniProgram.envVersion === 'trial' ? 'trial' : 'release'
-  } catch (_e) {
-    runtimeEnv = 'release'
-  }
+var runtimeEnv = 'release'
+try {
+  const info = wx.getAccountInfoSync()
+  const system = typeof wx.getSystemInfoSync === 'function' ? wx.getSystemInfoSync() : {}
+  runtimeEnv = resolveRuntimeConfig({
+    envVersion: info.miniProgram.envVersion,
+    platform: system.platform,
+    localDebug: LOCAL_DEBUG,
+  })
+} catch (_e) {
+  runtimeEnv = 'release'
 }
 
 const envConfig = {

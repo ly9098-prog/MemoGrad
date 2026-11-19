@@ -79,8 +79,13 @@ async def test_records_are_flushed_before_wrong_book_side_effects():
     assert outbox_calls[0][1] == {
         "practice_record_id": 78,
         "request_id": "request-1",
+        "owner_user_id": 8,
     }
-    assert outbox_calls[1][1] == {"practice_record_id": 79, "request_id": None}
+    assert outbox_calls[1][1] == {
+        "practice_record_id": 79,
+        "request_id": None,
+        "owner_user_id": 8,
+    }
 
 
 @pytest.mark.asyncio

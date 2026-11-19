@@ -472,8 +472,10 @@ async def test_current_question_loader_uses_question_id_and_kp_fallback(
     monkeypatch.setattr(api, "load_question_kps", loader)
     assert await api._load_current_question_view(db, wrong()) == (current, [])
     stmt = db.execute.call_args.args[0]
-    assert list(stmt.compile().params.values()) == [8]
+    assert list(stmt.compile().params.values()) == [8, "approved"]
     assert "question_version" not in str(stmt)
+    assert "questions.is_active" in str(stmt)
+    assert "questions.review_status" in str(stmt)
     assert loader.await_count == int(alive)
 
 

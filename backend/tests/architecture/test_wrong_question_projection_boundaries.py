@@ -57,7 +57,14 @@ HELPERS = (
     "_batch_set_mastered_state",
     "_batch_remove_from_book",
     "_batch_delete_wrong_questions",
-    "_load_all_task_flow_items",
+    "_task_flow_scope_query",
+    "_task_flow_group_condition",
+    "_task_flow_summary_statement",
+    "_task_flow_aggregate",
+    "_task_flow_group_counts",
+    "_task_flow_preview_ids",
+    "_load_task_flow_preview_items",
+    "_task_flow_preview_lists",
     "_task_flow_bucket",
     "_task_flow_groups",
     "_task_flow_summary",
@@ -137,8 +144,9 @@ FROZEN_SOURCES = {
     "_reactivate_wrong_question_row": "def _reactivate_wrong_question_row(wq: WrongQuestion) -> bool:\n    changed = False\n    if not wq.is_active:\n        wq.is_active = True\n        wq.removed_at = None\n        changed = True\n    if wq.mastered:\n        wq.mastered = False\n        wq.mastered_at = None\n        changed = True\n    return changed",
     "_force_schedule_due_now": "def _force_schedule_due_now(schedule: ReviewSchedule, rebound: bool) -> bool:\n    changed = False\n    now = utcnow()\n    if not schedule.is_active:\n        schedule.is_active = True\n        changed = True\n    if schedule.mastered:\n        schedule.mastered = False\n        changed = True\n    if schedule.next_review_at is None or schedule.next_review_at > now:\n        schedule.next_review_at = now\n        if not rebound:\n            schedule.occurrence_seq = int(schedule.occurrence_seq or 0) + 1\n        changed = True\n    return changed",
     "_task_flow_bucket": "def _task_flow_bucket(item: dict, today_end, fourteen_days_ago) -> str:\n    \"\"\"Priority-deduplicated bucket key for one wrong-book list item.\"\"\"\n    if item['next_review_at'] and item['next_review_at'] <= today_end and (not item['is_mastered']):\n        return 'today_due'\n    if item['wrong_count'] >= _TASK_FLOW_HIGH_FREQUENCY_MIN and (not item['is_mastered']):\n        return 'high_frequency'\n    if item['created_at'] and item['created_at'] >= fourteen_days_ago and (not item['is_mastered']):\n        return 'recent_added'\n    if not item['is_mastered']:\n        return 'to_consolidate'\n    return 'mastered'",
-    "_task_flow_groups": "def _task_flow_groups(buckets: dict[str, list[dict]], preview_size: int) -> list[dict]:\n    return [{'key': key, 'title': title, 'total': len(buckets[key]), 'items': buckets[key][:preview_size]} for key, title in _TASK_FLOW_GROUPS]",
-    "_task_flow_summary": "def _task_flow_summary(all_items: list[dict], total_count: int, today_due_count: int) -> dict:\n    return {'total_count': total_count, 'mastered_count': sum((1 for item in all_items if item['is_mastered'])), 'high_frequency_count': sum((1 for item in all_items if item['wrong_count'] >= _TASK_FLOW_HIGH_FREQUENCY_MIN and (not item['is_mastered']))), 'today_due_count': today_due_count}",
+    "_task_flow_group_condition": "def _task_flow_group_condition(group_key: str, today_end, fourteen_days_ago):\n    \"\"\"SQL predicate that mirrors the priority-deduplicated bucket keys.\"\"\"\n    next_review = _wrong_next_review_subquery()\n    not_due = or_(next_review.is_(None), next_review > today_end)\n    not_mastered = ~WrongQuestion.mastered\n    high_frequency = WrongQuestion.review_count >= _TASK_FLOW_HIGH_FREQUENCY_MIN\n    recent_added = WrongQuestion.created_at >= fourteen_days_ago\n    if group_key == 'today_due':\n        return and_(not_mastered, next_review <= today_end)\n    if group_key == 'high_frequency':\n        return and_(not_mastered, not_due, high_frequency)\n    if group_key == 'recent_added':\n        return and_(not_mastered, not_due, ~high_frequency, recent_added)\n    if group_key == 'to_consolidate':\n        return and_(not_mastered, not_due, ~high_frequency, or_(WrongQuestion.created_at.is_(None), WrongQuestion.created_at < fourteen_days_ago))\n    return WrongQuestion.mastered",
+    "_task_flow_groups": "def _task_flow_groups(counts: dict[str, int], previews: dict[str, list[dict]], preview_size: int) -> list[dict]:\n    return [{'key': key, 'title': title, 'total': counts[key], 'items': previews[key][:preview_size]} for key, title in _TASK_FLOW_GROUPS]",
+    "_task_flow_summary": "def _task_flow_summary(aggregate: dict) -> dict:\n    \"\"\"Non-exclusive headline counters from the aggregate SQL statement.\"\"\"\n    return {'total_count': int(aggregate['total_count']), 'mastered_count': int(aggregate['mastered_count']), 'high_frequency_count': int(aggregate['high_frequency_count']), 'today_due_count': int(aggregate['today_due_count'])}",
     "_wrong_mastery_percent": "def _wrong_mastery_percent(wq: WrongQuestion, mastery_pct) -> float:\n    if wq.mastered:\n        return 1.0\n    return round(float(mastery_pct if mastery_pct is not None else 0.2), 4)",
     "_wrong_ai_analysis_status": "def _wrong_ai_analysis_status(ai_analysis) -> str:\n    return 'ready' if isinstance(ai_analysis, dict) and ai_analysis else 'empty'",
 }
@@ -285,17 +293,12 @@ def check_delegation(tree):
         "return (len(ordered_wqs), [])",
     )
 
-    loader = source_of(tree, "_load_all_task_flow_items")
+    loader = source_of(tree, "_task_flow_scope_query")
     ordered(
         loader,
-        "all_items: list[dict] = []",
-        "while True:",
-        "page_items, total_count = await list_wrong_enriched(",
-        "page_size=_TASK_FLOW_PAGE_SIZE",
-        "all_items.extend(page_items)",
-        "if not page_items or len(all_items) >= total_count:",
-        "page += 1",
-        "return (all_items, total_count)",
+        "select(",
+        ".join(Question, WrongQuestion.question_id == Question.id)",
+        ".where(and_(*conditions))",
     )
 
     bucket = source_of(tree, "_task_flow_bucket")
@@ -313,12 +316,17 @@ def check_delegation(tree):
         flow,
         "_, today_end = shanghai_today_boundaries()",
         "fourteen_days_ago = utcnow() - timedelta(days=_TASK_FLOW_RECENT_DAYS)",
-        "all_items, total_count = await _load_all_task_flow_items(",
-        "buckets: dict[str, list[dict]] = {key: [] for key, _ in _TASK_FLOW_GROUPS}",
-        "buckets[_task_flow_bucket(item, today_end, fourteen_days_ago)].append(item)",
+        "conditions = _wrong_book_conditions(user_id, allowed_subject_ids)",
+        "conditions.extend(_wrong_list_optional_conditions(",
+        "scope = _task_flow_scope_query(conditions)",
+        "scope = await _apply_wrong_subject_scope(db, scope, subject_id)",
+        "scope = _apply_wrong_topic_scope(scope, topic)",
+        "aggregate = await _task_flow_aggregate(db, scope, today_end)",
+        "counts = await _task_flow_group_counts(",
+        "previews = await _task_flow_preview_lists(",
         "return {",
         "'summary': _task_flow_summary(",
-        "'groups': _task_flow_groups(buckets, preview_size)",
+        "'groups': _task_flow_groups(counts, previews, preview_size)",
     )
 
     add_all = source_of(tree, "_batch_add_to_review")
@@ -345,18 +353,20 @@ def check_single_source(tree):
         return source_of(tree, name).count(fragment)
 
     assert count("_task_flow_bucket", "_TASK_FLOW_HIGH_FREQUENCY_MIN") == 1
-    assert count("_task_flow_summary", "_TASK_FLOW_HIGH_FREQUENCY_MIN") == 1
-    assert MODULE_TEXT.count("_TASK_FLOW_HIGH_FREQUENCY_MIN") == 3
+    assert count("_task_flow_group_condition", "_TASK_FLOW_HIGH_FREQUENCY_MIN") == 1
+    assert count("_task_flow_summary_statement", "_TASK_FLOW_HIGH_FREQUENCY_MIN") == 1
+    assert MODULE_TEXT.count("_TASK_FLOW_HIGH_FREQUENCY_MIN") == 4
     assert MODULE_TEXT.count("_TASK_FLOW_RECENT_DAYS") == 2
-    assert MODULE_TEXT.count("_TASK_FLOW_PAGE_SIZE") == 2
+    assert "_TASK_FLOW_PAGE_SIZE" not in MODULE_TEXT
+    assert "while True:" not in MODULE_TEXT
     assert "wrong_count >= 3" not in MODULE_TEXT
     for title in ("今日应复习", "高频错题", "最近新增", "待巩固", "已经掌握"):
         assert MODULE_TEXT.count(title) == 1, title
     assert MODULE_TEXT.count('"today_due"') == 3
-    assert MODULE_TEXT.count('"high_frequency"') == 2
-    assert MODULE_TEXT.count('"recent_added"') == 2
-    assert MODULE_TEXT.count('"to_consolidate"') == 2
-    assert MODULE_TEXT.count('"mastered"') == 4
+    assert MODULE_TEXT.count('"high_frequency"') == 3
+    assert MODULE_TEXT.count('"recent_added"') == 3
+    assert MODULE_TEXT.count('"to_consolidate"') == 3
+    assert MODULE_TEXT.count('"mastered"') == 5
 
     # Entry points orchestrate; they must not inline SQL or savepoints.
     for name in ("record_wrong", "get_stats", "batch_operate", "get_task_flow"):
@@ -458,15 +468,14 @@ def test_gate_rejects_missing_inactive_guard_in_remove():
         check_delegation(tree)
 
 
-def test_gate_rejects_exclusive_task_flow_summary():
+def test_gate_rejects_task_flow_summary_using_the_wrong_counter():
     tree = load()
     summary = function(tree, "_task_flow_summary")
     for node in ast.walk(summary):
-        if isinstance(node, ast.BoolOp) and ast.unparse(node) == (
-            "item['wrong_count'] >= _TASK_FLOW_HIGH_FREQUENCY_MIN "
-            "and (not item['is_mastered'])"
+        if isinstance(node, ast.Subscript) and ast.unparse(node) == (
+            "aggregate['high_frequency_count']"
         ):
-            node.values = node.values[:1]
+            node.slice = ast.Constant(value="today_due_count")
             break
     with pytest.raises(AssertionError):
         check_frozen_sources(tree)

@@ -20,6 +20,7 @@ async def _stage_excel(request: UploadRequest, pipeline_id: str) -> StagingObjec
         request.file_path,
         original_name=request.filename,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        owner_user_id=request.owner_user_id,
     )
     await _set_pipeline_store(
         pipeline_id,
@@ -33,6 +34,7 @@ async def _stage_excel(request: UploadRequest, pipeline_id: str) -> StagingObjec
             "errors": [],
             "started_at": serialize_utc_datetime(utcnow()),
             "staging_object_id": staging_obj.object_id,
+            "created_by": request.created_by,
         },
     )
     return staging_obj

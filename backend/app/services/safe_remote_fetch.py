@@ -344,6 +344,13 @@ def request_remote_bytes(
                 chunks: list[bytes] = []
                 total = 0
                 while current_method != "HEAD":
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise RemoteFetchTimeoutError(
+                            "remote resource fetch timed out"
+                        )
+                    if connection.sock is not None:
+                        connection.sock.settimeout(remaining)
                     remaining_bytes = max_bytes + 1 - total
                     if remaining_bytes <= 0:
                         raise UnsafeRemoteURLError("remote resource is too large")

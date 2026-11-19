@@ -35,6 +35,7 @@ from app.models.pomodoro import (
 from app.models.practice_session import PracticeSession  # noqa: F401
 from app.models.review_scheduler import ReviewRecord  # noqa: F401
 from app.models.study_plan import StudyPlan, StudyPlanDay
+from app.models.user import User  # noqa: F401 - live study-plan request port
 from app.schemas.study_plan import StudyPlanUpsertRequest
 from app.services import study_plan_activity as _activity
 from app.services import study_plan_request as _request

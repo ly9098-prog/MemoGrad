@@ -146,6 +146,7 @@ async def _create_projection_repair(
     repair_task_id: str,
     payload: dict[str, Any],
     stats: dict[str, int],
+    owner_user_id: int,
 ) -> None:
     """Isolate only the outbox insert with a savepoint; other errors escape."""
     try:
@@ -156,6 +157,7 @@ async def _create_projection_repair(
                 task_type=_TASK_TYPE,
                 payload=payload,
                 schema_version=ANSWER_PROJECTION_TASK_SCHEMA_VERSION,
+                owner_user_id=owner_user_id,
             )
         stats["scheduled"] += 1
     except IntegrityError:
@@ -205,7 +207,23 @@ async def _schedule_projection_repair(
     original_trace = _payload_trace(original)
     if original_trace is not None:
         payload["_trace"] = original_trace
-    await _create_projection_repair(db, record_id, repair_task_id, payload, stats)
+    owner_user_id = await db.scalar(
+        select(PracticeRecord.user_id).where(PracticeRecord.id == record_id)
+    )
+    if owner_user_id is None:
+        stats["errors"] += 1
+        logger.warning(
+            "answer projection repair owner disappeared: record_id=%s", record_id
+        )
+        return
+    await _create_projection_repair(
+        db,
+        record_id,
+        repair_task_id,
+        payload,
+        stats,
+        int(owner_user_id),
+    )
 
 
 async def reconcile_answer_projections(

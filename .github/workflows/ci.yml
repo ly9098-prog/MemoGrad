@@ -267,6 +267,18 @@ jobs:
           STAGING_STORAGE_DIR: ${{ runner.temp }}/regression-staging
         run: |
           python -m pytest \
+            tests/core/test_cache_local_expiry.py \
+            tests/test_core/test_sentry_redaction.py \
+            tests/test_api/test_app_question_write_boundary.py \
+            tests/test_api/test_question_detail_answer_boundaries.py \
+            tests/test_api/test_query_admission_bounds.py \
+            tests/test_services/test_ai_token_reservation_concurrency.py \
+            tests/test_services/test_stats_ai_billing.py \
+            tests/test_services/test_pdf_render_admission.py \
+            tests/test_services/test_worker_account_owner_guard.py \
+            tests/test_services/test_wrong_task_flow_admission.py \
+            tests/test_services/test_task_outbox_owner_migration.py \
+            tests/export/test_export_ws_backpressure.py \
             tests/architecture/test_architecture_boundaries.py \
             tests/architecture/test_dependency_direction.py \
             tests/architecture/test_task_queue_protocol_boundaries.py \
@@ -647,6 +659,8 @@ jobs:
             tests/test_services/test_formula_graph_expr_parser_magnitude_guard.py \
             tests/test_deploy_dockerfile_pip_tls.py \
             tests/test_deploy_requirements_lock.py \
+            tests/core/test_sqlite_lifecycle.py \
+            tests/test_features/test_migration_ci_scripts.py \
             tests/test_services/test_safe_httpx_pinned_backend.py \
             tests/test_features/test_ocr_vl_result_url_global_only.py \
             tests/test_services/test_account_erasure_service.py \

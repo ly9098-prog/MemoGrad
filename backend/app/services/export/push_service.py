@@ -43,6 +43,15 @@ _AUTH_RECHECK_INTERVAL = 30
 # Max message payload size (bytes)
 _MAX_MESSAGE_BYTES = 65_536
 
+# Per-socket send and close deadlines. A stalled socket must never block the
+# shared per-instance subscriber indefinitely.
+_SEND_TIMEOUT_SEC = 1.0
+_CLEANUP_TIMEOUT_SEC = 1.0
+
+# Minimum interval between pong replies; clients may flood ping frames and
+# must not be able to turn one connection into an unbounded send loop.
+_MIN_PONG_INTERVAL_SEC = 5.0
+
 # Redis channel prefix
 _CHANNEL_PREFIX = "export:task:events:"
 
@@ -184,11 +193,41 @@ def unregister(user_id: int, ws: WebSocket) -> None:
     logger.debug("WebSocket unregistered for user %d", user_id)
 
 
+async def _send_bounded(ws: WebSocket, send: Any, value: Any) -> bool:
+    """Run one WebSocket send with a short deadline.
+
+    All export WebSocket sends (events, ping and pong) go through this same
+    boundary so a stalled transport cannot hold the shared subscriber.
+    """
+    try:
+        await asyncio.wait_for(send(value), timeout=_SEND_TIMEOUT_SEC)
+        return True
+    except Exception:
+        return False
+
+
+async def _send_text_bounded(ws: WebSocket, text: str) -> bool:
+    return await _send_bounded(ws, ws.send_text, text)
+
+
+async def _send_json_bounded(ws: WebSocket, payload: dict[str, Any]) -> bool:
+    return await _send_bounded(ws, ws.send_json, payload)
+
+
+async def _close_bounded(ws: WebSocket, **kwargs: Any) -> None:
+    """Close a stale socket within a bounded window."""
+    try:
+        await asyncio.wait_for(ws.close(**kwargs), timeout=_CLEANUP_TIMEOUT_SEC)
+    except Exception:
+        pass
+
+
 async def send_to_user(user_id: int, event: dict) -> int:
     """Send an event to all connections of a user.
 
     Returns the number of successfully delivered connections.
-    Cleans up stale connections.
+    Cleans up stale connections. Per-user sends are concurrent (bounded by the
+    per-user connection limit) and each send/close has its own deadline.
 
     Thread-safety: iterates a snapshot of the user's connection set to
     avoid ``Set changed size during iteration`` when a concurrent
@@ -197,8 +236,6 @@ async def send_to_user(user_id: int, event: dict) -> int:
     if user_id not in _connections:
         return 0
 
-    stale: set[WebSocket] = set()
-    delivered = 0
     payload = json.dumps(event, ensure_ascii=False, default=str)
 
     if len(payload) > _MAX_MESSAGE_BYTES:
@@ -213,18 +250,22 @@ async def send_to_user(user_id: int, event: dict) -> int:
         payload = json.dumps(event, ensure_ascii=False, default=str)
 
     # Snapshot to avoid Set changed size during iteration
-    for ws in list(_connections.get(user_id, ())):
-        try:
-            await ws.send_text(payload)
-            delivered += 1
-        except Exception:
-            stale.add(ws)
+    snapshot = list(_connections.get(user_id, ()))
+    if not snapshot:
+        return 0
+
+    results = await asyncio.gather(
+        *(_send_text_bounded(ws, payload) for ws in snapshot)
+    )
+    stale = {ws for ws, ok in zip(snapshot, results) if not ok}
+    delivered = len(snapshot) - len(stale)
 
     if stale:
         if user_id in _connections:
             _connections[user_id] -= stale
             if not _connections[user_id]:
                 _connections.pop(user_id, None)
+        await asyncio.gather(*(_close_bounded(ws) for ws in stale))
 
     return delivered
 
@@ -344,12 +385,13 @@ async def handle_export_ws(
 
     accepted = await register(user_id, ws)
     if not accepted:
-        await ws.send_json({"type": "error", "message": "连接数过多"})
-        await ws.close()
+        await _send_json_bounded(ws, {"type": "error", "message": "连接数过多"})
+        await _close_bounded(ws)
         return
 
     try:
         last_auth_check = time.monotonic()
+        last_pong_sent = -float("inf")
         # Heartbeat loop — respond to PING from client
         while True:
             if time.monotonic() - last_auth_check >= _AUTH_RECHECK_INTERVAL:
@@ -363,7 +405,7 @@ async def handle_export_ws(
                         raise ValueError("user mismatch")
                     last_auth_check = time.monotonic()
                 except Exception:
-                    await ws.close(code=4001, reason="Session expired")
+                    await _close_bounded(ws, code=4001, reason="Session expired")
                     break
             try:
                 data = await asyncio.wait_for(
@@ -371,11 +413,15 @@ async def handle_export_ws(
                 )
                 msg = json.loads(data)
                 if msg.get("type") == "ping":
-                    await ws.send_json({"type": "pong"})
+                    now = time.monotonic()
+                    if now - last_pong_sent >= _MIN_PONG_INTERVAL_SEC:
+                        if not await _send_json_bounded(ws, {"type": "pong"}):
+                            await _close_bounded(ws)
+                            break
+                        last_pong_sent = now
             except TimeoutError:
-                try:
-                    await ws.send_json({"type": "ping"})
-                except Exception:
+                if not await _send_json_bounded(ws, {"type": "ping"}):
+                    await _close_bounded(ws)
                     break
             except json.JSONDecodeError:
                 pass  # ignore malformed messages

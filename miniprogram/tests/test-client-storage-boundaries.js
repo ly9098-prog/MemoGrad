@@ -120,7 +120,8 @@ test('facade re-exports the same objects the submodules own', () => {
   assert.equal(storage.BUSINESS_CACHE_KEYS, core.BUSINESS_CACHE_KEYS)
   assert.equal(storage.PROTECTED_KEYS, core.PROTECTED_KEYS)
   assert.equal(storage.SESSION_DYNAMIC_KEY_PREFIXES, core.SESSION_DYNAMIC_KEY_PREFIXES)
-  for (const name of ['get', 'set', 'setStrict', 'remove', 'clearSession']) {
+  for (const name of ['get', 'set', 'setStrict', 'remove', 'clearSession',
+    'currentSessionGeneration', 'ownerFingerprint']) {
     assert.equal(storage[name], core[name], name)
   }
   assert.equal(storage.studyStrategy, strategy.studyStrategy)

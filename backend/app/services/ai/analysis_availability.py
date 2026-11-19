@@ -159,12 +159,16 @@ async def require_runtime_verified(runtime: Any) -> None:
 
 
 async def availability_for_user(db: Any, user_id: int) -> dict:
-    from app.services.ai_learning_service import check_token_limit
-
-    if not await check_token_limit(db, user_id, 900):
+    if await _user_quota_exhausted(db, user_id):
         return unavailable_state("user_quota")
     _, state = await resolve_available_runtime(db)
     return state
+
+
+async def _user_quota_exhausted(db: Any, user_id: int) -> bool:
+    from app.services.ai_learning_service import check_token_limit
+
+    return not await check_token_limit(db, user_id, 0)
 
 
 async def note_failure(runtime: Any, exc: Exception) -> None:

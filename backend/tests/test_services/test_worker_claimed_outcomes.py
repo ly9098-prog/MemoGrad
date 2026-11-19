@@ -68,11 +68,13 @@ async def test_log_identity_fallback_and_child_context(
         request_id="explicit-request" if explicit_ids else "made-req_job",
         job_id="claimed-task",
         pipeline_id=pipeline_id,
+        user_id=None,
     )
     assert ("trace_id" in harness.events) == (not explicit_ids)
     assert ("request_id" in harness.events) == (not explicit_ids)
     context = harness.call("process")[1]["context"]
-    assert context == {"user_id": "outer", **kwargs}
+    assert context == kwargs
+    assert context["user_id"] is None
     assert_stopped(harness)
 
 

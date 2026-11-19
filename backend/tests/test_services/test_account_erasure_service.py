@@ -13,7 +13,15 @@ from app.core.database import Base
 from app.core.time_utils import utcnow
 from app.models.ai_chat import AiChat
 from app.models.export_task import ExportTask
+from app.models.import_batch_job import (
+    BatchJobTraceEvent,
+    ImportBatchJob,
+    ImportBatchJobItem,
+)
+from app.models.import_pipeline import ImportPipeline, ImportPipelineChunk
+from app.models.question_import import QuestionImport
 from app.models.refresh_token import RefreshToken
+from app.models.task_outbox import TaskOutbox
 from app.models.user import User
 
 
@@ -86,6 +94,123 @@ async def test_sweep_purges_cancelled_user_data_and_marks_erased(factory, monkey
 
 
 @pytest.mark.asyncio
+async def test_sweep_removes_import_children_staging_caches_and_outbox(
+    factory, monkeypatch
+):
+    from app.services import account_erasure_service as svc
+
+    storage = type(
+        "S",
+        (),
+        {
+            "delete": AsyncMock(return_value=True),
+            "exists": AsyncMock(return_value=False),
+        },
+    )()
+    monkeypatch.setattr(svc, "get_export_storage", lambda: storage)
+    cache_delete = AsyncMock(return_value=1)
+    monkeypatch.setattr(svc.cache, "delete", cache_delete)
+    monkeypatch.setattr(svc.cache, "purge_expired_local", lambda: 0)
+    purge_staging = AsyncMock(return_value=(1, 2))
+    from app.services import staging_storage
+
+    monkeypatch.setattr(staging_storage, "async_purge_owned_objects", purge_staging)
+    purge_artifacts = AsyncMock()
+    monkeypatch.setattr(svc, "_purge_import_artifacts", purge_artifacts)
+
+    async with factory() as db:
+        user = await _seed_user(db, "wx-cancelled", deleted_at=utcnow())
+        owner = str(user.id)
+        db.add(
+            ImportPipeline(
+                pipeline_id="pl_owned",
+                source_type="pdf",
+                source_file="private.pdf",
+                created_by=owner,
+            )
+        )
+        db.add(
+            ImportPipelineChunk(
+                pipeline_id="pl_owned",
+                chunk_index=0,
+                page_start=1,
+                page_end=1,
+                status="completed",
+                batch_id="review-owned",
+            )
+        )
+        db.add(
+            ImportBatchJob(
+                job_id="job_owned",
+                created_by=owner,
+                source_type="image",
+                total=1,
+                concurrency=1,
+            )
+        )
+        db.add(
+            ImportBatchJobItem(
+                job_id="job_owned",
+                seq=1,
+                source_file="private.png",
+                status="succeeded",
+                pipeline_id="pl_owned",
+                review_batch_id="review-owned",
+                ocr_raw_text="private OCR",
+            )
+        )
+        db.add(
+            BatchJobTraceEvent(
+                job_id="job_owned",
+                seq=1,
+                step="upload",
+                status="success",
+            )
+        )
+        db.add(
+            QuestionImport(
+                batch_id="review-owned",
+                source_type="image",
+                raw_data={"text": "private question"},
+            )
+        )
+        db.add(
+            TaskOutbox(
+                task_id="answer_projection:42",
+                task_type="answer_projection",
+                owner_user_id=user.id,
+                payload={"practice_record_id": 42},
+                status="pending",
+            )
+        )
+        await db.commit()
+
+        result = await svc.run_account_lifecycle_sweep(db)
+
+        assert result["purged"] == 1
+        for model in (
+            ImportPipeline,
+            ImportPipelineChunk,
+            ImportBatchJob,
+            ImportBatchJobItem,
+            BatchJobTraceEvent,
+            QuestionImport,
+            TaskOutbox,
+        ):
+            count = await db.scalar(select(func.count()).select_from(model))
+            assert count == 0
+        purge_staging.assert_awaited_once_with(user.id)
+        purge_artifacts.assert_awaited_once_with(["pl_owned"])
+        assert {call.args[0] for call in cache_delete.await_args_list} >= {
+            f"stats:*:{user.id}*",
+            f"practice:stats:{user.id}:*",
+            f"review:*:{user.id}*",
+            "import:*:pl_owned*",
+            "import:recovery:context:pl_owned",
+        }
+
+
+@pytest.mark.asyncio
 async def test_sweep_is_idempotent(factory, monkeypatch):
     from app.services import account_erasure_service as svc
 
@@ -136,6 +261,41 @@ async def test_inactive_accounts_get_login_identifier_anonymized(factory, monkey
         assert s.openid.startswith(svc.ANONYMIZED_PREFIX)
         assert a.openid == "wx-active"
         assert await _count(db, RefreshToken, stale.id) == 0
+
+
+@pytest.mark.asyncio
+async def test_inactive_banned_account_keeps_login_identity(factory, monkeypatch):
+    from app.services import account_erasure_service as svc
+
+    monkeypatch.setattr(
+        svc,
+        "get_export_storage",
+        lambda: type(
+            "S",
+            (),
+            {
+                "delete": AsyncMock(return_value=True),
+                "exists": AsyncMock(return_value=False),
+            },
+        )(),
+    )
+    old = utcnow() - timedelta(days=svc.INACTIVITY_DAYS + 30)
+    async with factory() as db:
+        banned = await _seed_user(db, "wx-banned-stale")
+        banned.is_banned = True
+        await db.execute(
+            User.__table__.update()
+            .where(User.id == banned.id)
+            .values(updated_at=old)
+        )
+        await db.commit()
+
+        result = await svc.run_account_lifecycle_sweep(db)
+        assert result["anonymized"] == 0
+        refreshed = (
+            await db.execute(select(User).where(User.id == banned.id))
+        ).scalar_one()
+        assert refreshed.openid == "wx-banned-stale"
 
 
 @pytest.mark.asyncio

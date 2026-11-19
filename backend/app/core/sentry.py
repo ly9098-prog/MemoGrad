@@ -13,6 +13,49 @@ from app.core.config import settings
 logger = logging.getLogger("postgraduate-ai.sentry")
 
 
+def _redact_sentry_event(event, _hint):
+    """Remove request and log-context fields that can carry learner data."""
+    request = event.get("request")
+    if isinstance(request, dict):
+        request.pop("cookies", None)
+        request.pop("data", None)
+        request.pop("query_string", None)
+        headers = request.get("headers")
+        if isinstance(headers, dict):
+            for name in (
+                "authorization",
+                "cookie",
+                "x-wechat-code",
+                "x-refresh-token",
+            ):
+                headers.pop(name, None)
+                headers.pop(name.title(), None)
+    tags = event.get("tags")
+    if isinstance(tags, dict):
+        for key in ("log.user_id", "user_id", "log.source_file", "source_file", "upload.filename"):
+            tags.pop(key, None)
+    event.pop("user", None)
+    return event
+
+
+def _redact_sentry_breadcrumb(breadcrumb, _hint):
+    data = breadcrumb.get("data")
+    if isinstance(data, dict):
+        for key in list(data):
+            if str(key).lower() in {
+                "authorization",
+                "cookie",
+                "filename",
+                "openid",
+                "prompt",
+                "source_file",
+                "token",
+                "user_id",
+            }:
+                data[key] = "[REDACTED]"
+    return breadcrumb
+
+
 def init_sentry():
     if settings.APP_ENV == "development":
         logger.info("Sentry disabled: APP_ENV=development")
@@ -49,7 +92,9 @@ def init_sentry():
             environment=env,
             traces_sample_rate=traces_sample_rate,
             profiles_sample_rate=profiles_sample_rate,
-            send_default_pii=True,
+            send_default_pii=False,
+            before_send=_redact_sentry_event,
+            before_breadcrumb=_redact_sentry_breadcrumb,
             integrations=[
                 FastApiIntegration(),
                 SqlalchemyIntegration(),

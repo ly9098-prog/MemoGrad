@@ -9,6 +9,9 @@ from fastapi import (  # noqa: F401 - live formula-library port
 from sqlalchemy import and_, func, or_, select  # noqa: F401 - live formula-library port
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.query_limits import (
+    require_bounded_csv,  # noqa: F401 - live formula-library port
+)
 from app.core.database import get_db
 from app.core.runtime_paths import API_V1_PREFIX
 from app.core.security import get_current_user, get_optional_current_user
@@ -285,8 +288,8 @@ async def list_formulas(
     subject_code: str | None = Query(None, alias="subject_code"),
     chapter_id: int | None = Query(None, alias="chapter_id"),
     category_id: int | None = Query(None, alias="category_id"),
-    tags: str | None = Query(None),
-    q: str | None = Query(None),
+    tags: str | None = Query(None, max_length=1024),
+    q: str | None = Query(None, max_length=200),
     favorite_only: bool = Query(False, alias="favorite_only"),
     library_type: str | None = Query(None),
     study_card_type: str | None = Query(None, alias="study_card_type"),
@@ -335,8 +338,8 @@ async def list_favorite_formulas(
     subject_code: str | None = Query(None, alias="subject_code"),
     chapter_id: int | None = Query(None, alias="chapter_id"),
     category_id: int | None = Query(None, alias="category_id"),
-    tags: str | None = Query(None),
-    q: str | None = Query(None),
+    tags: str | None = Query(None, max_length=1024),
+    q: str | None = Query(None, max_length=200),
     library_type: str | None = Query(None),
     study_card_type: str | None = Query(None, alias="study_card_type"),
     exam_scope: str | None = Query(None, alias="exam_scope"),
@@ -374,8 +377,8 @@ async def get_random_formula(
     subject_code: str | None = Query(None, alias="subject_code"),
     chapter_id: int | None = Query(None, alias="chapter_id"),
     category_id: int | None = Query(None, alias="category_id"),
-    tags: str | None = Query(None),
-    exclude_ids: str | None = Query(None, alias="exclude_ids"),
+    tags: str | None = Query(None, max_length=1024),
+    exclude_ids: str | None = Query(None, alias="exclude_ids", max_length=4096),
     library_type: str | None = Query(None),
     study_card_type: str | None = Query(None, alias="study_card_type"),
     exam_scope: str | None = Query(None, alias="exam_scope"),

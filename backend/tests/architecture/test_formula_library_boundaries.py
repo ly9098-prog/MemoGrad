@@ -24,8 +24,8 @@ HELPERS = {
 }
 PORTS = {
     "projection": "FormulaCardTag FormulaGraphAssetResponse FormulaGraphSpec FormulaTag _graph_spec_to_dict is_function_graph resolve_graph_asset_public_url select serialize_utc_datetime",
-    "listing": "FormulaCard UserFormulaFavorite _apply_library_type_filter _apply_list_filters _apply_study_card_type_filter _batch_load_specs _batch_load_tags _card_to_response _exam_scope_values _validate_chapter choose_effective_graph_asset func list load_graph_assets_map paginated_response select",
-    "access": "FormulaCard HTTPException UserFormulaFavorite ValueError _apply_library_type_filter _apply_list_filters _apply_study_card_type_filter _card_to_response _exam_scope_values func get_random_formula int random select",
+    "listing": "FormulaCard UserFormulaFavorite _apply_library_type_filter _apply_list_filters _apply_study_card_type_filter _batch_load_specs _batch_load_tags _card_to_response _exam_scope_values _validate_chapter choose_effective_graph_asset func list load_graph_assets_map paginated_response require_bounded_csv select",
+    "access": "FormulaCard HTTPException User UserFormulaFavorite ValueError _apply_library_type_filter _apply_list_filters _apply_study_card_type_filter _card_to_response _exam_scope_values func get_random_formula int random require_bounded_csv select",
     "filters": "EXAM408_FORMULA_SCOPE FormulaCard FormulaCardTag FormulaCategory FormulaGraphAsset FormulaTag HTTPException and_ apply_formula_subject_filter expand_formula_subject_code func len or_ select set str validate_study_card_type",
     "catalog": "FormulaCard FormulaCategory FormulaTag UserFormulaFavorite _apply_library_type_filter _apply_study_card_type_filter _build_category_tree _exam_scope_values _get_active_categories apply_formula_subject_filter collapse_formula_catalog_subjects formula_catalog_category_ids func list select",
 }
@@ -65,6 +65,8 @@ METHODS = {
     "add",
     "delete",
     "commit",
+    "execution_options",
+    "with_for_update",
 }
 IMPORTS = {
     "__future__": {"annotations"},

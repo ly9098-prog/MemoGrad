@@ -67,6 +67,10 @@ def build_random_query(
     exam_scope,
     ports,
 ):
+    ports("require_bounded_csv")(tags, field="tags", max_items=20, max_length=1024)
+    ports("require_bounded_csv")(
+        exclude_ids, field="exclude_ids", max_items=200, max_length=4096
+    )
     base_query = ports("select")(ports("FormulaCard")).where(
         ports("FormulaCard").status == "published",
         ports("FormulaCard").deleted_at.is_(None),
@@ -112,6 +116,14 @@ async def get_formula_detail(
 async def add_formula_favorite(
     formula_id: int, current_user: User, db: AsyncSession, *, ports
 ):
+    user = await db.scalar(
+        ports("select")(ports("User"))
+        .where(ports("User").id == current_user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if user is None or user.deleted_at is not None:
+        raise ports("HTTPException")(status_code=401, detail="账号已注销")
     result = await db.execute(
         ports("select")(ports("FormulaCard")).where(
             ports("FormulaCard").id == formula_id,

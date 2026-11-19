@@ -175,3 +175,88 @@ class TestPdfValidationMemoryGuard:
         data = b"%PDF-1.4\n" + b"x" * (201 * 1024 * 1024)
         with pytest.raises(PdfValidationError, match="过大"):
             validate_pdf_basic(data)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Pixel-budget preflight (reject before get_pixmap allocates)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPixelBudgetPreflight:
+    """Renderers must reject oversized pages before allocating a pixmap."""
+
+    @staticmethod
+    def _pdf_bytes(width: int, height: int) -> bytes:
+        import fitz
+
+        doc = fitz.open()
+        doc.new_page(width=width, height=height)
+        data = doc.tobytes()
+        doc.close()
+        return data
+
+    def test_render_one_page_rejects_pixel_budget_before_pixmap(self, monkeypatch):
+        import fitz
+
+        from app.core.pdf_error import PdfResourceLimitError
+        from app.services.pdf_renderer_service import _render_one_page
+
+        calls = []
+
+        def fail_get_pixmap(*_args, **_kwargs):
+            calls.append(1)
+            raise AssertionError("get_pixmap must not be called")
+
+        monkeypatch.setattr(fitz.Page, "get_pixmap", fail_get_pixmap)
+        pdf = self._pdf_bytes(10000, 10000)
+        with pytest.raises(PdfResourceLimitError) as exc:
+            _render_one_page(pdf, False, 1, 2048, 150)
+        assert exc.value.code == "page_pixel_limit"
+        assert calls == []
+
+    def test_render_one_page_rejects_decoded_budget_before_pixmap(self, monkeypatch):
+        import fitz
+
+        from app.core.pdf_error import PdfResourceLimitError
+        from app.services.pdf_renderer_service import _render_one_page
+
+        calls = []
+
+        def fail_get_pixmap(*_args, **_kwargs):
+            calls.append(1)
+            raise AssertionError("get_pixmap must not be called")
+
+        monkeypatch.setattr(fitz.Page, "get_pixmap", fail_get_pixmap)
+        # Fits the pixel limit but exceeds 50MB decoded-bytes budget at dpi=150.
+        pdf = self._pdf_bytes(3900, 800)
+        with pytest.raises(PdfResourceLimitError) as exc:
+            _render_one_page(pdf, False, 1, 2048, 150)
+        assert exc.value.code == "decoded_memory_limit"
+        assert calls == []
+
+    def test_render_sync_rejects_pixel_budget_before_pixmap(self, monkeypatch):
+        import fitz
+
+        from app.core.pdf_error import PdfResourceLimitError
+        from app.services.pdf_renderer_service import _render_sync
+
+        calls = []
+
+        def fail_get_pixmap(*_args, **_kwargs):
+            calls.append(1)
+            raise AssertionError("get_pixmap must not be called")
+
+        monkeypatch.setattr(fitz.Page, "get_pixmap", fail_get_pixmap)
+        pdf = self._pdf_bytes(10000, 10000)
+        with pytest.raises(PdfResourceLimitError) as exc:
+            _render_sync(pdf, False, 1, 1, 2048, 150)
+        assert exc.value.code == "page_pixel_limit"
+        assert calls == []
+
+    def test_render_one_page_normal_pdf_still_renders(self):
+        from app.services.pdf_renderer_service import _guess_png_size, _render_one_page
+
+        pdf = self._pdf_bytes(200, 100)
+        png = _render_one_page(pdf, False, 1, 2048, 150)
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+        assert _guess_png_size(png) == (417, 209)

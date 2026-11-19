@@ -613,6 +613,8 @@ jobs:
           node --test miniprogram/tests/test-storage-facade-contract.js
           node --test miniprogram/tests/test-client-storage-boundaries.js
           node --test miniprogram/tests/test-api-client-contract.js
+          node miniprogram/tests/test-storage-session-cleanup.js
+          node miniprogram/tests/test-export-preview-auth-boundary.js
           node --test miniprogram/tests/test-knowledge-map-request-contract.js
           node --test miniprogram/tests/test-knowledge-graph-layout.js
           node --test miniprogram/tests/test-api-client-boundaries.js

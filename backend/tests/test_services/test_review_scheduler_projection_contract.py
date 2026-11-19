@@ -306,7 +306,7 @@ def seams(monkeypatch):
 async def test_submit_review_applies_sm2_and_appends_record(monkeypatch, seams):
     seams.now().locks().loaders().replay(existing=None)
     sched = schedule()
-    db = FakeDb(scalar_responses=[sched, 900])
+    db = FakeDb(scalar_responses=[sched, 900, 900])
     answer_calls = []
 
     async def update_state(db_, user_id, question_id, is_correct, answered_at=None):
@@ -379,7 +379,7 @@ async def test_submit_review_applies_sm2_and_appends_record(monkeypatch, seams):
 async def test_submit_review_skips_commit_when_auto_commit_false(monkeypatch, seams):
     seams.now().locks().loaders().replay(existing=None).sync()
     sched = schedule(repetitions=0, interval=1)
-    db = FakeDb(scalar_responses=[sched, None])
+    db = FakeDb(scalar_responses=[sched, 900, None])
 
     payload = await rs.submit_review(
         db,
@@ -408,7 +408,11 @@ async def test_submit_review_skips_commit_when_auto_commit_false(monkeypatch, se
 async def test_submit_review_replays_identical_request(monkeypatch, seams):
     existing = review_record()
     seams.now().locks().loaders().replay(existing=existing)
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901), (13, 102, 902)])
+        ]
+    )
 
     payload = await rs.submit_review(
         db,
@@ -435,7 +439,7 @@ async def test_submit_review_replays_identical_request(monkeypatch, seams):
 async def test_submit_review_rejects_replay_reuse(monkeypatch, seams):
     existing = review_record(rating=3, user_answer="B")
     seams.now().locks().loaders().replay(existing=existing)
-    db = FakeDb()
+    db = FakeDb(execute_responses=[Result(rows=[(11, 100, 900)])])
 
     with pytest.raises(ValueError, match="已用于不同提交"):
         await rs.submit_review(
@@ -487,8 +491,34 @@ async def test_submit_review_rejects_invalid_schedule(
 
 
 @pytest.mark.asyncio
+async def test_submit_review_rejects_withdrawn_question_before_grading(seams):
+    seams.now().locks().loaders().replay(existing=None)
+    db = FakeDb(scalar_responses=[schedule(), None])
+
+    with pytest.raises(ValueError, match="已下线"):
+        await rs.submit_review(
+            db,
+            USER,
+            schedule_id=11,
+            question_id=100,
+            question_version_id=900,
+            occurrence_seq=4,
+            rating=4,
+            request_id="req-withdrawn",
+            user_answer="A",
+        )
+
+    assert db.events.count("commit") == 0
+    assert not any(type(obj).__name__ == "ReviewRecord" for obj in db.added)
+
+
+@pytest.mark.asyncio
 async def test_submit_review_rejects_out_of_range_rating_before_locking(seams):
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901), (13, 102, 902)])
+        ]
+    )
     with pytest.raises(ValueError, match="评分必须在 0-5 之间"):
         await rs.submit_review(
             db,
@@ -549,7 +579,7 @@ async def test_prepare_revisions_skips_missing_revision(monkeypatch, seams):
     seams.latest_ids = {100: 901}
     seams.revision_views = {}
     monkeypatch.setattr(rs, "logger", Logger())
-    db = FakeDb()
+    db = FakeDb(execute_responses=[Result(rows=[(11, 100, 900)])])
 
     prepared = await rs._prepare_latest_review_revisions(
         db, user_id=USER, schedules=[schedule()]
@@ -597,7 +627,7 @@ async def test_prepare_revisions_uses_row_rebound_by_other_request(monkeypatch, 
 
 
 @pytest.mark.asyncio
-async def test_prepare_revisions_keeps_pinned_revision_without_latest_index(seams):
+async def test_prepare_revisions_drops_withdrawn_latest_revision(seams):
     seams.now().locks().loaders()
     seams.latest_ids = {}
     seams.revision_views = {900: revision(id=900)}
@@ -607,9 +637,20 @@ async def test_prepare_revisions_keeps_pinned_revision_without_latest_index(seam
         db, user_id=USER, schedules=[schedule(question_version_id=900)]
     )
 
-    assert len(prepared) == 1
-    assert prepared[0][0].question_version_id == 900
+    assert prepared == []
     assert db.events.count("commit") == 0
+
+
+def test_latest_revision_view_rejects_withdrawn_revision():
+    withdrawn = revision(id=901, is_active=False)
+
+    assert rs._latest_revision_view({901: withdrawn}, 901, schedule()) is None
+
+
+def test_latest_revision_view_accepts_active_revision():
+    active = revision(id=901, is_active=True)
+
+    assert rs._latest_revision_view({901: active}, 901, schedule()) is active
 
 
 # ── set_mastered_state ───────────────────────────────────────────────
@@ -743,7 +784,7 @@ async def test_set_mastered_state_without_schedule_still_tracks_wrong_book(
 @pytest.mark.asyncio
 async def test_get_today_review_rejects_foreign_subject(monkeypatch, seams):
     seams.now().subjects({1})
-    db = FakeDb()
+    db = FakeDb(execute_responses=[Result(rows=[(11, 100, 900)])])
 
     payload = await rs.get_today_review(db, USER, subject_id=9)
 
@@ -910,7 +951,11 @@ async def test_auto_schedule_creates_missing_schedule_with_flush_only(
 async def test_auto_schedule_rejects_revision_mismatch(monkeypatch, seams):
     seams.now().locks().loaders()
     seams.revision_views = {900: revision(id=900, question_id=999)}
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901), (13, 102, 902)])
+        ]
+    )
 
     with pytest.raises(ValueError, match="错题版本不存在或与题目不匹配"):
         await rs.auto_schedule_wrong_question(db, USER, 100, 900)
@@ -1333,7 +1378,11 @@ async def test_grade_batch_review_grades_orders_and_prewarms(monkeypatch, seams)
         "build_prewarm_revision",
         lambda *, review_count, wrong_answer: f"rev:{review_count}:{wrong_answer}",
     )
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901), (13, 102, 902)])
+        ]
+    )
 
     payload = await rs.grade_batch_review(
         db,
@@ -1341,7 +1390,9 @@ async def test_grade_batch_review_grades_orders_and_prewarms(monkeypatch, seams)
         [
             batch_item(1, question_id=101, schedule_id=12, question_version_id=901),
             batch_item(2),
-            batch_item(3, question_id=102, question_version_id=902),
+            batch_item(
+                3, schedule_id=13, question_id=102, question_version_id=902
+            ),
         ],
         session_meta={"request_id": "seg-9"},
     )
@@ -1375,7 +1426,7 @@ async def test_grade_batch_review_maps_submit_errors(monkeypatch, seams):
     )
     seams.revision_views = {900: revision(id=900)}
     seams.submit({100: ValueError("复习题版本已更新，请刷新后重试")})
-    db = FakeDb()
+    db = FakeDb(execute_responses=[Result(rows=[(11, 100, 900)])])
 
     payload = await rs.grade_batch_review(db, USER, [batch_item(1)])
 
@@ -1384,7 +1435,7 @@ async def test_grade_batch_review_maps_submit_errors(monkeypatch, seams):
     assert result["error_code"] == "REVIEW_VERSION_MISMATCH"
     assert result["retryable"] is True
     assert result["refresh_required"] is True
-    assert result["correct_answer"] == "A"
+    assert result["correct_answer"] == ""
     assert result["rating"] == 4
     assert payload["correct_count"] == 0
     assert payload["wrong_count"] == 0
@@ -1401,7 +1452,7 @@ async def test_submit_review_mastered_transition_projects_to_schedule_and_record
     """A rating that crosses the auto-mastery threshold must reach every projection."""
     seams.now().locks().loaders().replay(existing=None).sync()
     sched = schedule(repetitions=2, interval=3, ease_factor=2.5, mastered=False)
-    db = FakeDb(scalar_responses=[sched, 900])
+    db = FakeDb(scalar_responses=[sched, 900, 900])
 
     from app.services import question_review_service
 
@@ -1555,7 +1606,7 @@ async def test_submit_review_mirrors_state_only_for_the_latest_revision(
     )
 
     seams.now().locks().loaders().replay(existing=None).sync()
-    stale = FakeDb(scalar_responses=[schedule(), 901])
+    stale = FakeDb(scalar_responses=[schedule(), 900, 901])
     await rs.submit_review(
         stale,
         USER,
@@ -1569,7 +1620,7 @@ async def test_submit_review_mirrors_state_only_for_the_latest_revision(
     )
     assert calls == []
 
-    current = FakeDb(scalar_responses=[schedule(), 900])
+    current = FakeDb(scalar_responses=[schedule(), 900, 900])
     await rs.submit_review(
         current,
         USER,
@@ -1666,7 +1717,11 @@ async def test_grade_batch_review_submits_with_the_grading_contract(monkeypatch,
         }
 
     monkeypatch.setattr(rs, "submit_review", submit)
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901)])
+        ]
+    )
 
     await rs.grade_batch_review(
         db,
@@ -1720,7 +1775,7 @@ async def test_grade_batch_review_prewarms_only_wrong_successes(monkeypatch, sea
         prewarm_calls.append((wq_id, user_id, revision))
 
     monkeypatch.setattr(ai_prewarm_worker, "enqueue_prewarm", enqueue)
-    db = FakeDb()
+    db = FakeDb(execute_responses=[Result(rows=[(11, 100, 900)])])
 
     payload = await rs.grade_batch_review(db, USER, [batch_item(1)])
 
@@ -1809,7 +1864,11 @@ async def test_grade_batch_review_payload_field_contract(monkeypatch, seams):
             },
         }
     )
-    db = FakeDb()
+    db = FakeDb(
+        execute_responses=[
+            Result(rows=[(11, 100, 900), (12, 101, 901), (13, 102, 902)])
+        ]
+    )
 
     payload = await rs.grade_batch_review(
         db,
@@ -1817,7 +1876,9 @@ async def test_grade_batch_review_payload_field_contract(monkeypatch, seams):
         [
             batch_item(1),
             batch_item(2, question_id=101, schedule_id=12, question_version_id=901),
-            batch_item(3, question_id=102, question_version_id=902),
+            batch_item(
+                3, schedule_id=13, question_id=102, question_version_id=902
+            ),
         ],
     )
 
@@ -1838,7 +1899,7 @@ async def test_grade_batch_review_payload_field_contract(monkeypatch, seams):
     assert error["is_correct"] is False
     assert error["success"] is False
     assert error["rating"] == 4
-    assert error["correct_answer"] == "A"
+    assert error["correct_answer"] == ""
     assert error["mastery_percent"] == 20
     assert error["interval_after"] == 0
     assert error["ease_factor_after"] == 0.0
@@ -1909,7 +1970,7 @@ async def test_submit_review_rating_two_is_still_incorrect(monkeypatch, seams):
     """The pass threshold is exactly rating >= 3; rating 2 must stay a failure."""
     seams.now().locks().loaders().replay(existing=None).sync()
     sched = schedule(interval=3, ease_factor=2.5, repetitions=2)
-    db = FakeDb(scalar_responses=[sched, None])
+    db = FakeDb(scalar_responses=[sched, 900, None])
 
     payload = await rs.submit_review(
         db,
@@ -1938,7 +1999,7 @@ async def test_submit_review_only_reports_wrong_book_fields_for_wrong_answers(
     synced = SimpleNamespace(id=55, review_count=3, wrong_answer="B")
     seams.now().locks().loaders().replay(existing=None).sync(result=synced)
 
-    correct = FakeDb(scalar_responses=[schedule(), None])
+    correct = FakeDb(scalar_responses=[schedule(), 900, None])
     payload = await rs.submit_review(
         correct,
         USER,
@@ -1954,7 +2015,7 @@ async def test_submit_review_only_reports_wrong_book_fields_for_wrong_answers(
     assert payload["wrong_review_count"] is None
     assert payload["wrong_answer"] is None
 
-    wrong = FakeDb(scalar_responses=[schedule(), None])
+    wrong = FakeDb(scalar_responses=[schedule(), 900, None])
     payload = await rs.submit_review(
         wrong,
         USER,
@@ -1976,7 +2037,7 @@ async def test_submit_review_only_reports_wrong_book_fields_for_wrong_answers(
 async def test_submit_review_records_the_submitted_answer(monkeypatch, seams):
     """The immutable record must keep the client's answer verbatim."""
     seams.now().locks().loaders().replay(existing=None).sync()
-    db = FakeDb(scalar_responses=[schedule(), None])
+    db = FakeDb(scalar_responses=[schedule(), 900, None])
 
     await rs.submit_review(
         db,

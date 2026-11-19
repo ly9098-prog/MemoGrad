@@ -26,6 +26,11 @@ const cleared = [
   'exam_attempt_pending_v2:12',
   'review_today_draft_v1:8:2026-10-23',
   'lastPracticeResult',
+  'guest_trial_draft_v1',
+  'guestPracticeResult',
+  'reader_sequence',
+  'pomodoro_task_type_records_v1',
+  'pomodoro_task_type_selection_v1',
 ]
 
 preserved.forEach(key => values.set(key, { key }))

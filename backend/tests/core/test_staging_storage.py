@@ -23,6 +23,7 @@ from app.services.staging_storage import (
     incr_refcount,
     is_object_leased,
     lease_object,
+    purge_owned_objects,
     release_object,
     retrieve_file,
     set_object_retention,
@@ -566,6 +567,27 @@ class TestStagingStorage:
         finally:
             os.unlink(tmp1.name)
             os.unlink(tmp2.name)
+
+    def test_owner_erasure_preserves_shared_content_and_removes_last_owner(self):
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
+        tmp.write(b"shared owner content")
+        tmp.close()
+        try:
+            first = store_file(tmp.name, owner_user_id=11)
+            second = store_file(tmp.name, owner_user_id=22)
+            assert first.object_id == second.object_id
+            assert get_metadata(first.object_id).owner_user_ids == [11, 22]
+
+            updated, deleted = purge_owned_objects(11)
+            assert (updated, deleted) == (1, 0)
+            assert get_metadata(first.object_id).owner_user_ids == [22]
+            assert retrieve_file(first.object_id) is not None
+
+            updated, deleted = purge_owned_objects(22)
+            assert (updated, deleted) == (0, 1)
+            assert retrieve_file(first.object_id) is None
+        finally:
+            os.unlink(tmp.name)
 
     def test_sha256_of_file(self):
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")

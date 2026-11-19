@@ -24,15 +24,9 @@ async def retry_export(task_id, db, current_user, *, ports):
     ports("validate_export_range")(
         config["range_type"], config.get("selected_ids"), count
     )
-    from app.services.export.processor import _MAX_PER_USER, get_user_pending_count
+    from app.services.export.api_creation import check_creation_capacity
 
-    pending_count = await get_user_pending_count(db, current_user.id)
-    if pending_count >= _MAX_PER_USER:
-        ports("raise_export_error")(
-            429,
-            ports("ExportErrorCode").TOO_MANY_CONCURRENT,
-            f"同时最多只能有 {_MAX_PER_USER} 个未完成的任务，请等待当前任务完成",
-        )
+    await check_creation_capacity(db, current_user, ports=ports)
     return await create_retry_task(db, current_user, task, count, ports=ports)
 
 
@@ -54,15 +48,9 @@ async def re_export(task_id, db, current_user, *, ports):
         ports("raise_export_error")(
             400, ports("ExportErrorCode").ACCESS_DENIED, "该文件正在导出，请稍候"
         )
-    from app.services.export.processor import _MAX_PER_USER, get_user_pending_count
+    from app.services.export.api_creation import check_creation_capacity
 
-    pending_count = await get_user_pending_count(db, current_user.id)
-    if pending_count >= _MAX_PER_USER:
-        ports("raise_export_error")(
-            429,
-            ports("ExportErrorCode").TOO_MANY_CONCURRENT,
-            f"同时最多只能有 {_MAX_PER_USER} 个未完成的任务，请等待当前任务完成",
-        )
+    await check_creation_capacity(db, current_user, ports=ports)
     reusable_snapshot_id = await validate_reexport_snapshot(
         db, current_user, task, ports=ports
     )

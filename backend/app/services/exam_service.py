@@ -570,7 +570,10 @@ async def save_attempt_answer(
 
 
 async def _create_projection_event(
-    db: AsyncSession, practice_record_id: int, request_id: str
+    db: AsyncSession,
+    practice_record_id: int,
+    request_id: str,
+    owner_user_id: int,
 ) -> None:
     from app.services.outbox_service import create_outbox
 
@@ -583,6 +586,7 @@ async def _create_projection_event(
             "request_id": request_id,
         },
         schema_version=ANSWER_PROJECTION_TASK_SCHEMA_VERSION,
+        owner_user_id=owner_user_id,
     )
 
 
@@ -732,6 +736,7 @@ async def _finalize_attempt(
                 db,
                 int(record.id),
                 request_id=f"exam:{attempt.id}:{item.id}",
+                owner_user_id=int(attempt.user_id),
             )
 
         result_questions.append(

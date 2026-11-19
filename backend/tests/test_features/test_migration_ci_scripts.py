@@ -3,6 +3,9 @@
 import json
 from pathlib import Path
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+
 from scripts.ci_collect_migration_checkpoints import collect_checkpoints
 from scripts.ci_migration_matrix_check import _load_checkpoints
 
@@ -12,7 +15,9 @@ def test_collect_migration_checkpoints_is_a_non_empty_unique_chain():
 
     assert checkpoints
     assert len(checkpoints) == len(set(checkpoints))
-    assert checkpoints[-1] == "v19_pomodoro_subject_allocations"
+    config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
+    script = ScriptDirectory.from_config(config)
+    assert script.get_heads() == [checkpoints[-1]]
 
 
 def test_load_migration_checkpoints_rejects_invalid_shape(tmp_path: Path):

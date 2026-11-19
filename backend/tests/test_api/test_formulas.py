@@ -79,6 +79,7 @@ class _Db:
         self.delete = AsyncMock()
         self.flush = AsyncMock()
         self.get = AsyncMock()
+        self.scalar = AsyncMock(return_value=_mock_user())
 
     async def execute(self, _statement):
         if self._queue:

@@ -107,6 +107,20 @@ def _payload_with_trace(payload: dict[str, Any]) -> dict[str, Any]:
     return persisted_payload
 
 
+def _normalize_owner_user_id(
+    explicit_owner_user_id: int | None,
+    payload: dict[str, Any],
+) -> int | None:
+    candidate = explicit_owner_user_id
+    if candidate is None:
+        candidate = payload.get("user_id")
+    try:
+        value = int(candidate) if candidate is not None else 0
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 # ── Outbox Service ──
 
 
@@ -116,6 +130,7 @@ async def create_outbox(
     task_type: str,
     payload: dict[str, Any],
     schema_version: int | None = None,
+    owner_user_id: int | None = None,
 ) -> TaskOutbox:
     """Create a pending outbox record.
 
@@ -132,6 +147,7 @@ async def create_outbox(
         payload,
         schema_version,
     )
+    effective_owner_user_id = _normalize_owner_user_id(owner_user_id, payload)
 
     # Idempotent check: skip if already published
     existing = await db.execute(
@@ -164,6 +180,7 @@ async def create_outbox(
                     select(
                         PracticeRecord.id,
                         PracticeRecord.created_at,
+                        PracticeRecord.user_id,
                     ).where(PracticeRecord.id == source_record_id)
                 )
             ).one_or_none()
@@ -188,6 +205,9 @@ async def create_outbox(
                 },
             }
             existing_row.schema_version = effective_schema_version
+            if effective_owner_user_id is None and source_record is not None:
+                effective_owner_user_id = int(source_record[2])
+            existing_row.owner_user_id = effective_owner_user_id
             existing_row.status = "pending"
             existing_row.lease_token = None
             existing_row.lease_expires_at = None
@@ -220,6 +240,7 @@ async def create_outbox(
         task_type=task_type,
         payload=persisted_payload,
         schema_version=effective_schema_version,
+        owner_user_id=effective_owner_user_id,
         status="pending",
     )
     db.add(outbox)
@@ -1132,10 +1153,15 @@ async def run_outbox_dispatcher(
                             )
 
                         async with async_session() as publish_db:
+                            publish_payload = dict(outbox.payload)
+                            if outbox.owner_user_id is not None:
+                                publish_payload["owner_user_id"] = int(
+                                    outbox.owner_user_id
+                                )
                             result = await enqueue_fn(
                                 outbox.task_id,
                                 outbox.task_type,
-                                outbox.payload,
+                                publish_payload,
                                 effective_schema_version,
                             )
                             if result and result.accepted:

@@ -287,17 +287,26 @@ async def load_latest_question_revision_ids(
             QuestionVersion.question_id.label("question_id"),
             func.max(QuestionVersion.version).label("version"),
         )
-        .where(QuestionVersion.question_id.in_(ids))
+        .where(
+            QuestionVersion.question_id.in_(ids),
+            QuestionVersion.is_active.is_(True),
+        )
         .group_by(QuestionVersion.question_id)
         .subquery()
     )
     rows = await db.execute(
-        select(QuestionVersion.question_id, QuestionVersion.id).join(
+        select(QuestionVersion.question_id, QuestionVersion.id)
+        .join(Question, Question.id == QuestionVersion.question_id)
+        .join(
             latest,
             and_(
                 latest.c.question_id == QuestionVersion.question_id,
                 latest.c.version == QuestionVersion.version,
             ),
+        )
+        .where(
+            Question.is_active.is_(True),
+            Question.review_status == "approved",
         )
     )
     values = rows.all()

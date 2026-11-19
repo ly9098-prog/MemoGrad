@@ -2235,6 +2235,50 @@ class DurableTaskQueue:
                 except Exception:
                     pass
 
+    @property
+    def redis_enabled(self) -> bool:
+        """Whether this queue has a configured shared Redis backend."""
+        return self._redis_enabled
+
+    async def purge_v2_task(self, task_id: str, task_type: str) -> int:
+        """Erase one task payload and all exact queue references.
+
+        Account erasure calls this after deleting the durable business owner.
+        Removing the task hash also makes an active worker fail closed at its
+        next heartbeat instead of continuing with an in-memory payload copy.
+        """
+        if not self._redis_enabled:
+            return 0
+        client = await self._get_script_client()
+        if client is None:
+            raise QueueHealthError("Cannot obtain Redis client")
+        removed = 0
+        try:
+            pipeline = client.pipeline(transaction=True)
+            pipeline.lrem(_v2_q_key(task_type), 0, task_id)
+            pipeline.zrem(_v2_p_key(task_type), task_id)
+            pipeline.zrem(_v2_retry_key(task_type), task_id)
+            pipeline.lrem(_v2_dead_key(task_type), 0, task_id)
+            pipeline.lrem(_v2_corrupt_key(task_type), 0, task_id)
+            pipeline.delete(
+                _v2_task_hash_key(task_id),
+                _v2_heartbeat_key(task_id),
+                _v2_fencing_key(task_id),
+                _v2_idempotent_key(task_id),
+            )
+            results = await pipeline.execute()
+            removed = sum(int(value or 0) for value in results)
+        except redis_exc.RedisError as exc:
+            raise QueueHealthError(
+                f"Redis error purging task {task_id}: {exc}"
+            ) from exc
+        finally:
+            try:
+                await client.aclose()
+            except Exception:
+                pass
+        return removed
+
     async def has_idempotency_v2(self, task_id: str) -> bool:
         """Return whether Redis still remembers an accepted v2 task id.
 

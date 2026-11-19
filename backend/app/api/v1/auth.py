@@ -117,7 +117,14 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
         await token_service.revoke_all_user_tokens(db, user.id)
         raise HTTPException(status_code=401, detail="会话已失效，请重新登录")
 
-    new_jwt, new_expires_at = await issue_user_token(user.id)
+    # Do not let the issuer adopt a logout marker that appeared after the last
+    # equality check. Bind issuance to the marker that authorized this refresh.
+    if await read_user_nbf(user.id) != nbf_before:
+        await token_service.revoke_all_user_tokens(db, user.id)
+        raise HTTPException(status_code=401, detail="会话已失效，请重新登录")
+    new_jwt, new_expires_at = await issue_user_token(
+        user.id, expected_nbf=nbf_before
+    )
 
     return TokenResponse(
         access_token=new_jwt,
@@ -212,6 +219,14 @@ async def request_deletion(
     Note: This action is irreversible. The user must re-register
     (get a new account) to use the service again.
     """
+    current_user = await db.scalar(
+        select(User)
+        .where(User.id == current_user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="账号不存在")
     if current_user.deleted_at:
         raise HTTPException(status_code=400, detail="账号已注销")
 

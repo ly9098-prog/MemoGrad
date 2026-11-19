@@ -50,11 +50,14 @@ def bind_claimed_context(
     )
     trace_id = state.task.trace_id or generate_trace_id("tr_job")
     request_id = state.task.request_id or generate_request_id("req_job")
+    from app.services.task_owner import app_owner_user_id
+
     state.log_tokens = bind_context(
         trace_id=trace_id,
         request_id=request_id,
         job_id=state.task.task_id,
         pipeline_id=pipeline_id,
+        user_id=app_owner_user_id(state.task.payload),
     )
     state.log_bound = True
 

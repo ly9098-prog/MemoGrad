@@ -1,5 +1,7 @@
 from typing import Literal
 
+from pydantic import Field, PositiveInt
+
 from app.schemas.base import BaseModel
 
 
@@ -55,7 +57,7 @@ class AiAnalysisStatusResponse(BaseModel):
 
 
 class AiPrewarmRequest(BaseModel):
-    wrong_question_ids: list[int]
+    wrong_question_ids: list[PositiveInt] = Field(min_length=1, max_length=50)
 
 
 class AiPrewarmResponse(BaseModel):
@@ -74,7 +76,7 @@ class AiChatRecord(BaseModel):
 
 
 class AiFeedbackRequest(BaseModel):
-    source: str  # 'dashboard' | 'wrong_book'
-    feedback_type: str
+    source: str = Field(min_length=1, max_length=32)  # 'dashboard' | 'wrong_book'
+    feedback_type: str = Field(min_length=1, max_length=64)
     question_id: int | None = None
-    detail: str | None = None
+    detail: str | None = Field(default=None, max_length=2000)

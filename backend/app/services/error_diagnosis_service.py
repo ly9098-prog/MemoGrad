@@ -13,10 +13,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.gateway import chat_with_db_model
 from app.core.time_utils import utcnow
 from app.models.admin import QuestionVersion, QuestionVersionKnowledgePoint, Subject
+from app.models.ai_chat import AiChat
 from app.models.error_diagnosis import WrongQuestionErrorDiagnosis
 from app.models.knowledge_point import KnowledgePoint
 from app.models.syllabus import SyllabusKnowledgePoint
 from app.models.wrong_question import WrongQuestion
+from app.services.ai_learning_service import (
+    cancel_token_reservation,
+    estimate_chat_token_reservation,
+    reserve_token_budget,
+    settle_token_reservation,
+)
 from app.services.question_revision_service import load_revision_kp_names
 
 logger = logging.getLogger(__name__)
@@ -266,6 +273,7 @@ async def _queue_diagnosis(
                     "classification_version": int(row.classification_version or 1),
                 },
                 schema_version=1,
+                owner_user_id=int(row.user_id),
             )
         return True
     except ValueError:
@@ -538,6 +546,21 @@ async def generate_ai_suggestion(
         },
     ]
 
+    reservation = await reserve_token_budget(
+        db,
+        user_id,
+        estimate_chat_token_reservation(messages, max_output_tokens=320),
+    )
+    if reservation is None:
+        row.ai_status = "failed"
+        row.ai_reason = "今日 AI 调用额度已用尽。"
+        await db.commit()
+        return {
+            "processed": True,
+            "suggested": False,
+            "reason": "quota_exceeded",
+        }
+
     try:
         response = await chat_with_db_model(
             db,
@@ -549,7 +572,35 @@ async def generate_ai_suggestion(
             response_format={"type": "json_object"},
             prefer_direct_answer=True,
         )
+        owned_wrong = await db.scalar(
+            select(WrongQuestion)
+            .where(
+                WrongQuestion.user_id == user_id,
+                WrongQuestion.id == row.wrong_question_id,
+                WrongQuestion.is_active,
+            )
+            .with_for_update()
+        )
+        if owned_wrong is None:
+            return {"processed": False, "missing": True}
+        if response is not None:
+            db.add(
+                AiChat(
+                    user_id=user_id,
+                    session_type="error_diagnosis",
+                    user_message=f"diagnosis_id={diagnosis_id}",
+                    ai_response=str(response.get("content") or "")[:2000],
+                    tokens_used=int(response.get("tokens_used") or 0),
+                    model=str(response.get("model") or "unknown"),
+                    duration_ms=int(response.get("duration_ms") or 0),
+                )
+            )
+            await db.commit()
+            await settle_token_reservation(
+                reservation, int(response.get("tokens_used") or 0)
+            )
         if response is None:
+            await cancel_token_reservation(reservation)
             row.ai_status = "failed"
             row.ai_reason = "AI 分析模型未配置。"
             row.ai_model = None

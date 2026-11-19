@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from app.services.task_owner import app_owner_user_id
 from app.services.worker_v2_dispatch import dispatch_v2_task
 from app.services.worker_v2_state import WorkerTaskState
 
@@ -32,6 +33,7 @@ async def prepare_v2_task(
     task: Any, namespace: dict[str, Any], set_context: Callable[..., Any]
 ) -> WorkerTaskState:
     await namespace["_check_worker_version_compatibility"](task)
+    await verify_active_account_owner(task)
     task_type = task.task_type
     payload = task.payload
     pipeline_id = payload.get("pipeline_id", task.task_id)
@@ -63,6 +65,30 @@ async def prepare_v2_task(
     return WorkerTaskState(
         task, task_type, payload, pipeline_id, fence_record_id, namespace, fence_token
     )
+
+
+def _app_owner_user_id(payload: dict[str, Any]) -> int | None:
+    return app_owner_user_id(payload)
+
+
+async def verify_active_account_owner(task: Any) -> None:
+    """Fail closed when a queued app task's account is gone or disabled."""
+    payload = getattr(task, "payload", None)
+    if not isinstance(payload, dict):
+        return
+    owner_user_id = _app_owner_user_id(payload)
+    if owner_user_id is None:
+        return
+    from app.core.database import async_session
+    from app.models.user import User
+    from app.services.db_fencing import FencingRejectedError
+
+    async with async_session() as db:
+        owner = await db.get(User, owner_user_id)
+    if owner is None or owner.deleted_at is not None or owner.is_banned:
+        raise FencingRejectedError(
+            f"Task owner is no longer active: user_id={owner_user_id}"
+        )
 
 
 async def cleanup_v2_resources(

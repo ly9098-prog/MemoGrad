@@ -1,5 +1,6 @@
 const api = require('../../../utils/api')
 const auth = require('../../../utils/auth')
+const storage = require('../../../utils/storage')
 const formulaContent = require('../utils/formula-content')
 const Parser = require('../utils/mp-html-parser')
 const LatexPlugin = require('../utils/katex/index')
@@ -40,7 +41,7 @@ function renderFormulaTitleNodes(title) {
   }
 }
 
-const READER_SEQUENCE_KEY = 'formula_reader_sequence_v2'
+const READER_SEQUENCE_KEY = 'reader_sequence'
 const SEARCH_DEBOUNCE_MS = 500
 const LIBRARY_TYPE_FORMULA = 'formula'
 const LIBRARY_TYPE_FUNCTION_GRAPH = 'function_graph'
@@ -913,6 +914,8 @@ Page({
         ids: sequenceIds,
         index: sequenceIndex,
         savedAt: formulaNowMs(),
+        owner: storage.ownerFingerprint(),
+        sessionGeneration: storage.currentSessionGeneration(),
         subjectCode: this.data.activeSubject,
         chapterId: this.data.activeChapterId,
         searchValue: this.data.searchValue,

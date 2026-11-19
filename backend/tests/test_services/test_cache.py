@@ -3,7 +3,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.cache import CacheClient, cached, make_cache_key
+from app.core.cache import (
+    _ADVANCE_INTEGER_MARKER_SCRIPT,
+    CacheClient,
+    cached,
+    make_cache_key,
+)
 
 
 class TestCacheClient:
@@ -129,6 +134,30 @@ class TestCacheClient:
                 await client.clear()
                 # 不再调用 flushdb
                 mock_redis.flushdb.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_integer_marker_advances_even_when_candidate_is_stale(self):
+        """Concurrent same-second revocations still create a new generation."""
+        assert "candidate = current + 1" in _ADVANCE_INTEGER_MARKER_SCRIPT
+        assert "return current" not in _ADVANCE_INTEGER_MARKER_SCRIPT
+        mock_redis = AsyncMock()
+        mock_redis.ping = AsyncMock()
+        mock_redis.eval.return_value = 1_700_000_001
+
+        with patch("redis.asyncio.from_url", return_value=mock_redis):
+            with patch("app.core.cache.settings") as mock_settings:
+                mock_settings.REDIS_URL = "redis://localhost:6379"
+                client = CacheClient()
+                marker = await client.advance_integer_marker_strict(
+                    "user:jwt:nbf:7", 1_700_000_000, ttl=60
+                )
+
+        assert marker == 1_700_000_001
+        assert mock_redis.eval.call_args.args[2:] == (
+            "user:jwt:nbf:7",
+            1_700_000_000,
+            60,
+        )
 
 
 def test_make_cache_key_deterministic():

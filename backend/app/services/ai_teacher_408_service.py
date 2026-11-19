@@ -39,7 +39,13 @@ from app.services.ai.analysis_availability import (
     note_success,
     require_available_runtime,
 )
-from app.services.ai_learning_service import check_token_limit, record_token_usage
+from app.services.ai_learning_service import (
+    cancel_token_reservation,
+    estimate_chat_token_reservation,
+    record_token_usage,
+    reserve_token_budget,
+    settle_token_reservation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -621,10 +627,12 @@ async def _resolve_exam_context(
     question_id: int,
     exam_attempt_id: int | None,
 ) -> dict[str, Any]:
+    # A selected submitted attempt only authorizes review of that attempt. It
+    # must not disable the account-wide guard for a later in-progress retake.
+    await assert_ai_answer_access_allowed(
+        db, user_id=user_id, question_id=question_id
+    )
     if not exam_attempt_id:
-        await assert_ai_answer_access_allowed(
-            db, user_id=user_id, question_id=question_id
-        )
         return {}
 
     attempt = await db.scalar(
@@ -1147,7 +1155,12 @@ async def run_teacher_action(
         "personalization": personalization,
     }
 
-    if not await check_token_limit(db, user_id, 900):
+    reservation = await reserve_token_budget(
+        db,
+        user_id,
+        estimate_chat_token_reservation(messages, max_output_tokens=1400),
+    )
+    if reservation is None:
         fallback = _fallback_payload(
             action=action,
             revision=revision,
@@ -1184,6 +1197,9 @@ async def run_teacher_action(
             exc_info=True,
         )
         result = None
+    else:
+        if result is None:
+            await cancel_token_reservation(reservation)
 
     if result is None:
         fallback = _fallback_payload(
@@ -1205,6 +1221,7 @@ async def run_teacher_action(
         str(result.get("content") or ""),
         result,
     )
+    await settle_token_reservation(reservation, result.get("tokens_used", 0))
 
     parsed = _parse_json_object(result.get("content"))
     if parsed is None:

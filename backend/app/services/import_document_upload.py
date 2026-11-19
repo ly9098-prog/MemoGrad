@@ -80,7 +80,10 @@ async def _stage_document(
 ) -> StagingObject:
     mime = request.content_type or ("application/pdf" if is_pdf else "text/plain")
     staging_obj = await async_store_file(
-        request.file_path, original_name=request.filename, mime=mime
+        request.file_path,
+        original_name=request.filename,
+        mime=mime,
+        owner_user_id=request.owner_user_id,
     )
     store_data: dict = {
         "pipeline_id": pipeline_id,
@@ -93,6 +96,7 @@ async def _stage_document(
         "errors": [],
         "started_at": serialize_utc_datetime(utcnow()),
         "staging_object_id": staging_obj.object_id,
+        "created_by": request.created_by,
     }
     if page_range:
         store_data["page_range"] = page_range.model_dump()

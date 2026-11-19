@@ -310,15 +310,32 @@ async def test_user_quota_does_not_change_global_health_or_start_probe(
     monkeypatch, runtime
 ):
     await finish(runtime)
+
     monkeypatch.setattr(
-        "app.services.ai_learning_service.check_token_limit",
+        analysis_availability,
+        "_user_quota_exhausted",
+        AsyncMock(return_value=True),
+    )
+    probe = AsyncMock()
+    monkeypatch.setattr(analysis_availability, "request_probe", probe)
+    state = await analysis_availability.availability_for_user(object(), 7)
+    assert state["reason"] == "user_quota"
+    assert model_health.public_state(await model_health.read_health(runtime))["enabled"]
+    probe.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_availability_with_unused_quota_does_not_start_probe(monkeypatch, runtime):
+    await finish(runtime)
+    monkeypatch.setattr(
+        analysis_availability,
+        "_user_quota_exhausted",
         AsyncMock(return_value=False),
     )
     probe = AsyncMock()
     monkeypatch.setattr(analysis_availability, "request_probe", probe)
-    state = await analysis_availability.availability_for_user("db", 7)
-    assert state["reason"] == "user_quota"
-    assert model_health.public_state(await model_health.read_health(runtime))["enabled"]
+    state = await analysis_availability.availability_for_user(object(), 7)
+    assert state["enabled"] is True
     probe.assert_not_called()
 
 

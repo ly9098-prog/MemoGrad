@@ -14,6 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import fallback
 from app.ai.prompts import build_generate_questions
+from app.core.config import settings
+from app.models.ai_chat import AiChat
+from app.services.ai_learning_service import (
+    estimate_chat_token_reservation,
+    reserve_token_budget,
+    settle_token_reservation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +77,21 @@ async def generate_drafts(
         subject_code, knowledge_points, difficulty, count, question_type, extra_hint
     )
     prompt_text = json.dumps(messages, ensure_ascii=False)
+    admission_estimate = estimate_chat_token_reservation(
+        messages,
+        max_output_tokens=max(0, int(settings.AI_SINGLE_MAX_TOKENS)),
+    )
+    reservation = await reserve_token_budget(db, user_id, admission_estimate)
+    if reservation is None:
+        raise ValueError("今日 AI 调用额度已用尽")
+
     resp, raw, _ = await _call_or_fallback(
         messages, fallback.get_fallback_generation(count), db
     )
 
     if raw is None:
+        # This helper also returns fallback after uncertain remote failures.
+        # Do not treat an absent raw response as proof of zero provider cost.
         db.add(
             _build_log(
                 user_id=user_id,
@@ -158,7 +175,20 @@ async def generate_drafts(
             success=True,
         )
     )
+    if int(resp.get("tokens_used") or 0) > 0:
+        db.add(
+            AiChat(
+                user_id=user_id,
+                session_type="ai_import_generate",
+                user_message=prompt_text[:500],
+                ai_response=str(raw or "")[:2000],
+                tokens_used=int(resp.get("tokens_used") or 0),
+                model=str(resp.get("model") or "unknown"),
+                duration_ms=int(resp.get("duration_ms") or 0),
+            )
+        )
     await db.commit()
+    await settle_token_reservation(reservation, resp.get("tokens_used", 0))
     return {
         "batch_id": batch_id,
         "generated": generated,

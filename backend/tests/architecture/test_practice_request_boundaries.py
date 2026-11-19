@@ -170,7 +170,7 @@ def digest(node):
 
 DECLARATIONS = {
     "get_practice_subjects": "43659c71debc647fea42d5eef657f8e8e92449448189e60118fc89a7e3a675d6",
-    "get_practice_questions": "de2ddda73239c4f31371669e6da6738d107050cd8416f58d25bdb2cded0a6585",
+    "get_practice_questions": "c8420b8ca9937790ce8e3ccf7c860ff37765423f8dcb684583c79ee81ee6e6b1",
     "_issue_questions_response": "ff990efb7e96f9031da665b8e59ab07a0697b0c17dbf470552a4a82aa2a52289",
     "reset_sequential_practice": "54be870a050d8a9aef2d3647348d6e2609ee03099b3d1eceb5c74ce652b89126",
     "batch_submit": "2dda2f19918b2f38260558f327392ddd7d820fce764a0ad1da1444d5e2e2071a",
@@ -184,7 +184,7 @@ DECLARATIONS = {
 
 RETAINED_BODIES = {
     "get_practice_subjects": "a953de57f8d6a86d9d77893f3d3ef75f50e515cfda70ce988a419f54938f1969",
-    "get_practice_questions": "d184ed011e596aab6af881accf4afb32c092973dce4d08b114b4f8dcc04b7d08",
+    "get_practice_questions": "1c30693cb1d7fd22576953bc21e3908f329115993f31e7aa3d19c7f3ed5a5f32",
     "_issue_questions_response": "d94ea8aed3baf511477b27b0a82c592fe156f60ce3605140be418b5d8674eb7e",
     "reset_sequential_practice": "1e74ee63bb01604ab0656b00b54dd69e6b520037ecb1c5525923362b8c070ff7",
     "get_practice_session_scope_snapshot": "9e699ee973bbe19e3421fde98d6b4bbe4a1d207f47e002322887ce4238ee5ea3",

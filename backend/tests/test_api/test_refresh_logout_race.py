@@ -17,10 +17,17 @@ def _setup(monkeypatch, marker_values):
     revoke = AsyncMock()
     issue = AsyncMock(return_value=("jwt", 123))
     markers = iter(marker_values)
+    marker_value = marker_values[-1]
     monkeypatch.setattr(auth_api.token_service, "verify_refresh_token", AsyncMock(return_value=SimpleNamespace(user_id=5)))
     monkeypatch.setattr(auth_api.token_service, "rotate_refresh_token", AsyncMock(return_value="new-refresh"))
     monkeypatch.setattr(auth_api.token_service, "revoke_all_user_tokens", revoke)
-    monkeypatch.setattr(auth_api, "read_user_nbf", AsyncMock(side_effect=lambda _uid: next(markers)))
+    async def read_marker(_uid):
+        try:
+            return next(markers)
+        except StopIteration:
+            return marker_value
+
+    monkeypatch.setattr(auth_api, "read_user_nbf", AsyncMock(side_effect=read_marker))
     monkeypatch.setattr(auth_api, "issue_user_token", issue)
     monkeypatch.setattr(auth_api.user_service, "get_user_response", AsyncMock(return_value={"id": 5}))
     return db, revoke, issue

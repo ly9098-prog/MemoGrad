@@ -141,5 +141,6 @@ async def persist_practice_batch_records(
             db,
             practice_record_id=int(record.id),
             request_id=answer_request_ids.get(int(q.id)),
+            owner_user_id=user_id,
         )
     return PersistedPracticeBatch(records, prewarm_wrong_questions, wrong_question_ids)
