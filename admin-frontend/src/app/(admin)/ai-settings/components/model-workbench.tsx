@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import {
   Bot,
   Check,
-  ChevronRight,
   CircleAlert,
   Cpu,
   Database,
@@ -19,7 +18,6 @@ import {
   RefreshCw,
   ScanEye,
   Search,
-  Server,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -40,6 +38,10 @@ import type {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { getAiModelIcon, getAiProviderIcon } from "@/lib/ai-model-icons";
+import { useAuthStore } from "@/lib/auth/auth-store";
+import { moveModelCatalogItem, sortModelCatalog } from "./model-catalog-order";
+import { ModelSortControl } from "./model-sort-control";
+import { useModelCatalogOrder } from "./use-model-catalog-order";
 import styles from "./model-workbench.module.css";
 
 type ModelKind = "chat" | "embedding" | "ocr_job";
@@ -129,16 +131,6 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function formatHost(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "未配置";
-  try {
-    return new URL(trimmed).host;
-  } catch {
-    return trimmed;
-  }
-}
-
 function isValidBaseUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return false;
@@ -219,12 +211,18 @@ function showToast(message: string, tone: "success" | "error" = "success") {
       : "border-destructive/30 bg-card text-destructive",
   );
   element.textContent = message;
+  element.setAttribute("role", tone === "error" ? "alert" : "status");
   document.body.appendChild(element);
   window.setTimeout(() => element.remove(), 2500);
 }
 
 export function ModelWorkbench() {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((state) => {
+    const user = state.user;
+    return user && "id" in user ? user.id : user?.user.id;
+  });
+  const { order, saveOrder } = useModelCatalogOrder(userId);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKind>("all");
@@ -232,6 +230,14 @@ export function ModelWorkbench() {
   const [deleteTarget, setDeleteTarget] = useState<AdminAiModelConfig | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
   const [pendingSelectId, setPendingSelectId] = useState<number | null>(null);
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<number | null>(null);
+  const [orderMessage, setOrderMessage] = useState("");
+
+  const handleDirtyChange = useCallback((dirty: boolean, modelId: number) => {
+    setEditorDirty(dirty);
+    if (dirty) setSelectedId(modelId);
+  }, []);
 
   const modelsQuery = useQuery({
     queryKey: ["ai-models"],
@@ -287,15 +293,10 @@ export function ModelWorkbench() {
     onError: (error) => showToast(getErrorMessage(error), "error"),
   });
 
-  const modelList = useMemo(() => {
-    const list = [...(modelsQuery.data ?? [])];
-    list.sort((a, b) => {
-      if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
-      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-      return a.id - b.id;
-    });
-    return list;
-  }, [modelsQuery.data]);
+  const modelList = useMemo(
+    () => sortModelCatalog(modelsQuery.data ?? [], order),
+    [modelsQuery.data, order],
+  );
 
   const filteredModels = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -343,6 +344,29 @@ export function ModelWorkbench() {
       return;
     }
     setSelectedId(modelId);
+  };
+
+  const endDrag = () => {
+    setDraggedId(null);
+    setDropTargetId(null);
+  };
+
+  const moveModel = (sourceId: number, targetId: number) => {
+    const reordered = moveModelCatalogItem(
+      modelList,
+      filteredModels.map((model) => model.id),
+      sourceId,
+      targetId,
+    );
+    if (reordered === modelList) return;
+    if (selectedModel) setSelectedId(selectedModel.id);
+    const persisted = saveOrder(reordered.map((model) => model.id));
+    const moved = filteredModels.find((model) => model.id === sourceId);
+    const visibleIds = new Set(filteredModels.map((model) => model.id));
+    const position = reordered.filter((model) => visibleIds.has(model.id))
+      .findIndex((model) => model.id === sourceId) + 1;
+    setOrderMessage(`${moved?.display_name ?? "模型"} 已移至第 ${position} 位${persisted ? "，顺序已保存到本机" : ""}`);
+    if (!persisted) showToast("顺序已调整，但浏览器未能保存；刷新后会恢复。", "error");
   };
 
   const totalCount = modelList.length;
@@ -423,80 +447,127 @@ export function ModelWorkbench() {
             })}
           </div>
 
-          <div className={styles.modelList} role="listbox" aria-label="模型列表">
+          <ul className={styles.modelList} aria-label="模型列表">
             {modelsQuery.isLoading ? (
               Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className={styles.skeletonRow}>
+                <li key={index} className={styles.skeletonRow}>
                   <span />
                   <div>
                     <i />
                     <b />
                   </div>
-                </div>
+                </li>
               ))
             ) : filteredModels.length > 0 ? (
-              filteredModels.map((model) => {
+              filteredModels.map((model, index) => {
                 const kind = getModelKind(model);
                 const features = configuredFeatures(model);
                 const isSelected = selectedModel?.id === model.id;
 
                 return (
-                  <button
+                  <li
                     key={model.id}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => selectModel(model.id)}
+                    data-model-id={model.id}
+                    data-drop={dropTargetId === model.id && draggedId !== model.id
+                      ? (filteredModels.findIndex((item) => item.id === draggedId) < index ? "after" : "before")
+                      : undefined}
                     className={cn(
                       styles.modelRow,
                       isSelected && styles.modelRowSelected,
                       !model.is_enabled && styles.modelRowDisabled,
+                      draggedId === model.id && styles.modelRowDragging,
                     )}
+                    onDragOver={(event) => {
+                      if (draggedId === null) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropTargetId(model.id);
+                    }}
+                    onDragLeave={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        setDropTargetId((current) => current === model.id ? null : current);
+                      }
+                    }}
+                    onDrop={(event) => {
+                      if (draggedId === null) return;
+                      event.preventDefault();
+                      moveModel(draggedId, model.id);
+                      endDrag();
+                    }}
                   >
-                    <span className={styles.modelIcon}>
-                      <ProviderGlyph
-                        provider={model.provider}
-                        modelName={model.name}
-                        kind={kind}
-                        className="h-[18px] w-[18px]"
-                      />
-                    </span>
-                    <span className={styles.modelInfo}>
-                      <span className={styles.modelName}>
-                        {model.display_name}
-                        {model.is_default ? <em>默认</em> : null}
+                    <ModelSortControl
+                      modelId={model.id}
+                      name={model.display_name}
+                      first={index === 0}
+                      last={index === filteredModels.length - 1}
+                      onMove={(direction) => {
+                        const target = filteredModels[index + direction];
+                        if (target) moveModel(model.id, target.id);
+                      }}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", String(model.id));
+                        if (event.currentTarget.parentElement?.parentElement) {
+                          event.dataTransfer.setDragImage(event.currentTarget.parentElement.parentElement, 24, 24);
+                        }
+                        setDraggedId(model.id);
+                        setOrderMessage("");
+                      }}
+                      onDragEnd={endDrag}
+                    />
+                    <button
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => selectModel(model.id)}
+                      className={styles.modelSelect}
+                    >
+                      <span className={styles.modelIcon}>
+                        <ProviderGlyph
+                          provider={model.provider}
+                          modelName={model.name}
+                          kind={kind}
+                          className="h-[18px] w-[18px]"
+                        />
                       </span>
-                      <span className={styles.modelId}>{model.name}</span>
-                      <span className={styles.modelFeatures}>
-                        {features.length > 0
-                          ? features.slice(0, 3).map(featureLabel).join(" · ")
-                          : kindLabel(kind)}
+                      <span className={styles.modelInfo}>
+                        <span className={styles.modelName}>
+                          {model.display_name}
+                          {model.is_default ? <em>默认</em> : null}
+                        </span>
+                        <span className={styles.modelId}>{model.name}</span>
+                        <span className={styles.modelFeatures}>
+                          {features.length > 0
+                            ? features.slice(0, 3).map(featureLabel).join(" · ")
+                            : kindLabel(kind)}
+                        </span>
                       </span>
-                    </span>
-                    <span className={styles.modelStatus}>
-                      <span className={styles.statusLine}>
-                        <i data-on={model.is_enabled} />
-                        {model.is_enabled ? "已启用" : "已停用"}
+                      <span className={styles.modelStatus}>
+                        <span className={styles.statusLine}>
+                          <i data-on={model.is_enabled} />
+                          {model.is_enabled ? "已启用" : "已停用"}
+                        </span>
+                        <span className={styles.modelKind}>{kindLabel(kind)}</span>
                       </span>
-                      <span className={styles.modelKind}>{kindLabel(kind)}</span>
-                    </span>
-                  </button>
+                    </button>
+                  </li>
                 );
               })
             ) : (
-              <div className={styles.catalogEmpty}>
+              <li className={styles.catalogEmpty}>
                 <p>没有匹配的模型</p>
                 <button type="button" onClick={() => { setSearch(""); setFilter("all"); }}>
                   清除筛选
                 </button>
-              </div>
+              </li>
             )}
-          </div>
+          </ul>
 
           <div className={styles.catalogFooter}>
             <span>{modelsQuery.isError ? "目录读取失败" : `共 ${filteredModels.length} 个结果`}</span>
-            <span className={styles.catalogFooterHint}>连接信息与能力绑定在右侧编辑</span>
+            <span className={styles.catalogFooterHint}>拖动手柄排序 · 仅保存到本机</span>
           </div>
+          <p id="model-order-help" className="sr-only">拖动手柄调整顺序，或点击手柄后选择上移、下移。聚焦手柄后也可按上下方向键。顺序按账号保存在本机，筛选时只调整可见模型。</p>
+          <p className="sr-only" role="status" aria-live="polite">{orderMessage}</p>
         </aside>
 
         <section className={styles.detail} aria-label="模型配置">
@@ -510,7 +581,7 @@ export function ModelWorkbench() {
                 selectedModel.provider,
               )}
               saving={patchMutation.isPending}
-              onDirtyChange={setEditorDirty}
+              onDirtyChange={handleDirtyChange}
               onSave={handleSave}
               onSetDefault={() => handleSetDefault(selectedModel)}
               onDelete={() => setDeleteTarget(selectedModel)}
@@ -604,7 +675,7 @@ function ModelEditor({
   models: AdminAiModelConfig[];
   providerOptions: ReturnType<typeof buildAiProviderOptions>;
   saving: boolean;
-  onDirtyChange: (dirty: boolean) => void;
+  onDirtyChange: (dirty: boolean, modelId: number) => void;
   onSave: (id: number, data: AdminAiModelConfigPatchRequest) => Promise<AdminAiModelConfig>;
   onSetDefault: () => void;
   onDelete: () => void;
@@ -638,8 +709,8 @@ function ModelEditor({
   const canSave = dirty && valid && conflicts.length === 0 && !saving && !testing;
 
   useEffect(() => {
-    onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
+    onDirtyChange(dirty, model.id);
+  }, [dirty, model.id, onDirtyChange]);
 
   const updateDraft = (patch: Partial<ModelDraft>) => {
     testRequestRef.current += 1;
@@ -713,7 +784,7 @@ function ModelEditor({
         ...(draft.apiKey.trim() ? { api_key: draft.apiKey.trim() } : {}),
       };
       await onSave(model.id, payload);
-      onDirtyChange(false);
+      onDirtyChange(false, model.id);
       setDraft((current) => ({ ...current, apiKey: "" }));
     } catch (error) {
       const message = getErrorMessage(error);
@@ -743,7 +814,6 @@ function ModelEditor({
         ? "凭据已配置"
         : "待配置";
   const statusTone = testing ? "pending" : testResult ? (testResult.success ? "ok" : "error") : "neutral";
-  const capabilities = effectiveFeatures.map(featureLabel);
   const updatedAt = formatDate(model.updated_at ?? model.created_at);
 
   return (
@@ -786,33 +856,6 @@ function ModelEditor({
           </div>
         </div>
 
-        <div className={styles.route} aria-label="模型连接路径">
-          <div className={styles.routeStep}>
-            <span className={styles.routeNode}>
-              <Server className="h-3.5 w-3.5" />
-            </span>
-            <span className={styles.routeLabel}>API 端点</span>
-            <span className={styles.routeValue}>{formatHost(draft.apiBaseUrl)}</span>
-          </div>
-          <ChevronRight className={styles.routeArrow} aria-hidden="true" />
-          <div className={styles.routeStep}>
-            <span className={styles.routeNode}>
-              <Cpu className="h-3.5 w-3.5" />
-            </span>
-            <span className={styles.routeLabel}>模型网关</span>
-            <span className={styles.routeValue}>{draft.name || "未填写"}</span>
-          </div>
-          <ChevronRight className={styles.routeArrow} aria-hidden="true" />
-          <div className={styles.routeStep}>
-            <span className={styles.routeNode}>
-              <Sparkles className="h-3.5 w-3.5" />
-            </span>
-            <span className={styles.routeLabel}>能力绑定</span>
-            <span className={styles.routeValue}>
-              {capabilities.length > 0 ? `${capabilities.length} 项` : "未绑定"}
-            </span>
-          </div>
-        </div>
       </header>
 
       <div className={styles.detailBody}>
