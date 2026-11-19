@@ -47,7 +47,6 @@ _INDEXES = {
         "formula_cards", ("exam_scope", "study_card_type", "status"), {}
     ),
     "ix_import_batch_jobs_execution_status": ("import_batch_jobs", ("execution_status",), {}),
-    "ix_import_batch_jobs_request_id": ("import_batch_jobs", ("request_id",), {"unique": True}),
     "ix_import_batch_jobs_subject_id": ("import_batch_jobs", ("subject_id",), {}),
     "ix_import_pipelines_created_by_status": ("import_pipelines", ("created_by", "status"), {}),
     "ix_import_pipelines_execution_status": ("import_pipelines", ("execution_status",), {}),
