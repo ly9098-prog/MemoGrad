@@ -3,123 +3,13 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge as SharedStatusBadge, type StatusBadgeTone } from "@/components/status-badge";
 
-type PremiumAccent = "blue" | "teal" | "violet" | "amber" | "rose";
-
-export function PremiumSection({
-  children,
-  className,
-  accent = "blue",
-  inset = false,
-  overflow = "clip",
-}: {
-  children: ReactNode;
-  className?: string;
-  accent?: PremiumAccent;
-  inset?: boolean;
-  overflow?: "clip" | "visible";
-}) {
-  return (
-    <section
-      className={cn(
-        "admin-premium-panel relative isolate rounded-[20px]",
-        overflow === "clip" ? "overflow-clip" : "overflow-visible",
-        inset && "admin-premium-inset",
-        className,
-      )}
-      data-accent={accent}
-    >
-      {children}
-    </section>
-  );
-}
-
-export function PremiumSectionHeader({
-  title,
-  description,
-  icon,
-  aside,
-  className,
-  titleAs = "h2",
-  titleClassName,
-  meta,
-}: {
-  title: ReactNode;
-  description?: ReactNode;
-  icon?: ReactNode;
-  aside?: ReactNode;
-  className?: string;
-  titleAs?: "h1" | "h2";
-  titleClassName?: string;
-  meta?: ReactNode;
-}) {
-  const Title = titleAs;
-  return (
-    <header className={cn("admin-premium-header", className)}>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2.5">
-          {icon ? <span className="admin-premium-icon">{icon}</span> : null}
-          <Title className={cn("admin-premium-title", titleClassName)}>{title}</Title>
-        </div>
-        {description ? <p className="admin-premium-description">{description}</p> : null}
-        {meta ? (
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] leading-5 text-muted-foreground">
-            {meta}
-          </div>
-        ) : null}
-      </div>
-      {aside ? <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">{aside}</div> : null}
-    </header>
-  );
-}
-
-export function PremiumStat({
-  label,
-  value,
-  hint,
-  icon,
-  loading = false,
-  tone = "default",
-  accent = "blue",
-}: {
-  label: ReactNode;
-  value: ReactNode;
-  hint?: ReactNode;
-  icon?: ReactNode;
-  loading?: boolean;
-  tone?: "default" | "alert";
-  accent?: PremiumAccent;
-}) {
-  return (
-    <div className="admin-premium-stat" data-tone={tone} data-accent={accent}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="admin-premium-stat-label">{label}</span>
-        {icon ? <span className="admin-premium-icon">{icon}</span> : null}
-      </div>
-      {loading ? (
-        <span className="mgmt-skeleton mt-2 h-8 w-20 rounded-md" aria-hidden="true" />
-      ) : (
-        <strong className="admin-premium-stat-value">{value}</strong>
-      )}
-      {hint ? (
-        <p
-          className="admin-premium-stat-hint"
-          data-alert={tone === "alert"}
-          title={typeof hint === "string" ? hint : undefined}
-        >
-          {hint}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 type MetricTone = "default" | "accent" | "warning" | "success" | "danger";
 
 export function ManagementPage({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--admin-line)] [--mgmt-muted:var(--admin-ink-muted)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_18px_44px_rgba(31,72,100,0.06)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:border-x before:border-[var(--admin-line)] before:bg-[rgba(255,255,255,0.18)]",
+        "mgmt-page-enter relative isolate min-w-0 w-full space-y-6 pb-16 [--mgmt-line:var(--admin-line)] [--mgmt-muted:var(--admin-ink-muted)] [--mgmt-paper:var(--card)] [--mgmt-steel:var(--secondary)] [--mgmt-steel-strong:var(--accent)] [--mgmt-shadow:0_18px_44px_rgba(31,72,100,0.06)] before:pointer-events-none before:absolute before:-inset-x-5 before:-bottom-8 before:-top-6 before:-z-10 before:bg-[rgba(255,255,255,0.18)]",
         className,
       )}
     >

@@ -122,10 +122,6 @@ export function operatorLabel(
   return operatorId != null ? `#${operatorId}` : "system";
 }
 
-export function resourceTypeLabel(type: string): string {
-  return RESOURCE_TYPE_LABELS[type] || type;
-}
-
 export function changedFieldLabel(field: string): string {
   return CHANGED_FIELD_LABELS[field] || field;
 }

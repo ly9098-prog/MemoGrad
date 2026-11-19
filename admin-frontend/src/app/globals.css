@@ -274,9 +274,6 @@ a {
    are reserved for grouping or an explicit interaction boundary. */
 @layer components {
 .admin-premium-panel {
-  --premium-accent: var(--admin-data-blue);
-  --premium-accent-soft: rgba(36, 107, 150, 0.12);
-  --premium-accent-ink: #1f5c7d;
   border: 1px solid var(--admin-glass-border);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(247, 252, 255, 0.54) 58%, rgba(232, 244, 253, 0.46)),
@@ -289,104 +286,11 @@ a {
   backdrop-filter: blur(26px) saturate(132%);
 }
 
-.admin-premium-panel[data-accent="blue"] { --premium-accent: var(--admin-data-blue); --premium-accent-soft: rgba(36, 107, 150, 0.12); --premium-accent-ink: #1f5c7d; }
-.admin-premium-panel[data-accent="teal"] { --premium-accent: var(--admin-data-teal); --premium-accent-soft: rgba(20, 122, 131, 0.11); --premium-accent-ink: #0d626a; }
-.admin-premium-panel[data-accent="violet"] { --premium-accent: var(--admin-data-violet-strong); --premium-accent-soft: rgba(138, 110, 158, 0.13); --premium-accent-ink: #5f4e7a; }
-.admin-premium-panel[data-accent="amber"] { --premium-accent: var(--admin-data-amber); --premium-accent-soft: rgba(176, 122, 53, 0.14); --premium-accent-ink: var(--warning-foreground); }
-.admin-premium-panel[data-accent="rose"] { --premium-accent: var(--admin-data-rose); --premium-accent-soft: rgba(167, 89, 109, 0.12); --premium-accent-ink: #884052; }
-
 .admin-premium-inset {
   border-color: rgba(255, 255, 255, 0.58);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.56), rgba(238, 248, 255, 0.42));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 14px 34px rgba(31, 72, 100, 0.05);
 }
-
-.admin-premium-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 15px 20px 12px;
-  border-bottom: 1px solid var(--admin-line);
-  border-radius: 19px 19px 0 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.44), transparent);
-}
-
-.admin-premium-icon {
-  display: inline-grid;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  place-items: center;
-  border: 1px solid var(--admin-line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--admin-ink-subtle);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
-}
-
-.admin-premium-title {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-  color: var(--admin-ink);
-}
-
-.admin-premium-description {
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--admin-ink-muted);
-}
-
-.admin-premium-stat {
-  position: relative;
-  min-width: 0;
-  padding: 15px 20px 13px;
-  background: transparent;
-}
-
-.admin-premium-stat[data-tone="alert"] .admin-premium-stat-value { color: var(--premium-accent); }
-.admin-premium-stat[data-accent="blue"] { --premium-accent: var(--admin-data-blue); --premium-accent-soft: rgba(36, 107, 150, 0.12); --premium-accent-ink: #1f5c7d; }
-.admin-premium-stat[data-accent="teal"] { --premium-accent: var(--admin-data-teal); --premium-accent-soft: rgba(20, 122, 131, 0.11); --premium-accent-ink: #0d626a; }
-.admin-premium-stat[data-accent="violet"] { --premium-accent: var(--admin-data-violet-strong); --premium-accent-soft: rgba(138, 110, 158, 0.13); --premium-accent-ink: #5f4e7a; }
-.admin-premium-stat[data-accent="amber"] { --premium-accent: var(--admin-data-amber); --premium-accent-soft: rgba(176, 122, 53, 0.14); --premium-accent-ink: var(--warning-foreground); }
-.admin-premium-stat[data-accent="rose"] { --premium-accent: var(--admin-data-rose); --premium-accent-soft: rgba(167, 89, 109, 0.12); --premium-accent-ink: #884052; }
-
-.admin-premium-stat-label {
-  overflow: hidden;
-  color: var(--admin-ink-muted);
-  font-size: 12.5px;
-  font-weight: 550;
-  letter-spacing: -0.005em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-premium-stat-value {
-  display: block;
-  margin-top: 4px;
-  font-size: 34px;
-  font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  color: var(--admin-ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.admin-premium-stat-hint {
-  overflow: hidden;
-  margin-top: 3px;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--admin-ink-subtle);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-premium-stat-hint[data-alert="true"] { color: var(--premium-accent-ink); }
 
 .admin-panel {
   border: 1px solid var(--admin-glass-border);

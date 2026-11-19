@@ -115,11 +115,3 @@ export function StructuredTable({
     </figure>
   );
 }
-
-export function StructuredTableList({ segments }: { segments: unknown[] }) {
-  const tables = segments
-    .map(normalizeStructuredTableSegment)
-    .filter((table): table is StructuredTableSegment => Boolean(table));
-  if (tables.length === 0) return null;
-  return <div className="space-y-3">{tables.map((table, index) => <StructuredTable key={table.table_id || index} segment={table} />)}</div>;
-}

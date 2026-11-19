@@ -130,14 +130,6 @@
   line-height: 1.35;
 }
 
-.scopeDesc {
-  display: block;
-  margin-top: 4px;
-  color: var(--ais-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
 .scopeCheck {
   position: relative;
   display: grid;
@@ -350,24 +342,6 @@
   color: var(--ais-faint);
   font-size: 10px;
   line-height: 1.5;
-}
-
-.editorAction {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ais-muted);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.editorAction:hover {
-  color: var(--ais-accent);
-}
-
-.editorAction:disabled {
-  cursor: default;
-  opacity: 0.45;
 }
 
 .toggleList {
@@ -681,17 +655,6 @@
   margin-top: 10px;
   color: var(--ais-muted);
   font-size: 9.5px;
-}
-
-.identityNumber {
-  display: block;
-  margin-top: 4px;
-  color: var(--ais-ink);
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.04em;
-  line-height: 1.2;
 }
 
 .selectWrap {

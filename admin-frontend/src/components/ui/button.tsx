@@ -50,5 +50,3 @@ export function Button({ className, variant, size, children, ...props }: ButtonP
     </button>
   );
 }
-
-export { buttonVariants };
