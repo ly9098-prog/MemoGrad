@@ -1304,8 +1304,20 @@ to{transform:translate3d(0,0,0);opacity:1;}
 .atlas-filter .filter-count{color:#507568;font-size:22rpx;}
 .theme-quick-chip,.theme-overview-card{height:124rpx!important;min-height:124rpx!important;}
 .theme-card-count,.graph-count{color:#507568;font-size:24rpx;}
-.graph-card-title{max-width:320rpx;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.graph-force-toggle{min-width:88rpx;height:88rpx;font-size:24rpx;}
+.graph-card-head{display:grid;grid-template-columns:minmax(0,1fr) 88rpx;gap:4rpx 16rpx;align-items:center;padding:16rpx 20rpx;}
+.graph-card-title-wrap{min-width:0;align-items:center;gap:8rpx;}
+.graph-card-copy{min-width:0;flex:1;}
+.graph-card-title{max-width:none;overflow:visible;white-space:normal;overflow-wrap:anywhere;font-size:30rpx;line-height:1.4;}
+.graph-head-actions{display:contents;}
+.graph-head-actions .graph-count{grid-column:1;grid-row:2;min-width:0;padding:0;white-space:normal;line-height:1.4;}
+.graph-force-toggle{grid-column:2;grid-row:1 / 3;min-width:88rpx;width:88rpx;height:88rpx;justify-content:center;gap:8rpx;padding:0;border:0;background:transparent;font-size:24rpx;line-height:1.4;}
+.graph-back{width:88rpx;height:88rpx;min-width:88rpx;margin:-12rpx 0 -12rpx -12rpx!important;border:0;background:transparent;}
+.graph-back-chevron{width:16rpx;height:16rpx;border-left:2rpx solid currentColor;border-bottom:2rpx solid currentColor;transform:rotate(45deg);}
+.theme-active-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4rpx 16rpx;padding:12rpx 0 0;border:0;border-top:1rpx solid #E1EFE8;border-radius:0;background:transparent;box-shadow:none;}
+.theme-graduation-summary{grid-column:1;color:#507568;font-size:22rpx;line-height:1.4;}
+.theme-active-copy{grid-column:1;min-width:0;flex-wrap:wrap;gap:8rpx;font-size:22rpx;line-height:1.4;}
+.theme-active-name{min-width:0;white-space:normal;overflow-wrap:anywhere;font-size:24rpx;line-height:1.5;font-weight:500;}
+.theme-active-summary .theme-clear{grid-column:2;grid-row:1 / 3;min-width:88rpx;min-height:88rpx;margin:0;padding:0 12rpx;border:0;background:transparent;font-size:24rpx;line-height:88rpx;}
 .point-card{border-color:#D8EEE6;background:#FFFFFF;box-shadow:0 10rpx 24rpx rgba(35,72,60,.04);}
 .point-card-kicker,.point-card-theme,.fact-label,.point-mastery-label{color:#507568;font-size:22rpx;}
 .graph-page-navigation{display:flex;align-items:center;justify-content:space-between;gap:16rpx;padding:8rpx 20rpx;color:#507568;font-size:24rpx;border-top:1rpx solid #D8EEE6;}
@@ -1319,6 +1331,8 @@ to{transform:translate3d(0,0,0);opacity:1;}
 .atlas-viewport.graph-canvas::before{display:none;}
 .atlas-node.force-node.node-dimmed{opacity:.44;}
 .atlas-edge.force-edge.edge-dimmed{opacity:.22;}
-.force-label{top:auto;font-size:inherit;line-height:1.4;}
+.force-label{top:calc(100% + 10px);bottom:auto;font-size:inherit;line-height:1.4;}
+.force-node.node-selected .force-label{top:calc(100% + 10px);bottom:auto;}
+.graph-interacting .atlas-node,.graph-interacting .force-edge,.graph-interacting .force-label{transition:none;}
 .point-facts > view{display:flex;flex-direction:column;align-items:flex-start;gap:8rpx;}
 .point-detail,.point-practice{min-height:88rpx;font-size:26rpx;}

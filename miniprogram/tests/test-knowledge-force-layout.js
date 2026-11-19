@@ -66,7 +66,6 @@ test('node size reflects real connections and selection highlights only neighbor
   highlightScene(scene, { selectedId: 3 })
   const frame = { width: 365, height: 343 }
   const labels = labelDisplay(fitCamera(frame), frame, scene.nodes).graphLabelVisibility
-  assert.equal(labels[leaf.id], undefined, 'previous selected labels reset')
   assert.equal(leaf.selected, false)
   assert.equal(labels[other.id], true)
   highlightScene(scene)
@@ -84,6 +83,13 @@ test('zoom reveals detail labels while preserving a readable screen size', () =>
     assert.ok(Math.abs(overview.graphLabelSize * camera.scale - 12) < 0.1, `${width}px overview labels`)
     assert.ok(Math.abs(detail.graphLabelSize * camera.scale * 2 - 12) < 0.1, `${width}px detail labels`)
   }
+})
+
+test('sparse chapter views show readable leaf names without requiring pinch zoom', () => {
+  const scene = buildScene([groupWithLeaves(8)], subject, { groupKey: 'tree', focusNodeId: 1 })
+  const frame = { width: 365, height: 343 }
+  const shown = labelDisplay(fitCamera(frame), frame, scene.nodes).graphLabelVisibility
+  assert.ok(scene.nodes.filter(node => node.kind === 'point' && shown[node.id]).length >= 4)
 })
 
 test('automatic labels avoid collisions, preserve selection priority, and stay stable while panning', () => {
@@ -166,4 +172,98 @@ test('core remains fixed and hidden pages cancel pending force work', () => {
   assert.equal(page._forceTimer, null)
   assert.equal(page._forceDirty, true)
   assert.equal(page._pageVisible, false)
+})
+
+test('panning only publishes the camera while zoom and node changes refresh labels', () => {
+  const frame = { left: 0, top: 0, width: 365, height: 343 }
+  const scene = buildScene([groupWithLeaves(8)], subject)
+  const page = { ...pageDefinition, data: { scene }, _frame: frame, _camera: fitCamera(frame) }
+  assert.ok(page.cameraPayload(false).graphLabelVisibility)
+  page._camera = { ...page._camera, x: page._camera.x + 20 }
+  assert.equal(page.cameraPayload(false).graphLabelVisibility, undefined)
+  page._camera = { ...page._camera, scale: page._camera.scale * 2 }
+  assert.ok(page.cameraPayload(false).graphLabelVisibility)
+  page._cameraLabelCache = null
+  assert.ok(page.cameraPayload(false).graphLabelVisibility)
+})
+
+test('drag events coalesce and release commits the final node position before teardown', () => {
+  const frame = { left: 0, top: 0, width: 365, height: 343 }
+  const page = {
+    ...pageDefinition, data: {}, _frame: frame, _camera: fitCamera(frame), _pageVisible: true,
+    _gesture: { moved: true, dragNodeId: 'point:2', touches: [{}] },
+    commits: [], commitDraggedNode(point) { this.commits.push(point) },
+    finishGraphInteraction() {},
+  }
+  page.moveDraggedNode({ x: 1, y: 2 })
+  const timer = page._dragTimer
+  page.moveDraggedNode({ x: 20, y: 30 })
+  assert.equal(page._dragTimer, timer)
+  assert.equal(page.commits.length, 0)
+  page.endGraphTouch({ type: 'touchend', touches: [] })
+  assert.deepEqual(page.commits, [{ x: 20, y: 30 }])
+  assert.equal(page._dragTimer, null)
+  assert.equal(page._gesture, null)
+  assert.equal(page._pendingDragPoint, null)
+})
+
+test('hiding during node drag clears its identity before a new background gesture', () => {
+  const frame = { left: 0, top: 0, width: 365, height: 343 }
+  const page = {
+    ...pageDefinition, data: { ...pageDefinition.data, graphInteracting: true },
+    _frame: frame, _camera: fitCamera(frame), _pageVisible: true,
+    _dragNodeId: 'point:2', _gesture: { dragNodeId: 'point:2' },
+    setData(patch) { Object.assign(this.data, patch) },
+  }
+  page.moveDraggedNode({ x: 200, y: 200 })
+  page.setCamera({ ...page._camera, x: 12 }, true, false)
+  page.onHide()
+  assert.equal(page._cameraTimer, null)
+  assert.equal(page._inertiaTimer, null)
+  assert.equal(page._dragTimer, null)
+  assert.equal(page._gesture, null)
+  assert.equal(page._dragNodeId, '')
+  assert.equal(page.data.graphInteracting, false)
+  page._pageVisible = true
+  page.startGraphTouch({ touches: [{ clientX: 200, clientY: 200 }] })
+  assert.equal(page._gesture.dragNodeId, '')
+  page.endGraphTouch({ touches: [], type: 'touchcancel' })
+})
+
+test('a long label cannot obscure another node even when labels do not overlap each other', () => {
+  const frame = { width: 365, height: 343 }
+  const camera = { ...fitCamera(frame), scale: 0.8 }
+  const nodes = [
+    { id: 'group:1', kind: 'group', label: '线性表的顺序存储结构', cx: 300, cy: 300, r: 14 },
+    { id: 'point:2', kind: 'point', label: '相邻节点', cx: 340, cy: 335, r: 7 },
+  ]
+  const shown = labelDisplay(camera, frame, nodes).graphLabelVisibility
+  assert.equal(shown['group:1'], undefined)
+  assert.equal(shown['point:2'], true)
+})
+
+test('resuming after a committed drag refreshes labels without another camera gesture', () => {
+  const frame = { left: 0, top: 0, width: 365, height: 343 }
+  const camera = { ...fitCamera(frame), scale: 0.8 }
+  const nodes = [
+    { id: 'group:1', kind: 'group', label: '线性表的顺序存储结构', cx: 300, cy: 300, r: 14 },
+    { id: 'point:2', kind: 'point', label: '相邻节点', cx: 600, cy: 600, r: 7 },
+  ]
+  const page = {
+    ...pageDefinition,
+    data: { ...pageDefinition.data, scene: { nodes, edges: [] }, graphInteracting: true },
+    _frame: frame, _camera: camera, _pageVisible: true, _loadedOnce: true, _readyForViewWork: true,
+    _gesture: { dragNodeId: 'point:2' }, _manualPositions: {},
+    _sceneNodeIndex: new Map(nodes.map((node, index) => [node.id, index])),
+    setData(patch) { Object.assign(this.data, patch) },
+  }
+  page.setCamera(camera)
+  assert.equal(page.data.graphLabelVisibility['group:1'], true)
+  page.commitDraggedNode({ x: 340 * camera.scale + camera.x, y: 335 * camera.scale + camera.y })
+  assert.equal(page.data.graphLabelVisibility['group:1'], true, 'drag defers label recalculation')
+  page.onHide()
+  page.onShow()
+  assert.equal(page.data.graphLabelVisibility['group:1'], undefined)
+  assert.equal(page.data.graphLabelVisibility['point:2'], true)
+  assert.equal(page.data.graphInteracting, false)
 })

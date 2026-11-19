@@ -77,6 +77,8 @@ test('prepares a submission after unanswered confirmation', async () => {
   assert.equal(submission.session.mode, 'sequential')
   assert.deepEqual(h.state.pausedPrompts[0], {
     scenario: 'unanswered',
+    layout: 'minimal',
+    hideEyebrow: true,
     title: '还有 1 题未完成',
     message: '现在交卷会将未完成题记为跳过。',
     confirmText: '仍然交卷',

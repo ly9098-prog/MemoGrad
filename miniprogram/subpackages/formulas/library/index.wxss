@@ -199,7 +199,8 @@ page {
 .fl-card-tag.tag-high_frequency { background:#FFF3DF; color:#A96518; }
 .fl-card-tag.tag-error_prone { background:#FDEBE8; color:#B24F43; }
 .fl-card-tag.tag-must_memorize { background:#F0EBF6; color:#735C8A; }
-.fl-favorite-btn { width:58rpx; height:58rpx; border:1rpx solid #D8EEE6; border-radius:18rpx; background:#F6FCF9; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.fl-favorite-btn { width:88rpx; height:88rpx; margin:-12rpx -12rpx 0 0; border:0; border-radius:20rpx; background:transparent; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.fl-favorite-btn .ui-lock { margin:0; width:30rpx; height:30rpx; }
 .fl-favorite-btn.active { border-color:#7ED8B5; background:#EAF9F4; }
 .fl-bookmark-icon { width:20rpx; height:26rpx; border:3rpx solid #507568; border-radius:4rpx 4rpx 2rpx 2rpx; position:relative; box-sizing:border-box; }
 .fl-bookmark-icon::after { content:''; position:absolute; left:2rpx; right:2rpx; bottom:-4rpx; height:9rpx; background:#F6FCF9; border-left:3rpx solid #507568; border-bottom:3rpx solid #507568; transform:rotate(-45deg) scale(.72); }

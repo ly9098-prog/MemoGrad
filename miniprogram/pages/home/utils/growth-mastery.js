@@ -91,20 +91,19 @@ function resolveSubjectMastery(values) {
 function masteryStatus(hasData, hubItem, hasAttempts) {
   const status = String(hubItem && hubItem.status || '')
   if (!hasData && status !== 'insufficient') {
-    return { statusText: hasAttempts ? (hubItem ? '样本积累中' : '评估暂不可用') : '开始积累', statusIconSrc: '' }
+    return { statusText: hasAttempts ? (hubItem ? '样本积累中' : '评估暂不可用') : '开始积累' }
   }
   const confidence = hubItem && hubItem.confidence != null ? Number(hubItem.confidence) : NaN
-  const icons = '/assets/icons/home-mastery/'
   if (status === 'insufficient' || !Number.isFinite(confidence) || confidence < 0.3) {
-    return { statusText: '样本积累中', statusIconSrc: `${icons}status-observing.svg` }
+    return { statusText: '样本积累中' }
   }
   const rawScore = Number(hubItem && hubItem.mastery_score)
   const code = ['weak', 'developing', 'good', 'mastered'].includes(status) ? status
     : (rawScore < 40 ? 'weak' : rawScore < 70 ? 'developing' : rawScore < 85 ? 'good' : 'mastered')
-  if (code === 'weak') return { statusText: '需要强化', statusIconSrc: `${icons}status-weak.svg` }
-  if (code === 'developing') return { statusText: '持续巩固', statusIconSrc: `${icons}status-good.svg` }
-  if (code === 'good') return { statusText: '较为稳定', statusIconSrc: `${icons}status-good.svg` }
-  return { statusText: '掌握稳固', statusIconSrc: `${icons}status-mastered.svg` }
+  if (code === 'weak') return { statusText: '需要强化' }
+  if (code === 'developing') return { statusText: '持续巩固' }
+  if (code === 'good') return { statusText: '较为稳定' }
+  return { statusText: '掌握稳固' }
 }
 
 function buildSubjectMasteryItem(meta, index, hubByKey, statsByKey) {

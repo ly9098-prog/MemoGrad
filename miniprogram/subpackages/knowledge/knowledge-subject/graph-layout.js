@@ -4,7 +4,7 @@
 // is the only layer that changes when the viewport is resized or zoomed.
 const WORLD = { width: 800, height: 920 }
 const POINTS_PER_PAGE = 8
-const DEFAULT_FORCES = { center: 0.52, repel: 10, link: 1, distance: 250 }
+const DEFAULT_FORCES = { center: 0.18, repel: 18, link: 0.8, distance: 270 }
 const MAX_FOCUS_NODES = 72
 const GROUPS_PER_PAGE = POINTS_PER_PAGE
 
@@ -116,6 +116,14 @@ function simulate(nodes, links, forces, manualPositions, focused, cache) {
         const py = dy / distance * force
         if (!a.fixed) { fx.set(a.id, fx.get(a.id) + px); fy.set(a.id, fy.get(a.id) + py) }
         if (!b.fixed) { fx.set(b.id, fx.get(b.id) - px); fy.set(b.id, fy.get(b.id) - py) }
+        const clearance = a.r + b.r + 44
+        if (distance < clearance) {
+          const push = (clearance - distance) * 0.12
+          const cx = dx / distance * push
+          const cy = dy / distance * push
+          if (!a.fixed) { fx.set(a.id, fx.get(a.id) + cx); fy.set(a.id, fy.get(a.id) + cy) }
+          if (!b.fixed) { fx.set(b.id, fx.get(b.id) - cx); fy.set(b.id, fy.get(b.id) - cy) }
+        }
       }
     }
     links.forEach((link) => {
@@ -165,6 +173,7 @@ function buildOverview(groups, subject, forces, requestedPage) {
       cx: 400 + Math.cos(angle) * 250,
       cy: 460 + Math.sin(angle) * 250,
       r: root.hasChildren ? 12 : 6,
+      chapterRoot: true,
     })
     nodes.push(rootNode)
     if (!root.hasChildren) pointIds.push(rootId)
@@ -284,13 +293,8 @@ function buildScene(groups, subject, options = {}) {
   const graph = focusNode && focusedGroup
     ? buildFocused(focusedGroup, focusNode, forces, options.page)
     : buildOverview(source, subject, forces, options.page)
-  const degrees = new Map()
-  graph.edges.forEach(({ from, to }) => {
-    degrees.set(from, (degrees.get(from) || 0) + 1)
-    degrees.set(to, (degrees.get(to) || 0) + 1)
-  })
   graph.nodes.forEach(node => {
-    node.r = node.kind === 'core' ? 18 : clamp(4 + Math.sqrt(degrees.get(node.id) || 1) * 2, 6, 16)
+    node.r = node.kind === 'core' ? 18 : node.chapterRoot ? 14 : 7
   })
   simulate(graph.nodes, graph.edges, forces, options.manualPositions || {}, Boolean(focusNode), options.layoutCache)
   highlightScene(graph, options)
@@ -402,13 +406,29 @@ function zoomCamera(camera, factor, anchor, frame) {
 
 function cameraStyle(camera) { return `transform:translate3d(${camera.x}px,${camera.y}px,0) scale(${camera.scale});` }
 
-function visibleLabels(nodes, fontSize, mode, scale) {
+function visibleLabels(nodes, fontSize, scale) {
   const visibility = {}
-  const occupied = []
+  const occupied = new Map()
+  const obstacles = new Map()
+  const cellSize = Math.max(48, fontSize * 6)
+  const cells = (box) => {
+    const keys = []
+    for (let x = Math.floor(box.left / cellSize); x <= Math.floor(box.right / cellSize); x += 1) {
+      for (let y = Math.floor(box.top / cellSize); y <= Math.floor(box.bottom / cellSize); y += 1) keys.push(`${x}:${y}`)
+    }
+    return keys
+  }
+  nodes.forEach(node => {
+    const box = { left: node.cx - node.r, right: node.cx + node.r, top: node.cy - node.r, bottom: node.cy + node.r, id: node.id }
+    cells(box).forEach(key => {
+      const entries = obstacles.get(key) || []
+      entries.push(box)
+      obstacles.set(key, entries)
+    })
+  })
   const priority = node => node.selected ? 0 : node.neighbor ? 1 : node.kind === 'group' ? 2 : 3
-  const candidates = nodes.filter(node => node.kind !== 'core' && (
-    mode === 'detail' || node.kind === 'group' || node.selected || node.neighbor
-  )).sort((a, b) => priority(a) - priority(b) || Number(a.dimmed) - Number(b.dimmed) || a.id.localeCompare(b.id))
+  const candidates = nodes.filter(node => node.kind !== 'core')
+    .sort((a, b) => priority(a) - priority(b) || Number(a.dimmed) - Number(b.dimmed) || a.id.localeCompare(b.id))
   const gap = 4 / scale
   candidates.forEach(node => {
     // Estimate mixed CJK/Latin labels in world coordinates. Camera translation
@@ -416,11 +436,18 @@ function visibleLabels(nodes, fontSize, mode, scale) {
     const units = Array.from(node.label).reduce((sum, char) => sum + (/[^\u0000-\u00ff]/.test(char) ? 1 : 0.58), 0)
     const width = Math.min(node.selected ? 320 : 240, units * fontSize)
     const height = fontSize * 1.4
-    const box = { left: node.cx - width / 2, right: node.cx + width / 2, top: node.cy - node.r - 10 - height, bottom: node.cy - node.r - 10 }
-    const overlap = occupied.some(other => box.left < other.right + gap && box.right > other.left - gap && box.top < other.bottom + gap && box.bottom > other.top - gap)
-    if (node.selected || !overlap) {
+    const box = { left: node.cx - width / 2, right: node.cx + width / 2, top: node.cy + node.r + 10, bottom: node.cy + node.r + 10 + height }
+    const nearby = cells({ left: box.left - gap, right: box.right + gap, top: box.top - gap, bottom: box.bottom + gap })
+    const intersects = other => box.left < other.right + gap && box.right > other.left - gap && box.top < other.bottom + gap && box.bottom > other.top - gap
+    const obscuresNode = nearby.some(key => (obstacles.get(key) || []).some(other => other.id !== node.id && intersects(other)))
+    const overlap = nearby.some(key => (occupied.get(key) || []).some(intersects))
+    if (!obscuresNode && (node.selected || !overlap)) {
       visibility[node.id] = true
-      occupied.push(box)
+      cells(box).forEach(key => {
+        const entries = occupied.get(key) || []
+        entries.push(box)
+        occupied.set(key, entries)
+      })
     }
   })
   return visibility
@@ -433,7 +460,7 @@ function labelDisplay(camera, frame, nodes) {
   return {
     graphLabelMode,
     graphLabelSize,
-    ...(nodes ? { graphLabelVisibility: visibleLabels(nodes, graphLabelSize, graphLabelMode, camera.scale) } : {}),
+    ...(nodes ? { graphLabelVisibility: visibleLabels(nodes, graphLabelSize, camera.scale) } : {}),
   }
 }
 

@@ -161,6 +161,12 @@ test('initial duration segments match the formatter contract', () => {
 })
 
 test('daily duration uses alternating digit reveal animation', () => {
+  const f = fixture()
+  const patch = f.page._getTodayDurationDisplayPatch('2时58分', { reveal: true })
+  const digits = plain(patch._dispTodayDurationSegments).filter(item => item.type === 'num')
+  assert.deepEqual(digits.map(item => item.direction), ['top', 'bottom', 'top'])
+  assert.deepEqual(digits.map(item => item.delay), [0, 28, 56])
+  assert.deepEqual(digits.map(item => item.text), ['2', '5', '8'])
   const wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8')
   const wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8')
   assert.match(wxml, /wx:key="key"/)

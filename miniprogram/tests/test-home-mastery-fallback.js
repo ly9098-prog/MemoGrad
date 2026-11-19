@@ -253,7 +253,6 @@ test('four mastery levels use reliable Hub scores with the reference subject ico
   assert.deepEqual(result.map(item => item.scoreText), ['28%', '58%', '78%', '91%'])
   assert.deepEqual(result.map(item => item.statusText), ['需要强化', '持续巩固', '较为稳定', '掌握稳固'])
   assert.ok(result.every(item => item.iconSrc.startsWith('/assets/icons/home-mastery/') && item.iconSrc.endsWith('.svg')))
-  assert.ok(result.every(item => item.statusIconSrc.endsWith('.svg')))
   assert.equal(result[0].sampleText, '已练 14 题', 'Hub observations never replace the actual question count')
 })
 

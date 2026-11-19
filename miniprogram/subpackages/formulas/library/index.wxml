@@ -198,11 +198,13 @@
             data-id="{{item.id}}"
             catchtap="toggleFormulaFavorite"
             hover-class="fl-pressed"
+            aria-role="button"
+            aria-label="{{item.isFavorited || item.is_favorited ? '取消收藏' : '收藏公式'}}"
           >
             <view class="fl-bookmark-icon"></view>
           </view>
-          <view wx:else class="fl-favorite-btn is-locked" aria-disabled="true">
-            <view class="fl-bookmark-icon"></view><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+          <view wx:else class="fl-favorite-btn is-locked" aria-disabled="true" aria-label="登录后可收藏公式">
+            <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
           </view>
         </view>
 

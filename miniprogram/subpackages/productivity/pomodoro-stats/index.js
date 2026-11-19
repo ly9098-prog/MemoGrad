@@ -626,8 +626,8 @@ return canvasPage._getCloseDetailController(this, { createCloseDetailController 
 return loadViewFlow._getTodayDurationDisplayPatch(this, text, options)
 },
 
-  _buildDurationSegments(text) {
-    return durationFormatter.buildDurationSegments(text)
+  _buildDurationSegments(text, reveal = false) {
+    return durationFormatter.buildDurationSegments(text, reveal)
   },
 
   _fmtHourMinute(sec) {

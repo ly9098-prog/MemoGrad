@@ -137,7 +137,7 @@ assert.ok(review.includes('reviewNavigationHeight'), 'review viewport accounts f
 for (const icon of ['shuffle', 'list-ordered', 'target', 'clock', 'notebook-tabs']) {
   assert.ok(fs.existsSync(path.join(root, 'assets/icons/practice/' + icon + '.svg')))
 }
-assert.ok(setup.includes('hero-config-icon'), 'reference plan 2 summary has a mode icon')
+assert.ok(setup.includes('hero-mode'), 'setup heading carries the selected practice mode')
 const confirmationCss = read('subpackages/study/components/submit-confirm/submit-confirm.wxss')
 assert.ok(confirmationCss.includes('.sc-icon-line.icon-exclamation::before'), 'confirmation owns its component-scoped drawn icon primitives')
 assert.ok(/\.sc-theme-mint \.sc-card \.sc-top-accent\s*\{[^}]*#7ED8B5/.test(confirmationCss), 'mint accent matches legacy scenario specificity')

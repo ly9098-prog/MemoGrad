@@ -142,6 +142,8 @@ async function confirmSubmission(options, skipConfirm, classification, total) {
   if (classification.unanswered > 0) {
     return options.showPausedConfirm({
       scenario: 'unanswered',
+      layout: 'minimal',
+      hideEyebrow: true,
       title: `还有 ${classification.unanswered} 题未完成`,
       message: '现在交卷会将未完成题记为跳过。',
       confirmText: '仍然交卷',

@@ -111,7 +111,7 @@
   "_getCloseDetailController": "_getCloseDetailController() {\nreturn canvasPage._getCloseDetailController(this, { createCloseDetailController })\n}",
   "noop": "noop() {}",
   "_getTodayDurationDisplayPatch": "_getTodayDurationDisplayPatch(text, options) {\nreturn loadViewFlow._getTodayDurationDisplayPatch(this, text, options)\n}",
-  "_buildDurationSegments": "_buildDurationSegments(text) {\n    return durationFormatter.buildDurationSegments(text)\n  }",
+  "_buildDurationSegments": "_buildDurationSegments(text, reveal = false) {\n    return durationFormatter.buildDurationSegments(text, reveal)\n  }",
   "_fmtHourMinute": "_fmtHourMinute(sec) {\n    return durationFormatter.formatHourMinute(sec)\n  }",
   "_fmtMin": "_fmtMin(sec) {\n    return durationFormatter.formatMin(sec)\n  }"
 }

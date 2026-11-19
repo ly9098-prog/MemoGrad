@@ -3167,10 +3167,12 @@ page { background: #FAFCFB; }
 .editorial-subtitle, .section-note, .route-desc, .tool-desc, .hub-task-meta { color: #507568; }
 .profile-chip, .section-quick-action { border-color: #D8EEE6; background: #FFFFFF; color: #3A6F5B; box-shadow: none; }
 .profile-level { color: #3A6F5B; }
-.profile-chip { min-height: 88rpx; }
-.section-quick-action { min-height: 88rpx; font-size: 24rpx; }
+.profile-chip { position: relative; min-height: 88rpx; padding: 6rpx 12rpx; border: 0; background: transparent; }
+.profile-chip::before { content: ''; position: absolute; inset: 16rpx 0; border: 1rpx solid #D8EEE6; border-radius: 999rpx; background: #FFFFFF; }
+.profile-chip > .profile-avatar, .profile-chip > .profile-level { position: relative; }
+.section-quick-action { min-height: 88rpx; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 24rpx; }
 .route-eyebrow { font-size: 22rpx; font-weight: 400; letter-spacing: 0; }
-.section-quick-action-pressed { background: #EAF9F4; }
+.section-quick-action-pressed { background: transparent; opacity: .65; }
 .focus-card {
   position: relative; overflow: hidden; margin: 0 24rpx;
   border: 1rpx solid #E4ECE7; border-radius: 32rpx;
@@ -3231,21 +3233,22 @@ page { background: #FAFCFB; }
 .route-title, .wrongbook-tool-card .route-title { color: #23483C; font-size: 28rpx; font-weight: 600; }
 .route-desc, .wrongbook-tool-card .route-desc { color: #507568; font-size: 24rpx; line-height: 1.6; }
 .card-pressed { background: #EAF9F4; }
-.mastery-card-tech { padding: 28rpx; border: 1rpx solid #DFE8E2; border-radius: 30rpx; background: #FFFFFF; box-shadow: none; }
+.mastery-card-tech { min-height: 0; padding: 24rpx; border: 1rpx solid #DFE8E2; border-radius: 24rpx; background: #FFFFFF; box-shadow: none; }
 .mastery-basis { display: block; margin-top: 8rpx; color: #637B6B; font-size: 22rpx; font-weight: 400; line-height: 1.5; }
 .mastery-card-tech::before, .mastery-card-tech::after, .mastery-icon::before { display: none; }
-.mastery-card-tech .mastery-icon { border: 0; border-radius: 50%; background: #E7F1EA; box-shadow: none; }
-.mastery-card-tech .mastery-title-row { display: flex; flex-direction: column; align-items: flex-start; gap: 10rpx; margin-top: 22rpx; }
-.mastery-card-tech .mastery-subject { color: #23483C; font-size: 26rpx; font-weight: 600; letter-spacing: 0; line-height: 1.4; white-space: normal; }
-.mastery-card-tech .mastery-score { display: flex; align-items: center; min-height: 56rpx; color: #23483C; font-size: 46rpx; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mastery-card-tech .mastery-card-head { align-items: center; justify-content: flex-start; gap: 12rpx; min-height: 64rpx; }
+.mastery-card-tech .mastery-icon { width: 44rpx; height: 44rpx; flex: 0 0 44rpx; border: 0; border-radius: 50%; background: #E7F1EA; box-shadow: none; }
+.mastery-card-tech .mastery-icon-image { width: 40rpx; height: 40rpx; }
+.mastery-card-tech .mastery-title-row { display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8rpx; margin-top: 16rpx; }
+.mastery-card-tech .mastery-subject { flex: 1; color: #23483C; font-size: 25rpx; font-weight: 600; letter-spacing: 0; line-height: 1.4; white-space: normal; }
+.mastery-card-tech .mastery-score { display: flex; align-items: center; min-height: 52rpx; color: #23483C; font-size: 44rpx; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mastery-title-row .mastery-status { color: #4F6C5C; font-size: 22rpx; font-weight: 400; white-space: nowrap; }
 .mastery-card-tech.no-data .mastery-score, .mastery-card-tech .mastery-score.is-empty { color: #637F72; font-size: 36rpx; }
-.mastery-card-tech .mastery-track-tech { height: auto; margin-top: 18rpx; padding: 0; background: transparent; transform: none; }
-.mastery-mint-rail { height: 12rpx; overflow: hidden; border-radius: 999rpx; background: #E3EDE7; }
+.mastery-card-tech .mastery-track-tech { height: auto; margin-top: 12rpx; padding: 0; background: transparent; transform: none; }
+.mastery-mint-rail { height: 8rpx; overflow: hidden; border-radius: 999rpx; background: #E3EDE7; }
 .mastery-mint-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #96D9B2, #55BB95); }
-.mastery-foot-tech { flex-direction: column; align-items: stretch; gap: 8rpx; margin-top: auto; padding-top: 24rpx; }
-.mastery-foot-tech, .mastery-foot-tech .mastery-status { color: #4F6C5C; font-size: 24rpx; font-weight: 400; line-height: 1.4; }
-.mastery-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8rpx; min-height: 36rpx; }
-.mastery-status-icon { width: 28rpx; height: 28rpx; flex-shrink: 0; }
+.mastery-foot-tech { flex-direction: row; align-items: center; gap: 8rpx; margin-top: 0; padding-top: 16rpx; }
+.mastery-foot-tech { color: #4F6C5C; font-size: 24rpx; font-weight: 400; line-height: 1.4; }
 .mastery-sample-copy { color: #617268; font-size: 24rpx; font-weight: 400; line-height: 1.4; }
 .mastery-card-pressed { background: #F0FAF6; }
 .tool-panel { border: 1rpx solid #E4ECE7; border-radius: 30rpx; background: #FFFFFF; box-shadow: none; }

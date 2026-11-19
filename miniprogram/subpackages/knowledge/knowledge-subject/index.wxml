@@ -64,7 +64,7 @@
 </button>
 </view>
 <view class="theme-active-summary" wx:if="{{activeGroupKey}}">
-<view class="theme-graduation-summary" wx:if="{{chapterGraduation && chapterGraduation.total}}"><text>章节毕业 {{chapterGraduation.text}}</text></view>
+<view class="theme-graduation-summary" wx:if="{{chapterGraduation && chapterGraduation.total}}"><text>{{chapterGraduation.text}}</text></view>
 <view class="theme-active-copy"><view class="current-scope-icon" aria-hidden="true"><view></view></view><text>当前范围</text><text class="theme-active-name">{{activeGroupKey ? activeGroupName : '全部主题'}}</text></view>
 <button class="theme-clear {{!activeGroupKey ? 'theme-clear-disabled' : ''}}" disabled="{{!activeGroupKey}}" bindtap="showOverview" hover-class="atlas-pressed">清除</button>
 </view>
@@ -74,7 +74,7 @@
 <view id="atlas-shell" class="atlas-shell graph-card page-reveal reveal-graph {{sceneAnimating ? 'scene-animating' : ''}} {{themeSwitching ? 'theme-content-switching' : ''}} theme-switch-{{themeSwitchPhase}} {{selectionSwitching ? 'selection-switching' : ''}} selection-{{selectionSwitchPhase}}">
 <view class="graph-card-head">
 <view class="graph-card-title-wrap">
-<button wx:if="{{scene.focused}}" class="graph-back" data-kind="core" data-key="{{scene.groupKey}}" data-id="{{scene.focusNodeId}}" catchtap="onGraphNodeTap" aria-label="返回上一级">‹</button>
+<button wx:if="{{scene.focused}}" class="graph-back" data-kind="core" data-key="{{scene.groupKey}}" data-id="{{scene.focusNodeId}}" catchtap="onGraphNodeTap" aria-label="返回上一级"><view class="graph-back-chevron" aria-hidden="true"></view></button>
 <view class="graph-card-copy">
 <text class="graph-card-title">{{scene.title}}</text>
 </view>

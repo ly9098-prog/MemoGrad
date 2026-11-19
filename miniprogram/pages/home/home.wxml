@@ -226,11 +226,12 @@
             <image wx:if="{{item.iconSrc}}" class="mastery-icon-image" src="{{item.iconSrc}}" mode="aspectFit" />
             <text wx:else class="mastery-icon-fallback">{{item.mark}}</text>
           </view>
+          <text class="mastery-subject">{{item.subjectName}}</text>
         </view>
 
         <view class="mastery-title-row">
-          <text class="mastery-subject">{{item.subjectName}}</text>
           <text class="mastery-score {{item.hasData ? '' : 'is-empty'}}">{{item.scoreText}}</text>
+          <text class="mastery-status">{{item.statusText}}</text>
         </view>
 
         <view class="mastery-track mastery-track-tech">
@@ -245,7 +246,6 @@
         </view>
 
         <view class="mastery-foot mastery-foot-tech">
-          <view class="mastery-status-row"><text class="mastery-status">{{item.statusText}}</text><image wx:if="{{item.statusIconSrc}}" class="mastery-status-icon" src="{{item.statusIconSrc}}" mode="aspectFit" aria-hidden="true" /></view>
           <text class="mastery-sample-copy">{{item.sampleText}}</text>
         </view>
       </view>

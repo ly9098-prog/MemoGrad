@@ -40,8 +40,8 @@
       <view class="login-panel route-enter-page delay-one">
         <button class="wechat-login-btn" hover-class="{{loading ? 'none' : 'wechat-login-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onWechatLogin" loading="{{loading}}" disabled="{{loading}}" aria-busy="{{loading}}">
           <text class="wechat-login-title">{{loading ? '正在登录…' : '微信一键登录'}}</text>
-          <text class="wechat-login-subtitle">同步错题、复习计划与打卡</text>
         </button>
+        <text class="wechat-login-subtitle">同步错题、复习计划与打卡</text>
         <view wx:if="{{error}}" class="error-msg" aria-role="alert">{{error}}</view>
         <view class="agreement-box">
           <checkbox-group class="agreement-group" bindchange="onAgreementChange">

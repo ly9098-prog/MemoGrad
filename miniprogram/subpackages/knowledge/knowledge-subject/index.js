@@ -353,6 +353,7 @@ clearTimeout(this._practiceLaunchFeedbackTimer)
 this._practiceLaunchFeedbackTimer = null
 }
 if (!this._readyForViewWork || !this._loadedOnce) return
+this.setCamera(this._camera)
 if (this.data.practiceLaunching || this.data.practiceLaunchingId) {
 this.setData({ practiceLaunching: false, practiceLaunchingId: 0 })
 }
@@ -378,7 +379,10 @@ clearTimeout(this._forceTimer)
 this._forceTimer = null
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
+this._cameraTimer = null
+this.cancelGraphGesture()
 clearTimeout(this._inertiaTimer)
+this._inertiaTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -412,7 +416,10 @@ this._layoutCache = null
 this._unloaded = true
 this._requestId = (this._requestId || 0) + 1
 clearTimeout(this._cameraTimer)
+this._cameraTimer = null
+this.cancelGraphGesture()
 clearTimeout(this._inertiaTimer)
+this._inertiaTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -1936,7 +1943,25 @@ startGraphNodeTouch(event) {
 const nodeId = String(event.currentTarget.dataset.nodeId || '')
 this._dragNodeId = nodeId !== 'core' && (event.touches || []).length === 1 ? nodeId : ''
 },
+cancelGraphGesture() {
+clearTimeout(this._dragTimer)
+this._dragTimer = null
+this._pendingDragPoint = null
+this._gesture = null
+this._dragNodeId = ''
+if (!this._unloaded && this.data.graphInteracting) this.setData({ graphInteracting: false })
+},
 moveDraggedNode(point) {
+this._pendingDragPoint = point
+if (this._dragTimer) return
+this._dragTimer = setTimeout(() => {
+this._dragTimer = null
+const pending = this._pendingDragPoint
+this._pendingDragPoint = null
+if (pending && !this._unloaded && this._pageVisible !== false) this.commitDraggedNode(pending)
+}, CAMERA_FRAME_MS)
+},
+commitDraggedNode(point) {
 const gesture = this._gesture
 const nodeId = gesture && gesture.dragNodeId
 const index = this._sceneNodeIndex && this._sceneNodeIndex.get(nodeId)
@@ -1961,7 +1986,8 @@ const toIndex = this._sceneNodeIndex.get(edge.to)
 if (fromIndex === undefined || toIndex === undefined) return
 patch[`scene.edges[${edgeIndex}].style`] = edgeStyle(nodes[fromIndex], nodes[toIndex])
 })
-this.setData({ ...patch, ...labelDisplay(this._camera, this._frame, nodes) })
+this._cameraLabelCache = null
+this.setData(patch)
 },
 measureViewport(reset = false) {
 if (!wx.createSelectorQuery || !this.data.subject) return
@@ -1974,7 +2000,13 @@ if (reset || changed) this.resetView()
 },
 cameraPayload(includeMetrics = true, extra = {}) {
 if (!this._frame || !this._camera) return extra
-const payload = { ...extra, ...labelDisplay(this._camera, this._frame, (this.data.scene || {}).nodes), stageStyle: cameraStyle(this._camera) }
+const nodes = (this.data.scene || {}).nodes
+const cache = this._cameraLabelCache
+const changed = !cache || cache.nodes !== nodes || cache.frame !== this._frame || cache.scale !== this._camera.scale
+const labels = changed ? labelDisplay(this._camera, this._frame, nodes) : cache.labels
+if (changed) this._cameraLabelCache = { nodes, frame: this._frame, scale: this._camera.scale, labels }
+const payload = { ...extra, graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
+...(changed ? { graphLabelVisibility: labels.graphLabelVisibility } : {}), stageStyle: cameraStyle(this._camera) }
 if (!includeMetrics) return payload
 const fit = fitCamera(this._frame)
 const limits = cameraLimits(this._frame)
@@ -2080,6 +2112,10 @@ this.setCamera(clampCamera({ ...start.camera, x: start.camera.x + dx, y: start.c
 },
 endGraphTouch(event) {
 const gesture = this._gesture
+clearTimeout(this._dragTimer)
+this._dragTimer = null
+if (this._pendingDragPoint && gesture && gesture.dragNodeId) this.commitDraggedNode(this._pendingDragPoint)
+this._pendingDragPoint = null
 if (gesture && gesture.moved) this._suppressTapUntil = Date.now() + 280
 this._gesture = null
 this._dragNodeId = ''
