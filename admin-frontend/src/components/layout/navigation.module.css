@@ -4,7 +4,7 @@
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
-  background: #f2f5f9;
+  background: linear-gradient(180deg, #ffffffb3, #edf2f74d), #f7f9fc;
 }
 
 .sidebar {
