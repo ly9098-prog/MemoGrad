@@ -1,6 +1,7 @@
 import logging
 import re
 from typing import Any
+from unicodedata import decimal
 
 from fastapi import Request
 from sqlalchemy import func, or_, select, text
@@ -86,6 +87,25 @@ def _escape_like_keyword(keyword: str) -> str:
 
 
 _MAX_FUZZY_SEARCH_TERMS = 8
+_MAX_SEARCH_INTEGER = 2**31 - 1
+
+
+def _search_integer_value(digits: str) -> int | None:
+    """Return a PostgreSQL INTEGER only when decimal text fits its range."""
+    # isdigit() also accepts characters such as ², which int() cannot parse.
+    if not digits.isdecimal():
+        return None
+    # Bound conversion work, including inputs beyond Python's int-string limit.
+    # Unicode decimal zeroes must behave like ASCII zeroes for valid ID lookups.
+    first_nonzero = next(
+        (index for index, char in enumerate(digits) if decimal(char) != 0),
+        len(digits),
+    )
+    significant_digits = digits[first_nonzero:] or "0"
+    if len(significant_digits) > len(str(_MAX_SEARCH_INTEGER)):
+        return None
+    value = int(significant_digits)
+    return value if value <= _MAX_SEARCH_INTEGER else None
 
 
 def _fuzzy_keyword_terms(keyword: str) -> list[str]:
@@ -324,8 +344,8 @@ async def list_admin_questions(
                 Question.subject_id.in_(matching_subject_ids),
             ]
             numeric_term = term.removeprefix("#")
-            if numeric_term.isdigit():
-                numeric_value = int(numeric_term)
+            numeric_value = _search_integer_value(numeric_term)
+            if numeric_value is not None:
                 term_conditions.append(Question.id == numeric_value)
                 if len(numeric_term) == 4:
                     term_conditions.append(Question.year == numeric_value)

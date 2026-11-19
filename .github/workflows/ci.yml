@@ -563,6 +563,8 @@ jobs:
             tests/practice/test_smart_entry.py \
             tests/practice/test_practice_session_scope.py \
             tests/architecture/test_practice_smart_scope_boundaries.py \
+            tests/test_services/test_admin_question_search_bounds.py \
+            tests/test_api/test_admin_questions.py \
             tests/core/test_http_error_contract.py \
             tests/core/test_http_middleware_contract.py \
             tests/core/test_runtime_metrics_contract.py \

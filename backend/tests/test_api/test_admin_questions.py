@@ -153,6 +153,80 @@ def test_list_admin_questions(monkeypatch):
     assert resp.json()["items"][0]["review_status"] == "approved"
 
 
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"keyword": "9" * 201},
+        {"subject_id": str(2**31)},
+        {"knowledge_point_id": str(2**31)},
+        {"year": str(2**31)},
+        {"year": str(-(2**31) - 1)},
+        {"page": str(2**31)},
+    ],
+)
+def test_list_questions_rejects_unsafe_input_before_query(monkeypatch, params):
+    query = AsyncMock(return_value=([], 0))
+    monkeypatch.setattr(admin_questions, "list_admin_questions", query)
+    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        resp = client.get("/api/admin/v1/questions", params=params)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert "input" not in resp.json()["error"]
+    query.assert_not_awaited()
+
+
+@pytest.mark.parametrize("headers", [
+    {},
+    {"X-Request-ID": "client-request", "X-Trace-ID": "client-trace"},
+    {"X-Request-ID": "invalid request id", "X-Trace-ID": "invalid trace id"},
+])
+def test_question_search_database_failure_is_safe_and_next_request_recovers(
+    monkeypatch, headers
+):
+    from sqlalchemy.exc import DBAPIError
+
+    query = AsyncMock(side_effect=[
+        DBAPIError(
+            "SELECT internal_query_marker",
+            {"keyword": "private_parameter_marker"},
+            RuntimeError("internal_database_marker"),
+            hide_parameters=True,
+        ),
+        ([_question()], 1),
+    ])
+    monkeypatch.setattr(admin_questions, "list_admin_questions", query)
+    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[get_db] = _override_db
+    safe_client = TestClient(app, raise_server_exceptions=False)
+    try:
+        failed = safe_client.get(
+            "/api/admin/v1/questions", params={"keyword": "test"}, headers=headers
+        )
+        recovered = safe_client.get("/api/admin/v1/questions")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert failed.status_code == 500
+    error = failed.json()["error"]
+    assert error["code"] == "INTERNAL_ERROR"
+    assert error["request_id"] == failed.headers["X-Request-ID"]
+    assert error["trace_id"] == failed.headers["X-Trace-ID"]
+    if headers.get("X-Request-ID", "").startswith("invalid"):
+        assert error["request_id"] != headers["X-Request-ID"]
+        assert error["trace_id"] != headers["X-Trace-ID"]
+    assert not any(marker in failed.text for marker in (
+        "internal_query_marker", "private_parameter_marker", "internal_database_marker"
+    ))
+    assert recovered.status_code == 200
+    assert recovered.json()["total"] == 1
+    assert recovered.headers["X-Request-ID"] != error["request_id"]
+
+
 def test_question_subject_options_use_question_read_permission(monkeypatch):
     now = datetime(2026, 5, 29)
     subject = {

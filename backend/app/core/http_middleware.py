@@ -72,6 +72,10 @@ async def log_requests(
         request.headers.get("traceparent"),
     )
     request_id = log_context.normalize_request_id(request.headers.get("x-request-id"))
+    # ServerErrorMiddleware handles unexpected exceptions after this middleware
+    # clears its ContextVars. Keep the normalized IDs on the shared ASGI scope.
+    request.state.request_id = request_id
+    request.state.trace_id = trace_id
     start = time.time()
     try:
         log_context.bind_log_context(trace_id=trace_id, request_id=request_id)

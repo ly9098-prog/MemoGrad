@@ -155,15 +155,15 @@ class AdminQuestionBatchRequest(BaseModel):
 class AdminQuestionExportRequest(BaseModel):
     format: Literal["csv", "docx"] = "csv"
     ids: list[int] | None = Field(default=None, max_length=5000)
-    subject_id: int | None = None
+    subject_id: int | None = Field(default=None, ge=1, le=2**31 - 1)
     review_status: str | None = None
     is_active: bool | None = None
     question_type: str | None = Field(default=None, max_length=32)
     keyword: str | None = Field(default=None, max_length=200)
-    year: int | None = None
+    year: int | None = Field(default=None, ge=-(2**31), le=2**31 - 1)
     import_batch_id: str | None = Field(default=None, max_length=64)
     difficulty: int | None = Field(default=None, ge=1, le=5)
-    knowledge_point_id: int | None = Field(default=None, ge=1)
+    knowledge_point_id: int | None = Field(default=None, ge=1, le=2**31 - 1)
 
     @field_validator("question_type")
     @classmethod
@@ -178,8 +178,8 @@ class AdminQuestionExportRequest(BaseModel):
         if v is None:
             return None
         normalized = list(dict.fromkeys(v))
-        if any(item <= 0 for item in normalized):
-            raise ValueError("ids 必须是正整数")
+        if any(item <= 0 or item > 2**31 - 1 for item in normalized):
+            raise ValueError("ids 必须是 PostgreSQL INTEGER 范围内的正整数")
         return normalized
 
 

@@ -91,6 +91,40 @@ def test_context_failure_uses_headers(monkeypatch):
     )
 
 
+def test_normalized_request_state_ids_survive_context_cleanup():
+    incoming = request([("x-request-id", "untrusted request id")])
+    incoming.state.request_id = "normalized-request"
+    incoming.state.trace_id = "normalized-trace"
+    log_context.bind_log_context(request_id="unrelated-request", trace_id="unrelated-trace")
+    assert contract._request_error_ids(incoming) == (
+        "normalized-request", "normalized-trace",
+    )
+    log_context.clear_log_context()
+    assert contract._request_error_ids(incoming) == (
+        "normalized-request", "normalized-trace",
+    )
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_logging_failure_does_not_break_unhandled_error_response(monkeypatch):
+    incoming = request()
+    incoming.state.request_id = "saved-request"
+    incoming.state.trace_id = "saved-trace"
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("synthetic logger failure")
+
+    monkeypatch.setattr(handlers.logger, "exception", fail)
+    response = await handlers.unhandled_exception_handler(
+        incoming, RuntimeError("synthetic private database detail")
+    )
+    assert response.status_code == 500
+    assert json.loads(response.body)["error"]["code"] == "INTERNAL_ERROR"
+    assert response.headers["X-Request-ID"] == "saved-request"
+    assert response.headers["X-Trace-ID"] == "saved-trace"
+    assert "synthetic" not in response.body.decode()
+
+
 @pytest.fixture
 def error_client():
     app = FastAPI(exception_handlers=dict(main.app.exception_handlers))

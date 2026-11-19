@@ -58,9 +58,17 @@ def _request_error_ids(request: Request) -> tuple[str, str]:
     except Exception:
         context = {}
     request_id = str(
-        context.get("request_id") or request.headers.get("x-request-id") or ""
+        getattr(request.state, "request_id", None)
+        or context.get("request_id")
+        or request.headers.get("x-request-id")
+        or ""
     )
-    trace_id = str(context.get("trace_id") or request.headers.get("x-trace-id") or "")
+    trace_id = str(
+        getattr(request.state, "trace_id", None)
+        or context.get("trace_id")
+        or request.headers.get("x-trace-id")
+        or ""
+    )
     return request_id, trace_id
 
 
