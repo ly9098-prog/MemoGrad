@@ -243,15 +243,15 @@ page {
   box-shadow: 0 0 0 8rpx rgba(117, 230, 180, .12);
 }
 .hero-status { margin-left: 14rpx; font-size: 23rpx; font-weight: 800; color: #EAF1FF; }
-.hero-period { margin-left: auto; font-size: 18rpx; letter-spacing: 1.7rpx; color: rgba(226, 234, 247, .56); }
 .hero-main {
   display: flex;
-  align-items: flex-end;
-  gap: 28rpx;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32rpx;
   margin-top: 35rpx;
 }
 .hero-score-block { flex-shrink: 0; }
-.hero-today-block { flex-shrink: 0; padding-bottom: 8rpx; border-left: 1rpx solid rgba(255, 255, 255, .1); padding-left: 22rpx; }
+.hero-today-block { flex-shrink: 0; margin-left: auto; padding-bottom: 8rpx; border-left: 1rpx solid rgba(255, 255, 255, .1); padding-left: 32rpx; }
 .hero-score-row { display: flex; align-items: flex-start; }
 .hero-score {
   font-size: 106rpx;
@@ -290,9 +290,9 @@ page {
 }
 .hero-metric { flex: 1; text-align: center; }
 .hero-metric-value { display: block; font-size: 35rpx; font-weight: 900; font-variant-numeric: tabular-nums; }
-.hero-today-value { display: inline-flex; align-items: baseline; gap: 4rpx; font-size: 35rpx; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.hero-today-value { display: inline-flex; align-items: baseline; gap: 4rpx; font-size: 58rpx; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .hero-today-unit { color: rgba(226, 233, 243, .58); font-size: 21rpx; font-weight: 800; }
-.hero-today-label { display: block; margin-top: 5rpx; color: rgba(226, 233, 243, .55); font-size: 19rpx; font-weight: 750; }
+.hero-today-label { display: block; margin-top: 12rpx; color: rgba(226, 233, 243, .55); font-size: 22rpx; font-weight: 750; }
 .hero-metric-label { display: block; margin-top: 5rpx; font-size: 19rpx; color: rgba(226, 233, 243, .55); }
 .hero-metric-divider { width: 1rpx; height: 48rpx; background: rgba(255, 255, 255, .1); }
 .reveal-metric { display: inline-flex; align-items: baseline; overflow: hidden; line-height: 1.1; }
@@ -2887,7 +2887,6 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
 }
 @media (max-width: 360px) {
   .hero-top-actions { gap: 8rpx; }
-  .hero-period { display: none; }
   .hero-mode-switch { padding: 0 13rpx; font-size: 17rpx; }
   .hero-budget-main { grid-template-columns: 160rpx minmax(0, 1fr); gap: 22rpx; }
   .hero-budget-score { font-size: 66rpx; }

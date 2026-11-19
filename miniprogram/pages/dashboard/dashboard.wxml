@@ -58,7 +58,6 @@
             <view class="hero-status-dot"></view>
             <text class="hero-status">{{trend ? trend.statusTitle : '学习状态'}}</text>
             <view class="hero-top-actions">
-              <text class="hero-period">RECENT {{trend ? trend.days : 7}} DAYS</text>
               <view class="hero-mode-switch" bindtap="toggleHeroCard" hover-class="surface-pressed" aria-role="button" aria-label="切换到选择题失分预算">
                 <text>失分预算</text>
                 <text class="line-icon icon-chevron-right"></text>
@@ -76,7 +75,7 @@
                 </view>
                 <text class="hero-score-unit">%</text>
               </view>
-              <text class="hero-score-label">平均正确率</text>
+              <text class="hero-score-label">{{trend ? '近 ' + trend.days + ' 天正确率' : '累计正确率'}}</text>
             </view>
             <view class="hero-today-block">
               <view class="hero-today-value reveal-metric _animTodayQuestionsSegments {{_animTodayQuestionsSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="今日答题数量 {{hero.todayQuestions}}">
@@ -85,12 +84,7 @@
                 </block>
                 <text class="hero-today-unit">题</text>
               </view>
-              <text class="hero-today-label">今日答题数量</text>
-            </view>
-            <view class="hero-copy">
-              <text class="hero-copy-title">{{subtitle}}</text>
-              <text class="hero-copy-desc" wx:if="{{trend && trend.summary}}">{{trend.summary}}</text>
-              <text class="hero-copy-desc" wx:else>持续练习后，报告会越来越准确。</text>
+              <text class="hero-today-label">今日答题</text>
             </view>
           </view>
 
@@ -110,7 +104,7 @@
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
               </view>
-              <text class="hero-metric-label">连续学习天数</text>
+              <text class="hero-metric-label">连续学习</text>
             </view>
             <view class="hero-metric-divider"></view>
             <view class="hero-metric">
@@ -119,7 +113,7 @@
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
               </view>
-              <text class="hero-metric-label">今日复习数量</text>
+              <text class="hero-metric-label">今日待复习</text>
             </view>
           </view>
 
@@ -140,7 +134,6 @@
             <view class="hero-status-dot"></view>
             <text class="hero-status">选择题失分预算</text>
             <view class="hero-top-actions">
-              <text class="hero-period">TARGET 130 · CHOICE ONLY</text>
               <view class="hero-mode-switch" bindtap="toggleHeroCard" hover-class="surface-pressed" aria-role="button" aria-label="切换到学习状态">
                 <text>学习状态</text>
                 <text class="line-icon icon-chevron-right"></text>
@@ -160,7 +153,7 @@
             <view class="hero-copy hero-budget-copy">
               <text class="hero-copy-title">目标 ≥ {{choiceLossBudget.targetPoints}} / {{choiceLossBudget.totalPoints}} 分</text>
               <text class="hero-copy-desc">{{choiceLossBudget.statusText}}</text>
-              <text class="hero-budget-note">130 分目标下建议最多错 {{choiceLossBudget.maxWrongQuestions}} 题；仅按已有四科选择题正确率估算。</text>
+              <text class="hero-budget-note">最多错 {{choiceLossBudget.maxWrongQuestions}} 题 · 按四科选择题估算</text>
             </view>
           </view>
 

@@ -72,9 +72,10 @@ async function withHomePage(run) {
   const originalWx = global.wx
   let definition
 
+  const localValues = new Map()
   global.wx = {
-    getStorageSync: () => '',
-    setStorageSync: () => {},
+    getStorageSync: key => localValues.get(key) || '',
+    setStorageSync: (key, value) => localValues.set(key, value),
     getSystemInfoSync: () => ({ windowWidth: 375, statusBarHeight: 20 }),
     getMenuButtonBoundingClientRect: () => ({
       top: 26,
@@ -410,4 +411,22 @@ test('home page stays within 800 lines and delegates growth infrastructure', () 
     const moduleSource = fs.readFileSync(path.join(HOME_UTILS, filename), 'utf8')
     assert.doesNotMatch(moduleSource, /require\('.*utils\/(?:api|storage)'\)/)
   }
+})
+
+test('daily goal control reopens, persists a valid choice and recalculates progress', async () => {
+  await withHomePage(async ({ page }) => {
+    page._lastOverview = { today_questions: 13, total_questions: 100, consecutive_days: 2 }
+    page.toggleGoalPicker()
+    assert.equal(page.data.showGoalPicker, true)
+    page.selectTodayGoal({ currentTarget: { dataset: { goal: 50 } } })
+    assert.equal(page.getStoredTodayGoal(), 50)
+    assert.equal(page.data.todayGoalTotal, 50)
+    assert.equal(page.data.showGoalPicker, false)
+    assert.equal(page._growthTargets.todayGoalDone, 13)
+    assert.equal(page._growthTargets.levelProgress, 26)
+    page.toggleGoalPicker()
+    page.selectTodayGoal({ currentTarget: { dataset: { goal: 999 } } })
+    assert.equal(page.getStoredTodayGoal(), 50)
+    assert.equal(page.data.showGoalPicker, true)
+  })
 })

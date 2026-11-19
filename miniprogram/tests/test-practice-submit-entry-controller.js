@@ -102,6 +102,8 @@ test('uses all-done confirmation and preserves an existing request id', async ()
   assert.equal(submission.requestId, 'existing')
   assert.deepEqual(h.state.pausedPrompts[0], {
     scenario: 'all-done',
+    layout: 'minimal',
+    hideEyebrow: true,
     title: '确认交卷？',
     message: '已完成 2 / 2 题',
     confirmText: '确认交卷',

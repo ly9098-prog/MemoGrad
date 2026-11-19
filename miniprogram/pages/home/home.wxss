@@ -3184,12 +3184,12 @@ page { background: #FAFCFB; }
 .focus-content, .focus-content-guest { position: relative; z-index: 2; padding: 30rpx; }
 .focus-topline { display: flex; align-items: center; justify-content: space-between; }
 .focus-status, .focus-status-light {
-  display: flex; align-items: center; min-height: 0; padding: 8rpx 14rpx;
-  border: 0; border-radius: 999rpx; background: #D6E9DE; color: #315D49;
-  font-size: 20rpx; font-weight: 500; letter-spacing: 1rpx; box-shadow: none;
+  display: flex; align-items: center; min-height: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent; color: #315D49;
+  font-size: 24rpx; font-weight: 500; letter-spacing: 0; box-shadow: none;
 }
 .focus-status-dot { display: none; }
-.focus-body { display: flex; align-items: center; gap: 22rpx; margin-top: 24rpx; }
+.focus-body { display: flex; align-items: center; gap: 24rpx; margin-top: 12rpx; }
 .focus-copy { flex: 1; min-width: 0; }
 .focus-title-line { margin-top: 0; padding-right: 0; }
 .focus-title { color: #23483C; font-size: 34rpx; font-weight: 600; line-height: 1.4; letter-spacing: 0; }
@@ -3198,7 +3198,7 @@ page { background: #FAFCFB; }
   color: #507568; font-size: 24rpx; line-height: 1.65;
 }
 .focus-guest-hint { color: #507568; font-size: 24rpx; }
-.focus-ring-wrap { flex: 0 0 204rpx; width: 204rpx; height: 204rpx; margin-top: -20rpx; }
+.focus-ring-wrap { flex: 0 0 204rpx; width: 204rpx; height: 204rpx; margin-top: 0; }
 .focus-ring { width: 100%; height: 100%; box-sizing: border-box; padding: 12rpx; border-radius: 50%; background: #DBEAE1; }
 .focus-ring-inner {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -3207,7 +3207,7 @@ page { background: #FAFCFB; }
 .focus-ring-value { display: flex; align-items: baseline; gap: 6rpx; color: #23483C; font-size: 42rpx; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
 .focus-ring-goal { color: #507568; font-size: 26rpx; font-weight: 400; }
 .focus-ring-label { margin-top: 10rpx; color: #507568; font-size: 22rpx; line-height: 1.3; }
-.focus-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; margin-top: 26rpx; padding-right: 0; }
+.focus-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 24rpx; margin-top: 24rpx; padding-right: 0; }
 .primary-action {
   flex: 0 1 auto; min-width: 0; min-height: 88rpx; padding: 0 12rpx 0 22rpx;
   gap: 10rpx; border-radius: 999rpx; background: #2C5444; color: #FFFFFF;
@@ -3227,7 +3227,8 @@ page { background: #FAFCFB; }
 .metric-label { color: #507568; font-size: 22rpx; }
 .metric-divider { background: #CEDFD5; }
 .route-stack, .hub-task-stack { overflow: hidden; gap: 0; border: 1rpx solid #E4ECE7; border-radius: 30rpx; background: #FFFFFF; box-shadow: none; }
-.route-card, .route-card.route-review, .route-card.route-wrong, .route-card.route-exam, .hub-task-card, .hub-task-completed { background: transparent; padding: 28rpx 26rpx; }
+.route-card, .route-card.route-review, .route-card.route-wrong, .route-card.route-exam, .hub-task-card, .hub-task-completed { align-items: center; min-height: 128rpx; background: transparent; padding: 24rpx 26rpx; }
+.hub-task-index { margin-top: 0; }
 .route-card + .route-card { border-top: 1rpx solid #E1EDE5; }
 .route-index, .route-wrong .route-index, .route-exam .route-index, .hub-task-index { border: 0; border-radius: 50%; background: #E7F1EA; box-shadow: none; }
 .route-arrow { border-color: #8DAE9B; background: transparent; color: #3A6F5B; }
@@ -3279,3 +3280,10 @@ page { background: #FAFCFB; }
 /* Digits wait for data commit, page readiness and viewport visibility. */
 .reveal-digit { animation-play-state: paused; }
 .number-reveal-playing .reveal-digit { animation-play-state: running; }
+
+/* Daily target remains a visible, in-place control beside the home heading. */
+.focus-goal-entry { display: flex; align-items: center; justify-content: flex-end; gap: 12rpx; min-height: 44px; color: #315D49; font-size: 24rpx; }
+.focus-goal-entry .home-chevron { transform: rotate(135deg); }
+.focus-goal-options { display: flex; gap: 12rpx; margin: 8rpx 0 24rpx; }
+.focus-goal-option { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 44px; border: 1rpx solid #D8E7DE; border-radius: 16rpx; background: #FFFFFF; color: #315D49; font-size: 24rpx; }
+.focus-goal-option.is-selected { border-color: #315D49; background: #E1F1E8; font-weight: 600; }

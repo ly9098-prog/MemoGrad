@@ -153,6 +153,8 @@ async function confirmSubmission(options, skipConfirm, classification, total) {
   if (skipConfirm !== true) {
     return options.showPausedConfirm({
       scenario: 'all-done',
+      layout: 'minimal',
+      hideEyebrow: true,
       title: '确认交卷？',
       message: `已完成 ${classification.answeredCount} / ${total} 题`,
       confirmText: '确认交卷',

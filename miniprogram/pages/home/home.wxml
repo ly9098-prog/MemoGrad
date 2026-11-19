@@ -44,10 +44,13 @@
   <view class="focus-card route-enter-page delay-one">
     <view class="focus-content {{guestMode ? 'focus-content-guest' : ''}}">
       <view class="focus-topline">
-        <view class="focus-status focus-status-light">
-          <view class="focus-status-dot"></view>
-          <text>{{primaryTaskKicker}}</text>
+        <text class="focus-status">{{guestMode ? '体验练习' : '今日学习'}}</text>
+        <view wx:if="{{!guestMode}}" class="focus-goal-entry" bindtap="toggleGoalPicker" hover-class="soft-pressed" aria-role="button" aria-label="设置每日题量，当前 {{todayGoalTotal}} 题" aria-expanded="{{showGoalPicker}}">
+          <text>目标 {{todayGoalTotal}} 题</text><view class="home-chevron" aria-hidden="true"></view>
         </view>
+      </view>
+      <view wx:if="{{!guestMode && showGoalPicker}}" class="focus-goal-options" aria-role="group" aria-label="每日题量">
+        <view wx:for="{{goalOptions}}" wx:key="*this" class="focus-goal-option {{todayGoalTotal === item ? 'is-selected' : ''}}" data-goal="{{item}}" bindtap="selectTodayGoal" hover-class="soft-pressed" aria-role="button" aria-label="每日 {{item}} 题" aria-pressed="{{todayGoalTotal === item}}">{{item}} 题</view>
       </view>
 
       <view class="focus-body">
@@ -55,21 +58,8 @@
           <view class="focus-title-line">
             <text class="focus-title">{{primaryTaskTitle}}</text>
           </view>
-          <text class="focus-desc">{{primaryTaskDesc}}</text>
+          <text wx:if="{{guestMode}}" class="focus-desc">{{primaryTaskDesc}}</text>
           <text wx:if="{{guestMode}}" class="focus-guest-hint">{{missionText}}</text>
-
-          <view class="focus-actions">
-            <view class="primary-action" bindtap="startPrimaryTask" hover-class="primary-action-pressed">
-              <text>{{primaryTaskAction}}</text>
-              <view class="primary-action-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
-            </view>
-            <view wx:if="{{!guestMode}}" class="secondary-action" bindtap="startSecondaryTask" hover-class="secondary-action-pressed">
-              <text>学习报告</text><view class="home-chevron" aria-hidden="true"></view>
-            </view>
-            <view wx:else class="secondary-action is-locked" aria-disabled="true">
-              <text>学习报告</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
-            </view>
-          </view>
         </view>
 
         <view wx:if="{{!guestMode}}" class="focus-ring-wrap" bindtap="goStudyPlan" hover-class="soft-pressed" aria-role="button" aria-label="今日刷题进度 {{_animGoalDone}} / {{todayGoalTotal}}，完成 {{_animLevelProgress}}%，查看学习目标">
@@ -79,6 +69,19 @@
               <text class="focus-ring-label">今日题量</text>
             </view>
           </view>
+        </view>
+      </view>
+
+      <view class="focus-actions">
+        <view class="primary-action" bindtap="startPrimaryTask" hover-class="primary-action-pressed">
+          <text>{{primaryTaskAction}}</text>
+          <view class="primary-action-arrow" aria-hidden="true"><view class="home-arrow-icon"></view></view>
+        </view>
+        <view wx:if="{{!guestMode}}" class="secondary-action" bindtap="startSecondaryTask" hover-class="secondary-action-pressed">
+          <text>学习报告</text><view class="home-chevron" aria-hidden="true"></view>
+        </view>
+        <view wx:else class="secondary-action is-locked" aria-disabled="true">
+          <text>学习报告</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
 
@@ -138,7 +141,6 @@
             <text class="hub-task-meta">{{item.metaText}}</text>
           </view>
           <text class="route-title">{{item.title}}</text>
-          <text class="route-desc">{{item.reason}}</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
@@ -149,7 +151,6 @@
         <view class="route-copy">
           <text class="route-eyebrow">常用工具</text>
           <text class="route-title">错题本</text>
-          <text class="route-desc">聚焦错题，复盘反复出错的知识点</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
@@ -160,13 +161,12 @@
         <view class="route-copy">
           <text class="route-eyebrow">套卷训练</text>
           <text class="route-title">选择题真题 / 模拟</text>
-          <text class="route-desc">仅练适合手机作答的选择题，自动判分并生成四科复盘</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
       <view wx:else class="route-card route-exam is-locked" aria-disabled="true">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
-        <view class="route-copy"><text class="route-eyebrow">套卷训练</text><text class="route-title">选择题真题 / 模拟</text><text class="route-desc">登录后解锁正式套卷训练</text></view>
+        <view class="route-copy"><text class="route-eyebrow">套卷训练</text><text class="route-title">选择题真题 / 模拟</text></view>
         <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
@@ -177,7 +177,6 @@
         <view class="route-copy">
           <text class="route-eyebrow">记忆复习</text>
           <text class="route-title">今日复习</text>
-          <text class="route-desc">{{guestMode ? '登录后查看个人复习计划' : (_animDueReviewCount > 0 ? _animDueReviewCount + ' 道错题正处于最佳复习窗口' : '暂无到期任务，也可以提前巩固')}}</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
@@ -187,7 +186,6 @@
         <view class="route-copy">
           <text class="route-eyebrow">薄弱项管理</text>
           <text class="route-title">错题本</text>
-          <text class="route-desc">聚焦错题，复盘反复出错的知识点</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
@@ -197,13 +195,12 @@
         <view class="route-copy">
           <text class="route-eyebrow">套卷训练</text>
           <text class="route-title">选择题真题 / 模拟</text>
-          <text class="route-desc">仅练适合手机作答的选择题，自动判分并生成四科复盘</text>
         </view>
         <view class="route-arrow">→</view>
       </view>
       <view wx:else class="route-card route-exam is-locked" aria-disabled="true">
         <view class="route-index"><image class="route-icon-image" src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" /></view>
-        <view class="route-copy"><text class="route-eyebrow">套卷训练</text><text class="route-title">选择题真题 / 模拟</text><text class="route-desc">登录后解锁正式套卷训练</text></view>
+        <view class="route-copy"><text class="route-eyebrow">套卷训练</text><text class="route-title">选择题真题 / 模拟</text></view>
         <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
