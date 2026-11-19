@@ -12,11 +12,31 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401 - register all model metadata
-from app.core.cache import CacheClient
+from app.core.cache import CacheClient, CacheUnavailableError
 from app.core.database import Base
 from app.models.ai_chat import AiChat
 from app.models.user import User
 from app.services import ai_learning_service as service
+from app.services import ai_token_budget as budget
+
+
+@pytest.mark.parametrize("name", [
+    "TokenReservation", "reserve_token_budget", "settle_token_reservation",
+    "cancel_token_reservation", "record_token_usage",
+])
+def test_learning_keeps_existing_public_budget_exports(name):
+    assert getattr(service, name) is getattr(budget, name)
+
+
+@pytest.mark.asyncio
+async def test_unavailable_atomic_ledger_rejects_admission(monkeypatch):
+    monkeypatch.setattr(budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000)
+    monkeypatch.setattr(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000)
+    monkeypatch.setattr(budget, "_load_token_usage", AsyncMock(return_value=(0, 0)))
+    reserve = AsyncMock(side_effect=CacheUnavailableError("ledger unavailable"))
+    monkeypatch.setattr(budget.cache, "reserve_token_budget_strict", reserve)
+    assert await service.reserve_token_budget(None, 41, 600) is None
+    reserve.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -38,14 +58,14 @@ async def test_only_one_concurrent_request_can_reserve_last_tokens(tmp_path):
     try:
         async with sessions() as first_db, sessions() as second_db:
             with patch.object(
-                service.settings,
+                budget.settings,
                 "AI_DAILY_TOKEN_LIMIT",
                 limits[0],
             ), patch.object(
-                service.settings,
+                budget.settings,
                 "AI_MONTHLY_TOKEN_LIMIT",
                 limits[1],
-            ), patch.object(service, "cache", client):
+            ), patch.object(budget, "cache", client):
                 reservations = await asyncio.gather(
                     service.reserve_token_budget(first_db, 41, 600),
                     service.reserve_token_budget(second_db, 41, 600),
@@ -67,10 +87,10 @@ async def test_settled_charge_blocks_a_request_with_stale_database_usage():
     """A SQL read started before settlement must not resurrect spent budget."""
     client = CacheClient()
     client._enabled = False
-    with patch.object(service, "cache", client), patch.object(
-        service.settings, "AI_DAILY_TOKEN_LIMIT", 1000
-    ), patch.object(service.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
-        service, "_load_token_usage", AsyncMock(return_value=(0, 0))
+    with patch.object(budget, "cache", client), patch.object(
+        budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000
+    ), patch.object(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
+        budget, "_load_token_usage", AsyncMock(return_value=(0, 0))
     ):
         first = await service.reserve_token_budget(None, 41, 600)
         assert first is not None
@@ -84,10 +104,10 @@ async def test_settlement_refunds_only_unused_tokens_without_double_counting_sql
     client = CacheClient()
     client._enabled = False
     usage = AsyncMock(side_effect=[(0, 0), (500, 500)])
-    with patch.object(service, "cache", client), patch.object(
-        service.settings, "AI_DAILY_TOKEN_LIMIT", 1000
-    ), patch.object(service.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
-        service, "_load_token_usage", usage
+    with patch.object(budget, "cache", client), patch.object(
+        budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000
+    ), patch.object(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
+        budget, "_load_token_usage", usage
     ):
         first = await service.reserve_token_budget(None, 41, 600)
         assert first is not None
@@ -109,10 +129,10 @@ async def test_chat_refunds_only_a_known_unconfigured_provider(provider_failed):
     provider = AsyncMock(return_value=None)
     if provider_failed:
         provider.side_effect = RuntimeError("response lost after request")
-    with patch.object(service, "cache", client), patch.object(
-        service.settings, "AI_DAILY_TOKEN_LIMIT", 1000
-    ), patch.object(service.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
-        service, "_load_token_usage", AsyncMock(return_value=(0, 0))
+    with patch.object(budget, "cache", client), patch.object(
+        budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000
+    ), patch.object(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
+        budget, "_load_token_usage", AsyncMock(return_value=(0, 0))
     ), patch.object(service, "_call_ai", provider):
         reservation = await service.reserve_token_budget(None, 41, 600)
         assert reservation is not None
@@ -152,10 +172,10 @@ async def test_redis_ledger_preserves_settled_charge_and_expiry(tmp_path):
                 break
             await asyncio.sleep(0.01)
         assert await redis.ping()
-        with patch.object(service, "cache", client), patch.object(
-            service.settings, "AI_DAILY_TOKEN_LIMIT", 1000
-        ), patch.object(service.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
-            service, "_load_token_usage", AsyncMock(return_value=(0, 0))
+        with patch.object(budget, "cache", client), patch.object(
+            budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000
+        ), patch.object(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
+            budget, "_load_token_usage", AsyncMock(return_value=(0, 0))
         ):
             first = await service.reserve_token_budget(None, 41, 600)
             assert first is not None

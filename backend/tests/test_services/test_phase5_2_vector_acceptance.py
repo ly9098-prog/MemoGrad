@@ -19,6 +19,8 @@ from collections import Counter
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.models.question import Question
 
 _SENTINEL = object()
@@ -615,7 +617,7 @@ class TestFaultInjection:
             "upsert_question_embedding",
             provider,
         ), patch(
-            "app.services.ai_learning_service.reserve_token_budget",
+            "app.services.ai_token_budget.reserve_token_budget",
             AsyncMock(return_value=None),
         ) as reserve:
             result = _run(
@@ -641,10 +643,10 @@ class TestFaultInjection:
             "upsert_question_embedding",
             AsyncMock(return_value={"status": "failed", "reason": "invalid_embedding"}),
         ) as provider, patch(
-            "app.services.ai_learning_service.reserve_token_budget",
+            "app.services.ai_token_budget.reserve_token_budget",
             AsyncMock(return_value=reservation),
         ), patch(
-            "app.services.ai_learning_service.cancel_token_reservation", AsyncMock()
+            "app.services.ai_token_budget.cancel_token_reservation", AsyncMock()
         ) as cancel:
             assert _run(
                 vector_retrieval_service._ensure_source_embedding(
@@ -653,6 +655,101 @@ class TestFaultInjection:
             ) is None
         provider.assert_awaited_once()
         cancel.assert_not_awaited()
+
+    @pytest.mark.parametrize("status", ["created", "updated", "skipped"])
+    def test_source_embedding_budget_lifecycle_uses_shared_owner(self, status):
+        from app.features.token_budget import estimate_tokens
+        from app.services import (
+            ai_token_budget,
+            embedding_service,
+            vector_retrieval_service,
+        )
+
+        db = _make_mock_db("postgresql")
+        rows = MagicMock()
+        rows.first.side_effect = [None, ("[0.1,0.2,0.3]",)]
+        db.execute.return_value = rows
+        db.begin_nested.return_value.__aenter__ = AsyncMock()
+        db.begin_nested.return_value.__aexit__ = AsyncMock(return_value=False)
+        question = _make_question(id=9)
+        content = embedding_service.build_question_embedding_text(question)
+        tokens = max(1, estimate_tokens(content))
+        reservation = object()
+        trace = MagicMock()
+        reserve = AsyncMock(return_value=reservation)
+        provider = AsyncMock(return_value={"status": status})
+        record, settle, cancel = AsyncMock(), AsyncMock(), AsyncMock()
+        for name, mock in [("reserve", reserve), ("provider", provider),
+                           ("record", record), ("settle", settle), ("cancel", cancel)]:
+            trace.attach_mock(mock, name)
+        with _vector_enabled_config(dim=3, model_config_id=17), patch.object(
+            ai_token_budget, "reserve_token_budget", reserve
+        ), patch.object(ai_token_budget, "record_token_usage", record), patch.object(
+            ai_token_budget, "settle_token_reservation", settle
+        ), patch.object(ai_token_budget, "cancel_token_reservation", cancel), patch.object(
+            vector_retrieval_service, "upsert_question_embedding", provider
+        ):
+            result = _run(vector_retrieval_service._ensure_source_embedding(
+                db, question, user_id=7
+            ))
+        reserve.assert_awaited_once_with(db, 7, tokens)
+        if status == "skipped":
+            assert result is None
+            assert [call[0] for call in trace.mock_calls] == ["reserve", "provider", "cancel"]
+            cancel.assert_awaited_once_with(reservation)
+        else:
+            assert result == [0.1, 0.2, 0.3]
+            assert [call[0] for call in trace.mock_calls] == ["reserve", "provider", "record", "settle"]
+            assert record.await_args.args[:5] == (db, 7, "vector_source_embedding", content[:500], "")
+            assert record.await_args.args[5]["tokens_used"] == tokens
+            settle.assert_awaited_once_with(reservation, tokens)
+
+    @pytest.mark.parametrize("outcome", ["rejected", "unconfigured", "success", "invalid"])
+    def test_text_embedding_budget_lifecycle_uses_shared_owner(self, outcome):
+        from app.features.token_budget import estimate_tokens
+        from app.services import (
+            ai_token_budget,
+            embedding_service,
+            vector_retrieval_service,
+        )
+
+        db = _make_mock_db("postgresql")
+        query = "导数定义"
+        tokens = max(1, estimate_tokens(query))
+        reservation = object()
+        reserve = AsyncMock(return_value=None if outcome == "rejected" else reservation)
+        embedding = None if outcome == "unconfigured" else [0.1, 0.2, 0.3]
+        if outcome == "invalid":
+            embedding = [0.1]
+        provider = AsyncMock(return_value=embedding)
+        record, settle, cancel = AsyncMock(), AsyncMock(), AsyncMock()
+        trace = MagicMock()
+        for name, mock in [("reserve", reserve), ("provider", provider),
+                           ("record", record), ("settle", settle), ("cancel", cancel)]:
+            trace.attach_mock(mock, name)
+        with _vector_enabled_config(dim=3, model_config_id=17), patch.object(
+            vector_retrieval_service, "is_vector_enabled", AsyncMock(return_value=True)
+        ), patch.object(vector_retrieval_service, "resolve_subject_ids", AsyncMock(return_value=[3])), patch.object(
+            vector_retrieval_service, "_get_user_answer_version", AsyncMock(return_value=0)
+        ), patch.object(vector_retrieval_service.cache, "get", AsyncMock(return_value=[])), patch.object(
+            ai_token_budget, "reserve_token_budget", reserve
+        ), patch.object(embedding_service, "get_embedding", provider), patch.object(
+            ai_token_budget, "record_token_usage", record
+        ), patch.object(ai_token_budget, "settle_token_reservation", settle), patch.object(
+            ai_token_budget, "cancel_token_reservation", cancel
+        ):
+            assert _run(vector_retrieval_service.vector_recall_by_text(db, 7, "math", query)) == []
+        reserve.assert_awaited_once_with(db, 7, tokens)
+        expected = ["reserve"]
+        if outcome == "unconfigured":
+            expected += ["provider", "cancel"]
+            cancel.assert_awaited_once_with(reservation)
+        elif outcome in ("success", "invalid"):
+            expected += ["provider", "record", "settle"]
+            assert record.await_args.args[:5] == (db, 7, "vector_text_embedding", query, "")
+            assert record.await_args.args[5]["tokens_used"] == tokens
+            settle.assert_awaited_once_with(reservation, tokens)
+        assert [call[0] for call in trace.mock_calls] == expected
 
     def test_fault_6_config_error(self):
         """故障 6: 配置错误（EMBEDDING_API_KEY 为空）→ is_vector_enabled=False。"""

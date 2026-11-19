@@ -3,7 +3,6 @@
 import json
 import logging
 import random
-from dataclasses import dataclass
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -22,39 +21,29 @@ from app.ai.prompts_learning import (
     build_mistake_analysis_prompt,
     build_report_prompt,
 )
-from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
 from app.core.time_utils import shanghai_date_utc_range, shanghai_today, utcnow
 from app.features.token_budget import estimate_tokens
 from app.models.ai_chat import AiChat
 from app.models.practice_record import PracticeRecord
 from app.models.question import Question
+
+# Preserve the existing public budget imports for AI callers.
+from app.services.ai_token_budget import TokenReservation as TokenReservation
+from app.services.ai_token_budget import (
+    cancel_token_reservation as cancel_token_reservation,
+)
+from app.services.ai_token_budget import record_token_usage as record_token_usage
+from app.services.ai_token_budget import reserve_token_budget as reserve_token_budget
+from app.services.ai_token_budget import (
+    settle_token_reservation as settle_token_reservation,
+)
 from app.services.knowledge_point_service import load_question_kps
 from app.services.subject_resolution import resolve_subject_ids
 
 # ============================================================
 # Token 用量控制
 # ============================================================
-
-
-@dataclass(slots=True)
-class TokenReservation:
-    user_id: int
-    reserved_tokens: int
-    day_key: str
-    month_key: str
-    active: bool = True
-
-
-def _token_period_keys(user_id: int) -> tuple[str, str]:
-    today_date = shanghai_today()
-    today = today_date.strftime("%Y-%m-%d")
-    month = today_date.strftime("%Y-%m")
-    env = str(settings.APP_ENV or "unknown").strip().lower()
-    return (
-        f"memograd:{env}:ai:budget:day:{today}:user:{user_id}",
-        f"memograd:{env}:ai:budget:month:{month}:user:{user_id}",
-    )
 
 
 def estimate_chat_token_reservation(
@@ -140,142 +129,6 @@ async def check_token_limit(
         return False
 
     return True
-
-
-async def reserve_token_budget(
-    db: AsyncSession, user_id: int, tokens_needed: int
-) -> TokenReservation | None:
-    """Atomically reserve estimated tokens before invoking a paid provider."""
-    tokens = max(1, int(tokens_needed))
-    daily_limit = int(settings.AI_DAILY_TOKEN_LIMIT)
-    monthly_limit = int(settings.AI_MONTHLY_TOKEN_LIMIT)
-    day_key, month_key = _token_period_keys(user_id)
-    if daily_limit <= 0 and monthly_limit <= 0:
-        return TokenReservation(user_id, 0, day_key, month_key)
-
-    today_date = shanghai_today()
-    today = shanghai_date_utc_range(today_date)[0]
-    first_of_month = shanghai_date_utc_range(today_date.replace(day=1))[0]
-    used_today, used_monthly = await _load_token_usage(
-        db,
-        user_id,
-        today=today,
-        first_of_month=first_of_month,
-    )
-    try:
-        reserved = await cache.reserve_token_budget_strict(
-            day_key=day_key,
-            month_key=month_key,
-            used_daily=int(used_today or 0),
-            used_monthly=int(used_monthly or 0),
-            tokens=tokens,
-            daily_limit=daily_limit,
-            monthly_limit=monthly_limit,
-            daily_ttl=3 * 24 * 60 * 60,
-            monthly_ttl=40 * 24 * 60 * 60,
-        )
-    except CacheUnavailableError:
-        return None
-    if not reserved:
-        return None
-    return TokenReservation(user_id, tokens, day_key, month_key)
-
-
-async def settle_token_reservation(
-    reservation: TokenReservation | None,
-    actual_tokens: int,
-) -> None:
-    """Keep the actual charge and refund only the unused part of a hold."""
-    if reservation is None or not reservation.active:
-        return
-    reservation.active = False
-    if reservation.reserved_tokens <= 0:
-        return
-    try:
-        await cache.release_token_budget_strict(
-            day_key=reservation.day_key,
-            month_key=reservation.month_key,
-            tokens=reservation.reserved_tokens,
-            actual_tokens=actual_tokens,
-        )
-    except CacheUnavailableError:
-        logger.warning(
-            "AI token reservation settlement failed user_id=%s reserved=%s actual=%s",
-            reservation.user_id,
-            reservation.reserved_tokens,
-            actual_tokens,
-        )
-
-
-async def cancel_token_reservation(
-    reservation: TokenReservation | None,
-) -> None:
-    """Release the full reservation when the provider is not billed."""
-    if reservation is None or not reservation.active:
-        return
-    reservation.active = False
-    if reservation.reserved_tokens <= 0:
-        return
-    try:
-        await cache.release_token_budget_strict(
-            day_key=reservation.day_key,
-            month_key=reservation.month_key,
-            tokens=reservation.reserved_tokens,
-        )
-    except CacheUnavailableError:
-        logger.warning(
-            "AI token reservation cancel failed user_id=%s tokens=%s",
-            reservation.user_id,
-            reservation.reserved_tokens,
-        )
-
-
-async def _load_token_usage(
-    db: AsyncSession,
-    user_id: int,
-    *,
-    today,
-    first_of_month,
-) -> tuple[int, int]:
-    result = await db.execute(
-        select(
-            func.coalesce(
-                func.sum(
-                    case((AiChat.created_at >= today, AiChat.tokens_used), else_=0)
-                ),
-                0,
-            ),
-            func.coalesce(func.sum(AiChat.tokens_used), 0),
-        ).where(
-            AiChat.user_id == user_id,
-            AiChat.created_at >= first_of_month,
-        )
-    )
-    used_today, used_monthly = result.one()
-    return int(used_today or 0), int(used_monthly or 0)
-
-
-async def record_token_usage(
-    db: AsyncSession,
-    user_id: int,
-    session_type: str,
-    user_message: str,
-    ai_response: str,
-    result: dict,
-) -> None:
-    """记录 AI 调用 token 用量到 AiChat。"""
-    db.add(
-        AiChat(
-            user_id=user_id,
-            session_type=session_type,
-            user_message=user_message[:500],
-            ai_response=ai_response[:2000],
-            tokens_used=result.get("tokens_used", 0),
-            model=result.get("model", "unknown"),
-            duration_ms=result.get("duration_ms", 0),
-        )
-    )
-    await db.commit()
 
 
 async def _call_ai(messages: list, db: AsyncSession | None = None) -> dict | None:

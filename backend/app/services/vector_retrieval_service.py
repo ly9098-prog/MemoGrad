@@ -17,7 +17,7 @@ from app.core.cache import cache
 from app.core.config import settings
 from app.models.practice_record import PracticeRecord
 from app.models.question import Question
-from app.services import embedding_service
+from app.services import ai_token_budget, embedding_service
 from app.services.knowledge_point_service import load_question_kps
 from app.services.subject_resolution import resolve_subject_ids
 from app.services.vector_config_service import EmbeddingConfig, VectorSearchConfig
@@ -775,16 +775,10 @@ async def _ensure_source_embedding(
             return None
 
     from app.features.token_budget import estimate_tokens
-    from app.services.ai_learning_service import (
-        cancel_token_reservation,
-        record_token_usage,
-        reserve_token_budget,
-        settle_token_reservation,
-    )
 
     content_text = embedding_service.build_question_embedding_text(question)
     estimated_tokens = max(1, estimate_tokens(content_text))
-    reservation = await reserve_token_budget(db, user_id, estimated_tokens)
+    reservation = await ai_token_budget.reserve_token_budget(db, user_id, estimated_tokens)
     if reservation is None:
         return None
 
@@ -803,9 +797,9 @@ async def _ensure_source_embedding(
         )
         return None
     if res["status"] == "skipped":
-        await cancel_token_reservation(reservation)
+        await ai_token_budget.cancel_token_reservation(reservation)
     if res["status"] in ("created", "updated"):
-        await record_token_usage(
+        await ai_token_budget.record_token_usage(
             db,
             user_id,
             "vector_source_embedding",
@@ -817,7 +811,7 @@ async def _ensure_source_embedding(
                 "duration_ms": 0,
             },
         )
-        await settle_token_reservation(reservation, estimated_tokens)
+        await ai_token_budget.settle_token_reservation(reservation, estimated_tokens)
     if res["status"] in ("created", "updated"):
         result = await db.execute(
             text(
@@ -1248,15 +1242,9 @@ async def vector_recall_by_text(
         return []
 
     from app.features.token_budget import estimate_tokens
-    from app.services.ai_learning_service import (
-        cancel_token_reservation,
-        record_token_usage,
-        reserve_token_budget,
-        settle_token_reservation,
-    )
 
     estimated_tokens = max(1, estimate_tokens(query_text))
-    reservation = await reserve_token_budget(db, user_id, estimated_tokens)
+    reservation = await ai_token_budget.reserve_token_budget(db, user_id, estimated_tokens)
     if reservation is None:
         return []
     query_embedding = await embedding_service.get_embedding(
@@ -1264,10 +1252,10 @@ async def vector_recall_by_text(
         config=_vs.emb,
     )
     if query_embedding is None:
-        await cancel_token_reservation(reservation)
+        await ai_token_budget.cancel_token_reservation(reservation)
         logger.warning("smart 模式 query embedding 生成失败")
         return []
-    await record_token_usage(
+    await ai_token_budget.record_token_usage(
         db,
         user_id,
         "vector_text_embedding",
@@ -1279,7 +1267,7 @@ async def vector_recall_by_text(
             "duration_ms": 0,
         },
     )
-    await settle_token_reservation(reservation, estimated_tokens)
+    await ai_token_budget.settle_token_reservation(reservation, estimated_tokens)
 
     try:
         query_embedding = validate_embedding(query_embedding, _vs.emb.dim)

@@ -274,6 +274,10 @@ jobs:
             tests/test_api/test_query_admission_bounds.py \
             tests/test_services/test_ai_token_reservation_concurrency.py \
             tests/test_services/test_stats_ai_billing.py \
+            tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_source_embedding_respects_user_budget_before_provider \
+            tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_failed_source_embedding_keeps_budget_when_provider_may_be_billed \
+            tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_source_embedding_budget_lifecycle_uses_shared_owner \
+            tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_text_embedding_budget_lifecycle_uses_shared_owner \
             tests/test_services/test_pdf_render_admission.py \
             tests/test_services/test_worker_account_owner_guard.py \
             tests/test_services/test_wrong_task_flow_admission.py \

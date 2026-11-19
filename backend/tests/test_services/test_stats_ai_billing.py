@@ -13,7 +13,7 @@ from app.core.database import Base
 from app.core.time_utils import utcnow
 from app.models.ai_chat import AiChat
 from app.models.user import User
-from app.services import ai_learning_service, stats_ai_billing, stats_service
+from app.services import ai_token_budget, stats_ai_billing, stats_service
 
 
 @pytest_asyncio.fixture
@@ -24,9 +24,9 @@ async def billing_db(monkeypatch):
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     cache = CacheClient()
     cache._enabled = False
-    monkeypatch.setattr(ai_learning_service, "cache", cache)
-    monkeypatch.setattr(ai_learning_service.settings, "AI_DAILY_TOKEN_LIMIT", 1000)
-    monkeypatch.setattr(ai_learning_service.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000)
+    monkeypatch.setattr(ai_token_budget, "cache", cache)
+    monkeypatch.setattr(ai_token_budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000)
+    monkeypatch.setattr(ai_token_budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000)
     try:
         async with sessions() as db:
             db.add(User(id=17, openid="stats-billing-test"))
@@ -46,7 +46,7 @@ async def test_stats_success_records_charge_and_retains_it_in_the_ledger(billing
     )
     assert result["tokens_used"] == 25
     assert await db.scalar(select(func.sum(AiChat.tokens_used))) == 25
-    day_key, _month_key = ai_learning_service._token_period_keys(17)
+    day_key, _month_key = ai_token_budget._token_period_keys(17)
     assert cache._local_get(day_key) == 25
 
 
@@ -76,7 +76,7 @@ async def test_stats_provider_failure_keeps_hold_and_does_not_write_chat(billing
             max_tokens=50, session_type="stats_ai_diagnosis",
         )
     assert await db.scalar(select(func.count(AiChat.id))) == 0
-    day_key, _month_key = ai_learning_service._token_period_keys(17)
+    day_key, _month_key = ai_token_budget._token_period_keys(17)
     assert cache._local_get(day_key) >= 50
 
 

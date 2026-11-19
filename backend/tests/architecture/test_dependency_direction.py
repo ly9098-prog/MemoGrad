@@ -40,6 +40,23 @@ def test_no_new_static_import_cycles():
     assert not allowed - current, f"Remove resolved cycle baseline entries: {sorted(allowed - current)}"
 
 
+def test_user_token_budget_is_shared_without_learning_vector_back_edges():
+    graph, _ = scan_application(APP)
+    budget = "app.services.ai_token_budget"
+    learning = "app.services.ai_learning_service"
+    vector = "app.services.vector_retrieval_service"
+    assert budget in graph[learning] and budget in graph[vector]
+    assert learning not in graph[vector]
+    assert vector in graph[learning]
+    assert not any(name.startswith("app.services") for name in graph[budget])
+    source = (APP / "services" / "ai_token_budget.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    assert len(source.splitlines()) <= 300
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            assert node.end_lineno - node.lineno + 1 <= 50
+
+
 @pytest.mark.parametrize("statement", [
     "from app.api.v1.auth import router",
     "from app import api",
