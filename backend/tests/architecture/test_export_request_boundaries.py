@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import ast
-import hashlib
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.ast_contract import digest
 
 ROOT = Path(__file__).resolve().parents[3]
 OWNERS = {
@@ -103,10 +104,6 @@ UNCHANGED = {
 }
 
 
-def digest(node):
-    return hashlib.sha256(ast.dump(node).encode()).hexdigest()
-
-
 def validate_modules(sources):
     assert set(sources) == set(FUNCTIONS)
     for name, source in sources.items():
@@ -147,8 +144,8 @@ def test_responsibility_modules_have_bounded_functions_and_one_way_imports():
     validate_modules(sources())
 
 
-def test_original_route_declarations_and_thin_entrypoints_are_preserved():
-    tree = ast.parse((ROOT / "backend/app/api/v1/exports.py").read_text())
+def validate_routes(source):
+    tree = ast.parse(source)
     funcs = {
         n.name: n
         for n in tree.body
@@ -186,6 +183,32 @@ def test_original_route_declarations_and_thin_entrypoints_are_preserved():
             assert {
                 kw.arg: ast.unparse(kw.value) for kw in value.keywords
             } == expected_kwargs
+
+
+def test_original_route_declarations_and_thin_entrypoints_are_preserved():
+    source = (ROOT / "backend/app/api/v1/exports.py").read_text()
+    validate_routes(source)
+    validate_routes(ast.unparse(ast.parse(source)))
+
+
+@pytest.mark.parametrize("mutation", ["parameters", "decorators", "returns", "body"])
+def test_route_gate_rejects_declaration_and_body_drift(mutation):
+    tree = ast.parse((ROOT / "backend/app/api/v1/exports.py").read_text())
+    node = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "export_health"
+    )
+    if mutation == "parameters":
+        node.args.args.append(ast.arg(arg="unexpected"))
+    elif mutation == "decorators":
+        node.decorator_list = []
+    elif mutation == "returns":
+        node.returns = ast.Name(id="Unexpected", ctx=ast.Load())
+    else:
+        node.body.append(ast.parse("raise RuntimeError('drift')").body[0])
+    with pytest.raises(AssertionError):
+        validate_routes(ast.unparse(ast.fix_missing_locations(tree)))
 
 
 def test_fresh_import_has_no_route_framework_database_or_config_side_effects():
