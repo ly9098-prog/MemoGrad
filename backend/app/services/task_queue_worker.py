@@ -514,6 +514,9 @@ async def enqueue_resume_pipeline(
     retry_token: str | None = None,
 ) -> EnqueueResult:
     """Enqueue a pipeline resume task."""
+    from app.core.database import async_session
+    from app.services.task_owner import resolve_app_owner_user_id
+
     payload = {
         "pipeline_id": pipeline_id,
         "staging_object_id": staging_object_id,
@@ -521,6 +524,10 @@ async def enqueue_resume_pipeline(
         "subject_id": subject_id,
         "options": options,
     }
+    async with async_session() as db:
+        owner_user_id = await resolve_app_owner_user_id(db, TASK_TYPE_RESUME_PIPELINE, payload)
+    if owner_user_id is not None:
+        payload["owner_user_id"] = owner_user_id
     return await _enqueue_v2_with_local_fallback(
         TASK_TYPE_RESUME_PIPELINE,
         payload,

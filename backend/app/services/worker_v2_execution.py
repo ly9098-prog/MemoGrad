@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from app.services.task_owner import app_owner_user_id
+from app.services.task_owner import (
+    BUSINESS_OWNER_TASK_TYPES,
+    app_owner_user_id,
+    resolve_app_owner_user_id,
+)
 from app.services.worker_v2_dispatch import dispatch_v2_task
 from app.services.worker_v2_state import WorkerTaskState
 
@@ -76,14 +80,19 @@ async def verify_active_account_owner(task: Any) -> None:
     payload = getattr(task, "payload", None)
     if not isinstance(payload, dict):
         return
-    owner_user_id = _app_owner_user_id(payload)
-    if owner_user_id is None:
+    task_type = getattr(task, "task_type", "")
+    if _app_owner_user_id(payload) is None and task_type not in BUSINESS_OWNER_TASK_TYPES:
         return
     from app.core.database import async_session
     from app.models.user import User
     from app.services.db_fencing import FencingRejectedError
 
     async with async_session() as db:
+        owner_user_id = await resolve_app_owner_user_id(
+            db, task_type, payload, task_id=getattr(task, "task_id", None)
+        )
+        if owner_user_id is None:
+            return
         owner = await db.get(User, owner_user_id)
     if owner is None or owner.deleted_at is not None or owner.is_banned:
         raise FencingRejectedError(

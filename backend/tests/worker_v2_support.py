@@ -5,7 +5,7 @@ import io
 import sys
 from contextlib import asynccontextmanager
 from types import ModuleType, SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from app.features import pipeline_checkpoint as checkpoint
 from app.services import task_queue_worker as worker
@@ -38,7 +38,10 @@ class Rows:
 
 class WorkerHarness:
     def __init__(self, monkeypatch):
+        from app.services import worker_v2_execution
+
         self.monkeypatch = monkeypatch
+        monkeypatch.setattr(worker_v2_execution, "verify_active_account_owner", AsyncMock())
         self.events = []
         self.calls = []
         self.contexts = []

@@ -11,12 +11,20 @@ from tests.architecture.dependency_scan import scan_application
 
 APP = Path(__file__).resolve().parents[2] / "app"
 DEPENDENCIES = {
+    "task_owner": {
+        "app.models.import_pipeline",
+        "app.models.practice_record",
+        "app.services.db_fencing",
+        "app.services.practice.answer_projection_contract",
+    },
     "worker_v2_state": set(),
     "worker_v2_execution": {
         "app.services.worker_v2_state",
         "app.services.worker_v2_dispatch",
         "app.core.database",
+        "app.models.user",
         "app.services.db_fencing",
+        "app.services.task_owner",
     },
     "worker_v2_dispatch": {
         "app.services.worker_v2_state",
