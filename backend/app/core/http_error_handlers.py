@@ -165,14 +165,13 @@ async def validation_exception_handler(
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # 兜底异常始终返回脱敏 JSON；详细异常只进入后端日志。
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-
     request_id, trace_id = _request_error_ids(request)
     try:
         from app.core.log_context import bind_log_context, log_event
 
         if trace_id or request_id:
             bind_log_context(trace_id=trace_id, request_id=request_id)
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         log_event(
             logging.getLogger("app.access"),
             "http.request.error",
