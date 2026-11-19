@@ -21,6 +21,8 @@ htmlcov/
 *.sqlite3
 *.db.backup-*
 *.db.*
+*.db-shm
+*.db-wal
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
@@ -145,6 +147,7 @@ backend/.venv-ocr-gpu/
 backend/.venv-ocr-gpu-*/
 backend/backend/.venv-ocr-gpu/
 /log.txt
+/error_log.txt
 
 # Agent collaboration files (local only)
 /AGENTS.md
