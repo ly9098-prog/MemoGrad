@@ -295,18 +295,18 @@ def _option_mutation_patch(
 
 @router.get("")
 async def list_questions(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=2**31 - 1),
     page_size: int = Query(20, ge=1, le=100),
-    subject_id: int | None = None,
+    subject_id: int | None = Query(None, ge=1, le=2**31 - 1),
     review_status: str | None = None,
     is_active: bool | None = Query(None),
     question_type: str | None = None,
-    keyword: str | None = None,
+    keyword: str | None = Query(None, max_length=200),
     subject_codes: str | None = Query(None, max_length=300),
-    year: int | None = None,
+    year: int | None = Query(None, ge=-(2**31), le=2**31 - 1),
     import_batch_id: str | None = None,
     difficulty: int | None = Query(None, ge=1, le=5),
-    knowledge_point_id: int | None = Query(None, ge=1),
+    knowledge_point_id: int | None = Query(None, ge=1, le=2**31 - 1),
     _=Depends(require_permissions("question:read")),
     db: AsyncSession = Depends(get_db),
 ):
