@@ -398,6 +398,10 @@
     transition-duration: 480ms;
   }
 
+  .workspace {
+    border-radius: 28px 28px 0 0;
+  }
+
   .mobileNavigationButton {
     display: none;
   }
