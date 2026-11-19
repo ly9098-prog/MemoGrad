@@ -99,7 +99,15 @@ test('camera helpers keep scale, translation and style finite at viewport limits
 
   const zoomed = zoomCamera(fit, 20, { x: 0, y: 0 }, frame)
   assert.ok(zoomed.scale >= limits.min && zoomed.scale <= limits.max)
-  assert.match(cameraStyle(zoomed), /^transform:translate3d\(-?\d+\.?\d*px,-?\d+\.?\d*px,0\) scale\([^)]+\);$/)
+  assert.match(cameraStyle(zoomed), /^transform:translate3d\(-?\d+\.?\d*px,-?\d+\.?\d*px,0\) scale\([^)]+\);--graph-hit-size:[\d.]+px;$/)
+  for (const width of [320, 390, 430]) {
+    const phoneFrame = { width: width * 702 / 750, height: width * 660 / 750 }
+    for (const scale of [fitCamera(phoneFrame).scale, cameraLimits(phoneFrame).max]) {
+      const style = cameraStyle({ x: 0, y: 0, scale })
+      const hitSize = Number(style.match(/--graph-hit-size:([\d.]+)px/)[1])
+      assert.ok(Math.abs(hitSize * scale - 44) < 0.01, 'touch targets stay 44px across phone sizes and zoom')
+    }
+  }
   assert.ok(WORLD.width > 0 && WORLD.height > 0)
 })
 

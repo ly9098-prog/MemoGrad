@@ -1240,7 +1240,7 @@ to{transform:translate3d(0,0,0);opacity:1;}
 .atlas-edge.force-edge.edge-dimmed{opacity:.10;}
 .atlas-node.force-node{z-index:3;display:flex;box-sizing:border-box;align-items:center;justify-content:center;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;font-size:inherit;box-shadow:none;opacity:1;transform:none;transition:opacity .16s ease;}
 .atlas-node.force-node::after,.atlas-node.force-node::before{display:none;}
-.force-hit{position:absolute;inset:-12px;border-radius:50%;background:transparent;}
+.force-hit{position:absolute;left:50%;top:50%;width:max(100%,var(--graph-hit-size,44px));height:max(100%,var(--graph-hit-size,44px));transform:translate(-50%,-50%);border-radius:50%;background:transparent;}
 .force-dot{display:block;width:100%;height:100%;box-sizing:border-box;border-radius:50%;background:#AFC6B7;}
 .force-ring{position:absolute;inset:-6px;border:1.5px solid rgba(58,112,78,.36);border-radius:50%;pointer-events:none;}
 .force-core .force-dot{background:#446B55;box-shadow:none;}

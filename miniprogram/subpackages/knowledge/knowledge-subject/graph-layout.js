@@ -116,7 +116,7 @@ function simulate(nodes, links, forces, manualPositions, focused, cache) {
         const py = dy / distance * force
         if (!a.fixed) { fx.set(a.id, fx.get(a.id) + px); fy.set(a.id, fy.get(a.id) + py) }
         if (!b.fixed) { fx.set(b.id, fx.get(b.id) - px); fy.set(b.id, fy.get(b.id) - py) }
-        const clearance = a.r + b.r + 44
+        const clearance = a.r + b.r + 80
         if (distance < clearance) {
           const push = (clearance - distance) * 0.12
           const cx = dx / distance * push
@@ -294,7 +294,7 @@ function buildScene(groups, subject, options = {}) {
     ? buildFocused(focusedGroup, focusNode, forces, options.page)
     : buildOverview(source, subject, forces, options.page)
   graph.nodes.forEach(node => {
-    node.r = node.kind === 'core' ? 18 : node.chapterRoot ? 14 : 7
+    node.r = node.kind === 'core' ? 40 : node.chapterRoot ? 30 : 22
   })
   simulate(graph.nodes, graph.edges, forces, options.manualPositions || {}, Boolean(focusNode), options.layoutCache)
   highlightScene(graph, options)
@@ -404,7 +404,10 @@ function zoomCamera(camera, factor, anchor, frame) {
   }, frame)
 }
 
-function cameraStyle(camera) { return `transform:translate3d(${camera.x}px,${camera.y}px,0) scale(${camera.scale});` }
+function cameraStyle(camera) {
+  // The stage scales in world space; keep its node targets finger-sized on screen.
+  return `transform:translate3d(${camera.x}px,${camera.y}px,0) scale(${camera.scale});--graph-hit-size:${44 / camera.scale}px;`
+}
 
 function visibleLabels(nodes, fontSize, scale) {
   const visibility = {}
