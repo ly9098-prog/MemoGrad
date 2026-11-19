@@ -82,11 +82,14 @@ fi
 }
 
 if [ -f "requirements-ocr.txt" ]; then
-    if "$RUNTIME_PYTHON" -c "import paddleocr" 2>/dev/null; then
+    if "$RUNTIME_PYTHON" -c "import Cython, cv2, paddleocr" 2>/dev/null; then
         echo -e "${GREEN}✅ OCR 依赖已存在${NC}"
     else
         echo -e "${YELLOW}📦 安装 OCR 依赖（PaddleOCR，首次安装可能较慢）...${NC}"
-        if "$RUNTIME_PYTHON" -m pip install --quiet -r requirements-ocr.txt $PIP_BREAK_SYSTEM && "$RUNTIME_PYTHON" -m pip install --quiet paddleocr==2.10.0 --no-deps $PIP_BREAK_SYSTEM; then
+        # PaddleOCR 的元数据声明 opencv-python/opencv-contrib-python，但本项目
+        # 明确使用二者共同提供的 opencv-python-headless，因此只忽略这一处
+        # 已知的 --no-deps 校验噪声，其他依赖仍由 requirements-ocr.txt 安装。
+        if "$RUNTIME_PYTHON" -m pip install --quiet --no-warn-conflicts -r requirements-ocr.txt $PIP_BREAK_SYSTEM && "$RUNTIME_PYTHON" -m pip install --quiet --no-warn-conflicts paddleocr==2.10.0 --no-deps $PIP_BREAK_SYSTEM; then
             if ! OCR_IMPORT_ERROR=$("$RUNTIME_PYTHON" -c "import paddleocr" 2>&1 >/dev/null); then
                 if [[ "$OCR_IMPORT_ERROR" == *"libgomp.so.1"* ]] && command -v apt-get &>/dev/null; then
                     echo -e "${YELLOW}⚠️  OCR 原生运行库缺失，尝试安装 libgomp1...${NC}"
@@ -113,9 +116,11 @@ echo -e "${CYAN}   停止服务: Ctrl+C${NC}"
 echo -e "${CYAN}   角色: PROCESS_ROLE=${PROCESS_ROLE:-all}${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
+echo -e "${NC}提示：Uvicorn 热重载会先显示 reloader，子进程随后输出 Application startup complete。${NC}"
+echo ""
 
 # 默认以 all 角色启动（API + 调度器 + Worker），导出任务自动处理。
 # 如需 web-only（不处理导出），请先执行: export PROCESS_ROLE=web
 export PROCESS_ROLE="${PROCESS_ROLE:-all}"
 
-"$RUNTIME_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+exec "$RUNTIME_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
