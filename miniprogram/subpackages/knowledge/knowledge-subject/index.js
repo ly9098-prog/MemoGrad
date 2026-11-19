@@ -9,9 +9,9 @@ const FILTERS = [
 { id: 'mastered', label: '较稳定', statuses: ['good', 'mastered'] },
 ]
 const INITIAL_INDEX_LIMIT = 12
-const INDEX_TREE_BASE_X = 42
-const INDEX_TREE_STEP_X = 44
-const INDEX_CONTENT_BASE_INDENT = 44
+const INDEX_TREE_BASE_X = 24
+const INDEX_TREE_STEP_X = 28
+const INDEX_CONTENT_BASE_INDENT = 32
 const QUICK_THEME_LIMIT = 5
 const RECENT_THEME_LIMIT = 5
 const SEARCH_DEBOUNCE_MS = 300
@@ -32,10 +32,6 @@ const SELECTION_SWITCH_IN_MS = 220
 const RETURN_REFRESH_DELAY_MS = 260
 const VIEW_STATE_VERSION = 2
 const VIEW_STATE_MAX_AGE_MS = 30 * 60 * 1000
-const CAMERA_FRAME_MS = 16
-const PAN_THRESHOLD = 5
-const INERTIA_MIN_SPEED = 0.025
-const INERTIA_DECAY = 0.91
 const SEARCH_SEPARATOR_RE = /[\s\-_/\\·•,，。.;；:：()（）[\]【】{}<>《》'"“”‘’]+/g
 const nonnegative = value => Math.max(0, Number(value) || 0)
 const normalizeSearchText = value => String(value || '').trim().toLowerCase()
@@ -259,7 +255,7 @@ filters: FILTERS.map(item => ({ id: item.id, label: item.label, count: 0 })),
 filter: 'all', query: '', searchDraft: '', searchFocused: false, searchPending: false, searchResultCount: 0, activeGroupKey: '', activeGroupName: '', indexScopeGroupKey: '',
 groupChips: [], quickGroupChips: [], themeGroupCount: 0, themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '', themeSheetGroups: [],
 scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
-pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphInteracting: false,
+pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
 forcePanelOpen: false, forceControls: [],
 showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
@@ -290,7 +286,6 @@ this._manualPositions = {}
 this._layoutCache = {}
 this._sceneNodeIndex = new Map()
 this._sceneEdgeLinks = new Map()
-this._dragNodeId = ''
 this._forceTimer = null
 this.setData({ forceControls: this.forceControlData() })
 this._expandedNodeIds = new Set()
@@ -378,11 +373,7 @@ this._forceDirty = Boolean(this._forceTimer)
 clearTimeout(this._forceTimer)
 this._forceTimer = null
 this._requestId = (this._requestId || 0) + 1
-clearTimeout(this._cameraTimer)
-this._cameraTimer = null
-this.cancelGraphGesture()
-clearTimeout(this._inertiaTimer)
-this._inertiaTimer = null
+this.cancelGraphMotion()
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -413,13 +404,9 @@ this._pageVisible = false
 clearTimeout(this._forceTimer)
 this._forceTimer = null
 this._layoutCache = null
+this.cancelGraphMotion()
 this._unloaded = true
 this._requestId = (this._requestId || 0) + 1
-clearTimeout(this._cameraTimer)
-this._cameraTimer = null
-this.cancelGraphGesture()
-clearTimeout(this._inertiaTimer)
-this._inertiaTimer = null
 clearTimeout(this._searchTimer)
 clearTimeout(this._indexSearchTimer)
 clearTimeout(this._indexNavigateTimer)
@@ -736,7 +723,7 @@ _walkIndexNode(node, siblingIndex, siblingCount, ancestorHasNext, byParent, full
   const indexSelected = Number(this._selectedId) === id
   const indexActionText = this._buildIndexActionText(node, indexExpandable, indexForcedOpen, indexExpanded, indexSelected)
   const depth = Math.max(0, Number(node.depth) || 0)
-  const visualDepth = Math.min(depth, 5)
+  const visualDepth = Math.min(depth, 4)
   const indexHasNextSibling = siblingIndex + 1 < siblingCount
   const indexAncestorGuides = ancestorHasNext
     .slice(1, visualDepth)
@@ -757,10 +744,10 @@ _walkIndexNode(node, siblingIndex, siblingCount, ancestorHasNext, byParent, full
     indexActionText,
     indexIconKind: iconKind,
     indexIconSrc: indexIconSrc(iconKind),
-    indexIndent: INDEX_CONTENT_BASE_INDENT + Math.max(0, Math.min(depth - 1, 4)) * INDEX_TREE_STEP_X,
+    indexIndent: INDEX_CONTENT_BASE_INDENT + Math.max(0, Math.min(depth - 1, 3)) * INDEX_TREE_STEP_X,
     indexAncestorGuides,
     indexJointLeft: depth ? INDEX_TREE_BASE_X + Math.max(0, visualDepth - 1) * INDEX_TREE_STEP_X : 0,
-    indexChildStemLeft: INDEX_TREE_BASE_X + Math.min(depth, 4) * INDEX_TREE_STEP_X,
+    indexChildStemLeft: INDEX_TREE_BASE_X + Math.min(depth, 3) * INDEX_TREE_STEP_X,
     indexSearchTarget: Boolean(dedicatedQuery && node.matched),
     indexAriaAction: this._buildIndexAriaAction(node, indexExpandable, indexForcedOpen, indexExpanded, indexSelected, dedicatedQuery),
   })
@@ -832,11 +819,9 @@ applyView(resetCamera = false, animateScene = resetCamera, callback) {
   const payload = this._buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, sceneState.scene, query)
   if (animateScene) payload.sceneAnimating = true
   if (resetCamera && this._frame) {
-    this.stopCameraInertia()
     this._camera = fitCamera(this._frame)
-    Object.assign(payload, this.cameraPayload(true, { graphInteracting: false }))
   }
-  if (this._camera && this._frame) Object.assign(payload, labelDisplay(this._camera, this._frame, sceneState.scene.nodes))
+  if (this._camera && this._frame) Object.assign(payload, this.cameraPayload(true, {}, sceneState.scene))
   this._commitView(payload, animateScene, callback)
 },
 
@@ -1939,55 +1924,56 @@ return
 }
 this._lastGraphTap = now
 },
-startGraphNodeTouch(event) {
-const nodeId = String(event.currentTarget.dataset.nodeId || '')
-this._dragNodeId = nodeId !== 'core' && (event.touches || []).length === 1 ? nodeId : ''
-},
-cancelGraphGesture() {
-clearTimeout(this._dragTimer)
-this._dragTimer = null
-this._pendingDragPoint = null
-this._gesture = null
-this._dragNodeId = ''
-if (!this._unloaded && this.data.graphInteracting) this.setData({ graphInteracting: false })
-},
-moveDraggedNode(point) {
-this._pendingDragPoint = point
-if (this._dragTimer) return
-this._dragTimer = setTimeout(() => {
-this._dragTimer = null
-const pending = this._pendingDragPoint
-this._pendingDragPoint = null
-if (pending && !this._unloaded && this._pageVisible !== false) this.commitDraggedNode(pending)
-}, CAMERA_FRAME_MS)
-},
-commitDraggedNode(point) {
-const gesture = this._gesture
-const nodeId = gesture && gesture.dragNodeId
-const index = this._sceneNodeIndex && this._sceneNodeIndex.get(nodeId)
-if (!this._camera || !this._frame || index === undefined || !this.data.scene) return
-const nodes = this.data.scene.nodes || []
-const node = nodes[index]
-if (!node) return
-const offset = gesture.dragOffset || { x: 0, y: 0 }
-node.cx = Math.max(24, Math.min(776, (point.x - this._camera.x) / this._camera.scale + offset.x))
-node.cy = Math.max(24, Math.min(896, (point.y - this._camera.y) / this._camera.scale + offset.y))
-this._manualPositions[nodeId] = { x: node.cx, y: node.cy }
-const patch = {
-[`scene.nodes[${index}].cx`]: node.cx,
-[`scene.nodes[${index}].cy`]: node.cy,
-[`scene.nodes[${index}].style`]: dotStyle(node),
+graphMotionModel(scene) {
+const limits = cameraLimits(this._frame)
+const nodes = (scene && scene.nodes) || []
+const byId = new Map(nodes.map((node, index) => [node.id, index]))
+this._graphMotionSequence = 0
+return {
+revision: this._graphMotionRevision = (this._graphMotionRevision || 0) + 1,
+active: !this._unloaded && this._pageVisible !== false,
+camera: { ...this._camera }, width: this._frame.width, height: this._frame.height,
+min: limits.min, max: limits.max,
+nodes: nodes.map(node => ({ id: node.id, cx: node.cx, cy: node.cy, r: node.r })),
+edges: ((scene && scene.edges) || []).map(edge => ({ from: byId.get(edge.from), to: byId.get(edge.to) })),
 }
-const linked = (this._sceneEdgeLinks && this._sceneEdgeLinks.get(nodeId)) || []
-linked.forEach((edgeIndex) => {
+},
+cancelGraphMotion() {
+const model = this.data.graphMotionState
+this._graphMotionRevision = (this._graphMotionRevision || 0) + 1
+if (model && !this._unloaded) this.setData({ graphMotionState: { ...model, active: false, revision: this._graphMotionRevision } })
+},
+commitGraphMotion(result) {
+if (this._unloaded || this._pageVisible === false || !result || result.revision !== this._graphMotionRevision) return
+if (!Number.isInteger(result.sequence) || result.sequence <= (this._graphMotionSequence || 0)) return
+const camera = result.camera
+if (!this._frame || !camera || ![camera.x, camera.y, camera.scale].every(Number.isFinite)) return
+this._graphMotionSequence = result.sequence
+this._camera = clampCamera(camera, this._frame)
+const patch = {}
+const moved = result.node
+const nodes = (this.data.scene && this.data.scene.nodes) || []
+const index = moved && this._sceneNodeIndex && this._sceneNodeIndex.get(moved.id)
+if (index !== undefined && index !== null && moved.id !== 'core' && [moved.cx, moved.cy].every(Number.isFinite)) {
+const node = nodes[index]
+node.cx = Math.max(24, Math.min(776, moved.cx))
+node.cy = Math.max(24, Math.min(896, moved.cy))
+node.style = dotStyle(node)
+this._manualPositions[moved.id] = { x: node.cx, y: node.cy }
+patch[`scene.nodes[${index}].cx`] = node.cx
+patch[`scene.nodes[${index}].cy`] = node.cy
+patch[`scene.nodes[${index}].style`] = node.style
+const linked = (this._sceneEdgeLinks && this._sceneEdgeLinks.get(moved.id)) || []
+linked.forEach(edgeIndex => {
 const edge = this.data.scene.edges[edgeIndex]
-const fromIndex = this._sceneNodeIndex.get(edge.from)
-const toIndex = this._sceneNodeIndex.get(edge.to)
-if (fromIndex === undefined || toIndex === undefined) return
-patch[`scene.edges[${edgeIndex}].style`] = edgeStyle(nodes[fromIndex], nodes[toIndex])
+edge.style = edgeStyle(nodes[this._sceneNodeIndex.get(edge.from)], nodes[this._sceneNodeIndex.get(edge.to)])
+patch[`scene.edges[${edgeIndex}].style`] = edge.style
 })
 this._cameraLabelCache = null
-this.setData(patch)
+}
+// A settled gesture is an acknowledgement, not a new view model. A model reset
+// here would cancel a subsequent gesture that started before this reply arrived.
+this.setData({ ...patch, ...this.cameraPayload(true, {}, this.data.scene, false) })
 },
 measureViewport(reset = false) {
 if (!wx.createSelectorQuery || !this.data.subject) return
@@ -1998,14 +1984,14 @@ this._frame = { left: rect.left, top: rect.top + (this._scrollTop || 0), width: 
 if (reset || changed) this.resetView()
 }).exec()
 },
-cameraPayload(includeMetrics = true, extra = {}) {
+cameraPayload(includeMetrics = true, extra = {}, scene = this.data.scene, syncMotion = true) {
 if (!this._frame || !this._camera) return extra
-const nodes = (this.data.scene || {}).nodes
+const nodes = (scene || {}).nodes
 const cache = this._cameraLabelCache
 const changed = !cache || cache.nodes !== nodes || cache.frame !== this._frame || cache.scale !== this._camera.scale
 const labels = changed ? labelDisplay(this._camera, this._frame, nodes) : cache.labels
 if (changed) this._cameraLabelCache = { nodes, frame: this._frame, scale: this._camera.scale, labels }
-const payload = { ...extra, graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
+const payload = { ...extra, ...(syncMotion ? { graphMotionState: this.graphMotionModel(scene) } : {}), graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
 ...(changed ? { graphLabelVisibility: labels.graphLabelVisibility, graphLabelLayouts: labels.graphLabelLayouts } : {}), stageStyle: cameraStyle(this._camera) }
 if (!includeMetrics) return payload
 const fit = fitCamera(this._frame)
@@ -2018,151 +2004,17 @@ zoomOutDisabled: this._camera.scale <= limits.min + .005,
 zoomInDisabled: this._camera.scale >= limits.max - .005,
 }
 },
-setCamera(camera, throttle = false, includeMetrics = true, extra = {}) {
+setCamera(camera) {
 this._camera = camera
-if (throttle && this._cameraTimer) return
-const publish = () => {
-this._cameraTimer = null
 if (this._unloaded || this._pageVisible === false || !this._frame || !this._camera) return
-this.setData(this.cameraPayload(includeMetrics, extra))
-}
-if (throttle) this._cameraTimer = setTimeout(publish, CAMERA_FRAME_MS)
-else { clearTimeout(this._cameraTimer); publish() }
+this.setData(this.cameraPayload())
 },
 resetView() {
-this.stopCameraInertia()
-if (this._frame) this.setCamera(fitCamera(this._frame), false, true, { graphInteracting: false })
+if (this._frame) this.setCamera(fitCamera(this._frame))
 },
 zoomGraph(event) {
 if (!this._frame) return
-this.stopCameraInertia()
 const factor = Number(event.currentTarget.dataset.step) > 0 ? 1.25 : .8
 this.setCamera(zoomCamera(this._camera, factor, { x: this._frame.width / 2, y: this._frame.height / 2 }, this._frame))
-},
-touchPositions(event) {
-return (event.touches || []).map(touch => ({
-x: touch.clientX - this._frame.left,
-y: touch.clientY + (this._scrollTop || 0) - this._frame.top,
-}))
-},
-startGraphTouch(event) {
-if (!this._frame) return
-this.stopCameraInertia()
-const touches = this.touchPositions(event)
-if (!touches.length) return
-const now = Date.now()
-if (touches.length > 1) this._dragNodeId = ''
-this._gesture = {
-touches, camera: { ...this._camera }, moved: touches.length > 1,
-lastPoint: touches[0], lastAt: now, velocityX: 0, velocityY: 0,
-dragNodeId: touches.length === 1 ? String(this._dragNodeId || '') : '',
-}
-if (this._gesture.dragNodeId && this._sceneNodeIndex) {
-const nodeIndex = this._sceneNodeIndex.get(this._gesture.dragNodeId)
-const node = nodeIndex === undefined ? null : (this.data.scene.nodes || [])[nodeIndex]
-if (node) {
-const worldX = (touches[0].x - this._camera.x) / this._camera.scale
-const worldY = (touches[0].y - this._camera.y) / this._camera.scale
-this._gesture.dragOffset = { x: node.cx - worldX, y: node.cy - worldY }
-}
-}
-if (!this.data.graphInteracting) this.setData({ graphInteracting: true })
-},
-moveGraphTouch(event) {
-if (!this._gesture) return
-const touches = this.touchPositions(event)
-if (!touches.length) return
-if (touches.length !== this._gesture.touches.length) { this.startGraphTouch(event); return }
-const start = this._gesture
-if (start.dragNodeId && touches.length === 1) {
-const dx = touches[0].x - start.touches[0].x
-const dy = touches[0].y - start.touches[0].y
-if (Math.abs(dx) + Math.abs(dy) > PAN_THRESHOLD) start.moved = true
-if (start.moved) this.moveDraggedNode(touches[0])
-return
-}
-if (touches.length > 1) {
-const a = start.touches; const b = touches
-const distance = Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y)
-if (distance < 1) return
-const anchor = { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }
-const midpoint = { x: (b[0].x + b[1].x) / 2, y: (b[0].y + b[1].y) / 2 }
-const limits = cameraLimits(this._frame)
-const scale = Math.max(limits.min, Math.min(limits.max, start.camera.scale * Math.hypot(b[1].x - b[0].x, b[1].y - b[0].y) / distance))
-this.setCamera(clampCamera({ scale, x: midpoint.x - (anchor.x - start.camera.x) * scale / start.camera.scale, y: midpoint.y - (anchor.y - start.camera.y) * scale / start.camera.scale }, this._frame), true, false)
-start.moved = true
-start.velocityX = 0
-start.velocityY = 0
-} else {
-const dx = touches[0].x - start.touches[0].x
-const dy = touches[0].y - start.touches[0].y
-if (Math.abs(dx) + Math.abs(dy) > PAN_THRESHOLD) start.moved = true
-if (start.moved) {
-const now = Date.now()
-const elapsed = Math.max(8, Math.min(40, now - start.lastAt))
-const instantX = (touches[0].x - start.lastPoint.x) / elapsed
-const instantY = (touches[0].y - start.lastPoint.y) / elapsed
-start.velocityX = start.velocityX * .62 + instantX * .38
-start.velocityY = start.velocityY * .62 + instantY * .38
-start.lastPoint = touches[0]
-start.lastAt = now
-this.setCamera(clampCamera({ ...start.camera, x: start.camera.x + dx, y: start.camera.y + dy }, this._frame), true, false)
-}
-}
-},
-endGraphTouch(event) {
-const gesture = this._gesture
-clearTimeout(this._dragTimer)
-this._dragTimer = null
-if (this._pendingDragPoint && gesture && gesture.dragNodeId) this.commitDraggedNode(this._pendingDragPoint)
-this._pendingDragPoint = null
-if (gesture && gesture.moved) this._suppressTapUntil = Date.now() + 280
-this._gesture = null
-this._dragNodeId = ''
-if (event && event.touches && event.touches.length) { this.startGraphTouch(event); return }
-const cancelled = event && event.type === 'touchcancel'
-if (!cancelled && gesture && gesture.moved && !gesture.dragNodeId && gesture.touches.length === 1) {
-const speed = Math.hypot(gesture.velocityX, gesture.velocityY)
-if (speed >= INERTIA_MIN_SPEED) {
-this.startCameraInertia(gesture.velocityX, gesture.velocityY)
-return
-}
-}
-this.finishGraphInteraction()
-},
-stopCameraInertia() {
-clearTimeout(this._inertiaTimer)
-this._inertiaTimer = null
-},
-finishGraphInteraction() {
-if (!this._camera || !this._frame) return
-this.setCamera(clampCamera(this._camera, this._frame), false, true, { graphInteracting: false })
-},
-startCameraInertia(velocityX, velocityY) {
-this.stopCameraInertia()
-let vx = velocityX
-let vy = velocityY
-let previous = Date.now()
-const step = () => {
-if (this._unloaded || this._gesture || !this._frame || !this._camera) return
-const now = Date.now()
-const elapsed = Math.max(8, Math.min(32, now - previous))
-previous = now
-const decay = Math.pow(INERTIA_DECAY, elapsed / CAMERA_FRAME_MS)
-vx *= decay
-vy *= decay
-const raw = { ...this._camera, x: this._camera.x + vx * elapsed, y: this._camera.y + vy * elapsed }
-const next = clampCamera(raw, this._frame)
-if (Math.abs(next.x - raw.x) > .01) vx = 0
-if (Math.abs(next.y - raw.y) > .01) vy = 0
-this.setCamera(next, true, false)
-if (Math.hypot(vx, vy) < INERTIA_MIN_SPEED) {
-this._inertiaTimer = null
-this.finishGraphInteraction()
-return
-}
-this._inertiaTimer = setTimeout(step, CAMERA_FRAME_MS)
-}
-this._inertiaTimer = setTimeout(step, CAMERA_FRAME_MS)
 },
 })

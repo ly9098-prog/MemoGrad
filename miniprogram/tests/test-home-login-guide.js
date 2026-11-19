@@ -123,7 +123,7 @@ function launch(memory = new Map(), options = {}) {
   }
 }
 
-test('guest home shows the measured guide for six seconds without persisting timeout dismissal', async () => {
+test('guest home closes the bubble at six seconds and keeps entry attention for exactly fifteen seconds', async () => {
   const runtime = launch()
   const page = runtime.page()
   assert.equal(page.data.showLoginGuide, false)
@@ -142,7 +142,9 @@ test('guest home shows the measured guide for six seconds without persisting tim
   assert.equal(page.data.showLoginGuide, false)
   assert.equal(page.data.loginEntryAttention, true)
   assert.equal(runtime.timers.size, 1)
-  runtime.advance(3999)
+  runtime.advance(4000)
+  assert.equal(page.data.loginEntryAttention, true, 'entry attention outlasts the former ten second limit')
+  runtime.advance(4999)
   assert.equal(page.data.loginEntryAttention, true)
   runtime.advance(1)
   assert.equal(page.data.loginEntryAttention, false)
@@ -272,9 +274,16 @@ test('the hint stays anchored to the guest profile control and respects reduced 
   assert.doesNotMatch(styles.match(/\.login-guide-arrow \{([^}]+)\}/)[1], /animation:/)
   assert.match(styles, /\.login-guide:not\(\.login-guide-pending\) \.login-guide-arrow \{[^}]*animation: loginGuideArrowNudge 2800ms 300ms linear 2 both;/)
   assert.match(styles, /@keyframes loginGuideArrowNudge \{[\s\S]*?translateY\(4px\)/)
-  assert.match(styles, /\.profile-entry-guide \.profile-chip::before \{\s*animation: loginGuideEntryPulse 5000ms linear 2;/)
-  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.login-guide-arrow,\s*\.profile-entry-guide \.profile-chip::before \{\s*animation: none !important;/)
-  assert.doesNotMatch(styles.match(/@keyframes loginGuideEntryPulse \{([\s\S]*?)\n\}/)[1], /box-shadow|transform/ )
+  const entryStyle = styles.match(/\.profile-entry-guide \.profile-chip::after \{([^}]+)\}/)[1]
+  const [, duration, iterations] = entryStyle.match(/animation: loginGuideEntryPulse (\d+)ms ease-in-out (\d+);/)
+  assert.equal(Number(duration) * Number(iterations), 15000, 'CSS and the entry lifecycle share a fifteen second window')
+  assert.match(entryStyle, /box-shadow: 0 0 18rpx 8rpx rgba\(85, 200, 155, \.28\),/)
+  assert.match(entryStyle, /pointer-events: none;/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.login-guide-arrow,\s*\.profile-entry-guide \.profile-chip::after \{\s*animation: none !important;/)
+  const entryMotion = styles.match(/@keyframes loginGuideEntryPulse \{([\s\S]*?)\n\}/)[1]
+  assert.match(entryMotion, /opacity:/)
+  assert.match(entryMotion, /transform:/)
+  assert.doesNotMatch(entryMotion, /box-shadow|filter|border-color|background-color/)
   assert.doesNotMatch(template, /class="btn login-guide-action"/)
   assert.doesNotMatch(guideStyle, /(?:margin|height|min-height):/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.login-guide,[\s\S]*?animation: none/)
@@ -450,7 +459,9 @@ test('the six second countdown starts after measurement and resize never restart
   runtime.advance(1)
   assert.equal(page.data.showLoginGuide, false)
   assert.equal(page.data.loginEntryAttention, true)
-  runtime.advance(4000)
+  runtime.advance(8999)
+  assert.equal(page.data.loginEntryAttention, true)
+  runtime.advance(1)
   assert.equal(page.data.loginEntryAttention, false)
 })
 
@@ -463,25 +474,42 @@ for (const handler of ['onHide', 'onUnload', 'closeLoginGuide', 'openLoginGuide'
     page[handler]()
     assert.equal(runtime.timers.size, 0)
     page.setData = () => assert.fail('late countdown write')
-    runtime.advance(10000)
+    runtime.advance(15000)
   })
 }
 
 for (const handler of ['onHide', 'onUnload', 'closeLoginGuide', 'openProfileSheet', 'dismissLoginGuideFromPage']) {
-  test(`${handler} cancels entry attention after the six second bubble has expired`, async () => {
+  test(`${handler} cancels entry attention just before fifteen seconds after the bubble has expired`, async () => {
     const runtime = launch()
     const page = runtime.page()
     await page.onShow()
-    runtime.advance(6000)
+    runtime.advance(14999)
     assert.equal(page.data.showLoginGuide, false)
     assert.equal(page.data.loginEntryAttention, true)
     assert.equal(runtime.timers.size, 1)
     await page[handler]()
     assert.equal(runtime.timers.size, 0)
     page.setData = () => assert.fail('late entry animation write')
-    runtime.advance(4000)
+    runtime.advance(15000)
   })
 }
+
+test('resize after the bubble expires preserves the original fifteen second entry deadline', async () => {
+  const runtime = launch()
+  const page = runtime.page()
+  await page.onShow()
+  runtime.advance(10000)
+  assert.equal(page.data.showLoginGuide, false)
+  assert.equal(page.data.loginEntryAttention, true)
+  runtime.resize(320)
+  page.onResize()
+  assert.equal(runtime.timers.size, 1)
+  runtime.advance(4999)
+  assert.equal(page.data.loginEntryAttention, true)
+  runtime.advance(1)
+  assert.equal(page.data.loginEntryAttention, false)
+  assert.equal(runtime.timers.size, 0)
+})
 
 test('intrinsic overlay widths stay within 16px screen edges with anchor-relative arrows', () => {
   const { loginGuideLayout } = launch().exports

@@ -799,7 +799,9 @@ Page({
       }
       // Fetch during the exit; fast results replace the card without a skeleton frame.
       const ready = sheetClosed ? sheetClosed.then(showLoading) : showLoading()
-      const [raw] = await Promise.all([request, ready])
+      // Promise.all returns an array; indexing avoids DevTools' slicedToArray helper chain.
+      const results = await Promise.all([request, ready])
+      const raw = results[0]
       if (!this._alive || !this._visible || seq !== this._knowledgeDiagnosisSeq) return null
       const snapshot = buildKnowledgeDiagnosisSnapshot(raw)
       this._knowledgeDiagnosisLoadedAt = Date.now()

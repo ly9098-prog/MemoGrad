@@ -132,28 +132,18 @@ global.Page = value => { pageDefinition = value }
 require('../subpackages/knowledge/knowledge-subject/index')
 global.Page = originalPage
 
-test('label preference and camera gestures update presentation without recomputing scene positions', () => {
+test('label preference and settled camera gestures preserve scene positions', () => {
   const frame = { left: 0, top: 0, width: 365, height: 343 }
   const scene = buildScene([groupWithLeaves(8)], subject)
   const positions = scene.nodes.map(node => [node.cx, node.cy])
-  const page = {
-    ...pageDefinition, data: { ...pageDefinition.data, scene }, _frame: frame,
-    _camera: fitCamera(frame), _pageVisible: true,
-    setData(patch) { Object.assign(this.data, patch) },
-  }
-  const touch = (x, y) => ({ clientX: x, clientY: y })
+  const page = { ...pageDefinition, data: { ...pageDefinition.data, scene }, _frame: frame,
+    _camera: fitCamera(frame), _pageVisible: true, setData(patch) { Object.assign(this.data, patch) } }
   page.toggleGraphLabels()
   assert.equal(page.data.showAllGraphLabels, true)
-  page.startGraphTouch({ touches: [touch(120, 100)] })
-  page.moveGraphTouch({ touches: [touch(140, 120)] })
-  assert.equal(page._gesture.moved, true)
-  page.endGraphTouch({ touches: [], type: 'touchcancel' })
-  page.startGraphTouch({ touches: [touch(100, 100), touch(200, 100)] })
-  page.moveGraphTouch({ touches: [touch(50, 100), touch(250, 100)] })
-  assert.equal(page.cameraPayload(false).graphLabelMode, 'detail')
-  page.endGraphTouch({ touches: [], type: 'touchcancel' })
+  page.setCamera(page._camera)
+  page.commitGraphMotion({ revision: page.data.graphMotionState.revision, sequence: 1, camera: { ...page._camera, scale: page._camera.scale * 2 } })
+  assert.equal(page.data.graphLabelMode, 'detail')
   assert.deepEqual(scene.nodes.map(node => [node.cx, node.cy]), positions)
-  assert.ok(page._suppressTapUntil > Date.now())
   page.onHide()
 })
 
@@ -177,10 +167,8 @@ test('index location on a large chapter retains the requested selection and deta
   assert.ok(page.data.scene.nodes.some(node => node.pointId === 81))
 })
 
-test('core remains fixed and hidden pages cancel pending force work', () => {
+test('hidden pages cancel pending force work', () => {
   const page = { ...pageDefinition, data: { subject }, _pageVisible: true, _forces: { ...DEFAULT_FORCES }, setData() {} }
-  page.startGraphNodeTouch({ currentTarget: { dataset: { nodeId: 'core' } }, touches: [{}] })
-  assert.equal(page._dragNodeId, '')
   page.changeForce({ currentTarget: { dataset: { key: 'repel' } }, detail: { value: 20 } })
   const timer = page._forceTimer
   assert.ok(timer)
@@ -203,47 +191,46 @@ test('panning only publishes the camera while zoom and node changes refresh labe
   assert.ok(page.cameraPayload(false).graphLabelVisibility)
 })
 
-test('drag events coalesce and release commits the final node position before teardown', () => {
-  const frame = { left: 0, top: 0, width: 365, height: 343 }
-  const page = {
-    ...pageDefinition, data: {}, _frame: frame, _camera: fitCamera(frame), _pageVisible: true,
-    _gesture: { moved: true, dragNodeId: 'point:2', touches: [{}] },
-    commits: [], commitDraggedNode(point) { this.commits.push(point) },
-    finishGraphInteraction() {},
-  }
-  page.moveDraggedNode({ x: 1, y: 2 })
-  const timer = page._dragTimer
-  page.moveDraggedNode({ x: 20, y: 30 })
-  assert.equal(page._dragTimer, timer)
-  assert.equal(page.commits.length, 0)
-  page.endGraphTouch({ type: 'touchend', touches: [] })
-  assert.deepEqual(page.commits, [{ x: 20, y: 30 }])
-  assert.equal(page._dragTimer, null)
-  assert.equal(page._gesture, null)
-  assert.equal(page._pendingDragPoint, null)
+test('one settled node update preserves manual placement and refreshes connected edges', () => {
+  const group = groupWithLeaves(2), frame = { left: 0, top: 0, width: 365, height: 343 }
+  const scene = buildScene([group], subject, { groupKey: 'tree', focusNodeId: 1 })
+  const patches = []
+  const page = { ...pageDefinition, data: { ...pageDefinition.data, scene }, _frame: frame,
+    _camera: { ...fitCamera(frame), scale: 0.8 }, _pageVisible: true, _manualPositions: {},
+    _sceneNodeIndex: new Map(scene.nodes.map((node, index) => [node.id, index])),
+    _sceneEdgeLinks: new Map(), setData(patch) { patches.push(patch); Object.assign(this.data, patch) } }
+  scene.edges.forEach((edge, index) => {
+    for (const id of [edge.from, edge.to]) page._sceneEdgeLinks.set(id, [...(page._sceneEdgeLinks.get(id) || []), index])
+  })
+  page.setCamera(page._camera)
+  patches.length = 0
+  const before = scene.edges[0].style
+  const node = scene.nodes.find(node => node.kind !== 'core')
+  page.commitGraphMotion({ revision: page._graphMotionRevision, sequence: 1, camera: page._camera, node: { id: node.id, cx: 220, cy: 320 } })
+  assert.equal(patches.length, 1)
+  assert.deepEqual(page._manualPositions[node.id], { x: 220, y: 320 })
+  assert.notEqual(scene.edges[0].style, before)
+  assert.ok(page.data.graphLabelLayouts)
 })
 
-test('hiding during node drag clears its identity before a new background gesture', () => {
+test('hidden pages reject stale view commits and resume with a fresh motion revision', () => {
   const frame = { left: 0, top: 0, width: 365, height: 343 }
-  const page = {
-    ...pageDefinition, data: { ...pageDefinition.data, graphInteracting: true },
+  const page = { ...pageDefinition, data: { ...pageDefinition.data, scene: { nodes: [], edges: [] } },
     _frame: frame, _camera: fitCamera(frame), _pageVisible: true,
-    _dragNodeId: 'point:2', _gesture: { dragNodeId: 'point:2' },
-    setData(patch) { Object.assign(this.data, patch) },
-  }
-  page.moveDraggedNode({ x: 200, y: 200 })
-  page.setCamera({ ...page._camera, x: 12 }, true, false)
+    _loadedOnce: true, _readyForViewWork: true, setData(patch) { Object.assign(this.data, patch) } }
+  page.setCamera(page._camera)
+  const revision = page._graphMotionRevision, before = { ...page._camera }
   page.onHide()
-  assert.equal(page._cameraTimer, null)
-  assert.equal(page._inertiaTimer, null)
-  assert.equal(page._dragTimer, null)
-  assert.equal(page._gesture, null)
-  assert.equal(page._dragNodeId, '')
-  assert.equal(page.data.graphInteracting, false)
-  page._pageVisible = true
-  page.startGraphTouch({ touches: [{ clientX: 200, clientY: 200 }] })
-  assert.equal(page._gesture.dragNodeId, '')
-  page.endGraphTouch({ touches: [], type: 'touchcancel' })
+  assert.equal(page.data.graphMotionState.active, false)
+  page.commitGraphMotion({ revision, sequence: 1, camera: { ...before, x: 12 } })
+  assert.deepEqual(page._camera, before)
+  page.onShow()
+  assert.equal(page.data.graphMotionState.active, true)
+  assert.ok(page._graphMotionRevision > revision)
+  page.commitGraphMotion({ revision, sequence: 2, camera: { ...before, x: 20 } })
+  assert.deepEqual(page._camera, before)
+  page.onUnload()
+  assert.equal(page.data.graphMotionState.active, false)
 })
 
 test('a long label cannot obscure another node even when labels do not overlap each other', () => {
@@ -268,23 +255,23 @@ test('resuming after a committed drag refreshes labels without another camera ge
   ]
   const page = {
     ...pageDefinition,
-    data: { ...pageDefinition.data, scene: { nodes, edges: [] }, graphInteracting: true },
+    data: { ...pageDefinition.data, scene: { nodes, edges: [] } },
     _frame: frame, _camera: camera, _pageVisible: true, _loadedOnce: true, _readyForViewWork: true,
-    _gesture: { dragNodeId: 'point:2' }, _manualPositions: {},
+    _manualPositions: {},
     _sceneNodeIndex: new Map(nodes.map((node, index) => [node.id, index])),
     setData(patch) { Object.assign(this.data, patch) },
   }
   page.setCamera(camera)
   assert.equal(page.data.graphLabelVisibility['group:1'], true)
   const initialLabelStyle = page.data.graphLabelLayouts['group:1'].style
-  page.commitDraggedNode({ x: 340 * camera.scale + camera.x, y: 335 * camera.scale + camera.y })
-  assert.equal(page.data.graphLabelVisibility['group:1'], true, 'drag defers label recalculation')
+  page.commitGraphMotion({ revision: page._graphMotionRevision, sequence: 1, camera, node: { id: 'point:2', cx: 340, cy: 335 } })
+  assert.notEqual(page.data.graphLabelLayouts['group:1'].style, initialLabelStyle, 'settled drag refreshes labels immediately')
   page.onHide()
   page.onShow()
   assert.notEqual(page.data.graphLabelLayouts['group:1'].style, initialLabelStyle)
   assertClearLabels(page.data, nodes, camera.scale)
   assert.equal(page.data.graphLabelVisibility['point:2'], true)
-  assert.equal(page.data.graphInteracting, false)
+  assert.equal(page.data.graphMotionState.active, true)
 })
 
 test('overview and focused scenes disclose one level while all descendants remain reachable', () => {

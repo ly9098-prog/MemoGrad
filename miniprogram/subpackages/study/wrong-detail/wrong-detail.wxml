@@ -179,7 +179,7 @@
 <view class="ai-result-tools">
 <view class="ai-hint-row">
 <image class="ai-history-icon-image" src="/assets/icons/wrong-detail/layers.svg" mode="aspectFit" aria-hidden="true" />
-<text class="ai-hint">{{aiFromQuestionAnalysis ? '当前展示题库解析' : (aiFromCache ? '来自历史复盘，仅供参考' : '内容由 AI 生成，仅供参考')}}</text>
+<text class="ai-hint">{{aiFromQuestionAnalysis ? '当前展示题库解析' : (aiFromCache ? '已生成的 AI 分析，仅供参考' : '内容由 AI 生成，仅供参考')}}</text>
 </view>
 <button class="ai-regenerate-link" hover-class="ai-control-pressed" hover-stay-time="90" disabled="{{aiRegenerating || aiAvailabilityPending || (!aiAvailabilityEnabled && !aiAvailabilityChecking)}}" bindtap="regenerateAiAnalysis" aria-label="重新生成 AI 复盘"><image class="ai-refresh-icon-image {{aiRegenerating ? 'is-spinning' : ''}}" src="/assets/icons/wrong-detail/refresh-cw.svg" mode="aspectFit" aria-hidden="true" /><text>{{aiRegenerating ? '更新中…' : (aiAvailabilityPending ? '确认服务中…' : '重新生成')}}</text></button>
 </view>

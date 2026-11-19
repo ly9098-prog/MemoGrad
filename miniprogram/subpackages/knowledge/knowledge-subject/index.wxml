@@ -1,3 +1,4 @@
+<wxs module="graphMotion" src="./graph-motion.wxs"></wxs>
 <view class="atlas-page {{pageEntered ? 'page-entered' : ''}}">
 <view class="atlas-loading" wx:if="{{loading}}">
 <view class="loading-copy">
@@ -73,21 +74,17 @@
 </view>
 <view id="atlas-shell" class="atlas-shell graph-card page-reveal reveal-graph {{sceneAnimating ? 'scene-animating' : ''}} {{themeSwitching ? 'theme-content-switching' : ''}} theme-switch-{{themeSwitchPhase}} {{selectionSwitching ? 'selection-switching' : ''}} selection-{{selectionSwitchPhase}}">
 <view class="graph-card-head">
-<view class="graph-card-title-wrap">
 <button wx:if="{{scene.focused}}" class="graph-back" data-kind="core" data-key="{{scene.groupKey}}" data-id="{{scene.focusNodeId}}" catchtap="onGraphNodeTap" aria-label="返回上一级"><view class="graph-back-chevron" aria-hidden="true"></view></button>
 <view class="graph-card-copy">
 <text class="graph-card-title">{{scene.title}}</text>
+<text class="graph-count">{{scene.countText}}</text>
 </view>
-</view>
-<view class="graph-head-actions">
-<view class="graph-count"><text>{{scene.countText}}</text></view>
 <button class="graph-force-toggle {{forcePanelOpen ? 'is-open' : ''}}" catchtap="toggleForcePanel" hover-class="atlas-pressed" aria-label="图谱显示与力度设置" aria-expanded="{{forcePanelOpen}}"><view class="force-toggle-icon" aria-hidden="true"><view></view><view></view><view></view></view><text>设置</text></button>
 </view>
-</view>
-<view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}} {{showAllGraphLabels ? 'graph-label-all' : ''}} {{graphInteracting ? 'graph-interacting' : ''}}" bindtouchstart="startGraphTouch" catchtouchmove="moveGraphTouch" bindtouchend="endGraphTouch" bindtouchcancel="endGraphTouch" bindtap="onGraphBackgroundTap">
+<view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}} {{showAllGraphLabels ? 'graph-label-all' : ''}}" motion="{{graphMotionState}}" change:motion="{{graphMotion.sync}}" bindtouchstart="{{graphMotion.start}}" catchtouchmove="{{graphMotion.move}}" bindtouchend="{{graphMotion.end}}" bindtouchcancel="{{graphMotion.end}}" bindtap="{{graphMotion.tap}}">
 <view class="atlas-stage" style="{{stageStyle}}font-size:{{graphLabelSize || 32}}px;" wx:if="{{scene.nodes.length}}">
 <view wx:for="{{scene.edges}}" wx:key="id" class="atlas-edge force-edge edge-{{item.kind}} {{item.active ? 'edge-active' : ''}} {{item.dimmed ? 'edge-dimmed' : ''}}" style="{{item.style}}" aria-hidden="true"></view>
-<view wx:for="{{scene.nodes}}" wx:key="id" class="atlas-node force-node force-{{item.kind}} tone-{{item.tone}} {{item.pathActive ? 'node-path' : ''}} {{item.selected ? 'node-selected' : ''}} {{item.neighbor ? 'node-neighbor' : ''}} {{graphLabelVisibility[item.id] ? 'node-label-visible' : ''}} {{item.dimmed ? 'node-dimmed' : ''}}" style="{{item.style}}" data-kind="{{item.kind}}" data-key="{{item.groupKey}}" data-id="{{item.pointId}}" data-node-id="{{item.id}}" bindtouchstart="startGraphNodeTouch" catchtap="onGraphNodeTap" hover-class="graph-node-pressed" hover-start-time="18" hover-stay-time="72" hover-stop-propagation="true" aria-role="button" aria-label="{{item.label}}">
+<view wx:for="{{scene.nodes}}" wx:key="id" class="atlas-node force-node force-{{item.kind}} tone-{{item.tone}} {{item.pathActive ? 'node-path' : ''}} {{item.selected ? 'node-selected' : ''}} {{item.neighbor ? 'node-neighbor' : ''}} {{graphLabelVisibility[item.id] ? 'node-label-visible' : ''}} {{item.dimmed ? 'node-dimmed' : ''}}" style="{{item.style}}" data-kind="{{item.kind}}" data-key="{{item.groupKey}}" data-id="{{item.pointId}}" data-node-id="{{item.id}}" bindtouchstart="{{graphMotion.nodeStart}}" catchtap="{{graphMotion.tap}}" hover-class="graph-node-pressed" hover-start-time="18" hover-stay-time="72" hover-stop-propagation="true" aria-role="button" aria-label="{{item.label}}">
 <view class="force-hit" aria-hidden="true"></view>
 <view class="force-dot" aria-hidden="true"></view>
 <view class="force-ring" wx:if="{{item.selected || item.kind === 'core'}}" aria-hidden="true"></view>
@@ -104,9 +101,9 @@
 <view class="graph-toolbar" wx:if="{{scene.nodes.length}}">
 <view class="graph-toolbar-copy"><text class="graph-scope-hint">{{scene.focused ? '当前层级 · 点击节点查看' : '章节总览 · 点击主题展开'}}</text><text class="graph-zoom-text">{{zoomText}} · 拖动 / 双指缩放</text></view>
 <view class="graph-controls">
-<button class="graph-control" data-step="1" catchtap="zoomGraph" disabled="{{zoomInDisabled}}" aria-label="放大图谱">+</button>
-<button class="graph-control graph-control-out" data-step="-1" catchtap="zoomGraph" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱">−</button>
-<button class="graph-control graph-control-reset" catchtap="resetView" aria-label="复位图谱"><view aria-hidden="true"></view></button>
+<button class="graph-control" data-step="1" catchtap="{{graphMotion.control}}" disabled="{{zoomInDisabled}}" aria-label="放大图谱">+</button>
+<button class="graph-control graph-control-out" data-step="-1" catchtap="{{graphMotion.control}}" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱">−</button>
+<button class="graph-control graph-control-reset" catchtap="{{graphMotion.control}}" aria-label="复位图谱"><view aria-hidden="true"></view></button>
 </view>
 </view>
 <view class="force-panel" wx:if="{{forcePanelOpen}}">
@@ -120,7 +117,7 @@
 </view>
 <view class="graph-page-navigation" wx:if="{{scene.pageCount > 1}}">
 <button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" bindtap="changeGraphPage" aria-label="上一页知识节点">上一页</button>
-<text>{{scene.page + 1}} / {{scene.pageCount}}</text>
+<text class="graph-page-status" aria-label="第 {{scene.page + 1}} 页，共 {{scene.pageCount}} 页">{{scene.page + 1}} / {{scene.pageCount}}</text>
 <button class="graph-page-turn" disabled="{{scene.page + 1 >= scene.pageCount}}" data-step="1" bindtap="changeGraphPage" aria-label="下一页知识节点">下一页</button>
 </view>
 </view>
@@ -144,17 +141,17 @@
 </view>
 </view>
 <view class="index-toolbar-side">
-<view class="status-key" aria-label="掌握状态图例">
-<view class="status-key-item"><view class="status-key-dot tone-unseen"></view><text>待建立</text></view>
-<view class="status-key-item"><view class="status-key-dot tone-weak"></view><text>需强化</text></view>
-<view class="status-key-item"><view class="status-key-dot tone-stable"></view><text>较稳定</text></view>
-</view>
 <button class="index-search-trigger {{indexSearchOpen ? 'index-search-open' : ''}} {{indexSearchDraft ? 'index-search-has-query' : ''}}" bindtap="toggleIndexSearch" hover-class="index-search-pressed" hover-start-time="12" hover-stay-time="55" aria-label="{{indexSearchOpen ? '收起知识索引搜索' : '在知识索引中搜索'}}">
 <image wx:if="{{!indexSearchOpen}}" src="/assets/icons/knowledge-index/search.svg" mode="aspectFit" aria-hidden="true" />
 <view wx:else class="index-search-close-symbol" aria-hidden="true"></view>
 <view class="index-search-query-dot" wx:if="{{indexSearchDraft && !indexSearchOpen}}" aria-hidden="true"></view>
 </button>
 </view>
+</view>
+<view class="status-key" aria-label="掌握状态图例">
+<view class="status-key-item"><view class="status-key-dot tone-unseen"></view><text>待建立</text></view>
+<view class="status-key-item"><view class="status-key-dot tone-weak"></view><text>需强化</text></view>
+<view class="status-key-item"><view class="status-key-dot tone-stable"></view><text>较稳定</text></view>
 </view>
 <view class="index-inline-search {{indexSearchFocused ? 'index-inline-search-focused' : ''}} {{indexSearchDraft ? 'index-inline-search-has-value' : ''}}" wx:if="{{indexSearchOpen}}">
 <view class="index-inline-search-leading" aria-hidden="true">

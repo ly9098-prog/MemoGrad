@@ -2,7 +2,7 @@ const storage = require('../../../utils/storage')
 
 const DISMISSED_KEY = 'preferences.home.loginHintDismissed'
 const LOGIN_GUIDE_VISIBLE_MS = 6000
-const LOGIN_ENTRY_ATTENTION_MS = 10000
+const LOGIN_ENTRY_ATTENTION_MS = 15000
 let shownThisLaunch = false
 
 function overlaps(first, second) {

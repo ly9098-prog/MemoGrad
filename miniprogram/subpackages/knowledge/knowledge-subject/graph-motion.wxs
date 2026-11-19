@@ -1,0 +1,307 @@
+// Keep touch frames in the view layer. Only the settled gesture crosses to JS.
+var math = getMath();
+function clamp(value, low, high) {
+  return math.max(low, math.min(high, value));
+}
+function now() {
+  return getDate().getTime();
+}
+function copyCamera(camera) {
+  return {
+    x: camera.x,
+    y: camera.y,
+    scale: camera.scale
+  };
+}
+function bound(camera, model) {
+  camera.scale = clamp(camera.scale, model.min, model.max);
+  var right = model.width - 800 * camera.scale - 28;
+  var bottom = model.height - 920 * camera.scale - 28;
+  camera.x = clamp(camera.x, math.min(28, right), math.max(28, right));
+  camera.y = clamp(camera.y, math.min(28, bottom), math.max(28, bottom));
+  return camera;
+}
+function point(touch, rect) {
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top
+  };
+}
+function distance(a, b) {
+  var x = a.x - b.x;
+  var y = a.y - b.y;
+  return math.sqrt(x * x + y * y);
+}
+function edgeStyle(from, to) {
+  var dx = to.cx - from.cx;
+  var dy = to.cy - from.cy;
+  var length = math.sqrt(dx * dx + dy * dy) || 1;
+  var start = math.min(length * 0.35, from.r);
+  var end = math.min(length * 0.35, to.r);
+  return {
+    left: from.cx + dx * start / length + 'px',
+    top: from.cy + dy * start / length + 'px',
+    width: math.max(0, length - start - end) + 'px',
+    transform: 'rotate(' + math.atan2(dy, dx) * 180 / math.PI + 'deg)'
+  };
+}
+function components(owner, state) {
+  state.stage = owner.selectComponent('.atlas-stage');
+  state.viewport = owner.selectComponent('#atlas-viewport');
+  state.dots = owner.selectAllComponents('.atlas-node');
+  state.links = owner.selectAllComponents('.force-edge');
+}
+function paint(state) {
+  if (!state.stage || !state.camera) return;
+  var camera = state.camera;
+  state.stage.setStyle({
+    transform: 'translate3d(' + camera.x + 'px,' + camera.y + 'px,0) scale(' + camera.scale + ')',
+    'font-size': clamp(12 / camera.scale, 8, 48) + 'px',
+    '--graph-hit-size': 44 / camera.scale + 'px'
+  });
+  if (!state.geometryDirty) return;
+  state.geometryDirty = false;
+  for (var i = 0; i < state.nodes.length; i++) {
+    var node = state.nodes[i];
+    if (state.dots[i]) state.dots[i].setStyle({
+      left: node.cx - node.r + 'px',
+      top: node.cy - node.r + 'px'
+    });
+  }
+  for (var j = 0; j < state.model.edges.length; j++) {
+    var edge = state.model.edges[j];
+    if (state.links[j]) state.links[j].setStyle(edgeStyle(state.nodes[edge.from], state.nodes[edge.to]));
+  }
+}
+function queuePaint(owner, state) {
+  if (state.paintPending) return;
+  state.paintPending = true;
+  var revision = state.revision;
+  owner.requestAnimationFrame(function () {
+    state.paintPending = false;
+    if (state.revision !== revision || !state.model.active) return;
+    if (state.refreshComponents) {
+      components(owner, state);
+      state.refreshComponents = false;
+    }
+    paint(state);
+  });
+}
+function publish(owner, state) {
+  if (!state.dirty || !state.model.active) return;
+  state.dirty = false;
+  owner.callMethod('commitGraphMotion', {
+    revision: state.revision,
+    sequence: state.sequence = (state.sequence || 0) + 1,
+    camera: copyCamera(state.camera),
+    node: state.changedNode ? {
+      id: state.changedNode.id,
+      cx: state.changedNode.cx,
+      cy: state.changedNode.cy
+    } : null
+  });
+}
+function settle(owner, state) {
+  if (state.viewport) state.viewport.removeClass('graph-interacting');
+  publish(owner, state);
+}
+function sync(value, oldValue, owner) {
+  if (!value) return;
+  var state = owner.getState();
+  state.revision = value.revision;
+  state.sequence = 0;
+  state.run = (state.run || 0) + 1;
+  state.model = value;
+  state.camera = copyCamera(value.camera);
+  state.gesture = null;
+  state.nodeIndex = -1;
+  state.changedNode = null;
+  state.dirty = false;
+  state.paintPending = false;
+  state.geometryDirty = true;
+  state.refreshComponents = true;
+  state.nodes = [];
+  for (var i = 0; i < value.nodes.length; i++) {
+    var node = value.nodes[i];
+    state.nodes.push({
+      id: node.id,
+      cx: node.cx,
+      cy: node.cy,
+      r: node.r
+    });
+  }
+  components(owner, state);
+  if (state.viewport) state.viewport.removeClass('graph-interacting');
+  if (value.active) queuePaint(owner, state);
+}
+function nodeStart(event, owner) {
+  var state = owner.getState();
+  var id = event.currentTarget.dataset.nodeId;
+  state.nodeIndex = -1;
+  if (id === 'core' || event.touches.length !== 1) return;
+  for (var i = 0; i < state.nodes.length; i++) {
+    if (state.nodes[i].id === id) {
+      state.nodeIndex = i;
+      return;
+    }
+  }
+}
+function begin(event, owner, state) {
+  if (!event.touches.length || !state.model || !state.model.active) return;
+  components(owner, state);
+  if (!state.viewport || !state.stage) return;
+  var rect = state.viewport.getBoundingClientRect();
+  if (!rect) return;
+  var first = point(event.touches[0], rect);
+  var second = event.touches.length > 1 ? point(event.touches[1], rect) : null;
+  if (second) state.nodeIndex = -1;
+  var camera = copyCamera(state.camera);
+  var node = state.nodeIndex >= 0 ? state.nodes[state.nodeIndex] : null;
+  state.run = (state.run || 0) + 1;
+  state.gesture = {
+    rect: rect,
+    first: first,
+    second: second,
+    camera: camera,
+    moved: !!second,
+    last: first,
+    time: now(),
+    vx: 0,
+    vy: 0,
+    nodeIndex: state.nodeIndex,
+    offsetX: node ? node.cx - (first.x - camera.x) / camera.scale : 0,
+    offsetY: node ? node.cy - (first.y - camera.y) / camera.scale : 0
+  };
+  state.viewport.addClass('graph-interacting');
+}
+function start(event, owner) {
+  begin(event, owner, owner.getState());
+}
+function move(event, owner) {
+  var state = owner.getState();
+  var gesture = state.gesture;
+  if (!gesture || !event.touches.length) return false;
+  if (event.touches.length > 1 !== !!gesture.second) {
+    begin(event, owner, state);
+    return false;
+  }
+  var first = point(event.touches[0], gesture.rect);
+  var dx = first.x - gesture.first.x;
+  var dy = first.y - gesture.first.y;
+  if (math.abs(dx) + math.abs(dy) > 5) gesture.moved = true;
+  if (!gesture.moved) return false;
+  if (gesture.nodeIndex >= 0) {
+    var node = state.nodes[gesture.nodeIndex];
+    node.cx = clamp((first.x - state.camera.x) / state.camera.scale + gesture.offsetX, 24, 776);
+    node.cy = clamp((first.y - state.camera.y) / state.camera.scale + gesture.offsetY, 24, 896);
+    state.changedNode = node;
+    state.geometryDirty = true;
+  } else if (gesture.second) {
+    var second = point(event.touches[1], gesture.rect);
+    var initialDistance = distance(gesture.first, gesture.second);
+    if (initialDistance < 1) return false;
+    var anchorX = (gesture.first.x + gesture.second.x) / 2;
+    var anchorY = (gesture.first.y + gesture.second.y) / 2;
+    var scale = clamp(gesture.camera.scale * distance(first, second) / initialDistance, state.model.min, state.model.max);
+    state.camera = bound({
+      scale: scale,
+      x: (first.x + second.x) / 2 - (anchorX - gesture.camera.x) * scale / gesture.camera.scale,
+      y: (first.y + second.y) / 2 - (anchorY - gesture.camera.y) * scale / gesture.camera.scale
+    }, state.model);
+  } else {
+    var time = now();
+    var elapsed = clamp(time - gesture.time, 8, 40);
+    gesture.vx = gesture.vx * 0.62 + (first.x - gesture.last.x) / elapsed * 0.38;
+    gesture.vy = gesture.vy * 0.62 + (first.y - gesture.last.y) / elapsed * 0.38;
+    gesture.last = first;
+    gesture.time = time;
+    state.camera = bound({
+      scale: gesture.camera.scale,
+      x: gesture.camera.x + dx,
+      y: gesture.camera.y + dy
+    }, state.model);
+  }
+  state.dirty = true;
+  state.suppressUntil = now() + 280;
+  queuePaint(owner, state);
+  return false;
+}
+function inertia(owner, state, gesture) {
+  var run = state.run;
+  var previous = now();
+  // A long pause before release must not revive an old swipe velocity.
+  var vx = now() - gesture.time > 80 ? 0 : gesture.vx;
+  var vy = now() - gesture.time > 80 ? 0 : gesture.vy;
+  function step() {
+    if (state.run !== run || !state.model.active) return;
+    var time = now();
+    var elapsed = clamp(time - previous, 8, 32);
+    previous = time;
+    var decay = math.pow(0.91, elapsed / 16);
+    vx *= decay;
+    vy *= decay;
+    var rawX = state.camera.x + vx * elapsed;
+    var rawY = state.camera.y + vy * elapsed;
+    state.camera = bound({
+      scale: state.camera.scale,
+      x: rawX,
+      y: rawY
+    }, state.model);
+    if (math.abs(state.camera.x - rawX) > 0.01) vx = 0;
+    if (math.abs(state.camera.y - rawY) > 0.01) vy = 0;
+    paint(state);
+    if (math.sqrt(vx * vx + vy * vy) < 0.025) {
+      settle(owner, state);
+      return;
+    }
+    owner.requestAnimationFrame(step);
+  }
+  owner.requestAnimationFrame(step);
+}
+function end(event, owner) {
+  var state = owner.getState();
+  var gesture = state.gesture;
+  if (!gesture) return;
+  state.gesture = null;
+  state.nodeIndex = -1;
+  if (event.touches.length) {
+    begin(event, owner, state);
+    return;
+  }
+  if (gesture.moved) state.suppressUntil = now() + 280;
+  paint(state);
+  if (event.type !== 'touchcancel' && gesture.moved && gesture.nodeIndex < 0 && !gesture.second) inertia(owner, state, gesture);else settle(owner, state);
+}
+function tap(event, owner) {
+  var state = owner.getState();
+  if (!state.model || !state.model.active || now() < (state.suppressUntil || 0)) return false;
+  publish(owner, state);
+  var data = event.currentTarget.dataset;
+  if (data.nodeId) owner.callMethod('onGraphNodeTap', {
+    currentTarget: {
+      dataset: data
+    }
+  });else owner.callMethod('onGraphBackgroundTap', {});
+  return false;
+}
+function control(event, owner) {
+  var state = owner.getState();
+  if (!state.model || !state.model.active) return;
+  state.run = (state.run || 0) + 1;
+  state.gesture = null;
+  state.nodeIndex = -1;
+  paint(state);
+  settle(owner, state);
+  var data = event.currentTarget.dataset;
+  if (data.step) owner.callMethod('zoomGraph', { currentTarget: { dataset: data } });
+  else owner.callMethod('resetView', {});
+}
+module.exports = {
+  sync: sync,
+  nodeStart: nodeStart,
+  start: start,
+  move: move,
+  end: end,
+  tap: tap,
+  control: control
+};

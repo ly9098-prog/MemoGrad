@@ -3,7 +3,7 @@ const { test } = require('node:test')
 const { fixture, deferred } = require('./helpers/wrong-detail-ai-recovery-fixture')
 const plain = value => JSON.parse(JSON.stringify(value))
 
-if (process.argv[2]) test('compiled AI errors keep reference content, recovery and disabled states visible', () => {
+if (process.argv[2]) test('compiled AI states retain recovery controls and accurate analysis source hints', () => {
   const fs = require('node:fs'), vm = require('node:vm')
   const context = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
   vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), context)
@@ -40,6 +40,21 @@ if (process.argv[2]) test('compiled AI errors keep reference content, recovery a
   const terminal = render({ ...base, aiRetryable: false })
   assert.equal(byClass(terminal, 'ai-review-error').length, 1)
   assert.equal(byClass(terminal, 'ai-retry-btn').length, 0)
+  const aiCards = {
+    mistakeDiagnosis: { raw: '错因', text: '错因' },
+    knowledgePatch: { raw: '补漏', text: '补漏' },
+    reviewTask: { raw: '复练', text: '复练' },
+  }
+  for (const [cached, questionAnalysis, hint] of [
+    [false, false, '内容由 AI 生成，仅供参考'],
+    [true, false, '已生成的 AI 分析，仅供参考'],
+    [false, true, '当前展示题库解析'],
+    [true, true, '当前展示题库解析'],
+  ]) {
+    const tree = render({ ...base, aiFallback: false, aiCards,
+      aiFromCache: cached, aiFromQuestionAnalysis: questionAnalysis })
+    assert.equal(byClass(tree, 'ai-hint')[0].children.join(''), hint)
+  }
 })
 
 function setup() {
