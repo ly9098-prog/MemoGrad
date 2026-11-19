@@ -21,6 +21,7 @@ test('number reveal clamps percentages and normalizes invalid counts', () => {
 
 test('number reveal starts only when values actually change and reaches targets', () => {
   const page = {
+    _digitRevealReady: true,
     _alive: true,
     _visible: true,
     data: {
@@ -86,6 +87,7 @@ test('number reveal starts only when values actually change and reaches targets'
 
 test('number reveal republishes zero and unchanged displays before animating', () => {
   const page = {
+    _digitRevealReady: true,
     _alive: true,
     _visible: true,
     data: {
@@ -100,7 +102,7 @@ test('number reveal republishes zero and unchanged displays before animating', (
       _animDueReviewCount: 0,
       _animDueReviewSegments: [],
     },
-    setData(patch) { Object.assign(this.data, patch) },
+    setData(patch, callback) { Object.assign(this.data, patch); if (callback) callback() },
   }
   const fields = [
     { name: '_animTodayQuestions', segmentsKey: '_animTodayQuestionsSegments' },
@@ -128,13 +130,14 @@ test('number reveal republishes zero and unchanged displays before animating', (
 
 test('number reveal finish commits final values when a page hides mid-animation', () => {
   const page = {
+    _digitRevealReady: true,
     _alive: true,
     _visible: true,
     data: {
       _animTotalCorrect: 3,
       _animTotalCorrectSegments: numberReveal.buildNumberSegments(3),
     },
-    setData(patch) { Object.assign(this.data, patch) },
+    setData(patch, callback) { Object.assign(this.data, patch); if (callback) callback() },
   }
   numberReveal.start(page, {
     fields: [{ name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments' }],

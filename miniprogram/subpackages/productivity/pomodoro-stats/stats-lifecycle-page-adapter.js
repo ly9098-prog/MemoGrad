@@ -61,16 +61,26 @@ const { api, chinaTime, createSettingsController, getConsole } = dependencies
   }
 
 function _getLifecycleController(page, dependencies) {
-const { createLifecycleController, getPlatform, getSetTimeout } = dependencies
+const { createLifecycleController, digitRevealGate, getPlatform, getSetTimeout } = dependencies
     if (!page._lifecycleController) {
       page._lifecycleController = createLifecycleController({
         isAlive: () => page._alive,
         isVisible: () => page._isVisible,
         isGuest: () => page._guestMode,
         isViewReady: () => page._viewReady,
-        setVisible: value => { page._isVisible = value },
-        setViewReady: () => { page._viewReady = true },
-        setAlive: value => { page._alive = value },
+        setVisible: value => {
+          page._isVisible = value
+          if (value) digitRevealGate.resume(page)
+          else digitRevealGate.suspend(page)
+        },
+        setViewReady: () => {
+          page._viewReady = true
+          digitRevealGate.resume(page, true)
+        },
+        setAlive: value => {
+          page._alive = value
+          if (!value) digitRevealGate.clear(page)
+        },
         incrementRequestId: () => { page._requestId++ },
         syncTheme: () => page._syncThemeFromStorage(),
         loadData: () => page.loadData(),

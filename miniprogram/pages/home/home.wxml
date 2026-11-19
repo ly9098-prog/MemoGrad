@@ -84,7 +84,7 @@
 
       <view wx:if="{{!guestMode}}" class="focus-metrics">
         <view class="metric-item">
-          <view class="metric-value reveal-metric" aria-label="到期复习 {{_animDueReviewCount}}">
+          <view class="metric-value reveal-metric _animDueReviewSegments {{_animDueReviewSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="到期复习 {{_animDueReviewCount}}">
             <block wx:for="{{_animDueReviewSegments}}" wx:key="key">
               <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
             </block>
@@ -93,7 +93,7 @@
         </view>
         <view class="metric-divider"></view>
         <view class="metric-item">
-          <view class="metric-value reveal-metric" aria-label="连续天数 {{_animStreakDays}}">
+          <view class="metric-value reveal-metric _animStreakSegments {{_animStreakSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="连续天数 {{_animStreakDays}}">
             <block wx:for="{{_animStreakSegments}}" wx:key="key">
               <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
             </block>

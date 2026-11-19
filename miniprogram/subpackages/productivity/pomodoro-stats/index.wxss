@@ -3885,3 +3885,6 @@ page {
     animation: none !important;
   }
 }
+
+.daily-duration-digit { animation-play-state: paused; }
+.duration-reveal-playing .daily-duration-digit { animation-play-state: running; }

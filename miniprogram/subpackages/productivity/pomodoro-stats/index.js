@@ -1,3 +1,4 @@
+const durationReveal = require('./duration-reveal')
 const lifecyclePage = require('./stats-lifecycle-page-adapter')
 const distributionPage = require('./stats-distribution-page-adapter')
 const datePage = require('./stats-date-page-adapter')
@@ -216,9 +217,8 @@ return loadViewFlow._reconcileFromServer(this, stats, summary, { chinaTime, reco
   },
 
   _getLifecycleController() {
-return lifecyclePage._getLifecycleController(this, { createLifecycleController, getPlatform: () => wx, getSetTimeout: () => setTimeout })
+return lifecyclePage._getLifecycleController(this, { createLifecycleController, digitRevealGate: durationReveal.gate, getPlatform: () => wx, getSetTimeout: () => setTimeout })
 },
-
 
   _clearDynamicRefresh() {
     this._getDynamicRefreshController().cancel()
@@ -409,7 +409,7 @@ return animationPage._getDeferredHistoryController(this, { createDeferredHistory
   },
 
   _getDurationAnimationController() {
-return animationPage._getDurationAnimationController(this, { createDurationAnimationController, getClearTimeout: () => clearTimeout, getSetTimeout: () => setTimeout })
+return animationPage._getDurationAnimationController(this, { createDurationAnimationController, durationReveal, getClearTimeout: () => clearTimeout, getSetTimeout: () => setTimeout })
 },
 
   /* ==================== Data Loading ==================== */
@@ -563,7 +563,7 @@ return canvasPage._getStatsCanvasInitController(this, { buildStatsCanvasInitPage
   },
 
   _getStartAnimationsController() {
-return animationPage._getStartAnimationsController(this, { createStartAnimationsController, getDate: () => Date, getSetTimeout: () => setTimeout })
+return animationPage._getStartAnimationsController(this, { createStartAnimationsController, durationReveal, getDate: () => Date, getSetTimeout: () => setTimeout })
 },
 
   /* ==================== Trend Bars ==================== */

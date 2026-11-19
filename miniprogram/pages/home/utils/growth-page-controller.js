@@ -1,3 +1,4 @@
+const digitRevealGate = require('../../../utils/digit-reveal-gate')
 const api = require('../../../utils/api')
 const storage = require('../../../utils/storage')
 const growthAnimation = require('./growth-animation')
@@ -16,12 +17,21 @@ const TODAY_GOAL_KEY = 'home_today_goal_total'
 const GOAL_OPTIONS = [10, 20, 30, 50]
 
 const growthPageMethods = {
+  onReady() {
+    digitRevealGate.resume(this, true)
+  },
+
+  _resumeNumberReveal() {
+    digitRevealGate.resume(this)
+  },
+
   async _validateHomeSession() {
     const valid = auth.isLoggedIn() && await auth.checkAndRefreshToken()
     this._authed = Boolean(valid && auth.isLoggedIn())
     const owner = this._authed ? userId() : ''
     if (this._authed && this._homeOwner === owner) return
     this._homeOwner = owner
+    numberReveal.clear(this)
     this._growthSeq += 1
     this._clearAnimTimer()
     this._hasGrowthSnapshot = false
@@ -176,8 +186,8 @@ const growthPageMethods = {
     growthAnimation.start(this)
     numberReveal.start(this, {
       fields: [
-        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
-        { name: '_animStreakDays', segmentsKey: '_animStreakSegments' },
+        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments', selector: '._animDueReviewSegments' },
+        { name: '_animStreakDays', segmentsKey: '_animStreakSegments', selector: '._animStreakSegments' },
       ],
       to: {
         _animDueReviewCount: this._growthTargets.dueReviewCount,
@@ -250,8 +260,11 @@ const growthPageMethods = {
 }
 
 function clearGrowthLifecycleTimers(page) {
+  if (page._alive) digitRevealGate.suspend(page)
+  else digitRevealGate.clear(page)
   growthAnimation.clear(page)
-  numberReveal.finish(page)
+  if (page._alive) numberReveal.finish(page)
+  else numberReveal.clear(page)
 }
 
 module.exports = {

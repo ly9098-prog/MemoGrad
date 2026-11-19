@@ -59,6 +59,7 @@ function launch(memory = new Map(), options = {}) {
     clearTimeout: handle => timers.delete(handle),
   })
   const growthPageMethods = {
+    _resumeNumberReveal() {},
     async _validateHomeSession() { this._authed = authenticated },
     _guestBasePatch: () => ({ guestMode: true }),
     _clearAnimTimer() {},

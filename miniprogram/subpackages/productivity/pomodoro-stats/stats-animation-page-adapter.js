@@ -71,7 +71,7 @@ const { createDeferredHistoryController, getClearTimeout, getSetTimeout } = depe
   }
 
 function _getDurationAnimationController(page, dependencies) {
-const { createDurationAnimationController, getClearTimeout, getSetTimeout } = dependencies
+const { createDurationAnimationController, durationReveal, getClearTimeout, getSetTimeout } = dependencies
     if (!page._durationAnimationController) {
       page._durationAnimationController = createDurationAnimationController({
         isAlive: () => page._alive,
@@ -85,7 +85,7 @@ const { createDurationAnimationController, getClearTimeout, getSetTimeout } = de
         getDisplaySessions: () => page.data._dispTodaySessions,
         setDisplayDurationSec: value => { page._displayTodayDurationSec = value },
         getDurationDisplayPatch: (text, options) => page._getTodayDurationDisplayPatch(text, options),
-        setData: patch => page.setData(patch),
+        setData: patch => durationReveal.commitDuration(page, patch),
       })
     }
     return page._durationAnimationController
@@ -135,7 +135,7 @@ const { createPieLabelRevealController, getSetTimeout } = dependencies
   }
 
 function _getStartAnimationsController(page, dependencies) {
-const { createStartAnimationsController, getDate, getSetTimeout } = dependencies
+const { createStartAnimationsController, durationReveal, getDate, getSetTimeout } = dependencies
     if (!page._startAnimationsController) {
       page._startAnimationsController = createStartAnimationsController({
         isAlive: () => page._alive,
@@ -155,7 +155,7 @@ const { createStartAnimationsController, getDate, getSetTimeout } = dependencies
         incrementPieLabelToken: () => { page._pieLabelToken = (page._pieLabelToken || 0) + 1 },
         now: () => getDate().now(),
         setTimeout: getSetTimeout(),
-        setData: patch => page.setData(patch),
+        setData: patch => durationReveal.commitDuration(page, patch),
         getDurationDisplayPatch: (text, options) => page._getTodayDurationDisplayPatch(text, options),
         formatMin: sec => page._fmtMin(sec),
         renderPie: (progress, includeLabels) => page._renderPieChart(progress, includeLabels),

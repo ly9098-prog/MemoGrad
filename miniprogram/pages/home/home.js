@@ -92,7 +92,6 @@ Page({
   _profileNicknameDraftRaw: '',
   _examRoutePending: false,
   _resumeAttempted: false,
-
   onLoad() {
     this._alive = true
     this.setData({ guestMode: !auth.isLoggedIn(), showLoginGuide: false })
@@ -111,6 +110,7 @@ Page({
     const showSeq = ++this._showSeq
     await this._validateHomeSession()
     if (!this._alive || !this._visible || showSeq !== this._showSeq) return
+    this._resumeNumberReveal()
     this._isAdmin = this._authed ? auth.isAdmin() : false
     this._applyHomeBasePatch()
     if (this._authed) this._maybeResumeColdLaunch()

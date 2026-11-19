@@ -3172,3 +3172,6 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
   box-shadow: 0 16rpx 34rpx rgba(58, 111, 91, .18);
 }
 .dashboard-state-guest .state-link { color: #2F8066; }
+
+.reveal-digit { animation-play-state: paused; }
+.number-reveal-playing .reveal-digit { animation-play-state: running; }

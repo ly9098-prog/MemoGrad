@@ -706,6 +706,7 @@ page {
 }
 
 .route-arrow {
+  align-self: center;
   width: 54rpx;
   height: 54rpx;
   margin-left: 14rpx;
@@ -3274,3 +3275,7 @@ page { background: #FAFCFB; }
   .focus-ring-goal { font-size: 24rpx; }
   .focus-ring-label { font-size: 22rpx; }
 }
+
+/* Digits wait for data commit, page readiness and viewport visibility. */
+.reveal-digit { animation-play-state: paused; }
+.number-reveal-playing .reveal-digit { animation-play-state: running; }

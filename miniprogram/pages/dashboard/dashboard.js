@@ -1,3 +1,4 @@
+const digitRevealGate = require('../../utils/digit-reveal-gate')
 const api = require('../../utils/api')
 const model = require('./dashboard.model')
 const charts = require('./dashboard.charts')
@@ -379,10 +380,15 @@ Page({
     wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/home/home' }) })
   },
 
+  onReady() {
+    digitRevealGate.resume(this, true)
+  },
+
   onShow() {
     if (this._guestMode) return
     this._alive = true
     this._visible = true
+    digitRevealGate.resume(this)
     this._chapterPracticeNavigationPending = false
     this.loadKnowledgeDiagnosisSubjects()
 
@@ -415,6 +421,7 @@ Page({
 
   onHide() {
     this._visible = false
+    digitRevealGate.suspend(this)
     this._chartsCancelled = true
     this._dashboardSeq++
     this._trendSeq++
@@ -458,6 +465,7 @@ Page({
 
   onUnload() {
     this._alive = false
+    digitRevealGate.clear(this)
     this._visible = false
     this._dashboardSeq++
     this._trendSeq++
@@ -480,7 +488,7 @@ Page({
     this._gaugeTimer = null
     clearTimeout(this._growthTimer)
     this._growthTimer = null
-    numberReveal.finish(this)
+    numberReveal.clear(this)
     clearTimeout(this._adaptiveTimer)
     this._adaptiveTimer = null
   },
@@ -1062,6 +1070,7 @@ Page({
 
   _commitDashboard(models, mode, canRedrawTrend) {
     const { hero, trend, subjects, choiceLossBudget, reviewRisk, growth, adaptive, yearly, subtitle, deepState } = models
+    const sequence = this._dashboardSeq
     this._insight = models.recommendation
     this._masteryRate = models.masteryRate
     this.setData({
@@ -1077,6 +1086,7 @@ Page({
       error: null,
       _hasData: models.hasData,
     }, () => {
+      if (!this._alive || !this._visible || sequence !== this._dashboardSeq) return
       this._startNumberReveal(models)
       this._afterDashboardCommit(models, mode, canRedrawTrend)
     })
@@ -1087,12 +1097,13 @@ Page({
     const trend = models.trend
     const hero = models.hero
     numberReveal.start(this, {
+      canStart: () => this.data.heroCardMode !== 'budget',
       fields: [
-        { name: '_animTodayQuestions', segmentsKey: '_animTodayQuestionsSegments' },
-        { name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments' },
-        { name: '_animConsecutiveDays', segmentsKey: '_animConsecutiveSegments' },
-        { name: '_animAccuracy', kind: 'percent', segmentsKey: '_animAccuracySegments' },
-        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments' },
+        { name: '_animTodayQuestions', segmentsKey: '_animTodayQuestionsSegments', selector: '._animTodayQuestionsSegments' },
+        { name: '_animTotalCorrect', segmentsKey: '_animTotalCorrectSegments', selector: '._animTotalCorrectSegments' },
+        { name: '_animConsecutiveDays', segmentsKey: '_animConsecutiveSegments', selector: '._animConsecutiveSegments' },
+        { name: '_animAccuracy', kind: 'percent', segmentsKey: '_animAccuracySegments', selector: '._animAccuracySegments' },
+        { name: '_animDueReviewCount', segmentsKey: '_animDueReviewSegments', selector: '._animDueReviewSegments' },
       ],
       to: {
         _animTodayQuestions: hero.todayQuestions || 0,
@@ -1358,7 +1369,10 @@ Page({
     // Both reports remain mounted in the same CSS grid cell. A single state flip
     // is enough; avoiding timer-driven unmount/remount keeps page height stable.
     const nextMode = this.data.heroCardMode === 'budget' ? 'summary' : 'budget'
-    this.setData({ heroCardMode: nextMode })
+    this.setData({ heroCardMode: nextMode }, () => {
+      digitRevealGate.suspend(this)
+      digitRevealGate.resume(this)
+    })
   },
 
   goReview() {

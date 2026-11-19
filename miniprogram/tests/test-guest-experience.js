@@ -622,14 +622,17 @@ test('guest home clears old account data and only checks an existing session', a
       checkAndRefreshToken: async () => { validations++; return true },
     },
     '../../../utils/launch-session-store': { userId: () => owner },
+    '../../../utils/number-reveal': require('../utils/number-reveal'),
   }
   vm.runInNewContext(fs.readFileSync(path.join(miniRoot, 'pages/home/utils/growth-page-controller.js'), 'utf8'), {
     module: exported, require: name => mocks[name] || {},
     wx: { navigateTo: options => { destination = options.url } },
   })
   const instance = { ...exported.exports.growthPageMethods, _growthSeq: 0, _clearAnimTimer() {},
-    _lastDashboardSubjectStats: [{ private: true }], _hasGrowthSnapshot: true }
+    _lastDashboardSubjectStats: [{ private: true }], _hasGrowthSnapshot: true,
+    _numberRevealState: { to: { privateCount: 12 } } }
   await instance._validateHomeSession()
+  assert.equal(instance._numberRevealState, null)
   assert.equal(validations, 0)
   assert.equal(instance._authed, false)
   assert.equal(instance._lastDashboardSubjectStats.length, 0)

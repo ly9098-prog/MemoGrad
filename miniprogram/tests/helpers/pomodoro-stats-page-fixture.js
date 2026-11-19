@@ -44,6 +44,7 @@ function fixture(sourcePath = process.env.STATS_PAGE_SOURCE) {
   const config = { DEV: false, enableMathImage: false }
   const stubs = {
     '../../../utils/api': api, '../../../config': config,
+    '../../../utils/digit-reveal-gate': require('../../utils/digit-reveal-gate'),
     '../../../utils/storage': {}, '../utils/pomodoro-theme': {}, '../utils/china-time': {},
   }
   const platform = new Proxy({}, { get: (object, key) => key in object ? object[key] : (...args) => { calls.push([key, ...args]); return undefined } })

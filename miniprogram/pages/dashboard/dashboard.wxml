@@ -69,7 +69,7 @@
           <view class="hero-main">
             <view class="hero-score-block">
               <view class="hero-score-row">
-                <view class="hero-score reveal-metric" aria-label="平均正确率 {{trend ? trend.avgAccuracyPct : hero.totalAccuracyPct}}%">
+                <view class="hero-score reveal-metric _animAccuracySegments {{_animAccuracySegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="平均正确率 {{trend ? trend.avgAccuracyPct : hero.totalAccuracyPct}}%">
                   <block wx:for="{{_animAccuracySegments}}" wx:key="key">
                     <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                   </block>
@@ -79,7 +79,7 @@
               <text class="hero-score-label">平均正确率</text>
             </view>
             <view class="hero-today-block">
-              <view class="hero-today-value reveal-metric" aria-label="今日答题数量 {{hero.todayQuestions}}">
+              <view class="hero-today-value reveal-metric _animTodayQuestionsSegments {{_animTodayQuestionsSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="今日答题数量 {{hero.todayQuestions}}">
                 <block wx:for="{{_animTodayQuestionsSegments}}" wx:key="key">
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
@@ -96,7 +96,7 @@
 
           <view class="hero-metrics">
             <view class="hero-metric">
-              <view class="hero-metric-value reveal-metric" aria-label="累计正确 {{hero.totalCorrect}}">
+              <view class="hero-metric-value reveal-metric _animTotalCorrectSegments {{_animTotalCorrectSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="累计正确 {{hero.totalCorrect}}">
                 <block wx:for="{{_animTotalCorrectSegments}}" wx:key="key">
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
@@ -105,7 +105,7 @@
             </view>
             <view class="hero-metric-divider"></view>
             <view class="hero-metric">
-              <view class="hero-metric-value accent-green reveal-metric" aria-label="连续学习天数 {{trend ? trend.activeDays : hero.consecutiveDays}}">
+              <view class="hero-metric-value accent-green reveal-metric _animConsecutiveSegments {{_animConsecutiveSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="连续学习天数 {{trend ? trend.activeDays : hero.consecutiveDays}}">
                 <block wx:for="{{_animConsecutiveSegments}}" wx:key="key">
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>
@@ -114,7 +114,7 @@
             </view>
             <view class="hero-metric-divider"></view>
             <view class="hero-metric">
-              <view class="hero-metric-value accent-orange reveal-metric" aria-label="今日复习数量 {{hero.dueReviewCount}}">
+              <view class="hero-metric-value accent-orange reveal-metric _animDueReviewSegments {{_animDueReviewSegmentsPlaying ? 'number-reveal-playing' : ''}}" aria-label="今日复习数量 {{hero.dueReviewCount}}">
                 <block wx:for="{{_animDueReviewSegments}}" wx:key="key">
                   <text class="reveal-digit reveal-digit-{{item.direction}}" style="animation-delay: {{item.delay}}ms;">{{item.text}}</text>
                 </block>

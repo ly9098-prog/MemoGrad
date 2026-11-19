@@ -1,3 +1,5 @@
+const revealGate = require('./digit-reveal-gate')
+
 const FRAME_INTERVAL_MS = 80
 
 const DEFAULT_DURATIONS = {
@@ -88,54 +90,69 @@ function tick(page, state) {
 }
 
 function clear(page) {
-  if (page._numberRevealTimer) {
-    clearTimeout(page._numberRevealTimer)
-    page._numberRevealTimer = null
-  }
+  page._numberRevealRevision = (page._numberRevealRevision || 0) + 1
+  ;(page._numberRevealFields || []).forEach(field => revealGate.cancel(page, field.segmentsKey))
+  if (page._numberRevealTimer) clearTimeout(page._numberRevealTimer)
+  page._numberRevealTimer = null
   page._numberRevealState = null
 }
 
 function finish(page) {
   const state = page._numberRevealState
-  clear(page)
+  if (page._numberRevealTimer) clearTimeout(page._numberRevealTimer)
+  page._numberRevealTimer = null
+  page._numberRevealState = null
   if (!state) return false
   const patch = {}
-  state.fields.forEach((field) => {
-    commitDisplayPatch(patch, field, toDisplayNumber(state.to[field.name]))
-  })
+  state.fields.forEach(field => commitDisplayPatch(patch, field, toDisplayNumber(state.to[field.name])))
+  // Retain offscreen/unfinished view commits: their CSS entrance is still owed
+  // when the user returns. Count-up itself is finalized on hide.
   page.setData(patch)
   return true
 }
 
 function start(page, options) {
-  clear(page)
   const fields = options.fields || []
-  const fieldsNeedingAnimation = fields.filter((field) => (
-    page.data[field.name] !== options.to[field.name] ||
-    !hasDisplaySegments(page.data, field)
+  const changed = fields.filter(field => (
+    page.data[field.name] !== options.to[field.name] || !hasDisplaySegments(page.data, field)
   ))
+  // An identical refresh must not cancel entrances waiting below the fold.
+  if (!changed.length) return false
+  changed.push(...fields.filter(field => !changed.includes(field) &&
+    page.data[field.segmentsKey + 'Playing'] === false))
+  clear(page)
+  const revision = page._numberRevealRevision
+  page._numberRevealFields = fields
   const initialPatch = {}
-  fields.forEach((field) => {
-    const toValue = toDisplayNumber(options.to[field.name])
-    const currentValue = toDisplayNumber(page.data[field.name])
-    if (toValue !== currentValue || !hasDisplaySegments(page.data, field)) {
-      commitDisplayPatch(initialPatch, field, currentValue)
-    }
+  changed.forEach(field => {
+    commitDisplayPatch(initialPatch, field, toDisplayNumber(page.data[field.name]))
+    initialPatch[field.segmentsKey + 'Playing'] = false
   })
-  if (Object.keys(initialPatch).length) page.setData(initialPatch)
-  if (!fieldsNeedingAnimation.length) return false
   const state = {
     fields,
     from: fields.reduce((result, field) => {
-      result[field.name] = page.data[field.name]
+      result[field.name] = toDisplayNumber(page.data[field.name])
       return result
     }, {}),
     to: options.to,
     durations: options.durations || DEFAULT_DURATIONS,
-    startTime: Date.now(),
+    startTime: null,
   }
   page._numberRevealState = state
-  page._numberRevealTimer = setTimeout(() => tick(page, state), FRAME_INTERVAL_MS)
+  page.setData(initialPatch, () => {
+    if (page._numberRevealRevision !== revision) return
+    changed.forEach(field => {
+      revealGate.arm(page, field.segmentsKey, field.selector || options.selector || '.reveal-metric', () => {
+        if (page._numberRevealRevision !== revision) return
+        page.setData({ [field.segmentsKey + 'Playing']: true }, () => {
+          if (page._numberRevealState !== state || state.startTime !== null ||
+              !page._alive || !page._visible) return
+          state.startTime = Date.now()
+          page._numberRevealTimer = setTimeout(() => tick(page, state), FRAME_INTERVAL_MS)
+        })
+      }, options.canStart)
+    })
+  })
   return true
 }
 
