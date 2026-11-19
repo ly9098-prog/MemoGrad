@@ -1,260 +1,111 @@
-<view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
-  <view class="fc-flip-shell">
-  <view
-    class="fc-flip-stage {{isFlipped ? 'is-flipped' : ''}}"
-    bindtap="toggleCardFlip"
-    bindtouchstart="onCardTouchStart"
-    bindtouchmove="onCardTouchMove"
-    bindtouchend="onCardTouchEnd"
-    bindtouchcancel="onCardTouchCancel"
-    role="button"
-    aria-label="{{isFlipped ? '返回公式卡封面' : '翻面查看公式与记忆提示'}}"
-    aria-expanded="{{isFlipped}}"
-  >
-    <view class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-      <view class="fc-face-label"><view class="fc-face-dot"></view><text>回想核心内容</text></view>
-      <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}"
-        bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
-        <view class="fc-header">
-          <rich-text
-            class="fc-title fc-title-rich"
-            nodes="{{content.titleNodes}}"
-            user-select="{{true}}"
-          />
-          <view class="fc-tags"><text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
-            <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:for-item="tag" wx:key="id">{{tag.name}}</text>
-          </view>
-        </view>
-      </scroll-view>
-      <view class="fc-flip-hint"><view class="fc-flip-icon" aria-hidden="true"></view><view class="fc-flip-hint-copy"><text>点击翻面查看公式与记忆提示</text><text class="fc-flip-scroll-note">长内容可在卡内上下滑动</text></view></view>
-    </view>
-    <view class="fc-flip-face fc-flip-back" aria-hidden="{{!isFlipped}}">
-      <view class="fc-section-heading">
-        <view>
-          <text class="fc-section-title">公式与记忆提示</text>
-        </view>
-        <text class="fc-flip-scroll-note">卡内上下滑动</text>
-      </view>
-      <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{true}}"
-        catchtap="containFormulaReading"
-        catchtouchstart="onFormulaTouchStart" catchtouchend="onFormulaTouchEnd" catchtouchcancel="onFormulaTouchEnd">
-      <view class="fc-flip-back-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
-        <text class="fc-flip-back-label">核心公式</text>
-        <view class="fc-formula-list">
-          <view class="fc-flip-formula-group" wx:for="{{formulaBlocks}}" wx:for-item="block" wx:key="_key">
-            <rich-text class="fc-flip-block-label" wx:if="{{block.labelNodes.length}}" nodes="{{block.labelNodes}}" />
-            <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
-              <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
-                scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}">
-                <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
-                  <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
-                </view>
-              </scroll-view>
-            </view>
-            <text class="fc-row-scroll-hint" wx:if="{{block.hasWideRows}}">超宽公式可左右滑动</text>
-          </view>
-        </view>
-      </view>
-      <view class="fc-flip-back-section" wx:if="{{content.symbolNotesNodes && content.symbolNotesNodes.length}}">
-        <text class="fc-flip-back-label">变量含义</text>
-        <rich-text class="fc-rich-text" nodes="{{content.symbolNotesNodes}}" user-select="{{true}}" />
-      </view>
-      <view class="fc-flip-back-section" wx:if="{{content.summaryNodes && content.summaryNodes.length}}">
-        <text class="fc-flip-back-label">记忆提示</text>
-        <rich-text class="fc-rich-text" nodes="{{content.summaryNodes}}" user-select="{{true}}" />
-      </view>
-      <view class="fc-flip-back-section" wx:if="{{content.conditionsNodes && content.conditionsNodes.length}}">
-        <text class="fc-flip-back-label">适用条件</text>
-        <rich-text class="fc-rich-text" nodes="{{content.conditionsNodes}}" user-select="{{true}}" />
-      </view>
-      <text class="fc-flip-empty" wx:if="{{!formulaBlocks.length && !content.summaryNodes.length && !content.symbolNotesNodes.length && !content.conditionsNodes.length}}">这张卡暂无补充提示，可继续查看下方内容。</text>
-      </scroll-view>
-      <view class="fc-flip-hint fc-flip-return" catchtap="toggleCardFlip" aria-role="button" aria-label="翻回公式卡正面"><view class="fc-flip-icon" aria-hidden="true"></view><text>翻回正面</text></view>
+<template name="card-heading">
+  <view class="fc-header">
+    <rich-text class="fc-title fc-title-rich" nodes="{{content.titleNodes}}" user-select="{{true}}" />
+    <view class="fc-tags">
+      <text class="fc-tag fc-tag-study">{{card.studyCardTypeLabel || '速记'}}</text>
+      <text class="fc-tag {{'fc-tag-' + tag.code}}" wx:for="{{card.tags}}" wx:for-item="tag" wx:key="id">{{tag.name}}</text>
     </view>
   </view>
-  </view>
+</template>
 
-  <view class="fc-detail-body">
-
-  <view class="fc-formula-section" wx:if="{{formulaBlocks && formulaBlocks.length}}">
-    <view class="fc-section-heading compact">
-      <view>
-        <text class="fc-section-title">核心公式</text>
-      </view>
-      <view class="fc-core-mark">Σ</view>
-    </view>
-
+<template name="card-content">
+  <view class="fc-formula-section" wx:if="{{formulaBlocks.length}}">
+    <text class="fc-section-title">核心公式</text>
     <view class="fc-formula-block fc-formula-block-{{blockIndex}}" wx:for="{{formulaBlocks}}" wx:for-item="block" wx:for-index="blockIndex" wx:key="_key">
       <view class="fc-block-head">
-        <rich-text
-          class="fc-block-label fc-block-label-rich"
-          wx:if="{{block.labelNodes && block.labelNodes.length}}"
-          nodes="{{block.labelNodes}}"
-          user-select="{{true}}"
-        />
-        <view class="fc-expand-button" data-index="{{blockIndex}}" bindtap="openFormulaReading" hover-class="fc-control-pressed" role="button" aria-label="放大查看公式"><text>放大查看</text></view>
+        <rich-text class="fc-block-label fc-block-label-rich" wx:if="{{block.labelNodes.length}}" nodes="{{block.labelNodes}}" user-select="{{true}}" />
+        <view class="fc-expand-button" data-index="{{blockIndex}}" catchtap="openFormulaReading" hover-class="fc-control-pressed" role="button" aria-label="放大查看公式"><text>放大查看</text></view>
       </view>
       <view class="fc-formula-list">
         <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
-          <scroll-view
-            class="fc-formula-line-scroll"
-            wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
+          <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
             scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}"
-            bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd"
-          >
+            bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
             <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
               <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
             </view>
           </scroll-view>
         </view>
       </view>
-      <text class="fc-row-scroll-hint" wx:if="{{block.hasWideRows}}">超出屏幕的部分可左右滑动查看</text>
-      <rich-text
-        class="fc-block-note"
-        wx:if="{{block.noteNodes && block.noteNodes.length}}"
-        nodes="{{block.noteNodes}}"
-        user-select="{{true}}"
-      />
+      <text class="fc-row-scroll-hint" wx:if="{{block.hasWideRows}}">超宽公式可左右滑动</text>
+      <rich-text class="fc-block-note" wx:if="{{block.noteNodes.length}}" nodes="{{block.noteNodes}}" user-select="{{true}}" />
     </view>
   </view>
 
   <view class="fc-graph-section" wx:if="{{(card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph) && (displayGraphUrl || graphImageUrl) && !graphLoadError}}">
-    <view class="fc-section-heading">
-      <view>
-        <text class="fc-section-kicker">FUNCTION GRAPH</text>
-        <text class="fc-section-title">函数图像</text>
-      </view>
-      <text class="fc-preview-hint">点击查看大图</text>
-    </view>
+    <view class="fc-section-heading"><text class="fc-section-title">函数图像</text><text class="fc-preview-hint">点击查看大图</text></view>
     <view class="fc-graph-viewport" style="padding-bottom:{{graphViewportRatio}}%;" bindtap="previewGraph">
-      <!-- Progressive load inside a fixed-ratio viewport: the thumbnail and the
-           master image letterbox into the same box (aspectFit), so the swap
-           never changes the section height and `widthFix` never lets an
-           unusually tall master image stretch the card. -->
-      <image
-        class="fc-graph-image"
-        src="{{displayGraphUrl || graphImageUrl}}"
-        mode="aspectFit"
-        lazy-load
-        bindload="onGraphLoad"
-        binderror="onGraphError"
-      />
-      <image
-        class="fc-graph-preload"
-        wx:if="{{graphImageUrl && displayGraphUrl !== graphImageUrl}}"
-        src="{{graphImageUrl}}"
-        bindload="onFullGraphLoad"
-        binderror="onFullGraphError"
-      />
+      <image class="fc-graph-image" src="{{displayGraphUrl || graphImageUrl}}" mode="aspectFit" lazy-load bindload="onGraphLoad" binderror="onGraphError" />
+      <image class="fc-graph-preload" wx:if="{{graphImageUrl && displayGraphUrl !== graphImageUrl}}" src="{{graphImageUrl}}" bindload="onFullGraphLoad" binderror="onFullGraphError" />
     </view>
+  </view>
+  <view class="fc-graph-section" wx:elif="{{(card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph) && (graphLoadError || (!displayGraphUrl && !graphImageUrl))}}">
+    <text class="fc-section-title">函数图像</text>
+    <view class="fc-graph-fallback"><text class="fc-graph-fallback-title">函数图像暂时无法加载</text><text class="fc-graph-fallback-desc">仍可继续查看公式与函数性质</text></view>
   </view>
 
-  <view class="fc-graph-section fc-graph-error" wx:elif="{{(card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph) && (graphLoadError || (!displayGraphUrl && !graphImageUrl))}}">
-    <view class="fc-section-heading">
-      <view>
-        <text class="fc-section-kicker">FUNCTION GRAPH</text>
-        <text class="fc-section-title">函数图像</text>
-      </view>
-    </view>
-    <view class="fc-graph-fallback">
-      <text class="fc-graph-fallback-title">函数图像暂时无法加载</text>
-      <text class="fc-graph-fallback-desc">仍可继续查看公式与函数性质</text>
+  <view class="fc-reading-section" wx:if="{{content.summaryNodes.length}}">
+    <text class="fc-section-title">{{card.study_card_type === 'formula' ? '记忆提示' : '核心记忆'}}</text>
+    <rich-text class="fc-rich-text" nodes="{{content.summaryNodes}}" user-select="{{true}}" />
+  </view>
+  <view class="fc-reading-section" wx:if="{{content.conditionsNodes.length}}">
+    <text class="fc-section-title">{{card.study_card_type === 'protocol_rule' ? '规则边界' : '适用条件'}}</text>
+    <rich-text class="fc-rich-text" nodes="{{content.conditionsNodes}}" user-select="{{true}}" />
+  </view>
+  <view class="fc-reading-section" wx:if="{{content.symbolNotesNodes.length}}">
+    <text class="fc-section-title">符号说明</text>
+    <rich-text class="fc-rich-text" nodes="{{content.symbolNotesNodes}}" user-select="{{true}}" />
+  </view>
+  <view class="fc-reading-section" wx:if="{{content.secondaryNodes.length}}">
+    <text class="fc-section-title">{{card.template_type === 'contrast' ? '对比要点' : '常见结论'}}</text>
+    <rich-text class="fc-rich-text" nodes="{{content.secondaryNodes}}" user-select="{{true}}" />
+  </view>
+  <view class="fc-reading-section fc-error-section" wx:if="{{content.errorTipsNodes.length}}">
+    <text class="fc-section-title">{{card.template_type === 'trap' || card.study_card_type === 'trap' ? '考试陷阱' : '易错提醒'}}</text>
+    <rich-text class="fc-rich-text" nodes="{{content.errorTipsNodes}}" user-select="{{true}}" />
+  </view>
+  <view class="fc-reading-section" wx:if="{{content.examples.length}}">
+    <text class="fc-section-title">典型例题 · {{content.examples.length}} 道</text>
+    <view class="fc-example" wx:for="{{content.examples}}" wx:for-item="ex" wx:key="_key">
+      <text class="fc-example-label">例 {{index + 1}}</text>
+      <rich-text class="fc-rich-text" nodes="{{ex.questionNodes}}" user-select="{{true}}" />
+      <view class="fc-example-detail" wx:if="{{ex.solutionNodes.length}}"><text class="fc-example-detail-label">解法</text><rich-text class="fc-rich-text" nodes="{{ex.solutionNodes}}" user-select="{{true}}" /></view>
+      <view class="fc-example-detail" wx:if="{{ex.answerNodes.length}}"><text class="fc-example-detail-label">答案</text><rich-text class="fc-rich-text" nodes="{{ex.answerNodes}}" user-select="{{true}}" /></view>
+      <view class="fc-example-detail" wx:if="{{ex.errorTipNodes.length}}"><text class="fc-example-detail-label">易错</text><rich-text class="fc-rich-text" nodes="{{ex.errorTipNodes}}" user-select="{{true}}" /></view>
     </view>
   </view>
+  <text class="fc-content-empty" wx:if="{{!formulaBlocks.length && !content.summaryNodes.length && !content.conditionsNodes.length && !content.symbolNotesNodes.length && !content.secondaryNodes.length && !content.errorTipsNodes.length && !content.examples.length && card.card_type !== 'function_graph' && !card.is_function_graph && !card.isFunctionGraph}}">这张速记卡暂无正文，可切换其他卡片</text>
+</template>
 
-  <view class="fc-reading-section" wx:if="{{content.summaryNodes && content.summaryNodes.length}}">
-    <view class="fc-section-index">01</view>
-    <view class="fc-section-copy">
-      <text class="fc-section-kicker">SUMMARY</text>
-      <text class="fc-section-title">{{card.study_card_type === 'formula' ? '摘要' : '核心记忆'}}</text>
-      <rich-text class="fc-rich-text" nodes="{{content.summaryNodes}}" user-select="{{true}}" />
-    </view>
-  </view>
-
-  <view class="fc-reading-section conditions" wx:if="{{content.conditionsNodes && content.conditionsNodes.length}}">
-    <view class="fc-section-index">02</view>
-    <view class="fc-section-copy">
-      <text class="fc-section-kicker">CONDITIONS</text>
-      <text class="fc-section-title">{{card.study_card_type === 'protocol_rule' ? '规则边界' : '适用条件'}}</text>
-      <rich-text class="fc-rich-text" nodes="{{content.conditionsNodes}}" user-select="{{true}}" />
-    </view>
-  </view>
-
-  <view class="fc-collapse" wx:if="{{content.symbolNotesNodes && content.symbolNotesNodes.length}}">
-    <view class="fc-collapse-header" hover-class="fc-pressed" bindtap="toggleSection" data-key="showSymbolNotes">
-      <view>
-        <text class="fc-collapse-kicker">SYMBOLS</text>
-        <text class="fc-collapse-title">符号说明</text>
+<view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
+  <view class="fc-flip-shell {{recitationMode ? 'is-recite' : ''}}">
+    <view class="fc-flip-stage {{recitationMode ? 'is-recite' : 'is-browse'}} {{recitationMode && isFlipped ? 'is-flipped' : ''}}"
+      bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
+      <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
+        <text class="fc-face-label">回想这一张</text>
+        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}"
+          bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
+          <template is="card-heading" data="{{card: card, content: content}}" />
+          <text class="fc-recall-prompt">先回想核心内容与适用条件，再翻面核对</text>
+        </scroll-view>
+        <button class="fc-flip-action" bindtap="toggleCardFlip" hover-class="fc-control-pressed" aria-label="显示答案" aria-expanded="{{isFlipped}}" disabled="{{isFlipped}}">显示答案</button>
       </view>
-      <view class="fc-collapse-arrow {{showSymbolNotes ? 'expanded' : ''}}"></view>
-    </view>
-    <view class="fc-collapse-body {{showSymbolNotes ? 'open' : ''}}">
-      <view class="fc-collapse-content">
-        <rich-text class="fc-rich-text" nodes="{{content.symbolNotesNodes}}" user-select="{{true}}" />
+      <view class="fc-flip-face {{recitationMode ? 'fc-flip-back' : 'fc-browse-face'}}" aria-hidden="{{recitationMode && !isFlipped}}">
+        <block wx:if="{{recitationMode}}">
+          <view class="fc-answer-heading"><text class="fc-face-label">答案</text><text class="fc-scroll-note">卡内上下滑动</text></view>
+          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}" catchtap="containFormulaReading"
+            catchtouchstart="onFormulaTouchStart" catchtouchend="onFormulaTouchEnd" catchtouchcancel="onFormulaTouchEnd">
+            <template is="card-heading" data="{{card: card, content: content}}" />
+            <template is="card-content" data="{{card: card, content: content, formulaBlocks: formulaBlocks, graphImageUrl: graphImageUrl, displayGraphUrl: displayGraphUrl, graphViewportRatio: graphViewportRatio, graphLoadError: graphLoadError}}" />
+          </scroll-view>
+          <button class="fc-flip-action fc-flip-return" bindtap="toggleCardFlip" hover-class="fc-control-pressed" aria-label="返回题面" disabled="{{!isFlipped}}">返回题面</button>
+        </block>
+        <block wx:else>
+          <template is="card-heading" data="{{card: card, content: content}}" />
+          <template is="card-content" data="{{card: card, content: content, formulaBlocks: formulaBlocks, graphImageUrl: graphImageUrl, displayGraphUrl: displayGraphUrl, graphViewportRatio: graphViewportRatio, graphLoadError: graphLoadError}}" />
+        </block>
       </view>
     </view>
-  </view>
-
-  <view class="fc-collapse" wx:if="{{content.secondaryNodes && content.secondaryNodes.length}}">
-    <view class="fc-collapse-header" hover-class="fc-pressed" bindtap="toggleSection" data-key="showSecondary">
-      <view>
-        <text class="fc-collapse-kicker">CONCLUSIONS</text>
-        <text class="fc-collapse-title">{{card.template_type === 'contrast' ? '对比要点' : '常见结论'}}</text>
-      </view>
-      <view class="fc-collapse-arrow {{showSecondary ? 'expanded' : ''}}"></view>
-    </view>
-    <view class="fc-collapse-body {{showSecondary ? 'open' : ''}}">
-      <view class="fc-collapse-content">
-        <rich-text class="fc-rich-text" nodes="{{content.secondaryNodes}}" user-select="{{true}}" />
-      </view>
-    </view>
-  </view>
-
-  <view class="fc-collapse fc-error-collapse" wx:if="{{content.errorTipsNodes && content.errorTipsNodes.length}}">
-    <view class="fc-collapse-header" hover-class="fc-pressed" bindtap="toggleSection" data-key="showErrorTips">
-      <view>
-        <text class="fc-collapse-kicker danger">ERROR ALERT</text>
-        <text class="fc-collapse-title">{{card.template_type === 'trap' || card.study_card_type === 'trap' ? '考试陷阱' : '易错提醒'}}</text>
-      </view>
-      <view class="fc-collapse-arrow {{showErrorTips ? 'expanded' : ''}}"></view>
-    </view>
-    <view class="fc-collapse-body {{showErrorTips ? 'open' : ''}}">
-      <view class="fc-collapse-content error-content">
-        <rich-text class="fc-rich-text" nodes="{{content.errorTipsNodes}}" user-select="{{true}}" />
-      </view>
-    </view>
-  </view>
-
-  <view class="fc-collapse" wx:if="{{content.examples && content.examples.length}}">
-    <view class="fc-collapse-header" hover-class="fc-pressed" bindtap="toggleSection" data-key="showExamples">
-      <view>
-        <text class="fc-collapse-kicker">EXAMPLES</text>
-        <text class="fc-collapse-title">典型例题 · {{content.examples.length}} 道</text>
-      </view>
-      <view class="fc-collapse-arrow {{showExamples ? 'expanded' : ''}}"></view>
-    </view>
-    <view class="fc-collapse-body {{showExamples ? 'open' : ''}}">
-      <view class="fc-example" wx:for="{{content.examples}}" wx:for-item="ex" wx:key="_key">
-        <view class="fc-example-head">
-          <text class="fc-example-index">{{index + 1 < 10 ? '0' : ''}}{{index + 1}}</text>
-          <text class="fc-example-label">典型例题</text>
-        </view>
-        <rich-text class="fc-rich-text" nodes="{{ex.questionNodes}}" user-select="{{true}}" />
-        <view class="fc-example-detail" wx:if="{{ex.solutionNodes && ex.solutionNodes.length}}">
-          <text class="fc-example-detail-label">解法</text>
-          <rich-text class="fc-rich-text" nodes="{{ex.solutionNodes}}" user-select="{{true}}" />
-        </view>
-        <view class="fc-example-detail answer" wx:if="{{ex.answerNodes && ex.answerNodes.length}}">
-          <text class="fc-example-detail-label">答案</text>
-          <rich-text class="fc-rich-text" nodes="{{ex.answerNodes}}" user-select="{{true}}" />
-        </view>
-        <view class="fc-example-detail error" wx:if="{{ex.errorTipNodes && ex.errorTipNodes.length}}">
-          <text class="fc-example-detail-label">易错</text>
-          <rich-text class="fc-rich-text" nodes="{{ex.errorTipNodes}}" user-select="{{true}}" />
-        </view>
-      </view>
-    </view>
-  </view>
   </view>
 </view>
 

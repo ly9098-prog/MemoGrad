@@ -19,6 +19,47 @@ test('number reveal clamps percentages and normalizes invalid counts', () => {
   assert.deepEqual(numberReveal.buildNumberSegments('bad').map(item => item.text), ['0'])
 })
 
+test('count-up changes glyphs without replacing digit nodes', () => {
+  assert.deepEqual(
+    numberReveal.buildNumberSegments(12).map(item => item.key),
+    numberReveal.buildNumberSegments(98).map(item => item.key),
+    'wx:key identifies the digit position, never an intermediate count-up value'
+  )
+})
+
+test('pending digits remain readable and only a released gate installs their shared entrance', () => {
+  const shared = fs.readFileSync(path.join(miniRoot, 'styles/number-reveal.wxss'), 'utf8')
+  const defaultRule = shared.match(/\.reveal-digit,\s*\.daily-duration-digit\s*\{([^}]+)\}/)[1]
+  assert.match(defaultRule, /opacity:\s*1\s*;/)
+  assert.match(defaultRule, /animation:\s*none\s*;/)
+  assert.match(defaultRule, /transform:\s*none\s*;/)
+  assert.doesNotMatch(shared, /opacity:\s*0\s*;|translate3d|scale\(|will-change|\bboth\s*;/)
+  for (const filename of ['pages/home/home.wxss', 'pages/dashboard/dashboard.wxss',
+    'subpackages/productivity/pomodoro-stats/index.wxss']) {
+    const source = fs.readFileSync(path.join(miniRoot, filename), 'utf8')
+    assert.match(source, /@import '[^']*styles\/number-reveal\.wxss'/)
+    assert.doesNotMatch(source, /\.(?:reveal-digit|daily-duration-digit)[^{}]*\{[^{}]*\banimation:\s*(?!none\b)\S/,
+      `${filename} cannot install another animation on the shared digits`)
+    assert.doesNotMatch(source, /animation-play-state:\s*paused/)
+  }
+})
+
+test('home progress animation never competes with the digit controller for streak', () => {
+  const growth = require('../pages/home/utils/growth-animation')
+  const patches = []
+  const page = { _alive: true, _visible: true, setData: patch => patches.push(patch) }
+  growth.tick(page, {
+    from: { streakDays: 0, goalDone: 0, levelProgress: 0 },
+    to: { streakDays: 7, goalDone: 3, levelProgress: 40 },
+    durations: { streakDays: 1, goalDone: 1, levelProgress: 1 },
+    startTime: Date.now() - 10,
+  })
+  assert(patches.length > 0)
+  assert(patches.every(patch => !Object.hasOwn(patch, '_animStreakDays')),
+    'numberReveal alone owns the scalar value and its displayed digit segments')
+  assert.equal(patches.at(-1)._animGoalDone, 3)
+})
+
 test('number reveal starts only when values actually change and reaches targets', () => {
   const page = {
     _digitRevealReady: true,

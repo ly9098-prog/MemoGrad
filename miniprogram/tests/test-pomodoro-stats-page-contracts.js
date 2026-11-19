@@ -148,10 +148,17 @@ test('duration display patch uses current segments hook and reveal option', () =
   assert.deepEqual(plain(patch._dispTodayDurationSegments), [{ type: 'num', key: 'pos-0', input: value, reveal: false }])
   const revealPatch = f.page._getTodayDurationDisplayPatch(value, { reveal: true })
   assert.equal(revealPatch._dispTodayDurationText, value)
-  assert.deepEqual(plain(revealPatch._dispTodayDurationSegments), [{ type: 'num', key: 'pos-0-reveal-1', input: value, reveal: true }])
+  assert.deepEqual(plain(revealPatch._dispTodayDurationSegments), [{ type: 'num', key: 'pos-0', input: value, reveal: true }])
+  const revision = f.page._durationRevealRevision
   const again = f.page._getTodayDurationDisplayPatch(value, { reveal: true })
-  assert.notEqual(again._dispTodayDurationSegments[0].key, revealPatch._dispTodayDurationSegments[0].key)
-  assert.deepEqual(calls, [[value, false], [value, true], [value, true]])
+  assert.equal(again._dispTodayDurationSegments[0].key, revealPatch._dispTodayDurationSegments[0].key)
+  assert.equal(f.page._durationRevealRevision, revision, 'the same date/value cannot restart an entrance')
+  f.page.data.selectedDate = '2026-11-19'
+  f.page._getTodayDurationDisplayPatch(value, { reveal: true })
+  assert.equal(f.page._durationRevealRevision, revision + 1, 'a new selected date still has its own entrance')
+  f.page._getTodayDurationDisplayPatch('30分钟', { reveal: true })
+  assert.equal(f.page._durationRevealRevision, revision + 2, 'a changed final duration still enters')
+  assert.deepEqual(calls, [[value, false], [value, true], [value, true], [value, true], ['30分钟', true]])
 })
 
 test('initial duration segments match the formatter contract', () => {
@@ -171,14 +178,14 @@ test('daily duration uses alternating digit reveal animation', () => {
   assert.deepEqual(digits.map(item => item.text), ['2', '5', '8'])
   const wxml = fs.readFileSync(path.join(pageDir, 'index.wxml'), 'utf8')
   const wxss = fs.readFileSync(path.join(pageDir, 'index.wxss'), 'utf8')
+  const shared = fs.readFileSync(path.join(pageDir, '../../../styles/number-reveal.wxss'), 'utf8')
   assert.match(wxml, /wx:key="key"/)
   assert.match(wxml, /daily-duration-digit-\{\{item\.direction\}\}/)
   assert.match(wxml, /animation-delay: \{\{item\.delay\}\}ms/)
-  assert.match(wxss, /@keyframes dailyDurationDigitInTop/)
-  assert.match(wxss, /@keyframes dailyDurationDigitInBottom/)
-  assert.match(wxss, /daily-duration-digit-top/)
-  assert.match(wxss, /daily-duration-digit-bottom/)
-  assert.match(wxss, /prefers-reduced-motion: reduce[\s\S]*daily-duration-digit/)
+  assert.match(wxss, /@import '\.\.\/\.\.\/\.\.\/styles\/number-reveal\.wxss'/)
+  assert.match(shared, /\.duration-reveal-playing \.daily-duration-digit-top/)
+  assert.match(shared, /\.duration-reveal-playing \.daily-duration-digit-bottom/)
+  assert.match(shared, /prefers-reduced-motion: reduce[\s\S]*daily-duration-digit/)
 })
 
 test('date event forwards raw value and preserves undefined return', () => {

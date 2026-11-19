@@ -113,16 +113,16 @@ swipeLeft()
 assert.equal(reader.nextCount, 1, 'normal page swipe still changes the card')
 const template = read('subpackages/formulas/components/formula-card/index.wxml')
 assert.match(template, /fc-flip-stage/)
-assert.match(fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8'), /\.fc-flip-shell\s*\{[^}]*perspective:\s*500px;[^}]*\}/)
-assert.match(fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8'), /\.fc-flip-stage\s*\{[^}]*transform-style:\s*preserve-3d;[^}]*transition:\s*transform\s*520ms/)
+assert.match(fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8'), /\.fc-flip-shell\.is-recite\s*\{[^}]*perspective:\s*500px;[^}]*\}/)
+assert.match(fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8'), /\.fc-flip-stage\.is-recite\s*\{[^}]*transform-style:\s*preserve-3d;[^}]*transition:\s*transform\s*520ms/)
 assert.match(template, /bindtap="toggleCardFlip"/)
 assert.match(template, /核心公式|变量含义|记忆提示/)
 assert.match(template, /role="button"/)
 assert.match(template, /aria-expanded="\{\{isFlipped\}\}"/)
 assert.match(template, /onFormulaTouchStart/)
 const cardWxss = fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8')
-assert.match(cardWxss, /\.fc-flip-stage\s*\{[^}]*will-change:\s*transform;/)
-assert.match(cardWxss, /\.fc-flip-stage,\s*\.fc-flip-face\s*\{\s*transition: none !important;\s*will-change: auto !important;/)
+assert.match(cardWxss, /\.fc-flip-stage\.is-recite\s*\{[^}]*will-change:\s*transform;/)
+assert.match(cardWxss, /\.fc-flip-stage\.is-recite,\s*\.fc-flip-face\s*\{\s*transition: none !important;\s*will-change: auto !important;/)
 assert.match(template, /class="fc-formula-line-scroll"/)
 assert.match(template, /<page-container[\s\S]*bind:afterleave="closeFormulaReading"/)
 assert.match(template, /bindtouchstart="onFormulaTouchStart"/)
@@ -208,6 +208,15 @@ const componentSource = read('subpackages/formulas/components/formula-card/index
 assert.match(componentSource, /isFlipped: false/)
 assert.match(componentSource, /toggleCardFlip\(\)/)
 assert.match(componentSource, /patch\.isFlipped = false/)
+assert.doesNotMatch(template, /fc-detail-body|toggleSection/, 'browse and recitation share one complete content surface')
+assert.doesNotMatch(read('subpackages/formulas/reader/index.wxml'), /fr-card-surface/, 'reader does not wrap the card in another card')
+const readerStyles = read('subpackages/formulas/reader/index.wxss')
+assert.match(readerStyles.slice(readerStyles.lastIndexOf('@media (prefers-reduced-motion: reduce)')),
+  /\.fr-transition-stage,[\s\S]*transition: none !important/, 'reduced motion wins after the reader transition rules')
+for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [readerStyles, 'fr-mode-tab']]) {
+  assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
+    control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
+}
 const opening = componentSource.slice(componentSource.indexOf('    openFormulaReading('), componentSource.indexOf('    closeFormulaReading('))
 assert.doesNotMatch(opening, /renderFormulaNodes|setTimeout/, 'click path never parses math or waits for animation')
 
@@ -218,3 +227,97 @@ for (const page of ['library', 'reader']) {
   assert.doesNotMatch(read(`subpackages/formulas/${page}/index.wxss`), /#(?:B7E82A|F4F4EE|C9F44D)/i)
 }
 console.log('Formula reader layout, math integrity, expanded reading and mint theme checks passed')
+
+// Optional native WCC bundle: verifies template data and conditional branches,
+// without a browser, screenshots, WeChat credentials or network access.
+if (process.argv[2]) {
+  const vm = require('node:vm')
+  const native = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
+  vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), native)
+  function nativeRenderer(file) {
+    const render = native.$gwx(file)
+    return data => {
+      // WCC checks constructors while cloning template values. Instantiate
+      // fixtures in its realm, matching data received by the actual webview.
+      native.fixtureJSON = JSON.stringify(data)
+      return render(vm.runInContext('JSON.parse(fixtureJSON)', native))
+    }
+  }
+  const renderCard = nativeRenderer('subpackages/formulas/components/formula-card/index.wxml')
+  const renderReader = nativeRenderer('subpackages/formulas/reader/index.wxml')
+  const textNodes = text => [{ type: 'text', text }]
+  const fixtureData = {
+    ...structuredClone(definition.data),
+    card: { id: 1, title: '根式积分与适用条件', studyCardTypeLabel: '公式', study_card_type: 'formula',
+      tags: Array.from({ length: 8 }, (_, index) => ({ id: index, code: 'basic', name: '标签' + index })) },
+    content: {
+      titleNodes: textNodes('根式积分与适用条件'),
+      summaryNodes: textNodes('记忆提示完整内容'), conditionsNodes: textNodes('适用条件完整内容'),
+      symbolNotesNodes: textNodes('符号说明完整内容'), secondaryNodes: textNodes('结论完整内容'),
+      errorTipsNodes: textNodes('易错提醒完整内容'),
+      examples: Array.from({ length: 12 }, (_, index) => ({
+        _key: 'ex-' + index, questionNodes: textNodes('例题题干' + index), solutionNodes: textNodes('解法' + index),
+        answerNodes: textNodes('末尾答案' + index), errorTipNodes: textNodes('例题易错' + index),
+      })),
+    },
+    formulaBlocks: [{ ...runtimeFixture, labelNodes: textNodes('积分公式'), noteNodes: textNodes('公式备注') }],
+    recitationMode: false,
+  }
+  function nodes(tree) {
+    if (!tree || typeof tree !== 'object') return []
+    return [tree, ...(tree.children || []).flatMap(nodes)]
+  }
+  const byClass = (tree, name) => nodes(tree).filter(node => String(node.attr && node.attr.class || '').split(/\s+/).includes(name))
+  function assertCompleteContent(tree) {
+    assert.equal(byClass(tree, 'fc-formula-block').length, 1, 'formulas appear once on the main content face')
+    assert.equal(byClass(tree, 'fc-formula-rich').length,
+      runtimeFixture.readingRows.reduce((count, row) => count + row.lineItems.length, 0), 'all formula fragments survive template binding')
+    assert.equal(byClass(tree, 'fc-example').length, 12, 'long content retains every example')
+    const richNodes = nodes(tree).filter(node => node.tag === 'wx-rich-text').map(node => JSON.stringify(node.attr.nodes))
+    for (const field of ['summaryNodes', 'conditionsNodes', 'symbolNotesNodes', 'secondaryNodes', 'errorTipsNodes']) {
+      assert.equal(richNodes.filter(value => value === JSON.stringify(fixtureData.content[field])).length, 1, field)
+    }
+    assert.ok(richNodes.includes(JSON.stringify(fixtureData.content.examples.at(-1).answerNodes)), 'last answer remains reachable in the scroll content')
+  }
+  const browse = renderCard(fixtureData)
+  assert.equal(byClass(browse, 'fc-flip-face').length, 1, 'browse renders one main surface')
+  assert.equal(byClass(browse, 'fc-title-rich').length, 1)
+  assert.equal(JSON.stringify(byClass(browse, 'fc-title-rich')[0].attr.nodes), JSON.stringify(fixtureData.content.titleNodes))
+  assert.equal(byClass(browse, 'fc-tag').length, 9, 'all tags remain present')
+  assert.equal(byClass(browse, 'fc-flip-action').length, 0)
+  assertCompleteContent(browse)
+
+  for (const isFlipped of [false, true]) {
+    const recite = renderCard({ ...fixtureData, recitationMode: true, isFlipped })
+    const front = byClass(recite, 'fc-flip-front')[0]
+    const back = byClass(recite, 'fc-flip-back')[0]
+    assert.equal(byClass(recite, 'fc-flip-face').length, 2)
+    assert.equal(front.attr.ariaHidden, isFlipped)
+    assert.equal(back.attr.ariaHidden, !isFlipped)
+    assert.equal(byClass(front, 'fc-formula-rich').length, 0, 'prompt does not expose answer content')
+    assert.equal(byClass(front, 'fc-flip-action')[0].attr.ariaLabel, '显示答案')
+    assert.equal(byClass(front, 'fc-flip-action')[0].attr.disabled, isFlipped)
+    assert.equal(byClass(back, 'fc-flip-action')[0].attr.ariaLabel, '返回题面')
+    assert.equal(byClass(back, 'fc-flip-action')[0].attr.disabled, !isFlipped)
+    assertCompleteContent(back)
+  }
+
+  const empty = { ...fixtureData, formulaBlocks: [], content: { ...structuredClone(definition.data.content) } }
+  assert.equal(byClass(renderCard(empty), 'fc-content-empty').length, 1)
+  const graph = { ...empty, card: { ...empty.card, card_type: 'function_graph' }, graphImageUrl: 'fixture-graph.png', displayGraphUrl: 'fixture-thumbnail.png' }
+  assert.equal(byClass(renderCard(graph), 'fc-graph-image')[0].attr.src, 'fixture-thumbnail.png')
+  assert.equal(byClass(renderCard(graph), 'fc-content-empty').length, 0)
+  assert.equal(byClass(renderCard({ ...graph, graphLoadError: true }), 'fc-graph-fallback').length, 1)
+  assert.equal(byClass(renderCard({ ...graph, graphImageUrl: '', displayGraphUrl: '' }), 'fc-graph-fallback').length, 1)
+
+  for (const recitationMode of [false, true]) {
+    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode })
+    const card = nodes(readerTree).find(node => node.attr && node.attr.id === 'readerFormulaCard')
+    assert.equal(card.attr.recitationMode, recitationMode, 'reader passes its chosen mode to the card')
+    const tabs = byClass(readerTree, 'fr-mode-tab')
+    assert.equal(tabs.length, 2)
+    assert.equal(tabs[0].attr.ariaPressed, !recitationMode)
+    assert.equal(tabs[1].attr.ariaPressed, recitationMode)
+  }
+  console.log('Native WXML mode, single-surface, complete-content and graph/empty branch checks passed')
+}

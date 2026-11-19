@@ -475,29 +475,46 @@ Component({
 
           if (idChanged) {
             patch.isFlipped = false
-            patch.showSymbolNotes = false
-            patch.showSecondary = false
-            patch.showErrorTips = true
-            patch.showExamples = false
             patch.graphLoadError = false
             patch.graphLoaded = false
             patch.displayGraphUrl = ''
           }
 
-          if (Object.keys(patch).length) this.setData(patch)
+          if (Object.keys(patch).length) {
+            this.setData(patch, () => {
+              if (patch.isFlipped === false) this.resetRecitationScroll()
+            })
+          }
         } catch (e) {
           console.error('[formula-card] observer error', e)
           // Fallback: set empty data so the component renders as plain text
           this.setData({
             cardRenderKey: '',
+            isFlipped: false,
             formulaBlocks: [],
             content: {
               titleNodes: [],
               summaryNodes: [],
-              formulaNodes: [],
+              conditionsNodes: [],
+              symbolNotesNodes: [],
+              secondaryNodes: [],
+              errorTipsNodes: [],
+              examples: [],
             },
           })
         }
+      },
+    },
+    recitationMode: {
+      type: Boolean,
+      value: false,
+      observer() {
+        this._flipGesture = null
+        this._flipTapSuppressedUntil = 0
+        if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
+        this._readingLayouts = {}
+        this.setData({ isFlipped: false })
+        this.resetRecitationScroll()
       },
     },
     graphImageUrl: { type: String, value: '' },
@@ -507,6 +524,7 @@ Component({
 
   data: {
     isFlipped: false,
+    recitationScrollTop: 0,
     expandedBlock: null,
     expandedHeight: 0,
     expandedScrollHeight: 0,
@@ -522,10 +540,6 @@ Component({
       errorTipsNodes: [],
       examples: [],
     },
-    showSymbolNotes: false,
-    showSecondary: false,
-    showErrorTips: true,
-    showExamples: false,
     graphLoadError: false,
     graphLoaded: false,
     // Progressive graph loading: show the small thumbnail immediately and
@@ -561,8 +575,15 @@ Component({
   },
 
   methods: {
+    resetRecitationScroll() {
+      if (!this.data.recitationMode) return
+      this.setData({ recitationScrollTop: 1 }, () => {
+        this.setData({ recitationScrollTop: 0 })
+      })
+    },
     toggleCardFlip() {
-      if (this.data.expandedBlock || Date.now() < (this._flipTapSuppressedUntil || 0)) return
+      if (!this.data.recitationMode || this.data.expandedBlock || this._readingOpening ||
+          Date.now() < (this._flipTapSuppressedUntil || 0)) return
       this.setData({ isFlipped: !this.data.isFlipped })
     },
     onCardTouchStart(event) {
@@ -636,12 +657,6 @@ Component({
     },
 
     containFormulaReading() {},
-
-    toggleSection(e) {
-      const key = e.currentTarget.dataset.key
-      if (!key) return
-      this.setData({ [key]: !this.data[key] })
-    },
 
     // Keep the viewport ratio in sync with the card currently mounted. Called
     // from the card observer so switching cards (reader swipes between cards

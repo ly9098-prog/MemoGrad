@@ -1,4 +1,5 @@
 <wxs module="graphMotion" src="./graph-motion.wxs"></wxs>
+<page-meta page-style="{{forcePanelOpen || themeSheetOpen ? 'overflow: hidden;' : ''}}" />
 <view class="atlas-page {{pageEntered ? 'page-entered' : ''}}">
 <view class="atlas-loading" wx:if="{{loading}}">
 <view class="loading-copy">
@@ -79,7 +80,7 @@
 <text class="graph-card-title">{{scene.title}}</text>
 <text class="graph-count">{{scene.countText}}</text>
 </view>
-<button class="graph-force-toggle {{forcePanelOpen ? 'is-open' : ''}}" catchtap="toggleForcePanel" hover-class="atlas-pressed" aria-label="图谱显示与力度设置" aria-expanded="{{forcePanelOpen}}"><view class="force-toggle-icon" aria-hidden="true"><view></view><view></view><view></view></view><text>设置</text></button>
+<button class="graph-force-toggle {{forcePanelOpen ? 'is-open' : ''}}" catchtap="toggleForcePanel" hover-class="atlas-pressed" aria-label="图谱设置" aria-expanded="{{forcePanelOpen}}"><image class="force-toggle-icon" src="/assets/icons/practice/sliders-horizontal.svg" mode="aspectFit" aria-hidden="true" /></button>
 </view>
 <view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}} {{showAllGraphLabels ? 'graph-label-all' : ''}}" motion="{{graphMotionState}}" change:motion="{{graphMotion.sync}}" bindtouchstart="{{graphMotion.start}}" catchtouchmove="{{graphMotion.move}}" bindtouchend="{{graphMotion.end}}" bindtouchcancel="{{graphMotion.end}}" bindtap="{{graphMotion.tap}}">
 <view class="atlas-stage" style="{{stageStyle}}font-size:{{graphLabelSize || 32}}px;" wx:if="{{scene.nodes.length}}">
@@ -105,15 +106,6 @@
 <button class="graph-control graph-control-out" data-step="-1" catchtap="{{graphMotion.control}}" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱">−</button>
 <button class="graph-control graph-control-reset" catchtap="{{graphMotion.control}}" aria-label="复位图谱"><view aria-hidden="true"></view></button>
 </view>
-</view>
-<view class="force-panel" wx:if="{{forcePanelOpen}}">
-<view class="force-panel-head"><text>图谱设置</text><button class="force-panel-close" catchtap="closeForcePanel" aria-label="关闭图谱设置">×</button></view>
-<view class="force-display-row"><text>知识点名称</text><button class="force-label-toggle" bindtap="toggleGraphLabels" hover-class="atlas-pressed" aria-label="切换图谱名称显示，当前{{showAllGraphLabels ? '全部显示' : '随缩放显示'}}">{{showAllGraphLabels ? '全部显示' : '随缩放显示'}}</button></view>
-<view class="force-row" wx:for="{{forceControls}}" wx:key="key">
-<view class="force-row-meta"><text>{{item.label}}</text><text class="force-value">{{item.valueText}}</text></view>
-<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchange="changeForce" activeColor="#3A6F5B" backgroundColor="#D8EEE6" block-color="#FFFFFF" block-size="20" aria-label="{{item.label}}" />
-</view>
-<button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">恢复默认力度</button>
 </view>
 <view class="graph-page-navigation" wx:if="{{scene.pageCount > 1}}">
 <button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" bindtap="changeGraphPage" aria-label="上一页知识节点">上一页</button>
@@ -218,6 +210,28 @@
 </view>
 </view>
 <view class="index-scroll-retainer" style="{{indexScrollRetentionStyle}}" aria-hidden="true"></view>
+</view>
+<view class="force-sheet-layer" wx:if="{{forcePanelOpen}}" aria-role="dialog" aria-modal="true" aria-labelledby="force-panel-title">
+<view class="force-sheet-mask" catchtap="closeForcePanel" catchtouchmove="preventBackgroundScroll" aria-label="关闭图谱设置" aria-role="button"></view>
+<view class="force-panel">
+<view class="force-panel-head"><text id="force-panel-title">图谱设置</text><button class="force-panel-close" catchtap="closeForcePanel" hover-class="atlas-pressed" aria-label="关闭图谱设置"><view class="clear-symbol" aria-hidden="true"></view></button></view>
+<scroll-view class="force-panel-scroll {{forceAdvancedOpen ? 'force-panel-expanded' : ''}}" scroll-y enhanced show-scrollbar="{{false}}">
+<view class="force-panel-body">
+<view class="force-display-row"><text>知识点名称</text><view class="force-label-options" aria-role="group" aria-label="知识点名称显示">
+<button class="force-label-option {{!showAllGraphLabels ? 'is-selected' : ''}}" data-mode="auto" bindtap="setGraphLabels" hover-class="atlas-pressed" aria-pressed="{{!showAllGraphLabels}}">自动</button>
+<button class="force-label-option {{showAllGraphLabels ? 'is-selected' : ''}}" data-mode="all" bindtap="setGraphLabels" hover-class="atlas-pressed" aria-pressed="{{showAllGraphLabels}}">全部</button>
+</view></view>
+<button class="force-advanced-toggle" bindtap="toggleForceAdvanced" hover-class="atlas-pressed" aria-expanded="{{forceAdvancedOpen}}"><text>布局微调</text><view class="force-advanced-caret {{forceAdvancedOpen ? 'is-open' : ''}}" aria-hidden="true"></view></button>
+<view class="force-advanced" wx:if="{{forceAdvancedOpen}}">
+<view class="force-row" wx:for="{{forceControls}}" wx:key="key">
+<view class="force-row-meta"><text>{{item.label}}</text><text class="force-value">{{item.valueText}}</text></view>
+<slider class="force-slider" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-key="{{item.key}}" bindchange="changeForce" activeColor="#3A6F5B" backgroundColor="#D8EEE6" block-color="#3A6F5B" block-size="20" aria-label="{{item.label}}" />
+</view>
+<button class="force-reset" catchtap="resetForces" hover-class="atlas-pressed">重置布局参数</button>
+</view>
+</view>
+</scroll-view>
+</view>
 </view>
 <view class="theme-sheet-layer {{themeSheetClosing ? 'theme-sheet-closing' : ''}}" wx:if="{{themeSheetOpen}}">
 <view class="theme-sheet-mask" bindtap="closeThemeSheet" catchtouchmove="preventBackgroundScroll" aria-hidden="true"></view>

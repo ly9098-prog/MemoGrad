@@ -1,6 +1,5 @@
 const FRAME_INTERVAL_MS = 80
 const ANIMATION_DURATIONS = {
-  streakDays: 600,
   goalDone: 600,
   levelProgress: 500,
 }
@@ -37,14 +36,6 @@ function tick(page, state) {
   const elapsed = Date.now() - state.startTime
   const data = {}
   const durations = state.durations || ANIMATION_DURATIONS
-  const streakDone = updateField({
-    data,
-    key: '_animStreakDays',
-    fromVal: state.from.streakDays,
-    toVal: state.to.streakDays,
-    duration: durations.streakDays,
-    elapsed,
-  })
   const goalDone = updateField({
     data,
     key: '_animGoalDone',
@@ -62,12 +53,11 @@ function tick(page, state) {
     elapsed,
   })
   if (Object.keys(data).length > 0) page.setData(data)
-  if (!streakDone || !goalDone || !levelDone) {
+  if (!goalDone || !levelDone) {
     page._animTimer = setTimeout(() => tick(page, state), FRAME_INTERVAL_MS)
     return
   }
   page.setData({
-    _animStreakDays: state.to.streakDays,
     _animGoalDone: state.to.goalDone,
     _animLevelProgress: state.to.levelProgress,
   })
@@ -78,17 +68,14 @@ function start(page) {
   clear(page)
   const targets = page._growthTargets
   const from = {
-    streakDays: page.data._animStreakDays,
     goalDone: page.data._animGoalDone,
     levelProgress: page.data._animLevelProgress,
   }
   const to = {
-    streakDays: targets.streakDays,
     goalDone: targets.todayGoalDone,
     levelProgress: targets.levelProgress,
   }
-  const unchanged = from.streakDays === to.streakDays &&
-    from.goalDone === to.goalDone &&
+  const unchanged = from.goalDone === to.goalDone &&
     from.levelProgress === to.levelProgress
   if (unchanged) return
   const state = { from, to, durations: ANIMATION_DURATIONS, startTime: Date.now() }

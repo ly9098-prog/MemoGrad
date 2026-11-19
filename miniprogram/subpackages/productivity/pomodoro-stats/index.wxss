@@ -1,3 +1,5 @@
+@import '../../../styles/number-reveal.wxss';
+
 /* ============================================
    🎯 极夜·专注 — Pomodoro Stats
    Dark immersive theme for focus analytics
@@ -3845,46 +3847,10 @@ page {
   filter: none;
 }
 
-/* 当日学习时长：数字按位交替从上下方滑入，并用递增延迟制造交错感。 */
+/* The digits own the entrance; avoid a second transform/transition layer. */
 .daily-duration-value-row {
   overflow: hidden;
+  transform: none;
+  transition: none;
+  will-change: auto;
 }
-.daily-duration-digit {
-  display: inline-block;
-  line-height: 1;
-  will-change: transform, opacity;
-}
-.daily-duration-digit-top {
-  animation: dailyDurationDigitInTop 320ms cubic-bezier(.22, 1, .36, 1) both;
-}
-.daily-duration-digit-bottom {
-  animation: dailyDurationDigitInBottom 320ms cubic-bezier(.22, 1, .36, 1) both;
-}
-@keyframes dailyDurationDigitInTop {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, -.42em, 0) scale(.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-@keyframes dailyDurationDigitInBottom {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, .42em, 0) scale(.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .daily-duration-digit {
-    animation: none !important;
-  }
-}
-
-.daily-duration-digit { animation-play-state: paused; }
-.duration-reveal-playing .daily-duration-digit { animation-play-state: running; }

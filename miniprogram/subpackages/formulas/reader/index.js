@@ -77,6 +77,7 @@ Page({
     canGoNext: false,
     readerScrollTop: 0,
     formulaReadingExpanded: false,
+    recitationMode: false,
     transitionClass: '',
 
     isRandom: false,
@@ -378,6 +379,17 @@ Page({
     this.setData({ formulaReadingExpanded: Boolean(event.detail && event.detail.expanded) })
   },
 
+  setReaderMode(event) {
+    const mode = event.currentTarget.dataset.mode
+    if (mode !== 'browse' && mode !== 'recite') return
+    const recitationMode = mode === 'recite'
+    if (this.data.loadingNext || this.data.formulaReadingExpanded || recitationMode === this.data.recitationMode) return
+    clearTimeout(this._formulaGestureTimer)
+    this._readerGesture = null
+    this._formulaGestureActive = false
+    this.setData({ recitationMode }, () => this.resetReaderScroll())
+  },
+
   onFormulaGestureStart() {
     clearTimeout(this._formulaGestureTimer)
     this._formulaGestureActive = true
@@ -392,7 +404,7 @@ Page({
   },
 
   onReaderTouchStart(e = {}) {
-    if (this.data.loadingNext || this._formulaGestureActive) return
+    if (this.data.loadingNext || this.data.formulaReadingExpanded || this._formulaGestureActive) return
     const touch = e.touches && e.touches[0]
     if (!touch) return
     this._readerGesture = { startX: touch.clientX, startY: touch.clientY, dx: 0, dy: 0, axis: '' }

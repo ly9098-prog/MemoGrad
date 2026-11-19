@@ -322,6 +322,8 @@ test('stale growth responses are ignored', async () => {
 })
 
 test('extracted numeric animation commits the exact growth targets', () => {
+  const numberReveal = require('../utils/number-reveal')
+  const { growthPageMethods } = require('../pages/home/utils/growth-page-controller')
   const writes = []
   const page = {
     _alive: true,
@@ -346,11 +348,28 @@ test('extracted numeric animation commits the exact growth targets', () => {
   })
 
   assert.deepEqual(writes[writes.length - 1], {
-    _animStreakDays: 5,
     _animGoalDone: 6,
     _animLevelProgress: 20,
   })
+  assert.ok(writes.every(patch => !Object.hasOwn(patch, '_animStreakDays')),
+    'growthAnimation owns goal and level progress, leaving streak to numberReveal')
+  assert.equal(page.data._animStreakDays, 0)
   assert.equal(page._animTimer, null)
+
+  page._growthTargets = { streakDays: 5, todayGoalDone: 6, levelProgress: 20, dueReviewCount: 0 }
+  try {
+    growthPageMethods._animateNumbers.call(page)
+    assert.equal(page._numberRevealState.to._animStreakDays, 5)
+    assert.ok(page._numberRevealState.fields.some(field =>
+      field.name === '_animStreakDays' && field.segmentsKey === '_animStreakSegments'))
+    assert.equal(numberReveal.finish(page), true)
+    assert.equal(page.data._animStreakDays, 5)
+    assert.equal(page.data._animStreakSegments.map(item => item.text).join(''), '5')
+    assert.deepEqual(writes[writes.length - 1]._animStreakSegments,
+      numberReveal.buildNumberSegments(5))
+  } finally {
+    numberReveal.clear(page)
+  }
 })
 
 test('fresh request failures are logged instead of being silently discarded', async () => {
@@ -413,20 +432,23 @@ test('home page stays within 800 lines and delegates growth infrastructure', () 
   }
 })
 
-test('daily goal control reopens, persists a valid choice and recalculates progress', async () => {
+test('home goal entry opens study plan and reads its saved daily target on refresh', async () => {
   await withHomePage(async ({ page }) => {
-    page._lastOverview = { today_questions: 13, total_questions: 100, consecutive_days: 2 }
-    page.toggleGoalPicker()
-    assert.equal(page.data.showGoalPicker, true)
-    page.selectTodayGoal({ currentTarget: { dataset: { goal: 50 } } })
+    const routes = []
+    global.wx.navigateTo = options => routes.push(options.url)
+    page.data.guestMode = false
+    page.goStudyPlan()
+    assert.deepEqual(routes, ['/subpackages/study/study-plan/index'])
+    // The plan page owns this setting. Returning Home must use its stored value.
+    require('../utils/storage').set('home_today_goal_total', 50)
+    const snapshot = page.buildGrowthSnapshot({
+      overview: { today_questions: 13, total_questions: 100, consecutive_days: 2 },
+    })
     assert.equal(page.getStoredTodayGoal(), 50)
-    assert.equal(page.data.todayGoalTotal, 50)
-    assert.equal(page.data.showGoalPicker, false)
+    assert.equal(snapshot.todayGoalTotal, 50)
     assert.equal(page._growthTargets.todayGoalDone, 13)
     assert.equal(page._growthTargets.levelProgress, 26)
-    page.toggleGoalPicker()
-    page.selectTodayGoal({ currentTarget: { dataset: { goal: 999 } } })
-    assert.equal(page.getStoredTodayGoal(), 50)
-    assert.equal(page.data.showGoalPicker, true)
+    require('../utils/storage').set('home_today_goal_total', 999)
+    assert.equal(page.getStoredTodayGoal(), 30)
   })
 })

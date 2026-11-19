@@ -1,5 +1,5 @@
 // Keep touch frames in the view layer. Only the settled gesture crosses to JS.
-var math = getMath();
+var math = Math;
 function clamp(value, low, high) {
   return math.max(low, math.min(high, value));
 }

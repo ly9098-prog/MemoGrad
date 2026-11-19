@@ -38,6 +38,14 @@ button::after { border: none; }
   gap: 20rpx;
 }
 
+.fr-mode-switch { display: flex; gap: 8rpx; padding: 6rpx; border-radius: 20rpx; background: #EAF1EC; }
+.fr-mode-tab { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 44px; min-width: 0; margin: 0; padding: 16rpx; border: 0; border-radius: 14rpx; background: transparent; color: #507568; font-size: 28rpx; font-weight: 500; line-height: 1.5; }
+.fr-mode-tab.is-active { background: #FFFFFF; color: #23483C; }
+.fr-mode-tab[disabled] { opacity: .55; }
+.fr-mode-pressed { opacity: .72; }
+.fr-mode-tab:focus-visible { outline: 2px solid #3A6F5B; outline-offset: -2px; }
+.fr-mode-note { display: block; margin: 16rpx 0 24rpx; color: #507568; font-size: 24rpx; line-height: 1.5; }
+
 .fr-reader-copy { min-width: 0; flex: 1; }
 .fr-meta-actions { display: flex; align-items: center; gap: 10rpx; flex-shrink: 0; }
 
@@ -90,14 +98,6 @@ button::after { border: none; }
 .fr-top-favorite.active { border-color: #7ED8B5; background: #EAF9F4; color: #3A6F5B; }
 .fr-top-favorite.disabled { opacity: .56; pointer-events: none; }
 
-.fr-card-surface {
-  overflow: hidden;
-  padding: 30rpx 28rpx 24rpx;
-  border: 1rpx solid #D8EEE6;
-  border-radius: 36rpx;
-  background: #F3FBF8;
-  box-shadow: 0 16rpx 42rpx rgba(43,117,91,.07);
-}
 
 .fr-swipe-note {
   margin: 24rpx 10rpx 0;
@@ -302,7 +302,6 @@ button::after { border: none; }
 
 @media (max-width: 360px) {
   .fr-card-wrap { padding-left: 24rpx; padding-right: 24rpx; }
-  .fr-card-surface { padding-left: 22rpx; padding-right: 22rpx; }
   .fr-actions { left: 18rpx; right: 18rpx; }
   .fr-action { font-size: 23rpx; }
 }
@@ -332,15 +331,6 @@ button::after { border: none; }
 .fr-reader-meta { padding-bottom: 18rpx; }
 .fr-meta-actions { display: none; }
 
-.fr-card-surface {
-  position: relative;
-  overflow: visible;
-  padding: 28rpx 26rpx 30rpx;
-  border-radius: 34rpx;
-  background: rgba(251,255,253,.94);
-  border: 1rpx solid rgba(216,238,230,.92);
-  box-shadow: 0 12rpx 34rpx rgba(43,117,91,.055);
-}
 
 .fr-card-favorite {
   position: relative;
@@ -426,17 +416,6 @@ button::after { border: none; }
 }
 @keyframes frNavSpin { to { transform: rotate(360deg); } }
 
-@media (max-width: 360px) {
-  .fr-card-surface { padding-left: 20rpx; padding-right: 20rpx; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fr-transition-stage,
-  .fr-card-favorite,
-  .fr-nav-hit,
-  .fr-nav-loader { transition: none !important; animation: none !important; }
-}
-
 /* ==================== Phase 2.4 safer formula transition ==================== */
 .fr-transition-stage {
   transition:
@@ -471,6 +450,12 @@ button::after { border: none; }
 .fr-card-wrap { padding-left: 24rpx; padding-right: 24rpx; }
 .fr-reader-actions { display: flex; align-items: center; gap: 16rpx; flex-shrink: 0; }
 .fr-index-pill { background: transparent; font-size: 26rpx; font-weight: 600; }
-.fr-card-surface { padding-left: 18rpx; padding-right: 18rpx; background: #FFFFFF; border-color: #D8EEE6; box-shadow: none; }
 .fr-nav-capsule { background: #3A6F5B; }
 .fr-nav-hit.next { color: #7ED8B5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-transition-stage,
+  .fr-card-favorite,
+  .fr-nav-hit,
+  .fr-nav-loader { transition: none !important; animation: none !important; will-change: auto; }
+}

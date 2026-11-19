@@ -171,26 +171,8 @@
 </scroll-view>
 </view>
 <view class="reward-strip" wx:if="{{!guestMode && selectedSubjectId}}">
-<view class="reward-strip-copy">
-<text class="reward-strip-title">完成本组可获得</text>
-<text class="reward-strip-desc">成长反馈会在练习结果中生成</text>
-</view>
-<view class="reward-strip-items">
-<view class="reward-strip-item">
-<image class="reward-strip-icon" src="/assets/icons/practice/target.svg" mode="aspectFit" aria-hidden="true" />
-<view class="reward-strip-detail">
-<text class="reward-strip-label">成长值</text>
-<text class="reward-strip-value reward-strip-text">完成后结算</text>
-</view>
-</view>
-<view class="reward-strip-item reward-strip-output">
 <image class="reward-strip-icon" src="/assets/icons/practice/notebook-tabs.svg" mode="aspectFit" aria-hidden="true" />
-<view class="reward-strip-detail">
-<text class="reward-strip-label">学习产出</text>
-<text class="reward-strip-value reward-strip-text">本组复盘</text>
-</view>
-</view>
-</view>
+<text class="reward-strip-text">完成后查看本组复盘与成长反馈</text>
 </view>
 </view>
 </scroll-view>

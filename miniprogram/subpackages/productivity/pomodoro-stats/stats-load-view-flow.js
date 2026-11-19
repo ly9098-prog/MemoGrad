@@ -119,12 +119,18 @@ function _getTodayDurationDisplayPatch(page, text, options) {
 }
 
 function _getTodayDurationDisplayPatchWithOptions(page, text, { reveal = false } = {}) {
-  const revision = reveal ? (page._durationRevealRevision = (page._durationRevealRevision || 0) + 1) : 0
+  const date = page.data.selectedDate
+  const previous = page._durationRevealTarget
+  const sameTarget = !!previous && previous.text === text && previous.date === date
+  if (!sameTarget && (reveal || previous)) {
+    page._durationRevealTarget = reveal ? { text, date } : null
+    page._durationRevealRevision = (page._durationRevealRevision || 0) + 1
+  }
   return {
     _dispTodayDurationText: text,
-    _dispTodayDurationSegments: page._buildDurationSegments(text, reveal).map(segment => (
-      reveal && segment.type === 'num' ? { ...segment, key: `${segment.key}-reveal-${revision}` } : segment
-    )),
+    // Ordinary refresh commits must keep the direction classes of the same
+    // rendered target; stripping and restoring them would replay its CSS.
+    _dispTodayDurationSegments: page._buildDurationSegments(text, reveal || sameTarget),
   }
 }
 

@@ -257,7 +257,7 @@ groupChips: [], quickGroupChips: [], themeGroupCount: 0, themeSheetOpen: false, 
 scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
 pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
-forcePanelOpen: false, forceControls: [],
+forcePanelOpen: false, forceAdvancedOpen: false, forceControls: [],
 showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
 indexNodes: [], indexCount: 0, indexDisplayCount: 0, hasMore: false, indexSearchOpen: false, indexSearchFocused: false,
@@ -1883,15 +1883,19 @@ retry() { return this.loadMap() },
 forceControlData() {
 const forces = this._forces || DEFAULT_FORCES
 return [
-{ key: 'center', label: '图谱向心力', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
-{ key: 'repel', label: '节点间的排斥力', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(2) },
-{ key: 'link', label: '相连节点间的吸引力', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
+{ key: 'center', label: '向心力', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
+{ key: 'repel', label: '节点斥力', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(2) },
+{ key: 'link', label: '连线引力', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
 { key: 'distance', label: '连线长度', min: 120, max: 360, step: 5, value: forces.distance, valueText: String(Math.round(forces.distance)) },
 ]
 },
 toggleForcePanel() { this.setData({ forcePanelOpen: !this.data.forcePanelOpen }) },
 closeForcePanel() { this.setData({ forcePanelOpen: false }) },
-toggleGraphLabels() { this.setData({ showAllGraphLabels: !this.data.showAllGraphLabels }) },
+toggleForceAdvanced() { this.setData({ forceAdvancedOpen: !this.data.forceAdvancedOpen }) },
+setGraphLabels(event) {
+const mode = event.currentTarget.dataset.mode
+if (mode === 'auto' || mode === 'all') this.setData({ showAllGraphLabels: mode === 'all' })
+},
 preventBackgroundScroll() {},
 changeForce(event) {
 const key = String(event.currentTarget.dataset.key || '')

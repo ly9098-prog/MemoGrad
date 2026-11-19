@@ -138,7 +138,11 @@ test('label preference and settled camera gestures preserve scene positions', ()
   const positions = scene.nodes.map(node => [node.cx, node.cy])
   const page = { ...pageDefinition, data: { ...pageDefinition.data, scene }, _frame: frame,
     _camera: fitCamera(frame), _pageVisible: true, setData(patch) { Object.assign(this.data, patch) } }
-  page.toggleGraphLabels()
+  page.setGraphLabels({ currentTarget: { dataset: { mode: 'all' } } })
+  assert.equal(page.data.showAllGraphLabels, true)
+  page.setGraphLabels({ currentTarget: { dataset: { mode: 'all' } } })
+  assert.equal(page.data.showAllGraphLabels, true, 'choosing the active option is idempotent')
+  page.setGraphLabels({ currentTarget: { dataset: { mode: 'invalid' } } })
   assert.equal(page.data.showAllGraphLabels, true)
   page.setCamera(page._camera)
   page.commitGraphMotion({ revision: page.data.graphMotionState.revision, sequence: 1, camera: { ...page._camera, scale: page._camera.scale * 2 } })

@@ -1,6 +1,5 @@
 const auth = require('../../utils/auth')
 const {
-  GOAL_OPTIONS,
   TODAY_GOAL_TOTAL,
   clearGrowthLifecycleTimers,
   growthPageMethods,
@@ -39,8 +38,6 @@ Page({
     _animLevelProgress: 0,
     _animGoalDone: 0,
     todayGoalTotal: TODAY_GOAL_TOTAL,
-    goalOptions: GOAL_OPTIONS,
-    showGoalPicker: false,
 
     _animDueReviewCount: 0,
     remainingCount: TODAY_GOAL_TOTAL,
@@ -761,7 +758,6 @@ Page({
     })
   },
   goStudyPlan() {
-    if (this.data.showGoalPicker) this.setData({ showGoalPicker: false })
     wx.navigateTo({ url: `/subpackages/study/study-plan/index${this.data.guestMode ? '?guest=1' : ''}` })
   },
   openMasterySubject(event) {

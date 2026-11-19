@@ -36,8 +36,7 @@ const growthPageMethods = {
     this._clearAnimTimer()
     this._hasGrowthSnapshot = false
     this._lastDashboardSubjectStats = []
-    this._lastOverview = {}
-    this._lastGrowth = this._lastHub = this._lastPlan = null
+    this._lastHub = null
     this._growthTargets = { streakDays: 0, todayGoalDone: 0, levelProgress: 0 }
   },
 
@@ -63,7 +62,6 @@ const growthPageMethods = {
       user: {},
       studyLevel: '游客',
       subjectMastery: [],
-      showGoalPicker: false,
       displayName: '同学',
       userInitial: '研',
       primaryTaskKicker: 'GUEST PREVIEW',
@@ -213,10 +211,7 @@ const growthPageMethods = {
 
   buildGrowthSnapshot(options = {}) {
     const opts = options || {}
-    this._lastOverview = opts.overview || {}
-    this._lastGrowth = opts.growth || null
     this._lastHub = opts.hub || null
-    this._lastPlan = opts.plan || null
     if (Array.isArray(opts.dashboardSubjectStats)) {
       this._lastDashboardSubjectStats = opts.dashboardSubjectStats
     }
@@ -235,28 +230,6 @@ const growthPageMethods = {
     return GOAL_OPTIONS.includes(stored) ? stored : TODAY_GOAL_TOTAL
   },
 
-  toggleGoalPicker() {
-    this.setData({ showGoalPicker: !this.data.showGoalPicker })
-  },
-
-  selectTodayGoal(e) {
-    const goal = Number(e.currentTarget.dataset.goal)
-    if (!GOAL_OPTIONS.includes(goal)) return
-    storage.set(TODAY_GOAL_KEY, goal)
-    this.setData({
-      _animStreakDays: 0,
-      _animGoalDone: 0,
-      _animLevelProgress: 0,
-      ...this.buildGrowthSnapshot({
-        overview: this._lastOverview || {},
-        growth: this._lastGrowth,
-        hub: this._lastHub,
-        plan: this._lastPlan,
-      }),
-      showGoalPicker: false,
-    })
-    this._animateNumbers()
-  },
 }
 
 function clearGrowthLifecycleTimers(page) {
@@ -268,7 +241,6 @@ function clearGrowthLifecycleTimers(page) {
 }
 
 module.exports = {
-  GOAL_OPTIONS,
   TODAY_GOAL_TOTAL,
   clearGrowthLifecycleTimers,
   growthPageMethods,

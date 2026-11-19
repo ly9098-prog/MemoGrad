@@ -25,7 +25,9 @@ function motionFixture(options = {}) {
     requestAnimationFrame: callback => frames.push(callback),
     callMethod(name, args) { calls.push({ name, args: JSON.parse(JSON.stringify(args)) }) },
   }
-  vm.runInNewContext(code, { module, getMath: () => Math, getDate: () => ({ getTime: () => clock }) })
+  // WXS exposes Math directly; getDate is its date factory. Do not invent globals
+  // here: doing so masked a module-load failure in the actual rendering layer.
+  vm.runInNewContext(code, { module, getDate: () => ({ getTime: () => clock }) })
   const motion = module.exports
   const frame = { width: rect.width, height: rect.height }
   const fit = layout.fitCamera(frame)

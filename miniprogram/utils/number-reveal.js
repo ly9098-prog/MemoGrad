@@ -22,7 +22,7 @@ function toDisplayNumber(value) {
 function buildSegment(value, index) {
   const text = String(value)
   return {
-    key: `${index}-${text}`,
+    key: `pos-${index}`,
     text,
     direction: index % 2 === 0 ? 'top' : 'bottom',
     delay: index * 38,
@@ -62,6 +62,7 @@ function updateField(options) {
 }
 
 function tick(page, state) {
+  if (page._numberRevealState !== state) return
   if (!page._alive || !page._visible) {
     page._numberRevealTimer = null
     return
@@ -78,6 +79,10 @@ function tick(page, state) {
   }))
   state.fields.forEach((field) => {
     if (patch[field.name] === undefined) return
+    if (patch[field.name] === page.data[field.name]) {
+      delete patch[field.name]
+      return
+    }
     if (field.segmentsKey) patch[field.segmentsKey] = buildDisplay(field, patch[field.name])
   })
   if (Object.keys(patch).length) page.setData(patch)
@@ -113,8 +118,10 @@ function finish(page) {
 
 function start(page, options) {
   const fields = options.fields || []
+  const active = page._numberRevealState
   const changed = fields.filter(field => (
-    page.data[field.name] !== options.to[field.name] || !hasDisplaySegments(page.data, field)
+    (active ? active.to[field.name] : page.data[field.name]) !== options.to[field.name] ||
+    !hasDisplaySegments(page.data, field)
   ))
   // An identical refresh must not cancel entrances waiting below the fold.
   if (!changed.length) return false

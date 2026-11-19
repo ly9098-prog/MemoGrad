@@ -402,6 +402,15 @@ jobs:
           node --test miniprogram/tests/test-home-mastery-fallback.js
           node --test miniprogram/tests/test-route-transition-contract.js
           node --test miniprogram/tests/test-number-reveal-motion.js
+          node --test \
+            miniprogram/tests/test-digit-reveal-gate.js \
+            miniprogram/tests/test-knowledge-force-layout.js \
+            miniprogram/tests/test-knowledge-graph-layout.js \
+            miniprogram/tests/test-knowledge-map-request-contract.js \
+            miniprogram/tests/test-knowledge-view-motion.js \
+            miniprogram/tests/test-knowledge-wxs-runtime.js \
+            miniprogram/tests/test-formula-flip.js
+          node miniprogram/tests/test-formula-reader-layout.js
           node --test miniprogram/tests/test-home-login-guide.js
           node --test \
             miniprogram/tests/test-quiz-runner-observer.js \

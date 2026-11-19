@@ -1,0 +1,44 @@
+/* Pending gates keep the committed number readable. Only the released class
+   installs an entrance; changing the glyph preserves its positional node. */
+.reveal-digit,
+.daily-duration-digit {
+  display: inline-block;
+  line-height: 1;
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.number-reveal-playing .reveal-digit-top {
+  animation: numberRevealTop 380ms cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+.number-reveal-playing .reveal-digit-bottom {
+  animation: numberRevealBottom 380ms cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+.duration-reveal-playing .daily-duration-digit-top {
+  animation: numberRevealTop 320ms cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+.duration-reveal-playing .daily-duration-digit-bottom {
+  animation: numberRevealBottom 320ms cubic-bezier(.22, 1, .36, 1) backwards;
+}
+
+@keyframes numberRevealTop {
+  from { transform: translateY(-.38em); }
+  to { transform: none; }
+}
+
+@keyframes numberRevealBottom {
+  from { transform: translateY(.38em); }
+  to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-digit,
+  .daily-duration-digit {
+    animation: none !important;
+    transform: none !important;
+  }
+}
