@@ -26,10 +26,9 @@
       <view class="brand-stage route-enter-page">
         <view class="disc-scene" aria-hidden="true">
           <view class="glass-disc">
+            <image class="disc-texture" src="/assets/images/login/disc-glass-clean.png" mode="aspectFit" aria-hidden="true" />
             <view class="disc-water">
               <view class="water-wave wave-one"></view>
-              <view class="water-wave wave-two"></view>
-              <view class="water-wave wave-three"></view>
             </view>
             <image class="memo-brand-mark hero-mark" src="/assets/icons/memograd-mark.svg" mode="aspectFit" />
           </view>
