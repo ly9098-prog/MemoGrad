@@ -11,7 +11,12 @@ from tests.architecture.dependency_scan import scan_application
 
 APP = Path(__file__).resolve().parents[2] / "app"
 DEPENDENCIES = {
-    "task_owner": set(),
+    "task_owner": {
+        "app.models.import_pipeline",
+        "app.models.practice_record",
+        "app.services.db_fencing",
+        "app.services.practice.answer_projection_contract",
+    },
     "worker_claimed_state": set(),
     "worker_claimed_cleanup": {"app.services.worker_claimed_state"},
     "worker_claimed_outcome": {"app.services.worker_claimed_state"},

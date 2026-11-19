@@ -41,16 +41,6 @@ export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
   );
 }
 
-export function TableFooter({ className, ...props }: ComponentProps<"tfoot">) {
-  return (
-    <tfoot
-      data-slot="table-footer"
-      className={cn("border-t border-border bg-muted/45 font-medium", className)}
-      {...props}
-    />
-  );
-}
-
 export function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
@@ -82,16 +72,6 @@ export function TableCell({ className, ...props }: ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn("px-4 py-3 align-middle", className)}
-      {...props}
-    />
-  );
-}
-
-export function TableCaption({ className, ...props }: ComponentProps<"caption">) {
-  return (
-    <caption
-      data-slot="table-caption"
-      className={cn("mt-3 text-xs text-muted-foreground", className)}
       {...props}
     />
   );

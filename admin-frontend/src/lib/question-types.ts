@@ -2,9 +2,7 @@
  * 题型字典 — 前端本地兜底配置
  *
  * ⚠️ 重要：后端是题型定义的**权威来源**。
- * 本文件仅作为后端 API 不可用时的离线/开发降级。
- * 生产环境下应优先使用 src/lib/api/question-types.ts 中的 useQuestionTypes() hook
- * 从 GET /api/admin/v1/metadata/question-types 获取数据。
+ * 本文件为题型展示与编辑校验提供本地标准值，不维护后端别名映射。
  *
  * 别名规范化（中文/英文题型别名）已移至后端 app/features/question_type.py，
  * 前端不再维护独立的别名映射。
