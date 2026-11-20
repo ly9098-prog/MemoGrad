@@ -299,14 +299,6 @@
   pointer-events: none;
 }
 
-.sentEmail {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .modeTabs {
   position: relative;
   display: grid;
@@ -410,43 +402,6 @@
 .resendButton:focus-visible {
   outline: 2px solid var(--login-focus);
   outline-offset: 3px;
-}
-
-.emailIntro {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  border: 1px solid rgb(202 233 251 / 11%);
-  border-radius: 10px;
-  padding: 11px 12px;
-  background: rgb(255 255 255 / 2.5%);
-  color: var(--login-muted);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.emailIntro[data-success] {
-  border-color: var(--login-border);
-  background: rgb(230 247 255 / 4%);
-}
-
-.emailIntro svg {
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
-  margin-top: 2px;
-  color: #bce9ff;
-}
-
-.emailIntro strong {
-  color: #eaf8ff;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.emailIntro p {
-  min-width: 0;
-  flex: 1;
 }
 
 .inputShell {

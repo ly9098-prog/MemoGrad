@@ -379,10 +379,6 @@ function LoginForm() {
                 </form>
                 <form onSubmit={handleEmailVerify} className={styles.form} aria-busy={loading}
                   inert={mode !== "email" || !emailCodeSent} aria-hidden={mode !== "email" || !emailCodeSent}>
-                  <div className={styles.emailIntro} data-success>
-                    <ShieldCheck aria-hidden="true" />
-                    <p>验证码已发送至 <strong className={styles.sentEmail} title={email}>{email || "管理员邮箱"}</strong>，5 分钟内有效。</p>
-                  </div>
                   <div className={styles.field}>
                     <label htmlFor="email-code">6 位验证码</label>
                     <OtpInput
