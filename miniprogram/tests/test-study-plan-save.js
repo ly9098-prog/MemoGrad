@@ -52,6 +52,9 @@ function harness(options = {}) {
   // Every utility module a loaded file reaches stays inside this vm context so the
   // fake wx/clock are shared, exactly like the Mini Program runtime.
   const loaded = new Map()
+  loaded.set(path.join(root, 'config.js'), {
+    exports: { BASE_URL: 'http://localhost:8000/api/v1' },
+  })
   function load(relative, dependencies = {}) {
     return loadFile(path.join(root, relative), dependencies)
   }
@@ -70,7 +73,6 @@ function harness(options = {}) {
   }
   const storage = load('utils/storage.js')
   const api = load('utils/api.js', {
-    '../config': { BASE_URL: 'http://localhost:8000/api/v1' },
     './storage': storage,
     './debug': { debugLog() {}, saveDebugSnapshot() {} },
   })

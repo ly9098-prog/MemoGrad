@@ -113,13 +113,9 @@
 }
 
 .memo-back-icon {
-  position: relative;
-  width: 18rpx;
-  height: 18rpx;
-  border-left: 4rpx solid #173426;
-  border-bottom: 4rpx solid #173426;
-  border-radius: 2rpx;
-  transform: rotate(45deg) translate(2rpx, -2rpx);
+  display: block;
+  width: 30rpx;
+  height: 30rpx;
 }
 
 .memo-back-pressed {

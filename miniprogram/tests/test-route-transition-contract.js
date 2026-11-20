@@ -73,9 +73,7 @@ test('remaining pages use a single classified transition system', () => {
     'pages/home/home.wxml': ['route-enter-page'],
     'pages/login/login.wxml': ['route-enter-page'],
     'pages/dashboard/dashboard.wxml': ['route-enter-opacity'],
-    'pages/agreement/user.wxml': ['route-enter-page'],
-    'pages/agreement/privacy.wxml': ['route-enter-page'],
-    'pages/agreement/ai.wxml': ['route-enter-page'],
+    'pages/agreement/agreement-document.wxml': ['route-enter-page'],
     'subpackages/animation/animation-index/animation-index.wxml': ['route-enter-opacity'],
     'subpackages/export/export-config/export-config.wxml': ['route-enter-page'],
     'subpackages/export/export-records/export-records.wxml': ['route-enter-page'],
@@ -93,6 +91,37 @@ test('remaining pages use a single classified transition system', () => {
     const source = read(...file.split('/'))
     for (const className of expected) assert.ok(source.includes(className), `${file} should use ${className}`)
   }
+})
+
+test('agreement pages share one versioned reading surface', () => {
+  for (const page of ['user', 'privacy', 'ai']) {
+    assert.match(
+      read('pages', 'agreement', `${page}.wxml`),
+      /<include src="\.\/agreement-document\.wxml" \/>/,
+      `${page} agreement page must use the shared document template`,
+    )
+  }
+
+  const content = require(path.join(miniprogramRoot, 'pages', 'agreement', 'agreement-content.js'))
+  const config = require(path.join(miniprogramRoot, 'config.js'))
+  for (const key of ['user', 'privacy', 'ai']) {
+    assert.equal(content.PAGE_CONTENT[key].version,
+      key === 'privacy' ? config.PRIVACY_POLICY_VERSION : config.AGREEMENT_VERSION)
+    assert.ok(content.PAGE_CONTENT[key].title)
+    assert.ok(content.PAGE_CONTENT[key].intro)
+    assert.ok(content.PAGE_CONTENT[key].summary.length >= 3)
+    assert.ok(content.PAGE_CONTENT[key].sections.length >= 5)
+    assert.ok(content.PAGE_CONTENT[key].sections.every(section =>
+      Array.isArray(section.paragraphs) && Array.isArray(section.bullets)))
+  }
+})
+
+test('privacy policy discloses optional profile uploads and their use', () => {
+  const { PAGE_CONTENT } = require(path.join(miniprogramRoot, 'pages', 'agreement', 'agreement-content.js'))
+  const collection = PAGE_CONTENT.privacy.sections.find(section => section.title === '收集的信息与用途')
+  assert.ok(collection)
+  assert.ok(collection.bullets.some(bullet =>
+    /昵称/.test(bullet) && /头像/.test(bullet) && /可选/.test(bullet) && /上传/.test(bullet)))
 })
 
 test('canvas and legacy reveal pages retain local opacity-safe entrances', () => {

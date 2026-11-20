@@ -334,7 +334,12 @@ Page({
       const code = loginResult && loginResult.code
       if (!code) throw new Error('微信登录失败，请重试')
 
-      const data = await api.post('/auth/login', { code })
+      const data = await api.post('/auth/login', {
+        code,
+        accepted_terms: true,
+        agreement_version: config.AGREEMENT_VERSION,
+        privacy_version: config.PRIVACY_POLICY_VERSION,
+      })
       if (!this._isCurrentAttempt(attemptSeq)) return
       auth.loginDirect(data.access_token, data.user, data.expires_at, data.refresh_token)
       this._savePrivacyAfterLogin()

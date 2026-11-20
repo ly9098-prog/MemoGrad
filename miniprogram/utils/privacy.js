@@ -8,9 +8,7 @@
  */
 
 const storage = require('./storage')
-
-// 当前协议版本号（更新协议后修改此值）
-const CURRENT_PRIVACY_VERSION = '1.1'
+const { AGREEMENT_VERSION, PRIVACY_POLICY_VERSION } = require('../config')
 
 const AGREEMENT_ITEMS = [
   'user_agreement',
@@ -24,7 +22,7 @@ const PRIVACY_KEY = 'privacy_acceptance'
  * 获取当前协议版本号
  */
 function getCurrentPrivacyVersion() {
-  return CURRENT_PRIVACY_VERSION
+  return PRIVACY_POLICY_VERSION
 }
 
 /**
@@ -43,7 +41,8 @@ function _getStored() {
  */
 function hasAcceptedCurrentPrivacy() {
   const stored = _getStored()
-  return stored.privacy_version === CURRENT_PRIVACY_VERSION &&
+  return stored.privacy_version === PRIVACY_POLICY_VERSION &&
+    stored.agreement_version === AGREEMENT_VERSION &&
     Array.isArray(stored.accepted_items) &&
     AGREEMENT_ITEMS.every(function (item) {
       return stored.accepted_items.indexOf(item) >= 0
@@ -57,7 +56,8 @@ function hasAcceptedCurrentPrivacy() {
 function savePrivacyAcceptance(items) {
   const accepted = items || AGREEMENT_ITEMS.slice()
   storage.setStrict(PRIVACY_KEY, {
-    privacy_version: CURRENT_PRIVACY_VERSION,
+    privacy_version: PRIVACY_POLICY_VERSION,
+    agreement_version: AGREEMENT_VERSION,
     accepted_at: Date.now(),
     accepted_items: accepted,
   })

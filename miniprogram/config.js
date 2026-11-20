@@ -2,7 +2,7 @@
 //  本地 / 生产切换 — 修改这里即可
 // ══════════════════════════════════════════════════════════════
 //  true  → 本地开发（localhost:8000），仅开发者工具可用
-//  false → 正式/体验/真机（https://xzshub.top）
+//  false → 正式/体验/真机（https://api.xzshub.top）
 const LOCAL_DEBUG = false
 
 // ══════════════════════════════════════════════════════════════
@@ -11,8 +11,8 @@ const LOCAL_DEBUG = false
 
 const API_URLS = {
   local: 'http://localhost:8000/api/v1',
-  trial: 'https://xzshub.top/api/v1',
-  release: 'https://xzshub.top/api/v1',
+  trial: 'https://api.xzshub.top/api/v1',
+  release: 'https://api.xzshub.top/api/v1',
 }
 
 // 发布前检查：发布时必须改 LOCAL_DEBUG = false
@@ -59,6 +59,8 @@ module.exports = {
   debug: debugMode,
   DEBUG_QUESTION_ID: '',
   ENV: runtimeEnv,
+  AGREEMENT_VERSION: '2026-11-20',
+  PRIVACY_POLICY_VERSION: '2026-11-20',
   resolveRuntimeConfig,
   enableMathImage: false,
   // Wrong-book export entry for all users (backend capability check enabled).

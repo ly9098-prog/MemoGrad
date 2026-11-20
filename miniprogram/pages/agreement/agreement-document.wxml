@@ -1,0 +1,61 @@
+<view class="agreement-root">
+  <view class="memo-nav" style="height: {{navHeight}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="memo-nav-inner agreement-nav-inner" style="height: {{navContentHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="memo-back-button" bindtap="goBack" hover-class="memo-back-pressed" aria-label="返回">
+        <image class="memo-back-icon" src="/assets/icons/mobile-controls/chevron-left.svg" mode="aspectFit" aria-hidden="true" />
+      </view>
+      <text class="memo-nav-title">{{title}}</text>
+    </view>
+  </view>
+
+  <view class="agreement-page" style="padding-top: {{navHeight}}px;">
+    <view class="agreement-content">
+      <view class="agreement-header route-enter-page">
+        <text class="agreement-title">{{title}}</text>
+        <text class="agreement-intro">{{intro}}</text>
+        <view class="agreement-meta">
+          <text>{{versionLabel}}</text>
+          <text class="agreement-meta-separator" aria-hidden="true">·</text>
+          <text>{{updatedLabel}}</text>
+        </view>
+      </view>
+
+      <view class="agreement-summary" aria-label="阅读重点">
+        <text class="agreement-summary-title">阅读重点</text>
+        <view wx:for="{{summary}}" wx:key="*this" class="agreement-summary-row">
+          <text class="agreement-summary-mark" aria-hidden="true">—</text>
+          <text class="agreement-summary-text">{{item}}</text>
+        </view>
+      </view>
+
+      <view class="agreement-sections">
+        <view wx:for="{{sections}}" wx:key="title" class="agreement-section">
+          <text class="agreement-section-title">{{item.title}}</text>
+          <text
+            wx:for="{{item.paragraphs}}"
+            wx:for-item="paragraph"
+            wx:key="*this"
+            class="agreement-copy"
+            user-select="true"
+          >{{paragraph}}</text>
+          <view wx:if="{{item.bullets.length}}" class="agreement-bullets">
+            <view
+              wx:for="{{item.bullets}}"
+              wx:for-item="bullet"
+              wx:key="*this"
+              class="agreement-bullet"
+            >
+              <text class="agreement-bullet-mark" aria-hidden="true">—</text>
+              <text class="agreement-bullet-text" user-select="true">{{bullet}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="agreement-footer">
+        <text class="agreement-footer-brand">MemoGrad</text>
+        <text class="agreement-footer-meta">{{versionLabel}} · {{updatedLabel}}</text>
+      </view>
+    </view>
+  </view>
+</view>

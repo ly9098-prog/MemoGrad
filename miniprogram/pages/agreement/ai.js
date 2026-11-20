@@ -1,3 +1,3 @@
 const { createAgreementPage } = require('./agreement-page')
 
-Page(createAgreementPage())
+Page(createAgreementPage('ai'))

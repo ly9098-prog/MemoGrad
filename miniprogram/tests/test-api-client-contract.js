@@ -102,6 +102,7 @@ global.wx = {
 const storage = require('../utils/storage')
 const api = require('../utils/api')
 const auth = require('../utils/auth')
+const privacy = require('../utils/privacy')
 
 function reset(entries = {}, options = {}) {
   memory.clear()
@@ -601,7 +602,12 @@ test('WeChat login persists the complete session after the code exchange', async
   try {
     const user = await auth.wechatLogin()
     assert.deepEqual(calls.requests.map(call => call.url), ['/auth/login'])
-    assert.deepEqual(calls.requests[0].data, { code: 'test-wechat-code' })
+    assert.deepEqual(calls.requests[0].data, {
+      code: 'test-wechat-code',
+      accepted_terms: true,
+      agreement_version: '2026-11-20',
+      privacy_version: '2026-11-20',
+    })
     assert.equal(user.id, 17)
     assert.equal(memory.get('token'), 'login-access')
     assert.equal(memory.get('refresh_token'), 'login-refresh')
@@ -710,6 +716,48 @@ function loginPage() {
   }
 }
 
+test('older consent cannot preselect the new agreement or bypass login confirmation', async () => {
+  for (const expiresIn of [0, 3600, 172800]) {
+    const entries = {
+      privacy_acceptance: {
+        privacy_version: '1.1',
+        accepted_items: privacy.AGREEMENT_ITEMS.slice(),
+      },
+    }
+    reset(expiresIn ? authed({
+      ...entries,
+      token_expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+    }) : entries)
+    const page = loginPage()
+    try {
+      page.onLoad()
+      assert.equal(page.data.agreed, false)
+      assert.equal(page.data.entryPending, false)
+      assert.equal(page._homeRedirectTimer, null)
+      await page.onWechatLogin()
+      assert.equal(calls.logins.length, 0)
+      assert.equal(calls.requests.length, 0)
+      assert.equal(calls.relaunches.length, 0)
+    } finally {
+      page.onUnload()
+    }
+  }
+})
+
+test('consent records require current versions of both agreements', () => {
+  reset()
+  privacy.savePrivacyAcceptance()
+  const record = memory.get('privacy_acceptance')
+  assert.equal(record.privacy_version, config.PRIVACY_POLICY_VERSION)
+  assert.equal(record.agreement_version, config.AGREEMENT_VERSION)
+  assert.equal(privacy.getCurrentPrivacyVersion(), config.PRIVACY_POLICY_VERSION)
+  assert.equal(privacy.hasAcceptedCurrentPrivacy(), true)
+  for (const key of ['privacy_version', 'agreement_version']) {
+    memory.set('privacy_acceptance', { ...record, [key]: 'earlier-version' })
+    assert.equal(privacy.hasAcceptedCurrentPrivacy(), false)
+  }
+})
+
 test('login page rolls authentication back when consent persistence fails', async () => {
   reset({}, { routes: { 'POST /auth/login': { statusCode: 200, data: {
     access_token: 'login-access', refresh_token: 'login-refresh',
@@ -753,7 +801,8 @@ test('late login completion commits consent before the destroyed page returns', 
     completeLogin({ code: 'test-wechat-code' })
     await completion
     assert.equal(memory.get('token'), 'login-access')
-    assert.equal(memory.get('privacy_acceptance').privacy_version, '1.1')
+    assert.equal(memory.get('privacy_acceptance').privacy_version, config.PRIVACY_POLICY_VERSION)
+    assert.equal(memory.get('privacy_acceptance').agreement_version, config.AGREEMENT_VERSION)
     assert.equal(memory.get('privacy_acceptance').accepted_items.length, 3)
     assert.equal(calls.relaunches.length, 0)
     assert.equal(page._homeRedirectTimer, null)
