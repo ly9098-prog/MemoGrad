@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import type { DailyTrendPoint } from "@/lib/api/types";
+import { springPressHandlers } from "@/components/motion/spring-press";
 import { RecordDialog } from "./record-dialog";
 import {
   AI_CHART,
@@ -126,6 +127,7 @@ export function AiTrendChart({
                   setMetric(item.key);
                   setSelectedIndex(null);
                 }}
+                {...springPressHandlers()}
               >
                 {item.label}
               </button>
@@ -138,6 +140,7 @@ export function AiTrendChart({
                 type="button"
                 aria-pressed={period === nextPeriod}
                 onClick={() => setPeriodAndClearSelection(nextPeriod)}
+                {...springPressHandlers()}
               >
                 {nextPeriod} 天
               </button>

@@ -34,6 +34,8 @@ import {
   computeTaskQueueStatus,
   numberValue,
 } from "@/lib/dashboard-utils";
+import { springPressHandlers } from "@/components/motion/spring-press";
+import { StaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { BodyPortal } from "@/components/ui/body-portal";
 import { AnimatedDigits } from "./animated-digits";
 import { DashboardTrendChart } from "./dashboard-trend-chart";
@@ -52,7 +54,6 @@ type QueryState<T> = {
   data?: T;
   isLoading: boolean;
   isError?: boolean;
-  dataUpdatedAt?: number;
 };
 
 export interface DashboardWorkbenchProps {
@@ -255,6 +256,7 @@ export function renderDashboardWorkbench({
             onClick={() => { void refreshAll(Date.now()); }}
             disabled={manualRefreshing}
             className={styles.refreshButton}
+            {...springPressHandlers()}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${manualRefreshing ? "animate-spin" : ""}`} />
             <span>{manualRefreshing ? "刷新中" : "刷新数据"}</span>
@@ -328,30 +330,32 @@ export function renderDashboardWorkbench({
               <span className={styles.miniCount}>{overview.data ? todoCount > 0 ? `${todoCount} 个队列` : "暂无待办" : "等待数据"}</span>
             </div>
             <div className={styles.todoList}>
-              <TodoRow
-                icon={<ShieldCheck size={16} />}
-                label="待审核题目"
-                value={numberValue(pendingReview)}
-                hint={overview.isError ? "队列计数暂不可用" : reviewHint}
-                href={reviewHref}
-                tone={(pendingReview ?? 0) > 0 ? "attention" : "default"}
-              />
-              <TodoRow
-                icon={<FileClock size={16} />}
-                label="待处理导入"
-                value={numberValue(pendingImports)}
-                hint={overview.isError ? "队列计数暂不可用" : importsHint}
-                href={canReadImports ? "/imports/review" : undefined}
-                tone={(pendingImports ?? 0) > 0 ? "attention" : "default"}
-              />
-              <TodoRow
-                icon={<ShieldAlert size={16} />}
-                label="关键审计"
-                value={numberValue(criticalAudit)}
-                hint={overview.isError ? "队列计数暂不可用" : auditHint}
-                href={canReadAudit ? "/audit-logs" : undefined}
-                tone={(criticalAudit ?? 0) > 0 ? "danger" : "default"}
-              />
+              <StaggeredEntrance ready={Boolean(overview.data)}>
+                <TodoRow
+                  icon={<ShieldCheck size={16} />}
+                  label="待审核题目"
+                  value={numberValue(pendingReview)}
+                  hint={overview.isError ? "队列计数暂不可用" : reviewHint}
+                  href={reviewHref}
+                  tone={(pendingReview ?? 0) > 0 ? "attention" : "default"}
+                />
+                <TodoRow
+                  icon={<FileClock size={16} />}
+                  label="待处理导入"
+                  value={numberValue(pendingImports)}
+                  hint={overview.isError ? "队列计数暂不可用" : importsHint}
+                  href={canReadImports ? "/imports/review" : undefined}
+                  tone={(pendingImports ?? 0) > 0 ? "attention" : "default"}
+                />
+                <TodoRow
+                  icon={<ShieldAlert size={16} />}
+                  label="关键审计"
+                  value={numberValue(criticalAudit)}
+                  hint={overview.isError ? "队列计数暂不可用" : auditHint}
+                  href={canReadAudit ? "/audit-logs" : undefined}
+                  tone={(criticalAudit ?? 0) > 0 ? "danger" : "default"}
+                />
+              </StaggeredEntrance>
             </div>
             <div className={styles.queueNote}><span>审核与导入均需人工确认</span><span>只读总览</span></div>
           </section>
@@ -472,60 +476,65 @@ export function renderDashboardWorkbench({
             </div>
 
             <div className={styles.systemRows}>
-              <SystemRow
-                icon={<Server size={12} className={styles.systemIcon} />}
-                label="工作台 API"
-                status={
-                  overview.isError
-                    ? { tone: "error", label: "异常" }
-                    : overview.isLoading
-                      ? { tone: "muted", label: "检测中" }
-                      : { tone: "ok", label: "正常" }
-                }
-              />
-              <SystemRow
-                icon={<Database size={12} className={styles.systemIcon} />}
-                label="数据库"
-                status={
-                  readyHealth.data?.db === "ok"
-                    ? { tone: "ok", label: "正常" }
-                    : readyHealth.isLoading
-                      ? { tone: "muted", label: "检测中" }
-                      : { tone: "error", label: "异常" }
-                }
-              />
-              <SystemRow
-                icon={<HardDrive size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
-                label="Redis"
-                status={redisStatus}
-              />
-              <SystemRow
-                icon={<Network size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
-                label="Task Queue"
-                status={taskQueueStatus}
-              />
-              <SystemRow
-                icon={<BrainCircuit size={12} className={styles.systemIconMuted} />}
-                label="AI Metrics API"
-                status={
-                  aiStats.data
-                    ? { tone: "ok", label: "正常" }
-                    : aiStats.isLoading
-                      ? { tone: "muted", label: "检测中" }
-                      : { tone: "warning", label: "异常" }
-                }
-              />
-              <SystemRow
-                icon={<CheckCircle2 size={12} className={styles.systemIconOk} />}
-                label="系统就绪"
-                status={
-                  readyHealth.data?.status === "ok"
-                    ? { tone: "ok", label: "Ready" }
-                    : readyHealth.isLoading
-                      ? { tone: "muted", label: "检测中" }
-                      : { tone: "warning", label: "Degraded" }
-                }
-              />
+              <StaggeredEntrance
+                ready={!overview.isLoading && !readyHealth.isLoading && !taskDiagnostics.isLoading && !aiStats.isLoading}
+                staggerMs={55}
+              >
+                <SystemRow
+                  icon={<Server size={12} className={styles.systemIcon} />}
+                  label="工作台 API"
+                  status={
+                    overview.isError
+                      ? { tone: "error", label: "异常" }
+                      : overview.isLoading
+                        ? { tone: "muted", label: "检测中" }
+                        : { tone: "ok", label: "正常" }
+                  }
+                />
+                <SystemRow
+                  icon={<Database size={12} className={styles.systemIcon} />}
+                  label="数据库"
+                  status={
+                    readyHealth.data?.db === "ok"
+                      ? { tone: "ok", label: "正常" }
+                      : readyHealth.isLoading
+                        ? { tone: "muted", label: "检测中" }
+                        : { tone: "error", label: "异常" }
+                  }
+                />
+                <SystemRow
+                  icon={<HardDrive size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
+                  label="Redis"
+                  status={redisStatus}
+                />
+                <SystemRow
+                  icon={<Network size={12} className={redisConfigured ? styles.systemIcon : styles.systemIconMuted} />}
+                  label="Task Queue"
+                  status={taskQueueStatus}
+                />
+                <SystemRow
+                  icon={<BrainCircuit size={12} className={styles.systemIconMuted} />}
+                  label="AI Metrics API"
+                  status={
+                    aiStats.data
+                      ? { tone: "ok", label: "正常" }
+                      : aiStats.isLoading
+                        ? { tone: "muted", label: "检测中" }
+                        : { tone: "warning", label: "异常" }
+                  }
+                />
+                <SystemRow
+                  icon={<CheckCircle2 size={12} className={styles.systemIconOk} />}
+                  label="系统就绪"
+                  status={
+                    readyHealth.data?.status === "ok"
+                      ? { tone: "ok", label: "Ready" }
+                      : readyHealth.isLoading
+                        ? { tone: "muted", label: "检测中" }
+                        : { tone: "warning", label: "Degraded" }
+                  }
+                />
+              </StaggeredEntrance>
             </div>
           </div>
         </div>

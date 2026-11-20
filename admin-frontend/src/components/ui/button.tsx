@@ -1,9 +1,12 @@
+"use client";
+
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { springPressHandlers } from "@/components/motion/spring-press";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[10px] border font-semibold leading-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0 active:scale-[0.985] disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-50 motion-reduce:transition-none motion-reduce:transform-none",
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[10px] border font-semibold leading-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none motion-reduce:transform-none",
   {
     variants: {
       variant: {
@@ -45,6 +48,17 @@ export function Button({ className, variant, size, children, ...props }: ButtonP
       data-size={size ?? "md"}
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
+      {...springPressHandlers({
+        onPointerDown: props.onPointerDown,
+        onPointerUp: props.onPointerUp,
+        onPointerCancel: props.onPointerCancel,
+        onPointerLeave: props.onPointerLeave,
+        onLostPointerCapture: props.onLostPointerCapture,
+        onKeyDown: props.onKeyDown,
+        onKeyUp: props.onKeyUp,
+        onBlur: props.onBlur,
+        onClickCapture: props.onClickCapture,
+      })}
     >
       {children}
     </button>
