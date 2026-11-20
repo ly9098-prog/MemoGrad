@@ -34,11 +34,38 @@ test('route transition styles remain reduced-motion and canvas safe', () => {
 
 test('first batch pages use transition classes without return replay', () => {
   assert.ok(read('subpackages', 'formulas', 'library', 'index.wxml').includes('route-enter-page'))
-  assert.ok(read('subpackages', 'formulas', 'reader', 'index.wxml').includes('route-enter-detail'))
   assert.ok(read('subpackages', 'exam', 'paper-list', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'history', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'result', 'index.wxml').includes('route-enter-opacity'))
   assert.ok(read('subpackages', 'study', 'study-plan', 'index.wxml').includes('route-enter-opacity'))
+})
+
+test('formula reader keeps native rich-text on opacity-only layers without return replay', () => {
+  const markup = read('subpackages', 'formulas', 'reader', 'index.wxml')
+  const styles = read('subpackages', 'formulas', 'reader', 'index.wxss')
+  const source = read('subpackages', 'formulas', 'reader', 'index.js')
+  assert.doesNotMatch(markup, /route-enter(?:-(?:page|detail|task|opacity))?\b/,
+    'reader ancestors must not replay route animations or translate native rich-text')
+  assert.match(markup, /fr-transition-stage \{\{transitionClass\}\}/)
+  assert.match(styles, /\.fr-transition-stage\s*\{[^}]*opacity:\s*1;[^}]*transform:\s*none\s*!important;[^}]*transition:\s*opacity\s+[^;]+;/)
+  assert.match(styles, /\.fr-slide-out-left,\s*\.fr-slide-out-right,\s*\.fr-slide-in-left,\s*\.fr-slide-in-right\s*\{\s*opacity:\s*0;\s*\}/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.fr-transition-stage,[\s\S]*transition:\s*none\s*!important;/)
+
+  let definition
+  require('node:vm').runInNewContext(source, {
+    require: () => ({}), Page: value => { definition = value }, console,
+  })
+  const writes = []
+  const reader = Object.assign({}, definition, {
+    data: { ...definition.data, loading: false, currentCard: { id: 1 } },
+    readerSessionValid: () => true,
+    setData(patch) { writes.push(patch); Object.assign(this.data, patch) },
+  })
+  const currentCard = reader.data.currentCard
+  reader.onShow()
+  reader.onShow()
+  assert.deepStrictEqual(writes, [], 'returning with the same session does not replay entrance or loading')
+  assert.strictEqual(reader.data.currentCard, currentCard)
 })
 
 test('remaining pages use a single classified transition system', () => {

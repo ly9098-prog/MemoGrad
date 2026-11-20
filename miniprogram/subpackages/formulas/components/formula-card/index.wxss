@@ -20,8 +20,8 @@
 }
 .fc-flip-stage { position: relative; }
 .fc-flip-stage.is-recite {
-  height: 760rpx;
-  min-height: 320px;
+  height: calc(100vh - 220px - env(safe-area-inset-bottom));
+  min-height: 240px;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
   transition: transform 520ms cubic-bezier(.4, 0, .2, 1);
@@ -245,7 +245,7 @@
 @media (max-width: 360px) {
   .formula-card-wrap, .fc-rich-text { font-size: 34rpx; }
   .fc-title, .fc-flip-front .fc-title { font-size: 40rpx; }
-  .fc-tag, .fc-face-label, .fc-scroll-note, .fc-flip-action { font-size: 28rpx; }
+  .fc-tag, .fc-face-label, .fc-scroll-note, .fc-flip-action { font-size: max(28rpx, 14px); }
   .fc-reading-line .fc-formula-rich { font-size: 34rpx; }
   .fc-expanded-content .fc-reading-line .fc-formula-rich { font-size: 38rpx; }
 }

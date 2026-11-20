@@ -215,7 +215,9 @@ const libraryStyles = read('subpackages/formulas/library/index.wxss')
 assert.match(readerStyles.slice(readerStyles.lastIndexOf('@media (prefers-reduced-motion: reduce)')),
   /\.fr-transition-stage,[\s\S]*transition: none !important/, 'reduced motion wins after the reader transition rules')
 for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [libraryStyles, 'fl-mode-tab'],
-  [libraryStyles, 'fl-settings-button'], [libraryStyles, 'fl-search-clear'],
+  [libraryStyles, 'fl-filter-button'], [libraryStyles, 'fl-search-clear'], [libraryStyles, 'fl-random-action'],
+  [libraryStyles, 'fl-chapter-chip'], [libraryStyles, 'fl-study-type-chip'], [libraryStyles, 'fl-filter-option'],
+  [libraryStyles, 'fl-filter-reset'], [libraryStyles, 'fl-filter-done'],
   [readerStyles, 'fr-card-favorite'], [readerStyles, 'fr-nav-hit']]) {
   assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
     control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
@@ -229,6 +231,8 @@ assert.match(template, /class="fc-formula-line-scroll"[\s\S]*?bindtouchstart="on
   'actual horizontal formula scroll views still isolate card switching')
 assert.match(readerStyles, /\.fr-transition-stage\s*\{[^}]*transform:\s*none\s*!important;/,
   'card changes stay opacity-only to avoid rich-text ghosts')
+assert.doesNotMatch(read('subpackages/formulas/reader/index.wxml'), /route-enter-detail/,
+  'reader ancestors must not inherit the global translated entrance animation')
 const opening = componentSource.slice(componentSource.indexOf('    openFormulaReading('), componentSource.indexOf('    closeFormulaReading('))
 assert.doesNotMatch(opening, /renderFormulaNodes|setTimeout/, 'click path never parses math or waits for animation')
 
@@ -292,8 +296,9 @@ if (process.argv[2]) {
     }
     assert.ok(richNodes.includes(JSON.stringify(fixtureData.content.examples.at(-1).answerNodes)), 'last answer remains reachable in the scroll content')
   }
-  const browse = renderCard(fixtureData)
+  const browse = renderCard({ ...fixtureData, readingHeight: 600 })
   assert.equal(byClass(browse, 'fc-flip-face').length, 1, 'browse renders one main surface')
+  assert.equal(byClass(browse, 'fc-flip-stage')[0].attr.style, '', 'browse keeps natural height even when the reader supplies viewport geometry')
   assert.equal(byClass(browse, 'fc-title-rich').length, 1)
   assert.equal(JSON.stringify(byClass(browse, 'fc-title-rich')[0].attr.nodes), JSON.stringify(fixtureData.content.titleNodes))
   assert.equal(byClass(browse, 'fc-tag').length, 9, 'all tags remain present')
@@ -301,10 +306,11 @@ if (process.argv[2]) {
   assertCompleteContent(browse)
 
   for (const isFlipped of [false, true]) {
-    const recite = renderCard({ ...fixtureData, recitationMode: true, isFlipped })
+    const recite = renderCard({ ...fixtureData, recitationMode: true, readingHeight: 600, isFlipped })
     const front = byClass(recite, 'fc-flip-front')[0]
     const back = byClass(recite, 'fc-flip-back')[0]
     assert.equal(byClass(recite, 'fc-flip-face').length, 2)
+    assert.match(byClass(recite, 'fc-flip-stage')[0].attr.style, /height:600px;/, 'both faces use the current reader viewport')
     assert.equal(front.attr.ariaHidden, isFlipped)
     assert.equal(back.attr.ariaHidden, !isFlipped)
     assert.equal(byClass(front, 'fc-formula-rich').length, 0, 'prompt does not expose answer content')
@@ -324,17 +330,35 @@ if (process.argv[2]) {
   assert.equal(byClass(renderCard({ ...graph, graphImageUrl: '', displayGraphUrl: '' }), 'fc-graph-fallback').length, 1)
 
   for (const recitationMode of [false, true]) {
-    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode })
+    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode, recitationHeight: 600 })
     const card = nodes(readerTree).find(node => node.attr && node.attr.id === 'readerFormulaCard')
     assert.equal(card.attr.recitationMode, recitationMode, 'reader passes its chosen mode to the card')
+    assert.equal(card.attr.readingHeight, 600, 'reader passes its actual available height to the card')
+    assert.equal(byClass(readerTree, 'fr-card-scroll')[0].attr.scrollY, !recitationMode, 'recitation scrolls long content inside the card')
     assert.equal(byClass(readerTree, 'fr-mode-tab').length, 0, 'mode settings live in the library')
     assert.equal(byClass(readerTree, 'fr-mode-label').length, 1)
-    const libraryTree = renderLibrary({ initialLoading: false, activeLibraryType: 'formula',
-      activeTags: [], formulas: [], recitationMode, showMoreSheet: true })
-    const tabs = byClass(libraryTree, 'fl-mode-tab')
-    assert.equal(tabs.length, 2)
-    assert.equal(tabs[0].attr.ariaPressed, !recitationMode)
-    assert.equal(tabs[1].attr.ariaPressed, recitationMode)
+    for (const showMoreSheet of [false, true]) {
+      const libraryTree = renderLibrary({ initialLoading: false, activeLibraryType: 'formula', activeSubject: 'exam408',
+        activeTags: [], _shownActiveTags: [], formulas: [], chapters: [{ id: 12, name: '算法分析', active: false }],
+        studyTypeTabs: [{ key: '', name: '全部', active: true }, { key: 'formula', name: '公式', active: false }],
+        recitationMode, showMoreSheet })
+      const tabs = byClass(libraryTree, 'fl-mode-tab')
+      assert.equal(tabs.length, 2, 'reading mode remains directly available with filters closed and is never duplicated in the sheet')
+      assert.equal(tabs[0].attr.ariaPressed, !recitationMode)
+      assert.equal(tabs[1].attr.ariaPressed, recitationMode)
+      assert.equal(byClass(libraryTree, 'fl-filter-button')[0].attr.ariaExpanded, showMoreSheet)
+      assert.equal(byClass(libraryTree, 'fl-chapter-chip').length, showMoreSheet ? 2 : 0, 'chapter choices appear only when filters are opened')
+      assert.equal(byClass(libraryTree, 'fl-study-type-chip').length, showMoreSheet ? 2 : 0, '408 choices remain available inside the filters')
+      if (showMoreSheet) assert.equal(byClass(libraryTree, 'fl-filter-body')[0].attr.scrollY, true, 'filter choices scroll on short phones')
+    }
   }
+  const filteredLibrary = renderLibrary({ initialLoading: false, activeLibraryType: 'formula', activeSubject: 'exam408',
+    formulas: [], chapters: [{ id: 12, name: '算法分析', active: true }], activeChapterId: 12,
+    studyTypeTabs: [{ key: 'formula', name: '公式', active: true }], activeStudyCardType: 'formula',
+    activeTags: [1], _shownActiveTags: [{ id: 1, name: '高频' }], onlyFavorites: true })
+  assert.equal(byClass(filteredLibrary, 'fl-active-tag').length, 4, 'applied chapter, content type, favorites and tag remain visible and removable')
+  assert.equal(byClass(filteredLibrary, 'fl-filter-dot').length, 1)
+  const guestFilters = renderLibrary({ initialLoading: false, formulas: [], activeTags: [], _shownActiveTags: [], showMoreSheet: true, guestMode: true })
+  assert.equal(byClass(guestFilters, 'fl-filter-option')[0].attr.disabled, true, 'guest filters cannot issue favorite requests')
   console.log('Native WXML mode, single-surface, complete-content and graph/empty branch checks passed')
 }

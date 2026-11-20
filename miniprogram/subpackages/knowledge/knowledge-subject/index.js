@@ -1,7 +1,7 @@
 const api = require('../../../utils/api')
 const { knowledgePracticeSync } = require('../../../utils/storage')
 const { buildKnowledgeGroups, summarizeGroups } = require('./tree-groups')
-const { POINTS_PER_PAGE, GROUPS_PER_PAGE, DEFAULT_FORCES, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay } = require('./graph-layout')
+const { POINTS_PER_PAGE, GROUPS_PER_PAGE, buildScene, highlightScene, dotStyle, edgeStyle, fitCamera, cameraLimits, clampCamera, zoomCamera, cameraStyle, labelDisplay } = require('./graph-layout')
 const STATUS_TEXT = { no_data: '未开始', insufficient: '数据不足', weak: '薄弱', developing: '提升中', good: '良好', mastered: '已掌握' }
 const FILTERS = [
 { id: 'all', label: '全部' }, { id: 'weak', label: '需强化', statuses: ['weak', 'developing'] },
@@ -255,10 +255,9 @@ filters: FILTERS.map(item => ({ id: item.id, label: item.label, count: 0 })),
 filter: 'all', query: '', searchDraft: '', searchFocused: false, searchPending: false, searchResultCount: 0, activeGroupKey: '', activeGroupName: '', indexScopeGroupKey: '',
 groupChips: [], quickGroupChips: [], themeGroupCount: 0, themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '', themeSheetGroups: [],
 scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
-pageEntered: false, sceneAnimating: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null,
+pageEntered: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
-forcePanelOpen: false, forceAdvancedOpen: false, forceControls: [],
-showAllGraphLabels: false, graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
+graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
 indexNodes: [], indexCount: 0, indexDisplayCount: 0, hasMore: false, indexSearchOpen: false, indexSearchFocused: false,
 indexQuery: '', indexSearchDraft: '', indexSearchPending: false, indexSearchResultCount: 0, indexNavigatingId: 0,
@@ -281,13 +280,10 @@ this._indexDetailRevealToken = 0
 this._indexDetailRevealTimer = null
 this._pageVisible = true
 this._focusNodeId = 0
-this._forces = { ...DEFAULT_FORCES }
 this._manualPositions = {}
 this._layoutCache = {}
 this._sceneNodeIndex = new Map()
 this._sceneEdgeLinks = new Map()
-this._forceTimer = null
-this.setData({ forceControls: this.forceControlData() })
 this._expandedNodeIds = new Set()
 this._indexSearchFootprintHeight = 0
 this._indexSearchRetentionHeight = 0
@@ -334,10 +330,6 @@ else setTimeout(start, 0)
 },
 onShow() {
 this._pageVisible = true
-if (this._forceDirty && this._loadedOnce) {
-this._forceDirty = false
-this.applyView(false, false)
-}
 this._practiceNavigationPending = false
 this._detailNavigationPending = false
 if (this.data.indexDetailRevealPhase || this.data.indexDetailRevealStyle) {
@@ -370,9 +362,6 @@ onPageScroll(event) { this._scrollTop = Number(event.scrollTop) || 0 },
 onHide() {
 this._pageVisible = false
 this._cancelSelectionTransition(true)
-this._forceDirty = Boolean(this._forceTimer)
-clearTimeout(this._forceTimer)
-this._forceTimer = null
 this._requestId = (this._requestId || 0) + 1
 this.cancelGraphMotion()
 clearTimeout(this._searchTimer)
@@ -385,7 +374,6 @@ this._indexDetailRevealTimer = null
 clearTimeout(this._indexSearchLeaveTimer)
 clearTimeout(this._indexSearchSettleTimer)
 clearTimeout(this._entryTimer)
-clearTimeout(this._sceneAnimationTimer)
 clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
@@ -401,8 +389,6 @@ onResize() { this.measureViewport(true) },
 onUnload() {
 this._pageVisible = false
 this._cancelSelectionTransition(false)
-clearTimeout(this._forceTimer)
-this._forceTimer = null
 this._layoutCache = null
 this.cancelGraphMotion()
 this._unloaded = true
@@ -417,7 +403,6 @@ this._indexDetailRevealTimer = null
 clearTimeout(this._indexSearchLeaveTimer)
 clearTimeout(this._indexSearchSettleTimer)
 clearTimeout(this._entryTimer)
-clearTimeout(this._sceneAnimationTimer)
 clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
@@ -555,7 +540,7 @@ async loadMap(showLoading = true, options = {}) {
       chapterGraduation: graduation.summary,
       ...(preserveViewState ? this._viewStateDataPatch(preserveViewState) : {}),
       ...(preserveViewState ? this.cameraPayload(true) : {}),
-    }, () => this.applyView(firstLoad && !preserveViewState, firstLoad && !preserveViewState, () => {
+    }, () => this.applyView(firstLoad && !preserveViewState, () => {
       if (firstLoad) this.enterPage()
       if (preserveViewState) this._restoreScrollPosition(preserveViewState)
       this._pendingInitialViewState = null
@@ -799,7 +784,7 @@ const effectiveQuery = dedicatedQuery || normalizeSearchText(this.data.query)
 const payload = this._buildIndexPayload({ query: effectiveQuery, dedicatedQuery, indexScopeGroupKey: this.data.indexScopeGroupKey })
 this.setData(payload, () => { if (typeof callback === 'function') callback() })
 },
-applyView(resetCamera = false, animateScene = resetCamera, callback) {
+applyView(resetCamera = false, callback) {
   if (!this.data.subject) return
   const config = FILTERS.find(item => item.id === this.data.filter) || FILTERS[0]
   const query = normalizeSearchText(this.data.query)
@@ -815,12 +800,11 @@ applyView(resetCamera = false, animateScene = resetCamera, callback) {
   const indexScopeGroupKey = this._resolveIndexScopeGroupKey(availableGroups)
   const groupChips = this._buildGroupChips()
   const payload = this._buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, sceneState.scene, query)
-  if (animateScene) payload.sceneAnimating = true
   if (resetCamera && this._frame) {
     this._camera = fitCamera(this._frame)
   }
   if (this._camera && this._frame) Object.assign(payload, this.cameraPayload(true, {}, sceneState.scene))
-  this._commitView(payload, animateScene, callback)
+  this._commitView(payload, callback)
 },
 
 _resolveActiveGroup(availableGroups) {
@@ -852,7 +836,6 @@ _buildSceneState(availableGroups, activeGroupKey, focusNodeId) {
     layoutCache: this._layoutCache || (this._layoutCache = {}),
     focusNodeId,
     selectedId: this._selectedId,
-    forces: this._forces,
     manualPositions: this._manualPositions,
   }
   let scene = buildScene(availableGroups, this.data.subject, options)
@@ -932,36 +915,26 @@ _buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroup
   return payload
 },
 
-_commitView(payload, animateScene, callback) {
+_commitView(payload, callback) {
   this._cancelSelectionTransition(false)
-  const commit = () => this.setData({ ...payload, selectionSwitching: false, selectionSwitchPhase: '' }, () => {
+  this.setData({ ...payload, selectionSwitching: false, selectionSwitchPhase: '' }, () => {
     const next = () => { if (!this._unloaded && this._pageVisible !== false) this.measureViewport(false) }
     if (wx.nextTick) wx.nextTick(next)
     else next()
-    if (animateScene) {
-      clearTimeout(this._sceneAnimationTimer)
-      this._sceneAnimationTimer = setTimeout(() => {
-        this._sceneAnimationTimer = null
-        if (!this._unloaded && this._pageVisible !== false) this.setData({ sceneAnimating: false })
-      }, 820)
-    }
     if (typeof callback === 'function') callback()
   })
-  if (animateScene && this.data.sceneAnimating) this.setData({ sceneAnimating: false }, commit)
-  else commit()
 },
 transitionLabelView(dataChanges = {}, callback) {
 clearTimeout(this._labelSwitchTimer)
 clearTimeout(this._themeTransitionTimer)
-clearTimeout(this._sceneAnimationTimer)
 this._cancelSelectionTransition(false)
-const startPayload = { ...dataChanges, sceneAnimating: false, themeSwitching: true, themeSwitchPhase: 'leaving', selectionSwitching: false, selectionSwitchPhase: '' }
+const startPayload = { ...dataChanges, themeSwitching: true, themeSwitchPhase: 'leaving', selectionSwitching: false, selectionSwitchPhase: '' }
 this.setData(startPayload, () => {
 this._labelSwitchTimer = setTimeout(() => {
 this._labelSwitchTimer = null
-if (this._unloaded) return
-this.applyView(false, false, () => {
-if (this._unloaded) return
+if (this._unloaded || this._pageVisible === false) return
+this.applyView(false, () => {
+if (this._unloaded || this._pageVisible === false) return
 this.setData({ themeSwitchPhase: 'entering' }, () => {
 if (typeof callback === 'function') callback()
 this._themeTransitionTimer = setTimeout(() => {
@@ -1319,7 +1292,7 @@ _commitSearchResult(anchor, token, nextQuery, normalizedNext, oldHeight, oldFoot
     themeSheetClosing: false,
     themeSheetPendingKey: '__idle__',
     themeQuery: '',
-  }, () => this.applyView(false, false, () => this._finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options)))
+  }, () => this.applyView(false, () => this._finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options)))
 },
 
 _finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options) {
@@ -1443,7 +1416,7 @@ changeGraphPage(event) {
 const next = this.data.scene.page + Number(event.currentTarget.dataset.step)
 if (!Number.isFinite(next) || next < 0 || next >= this.data.scene.pageCount) return
 this._graphPage = next; this._selectedId = 0
-this.applyView(true)
+this.applyView(false)
 },
 navigateToFocus(groupKey, focusNodeId, callback) {
 const normalizedGroupKey = String(groupKey || '')
@@ -1506,7 +1479,20 @@ indexAriaAction: this._buildIndexAriaAction(row, row.indexExpandable, row.indexF
 const labels = this._frame && this._camera ? labelDisplay(this._camera, this._frame, scene.nodes) : {}
 this._cameraLabelCache = null
 const revision = this._selectionRevision
-this.setData({ scene, indexNodes, ...labels, selectionSwitching: true, selectionSwitchPhase: 'leaving' }, () => {
+// Keep the mounted geometry and WXS references intact. A tap only changes state;
+// replacing the complete scene would resend every node's position and style.
+const highlightPatch = {}
+scene.nodes.forEach((node, index) => {
+;['selected', 'neighbor', 'pathActive', 'dimmed'].forEach(key => {
+if (node[key] !== currentScene.nodes[index][key]) highlightPatch[`scene.nodes[${index}].${key}`] = node[key]
+})
+})
+scene.edges.forEach((edge, index) => {
+;['active', 'dimmed'].forEach(key => {
+if (edge[key] !== currentScene.edges[index][key]) highlightPatch[`scene.edges[${index}].${key}`] = edge[key]
+})
+})
+this.setData({ ...highlightPatch, indexNodes, ...labels, selectionSwitching: true, selectionSwitchPhase: 'leaving' }, () => {
 if (revision !== this._selectionRevision || this._unloaded || this._pageVisible === false) return
 this._selectionSwitchTimer = setTimeout(() => {
 this._selectionSwitchTimer = null
@@ -1753,7 +1739,7 @@ _applyIndexNavigation(revealToken, pointId, point, sourceGroup) {
   }, () => {
     // Avoid graph entrance animation while landing on the detail card; the graph is
     // outside the focal viewport and the extra compositor pass can look like a flash.
-    this.applyView(true, false, () => this._expandIndexDetailCard(revealToken, () => this._finishIndexNavigation(pointId)))
+    this.applyView(true, () => this._expandIndexDetailCard(revealToken, () => this._finishIndexNavigation(pointId)))
   })
 },
 
@@ -1842,7 +1828,7 @@ this._focusNodeId = parentId
 this._graphPage = Math.floor(index / POINTS_PER_PAGE)
 const nextData = { activeGroupKey: String(point.groupKey) }
 if (options.syncIndexScope) nextData.indexScopeGroupKey = String(point.groupKey)
-this.setData(nextData, () => this.applyView(true, options.scrollToGraph !== false, finish))
+this.setData(nextData, () => this.applyView(true, finish))
 } else {
 const availableGroups = (this._filteredGroups || []).filter(item => item.matchCount > 0 && item.nodes.length)
 const groupIndex = availableGroups.findIndex(item => String(item.key) === String(point.groupKey))
@@ -1851,7 +1837,7 @@ this._focusNodeId = 0
 this._graphPage = Math.floor(groupIndex / GROUPS_PER_PAGE)
 const nextData = { activeGroupKey: '' }
 if (options.syncIndexScope) nextData.indexScopeGroupKey = ''
-this.setData(nextData, () => this.applyView(true, options.scrollToGraph !== false, finish))
+this.setData(nextData, () => this.applyView(true, finish))
 }
 },
 loadMore() { this._indexLimit = (this._indexLimit || INITIAL_INDEX_LIMIT) + INITIAL_INDEX_LIMIT; this._applyIndexViewOnly() },
@@ -1918,46 +1904,9 @@ wx.showToast({ title: '练习页打开失败，请重试', icon: 'none' })
 })
 },
 retry() { return this.loadMap() },
-forceControlData() {
-const forces = this._forces || DEFAULT_FORCES
-return [
-{ key: 'center', label: '向心力', hint: '越高，整体越向中心聚拢', min: 0, max: 1, step: .01, value: forces.center, valueText: Number(forces.center).toFixed(2) },
-{ key: 'repel', label: '节点斥力', hint: '越高，节点之间越分散', min: 0, max: 30, step: .5, value: forces.repel, valueText: Number(forces.repel).toFixed(1) },
-{ key: 'link', label: '连线引力', hint: '越高，相连节点拉得越紧', min: 0, max: 3, step: .05, value: forces.link, valueText: Number(forces.link).toFixed(2) },
-{ key: 'distance', label: '连线长度', hint: '越高，相连节点的间距越大', min: 120, max: 360, step: 5, value: forces.distance, valueText: String(Math.round(forces.distance)) },
-]
-},
-toggleForcePanel() { this.setData({ forcePanelOpen: !this.data.forcePanelOpen }) },
-closeForcePanel() { this.setData({ forcePanelOpen: false }) },
-toggleForceAdvanced() { this.setData({ forceAdvancedOpen: !this.data.forceAdvancedOpen }) },
-setGraphLabels(event) {
-const mode = event.currentTarget.dataset.mode
-if (mode === 'auto' || mode === 'all') this.setData({ showAllGraphLabels: mode === 'all' })
-},
 preventBackgroundScroll() {},
-changeForce(event) {
-const key = String(event.currentTarget.dataset.key || '')
-const value = Number(event.detail.value)
-if (!Object.prototype.hasOwnProperty.call(this._forces || {}, key) || !Number.isFinite(value)) return
-this._forces[key] = value
-this.setData({ forceControls: this.forceControlData() })
-clearTimeout(this._forceTimer)
-this._forceTimer = setTimeout(() => {
-this._forceTimer = null
-if (!this._unloaded && this._pageVisible !== false && this.data.subject) this.applyView(false, false)
-}, 120)
-},
-resetForces() {
-clearTimeout(this._forceTimer)
-this._forceTimer = null
-this._forces = { ...DEFAULT_FORCES }
-this._manualPositions = {}
-this.setData({ forceControls: this.forceControlData() })
-if (this.data.subject) this.applyView(false, false)
-},
 onGraphBackgroundTap() {
 if (Date.now() < (this._suppressTapUntil || 0)) return
-if (this.data.forcePanelOpen) { this.closeForcePanel(); return }
 const now = Date.now()
 if (now - (this._lastGraphTap || 0) < 320) {
 this._lastGraphTap = 0

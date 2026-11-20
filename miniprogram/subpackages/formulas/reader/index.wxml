@@ -37,8 +37,8 @@
 
   <scroll-view
     wx:else
-    class="fr-card-scroll route-enter-detail"
-    scroll-y
+    class="fr-card-scroll"
+    scroll-y="{{!recitationMode || recitationNeedsScroll}}"
     enhanced
     show-scrollbar="{{false}}"
     scroll-top="{{readerScrollTop}}"
@@ -77,6 +77,7 @@
           id="readerFormulaCard"
           card="{{currentCard}}"
           recitationMode="{{recitationMode}}"
+          readingHeight="{{recitationHeight}}"
           graphImageUrl="{{currentCard.graphImageUrl}}"
           graphThumbnailUrl="{{currentCard.graphThumbnailUrl}}"
           bind:readingchange="onFormulaReadingChange"

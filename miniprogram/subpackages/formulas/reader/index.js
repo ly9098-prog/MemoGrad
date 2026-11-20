@@ -79,6 +79,8 @@ Page({
     readerScrollTop: 0,
     formulaReadingExpanded: false,
     recitationMode: false,
+    recitationHeight: 0,
+    recitationNeedsScroll: false,
     transitionClass: '',
 
     isRandom: false,
@@ -90,6 +92,7 @@ Page({
     this._navigatingBack = false
     this._readerSession = readerState.sessionIdentity()
     this.setData({ guestMode: !auth.isLoggedIn(), recitationMode: readerState.readMode(options.mode) === 'recite' })
+    this.updateReaderViewport()
     const formulaId = normalizeId(options.id)
     const isRandom = options.random === '1'
     let sequenceIds = normalizeSequence(String(options.ids || '').split(',').filter(Boolean))
@@ -148,6 +151,46 @@ Page({
     return !this._readerSession || readerState.sameSession(this._readerSession)
   },
 
+  onReady() {
+    this.refineReaderViewport()
+  },
+
+  onResize(event = {}) {
+    this.updateReaderViewport(event.size)
+  },
+
+  updateReaderViewport(size = {}) {
+    let info = {}, menu = null
+    try { info = wx.getWindowInfo() } catch (_) {}
+    try { menu = wx.getMenuButtonBoundingClientRect() } catch (_) {}
+    const width = Number(size.windowWidth || info.windowWidth)
+    const height = Number(size.windowHeight || info.windowHeight)
+    if (!(width > 0 && height > 0)) return
+    const rpx = width / 750
+    const status = Number(info.statusBarHeight || 20)
+    const navHeight = status + Number(menu && menu.height || 32) + Math.max(4, Number(menu && menu.top || status + 6) - status) * 2
+    const bottomInset = Math.max(0, Number(info.screenHeight || height) - Number(info.safeArea && info.safeArea.bottom || info.screenHeight || height))
+    // Reserve the 44px navigation targets, their spacing and one line of help.
+    const footerHeight = 64 + bottomInset + 20 * rpx + Math.max(24 * rpx, 12) * 1.6
+    this._readerLayout = { height, footerHeight }
+    this._readerLayoutMeasured = false
+    this._readerLayoutToken = (this._readerLayoutToken || 0) + 1
+    const available = height - navHeight - 22 * rpx - 44 - 28 * rpx - footerHeight
+    this.setData({ recitationHeight: Math.max(240, Math.floor(available)), recitationNeedsScroll: available < 240 }, () => this.refineReaderViewport())
+  },
+
+  refineReaderViewport() {
+    if (!this._readerAlive || !this._readerLayout || this._readerLayoutMeasured || !this.data.currentCard || !this.createSelectorQuery) return
+    const token = this._readerLayoutToken
+    this.createSelectorQuery().select('.fr-reader-meta').boundingClientRect().exec(rects => {
+      if (!this._readerAlive || token !== this._readerLayoutToken || !rects || !rects[0]) return
+      const available = this._readerLayout.height - rects[0].bottom - this._readerLayout.footerHeight
+      if (!Number.isFinite(available)) return
+      this._readerLayoutMeasured = true
+      this.setData({ recitationHeight: Math.max(240, Math.floor(available)), recitationNeedsScroll: available < 240 })
+    })
+  },
+
   onUnload() {
     this._readerAlive = false
     clearTimeout(this._transitionTimer)
@@ -156,6 +199,7 @@ Page({
     this._cardRequestToken = (this._cardRequestToken || 0) + 1
     this._randomRequestToken = (this._randomRequestToken || 0) + 1
     this._sequenceRequestToken = (this._sequenceRequestToken || 0) + 1
+    this._readerLayoutToken = (this._readerLayoutToken || 0) + 1
     this._readerGesture = null
     this._formulaGestureActive = false
   },
@@ -433,6 +477,7 @@ Page({
 
   resetReaderScroll() {
     if (!this._readerAlive) return
+    this.refineReaderViewport()
     this.setData({ readerScrollTop: 1 }, () => {
       if (this._readerAlive) this.setData({ readerScrollTop: 0 })
     })

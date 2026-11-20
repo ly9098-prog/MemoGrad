@@ -265,7 +265,7 @@ function navigationRuntime() {
     reader.onLoad(Object.fromEntries(new URL('https://fixture.local' + url).searchParams))
     return reader
   }
-  return { memory, urls, requests, api, loadPage, open }
+  return { memory, urls, requests, api, wx, loadPage, open }
 }
 const settleNavigation = () => new Promise(resolve => setImmediate(resolve))
 
@@ -493,6 +493,53 @@ test('library session changes clear previous favorite membership and block stale
   assert.equal(library.data.onlyFavorites, false)
   assert.equal(library.data.favoriteIds.length, 0)
   assert.equal(library.data.formulas.length, 0)
+})
+
+test('recitation uses the available phone height and keeps safe-area navigation reachable', async () => {
+  for (const [width, height, status, bottomInset] of [[320, 568, 20, 0], [390, 844, 47, 34], [430, 932, 59, 34]]) {
+    const runtime = navigationRuntime()
+    runtime.wx.getWindowInfo = () => ({ windowWidth: width, windowHeight: height, screenHeight: height,
+      statusBarHeight: status, safeArea: { bottom: height - bottomInset } })
+    runtime.wx.getMenuButtonBoundingClientRect = () => ({ top: status + 7, height: 32 })
+    const reader = runtime.open('/subpackages/formulas/reader/index?id=201&ids=201,202&mode=recite')
+    await settleNavigation()
+    const cardHeight = reader.data.recitationHeight
+    assert.ok(cardHeight > width * 760 / 750, 'a tall phone is not limited to the old width-based stage: ' + width)
+    assert.equal(reader.data.recitationNeedsScroll, false)
+    assert.ok(cardHeight + status + 46 + 44 + bottomInset < height, 'card leaves space for navigation and safe area')
+    runtime.wx.getWindowInfo = () => ({ windowWidth: width, windowHeight: height, screenHeight: height,
+      statusBarHeight: status, safeArea: { bottom: height } })
+    reader.onResize({ size: { windowWidth: width, windowHeight: height } })
+    assert.equal(reader.data.recitationHeight, cardHeight + bottomInset, 'safe area is reserved once, not twice')
+    const currentCard = reader.data.currentCard
+    reader.onResize({ size: { windowWidth: 844, windowHeight: 390 } })
+    assert.equal(reader.data.recitationNeedsScroll, true, 'a very short window allows page scrolling instead of clipping controls')
+    assert.equal(reader.data.currentCard, currentCard, 'resize does not reload or replace prepared card content')
+    reader.onUnload()
+  }
+})
+
+test('native reader measurements refine height and stale resize/unload measurements are ignored', () => {
+  const runtime = navigationRuntime()
+  runtime.wx.getWindowInfo = () => ({ windowWidth: 390, windowHeight: 844, screenHeight: 844, safeArea: { bottom: 810 } })
+  const reader = runtime.loadPage('reader')
+  reader._readerAlive = true
+  reader.data.currentCard = { id: 201 }
+  const pending = []
+  reader.createSelectorQuery = () => ({ select() { return this }, boundingClientRect() { return this }, exec(callback) { pending.push(callback) } })
+  reader.updateReaderViewport()
+  const initialHeight = reader.data.recitationHeight
+  pending.shift()([{ bottom: 220 }])
+  assert.ok(reader.data.recitationHeight < initialHeight, 'a taller measured header reduces the stage before the footer')
+  reader.onResize({ size: { windowWidth: 390, windowHeight: 700 } })
+  const oldResize = pending.shift()
+  reader.onResize({ size: { windowWidth: 390, windowHeight: 800 } })
+  const freshHeight = reader.data.recitationHeight
+  oldResize([{ bottom: 220 }])
+  assert.equal(reader.data.recitationHeight, freshHeight, 'older geometry cannot overwrite a later window')
+  reader.onUnload()
+  pending.shift()([{ bottom: 250 }])
+  assert.equal(reader.data.recitationHeight, freshHeight, 'late native measurement cannot update an unloaded reader')
 })
 
 // These cases load the real API/auth/storage graph in a fresh module realm.

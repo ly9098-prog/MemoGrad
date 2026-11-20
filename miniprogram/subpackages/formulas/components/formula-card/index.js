@@ -518,6 +518,7 @@ Component({
       },
     },
     graphImageUrl: { type: String, value: '' },
+    readingHeight: { type: Number, value: 0 },
     graphThumbnailUrl: { type: String, value: '' },
     graphViewportRatio: { type: Number, value: 75 },
   },

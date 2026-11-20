@@ -167,21 +167,47 @@ function sheetHarness() {
   return { state, controller }
 }
 
-test('native swipe only changes the visible discipline and ignores programmatic/stale change events', () => {
+test('native swipe clears only the draft; programmatic, repeated and invalid change events preserve it', () => {
   const { state, controller } = sheetHarness()
   assert.equal(state.data.subjectSheetPages[1].node_id, 71, 'opening restores the selected descendant path')
+  controller.stage(71)
+  const draft = state.data.subjectSheetDraft
   const before = state.writes.length
-  controller.change({ detail: { current: 0, source: '' } })
+  for (const detail of [
+    { current: 0, source: '' }, { current: 0, source: 'autoplay' },
+    { current: 1, source: 'touch' }, { current: -1, source: 'touch' },
+    { current: 9, source: 'touch' }, { current: 0.5, source: 'touch' },
+    { current: '0', source: 'touch' }, {},
+  ]) controller.change({ detail })
   assert.equal(state.writes.length, before)
+  assert.equal(state.data.subjectSheetDraft, draft)
   controller.change({ detail: { current: 0, source: 'touch' } })
   assert.equal(state.data.subjectSheetCurrent, 0)
+  assert.equal(state.data.subjectSheetDraft, null)
+  controller.stage(11)
+  const mathDraft = state.data.subjectSheetDraft
   const after = state.writes.length
   controller.change({ detail: { current: 0, source: 'touch' } })
   controller.change({ detail: { current: 9, source: 'touch' } })
   assert.equal(state.writes.length, after)
+  assert.equal(state.data.subjectSheetDraft, mathDraft)
   assert.deepEqual(state.selections, [])
   controller.change({ detail: { current: 1, source: 'touch' } })
   assert.equal(state.data.subjectSheetCurrent, 1, 'native circular wrap can report either valid edge index')
+  assert.equal(state.data.subjectSheetDraft, null)
+})
+
+test('cross-discipline swipe prevents confirmation until a subject on the current page is staged', () => {
+  const { state, controller } = sheetHarness()
+  controller.stage(71)
+  controller.change({ detail: { current: 0, source: 'touch' } })
+  controller.confirm()
+  assert.deepEqual(state.selections, [], 'the offscreen subject cannot be committed')
+  assert.equal(state.data.subjectSheetClosing, false)
+  controller.stage(10)
+  controller.confirm()
+  assert.deepEqual(state.selections, [[10, '数学（全部）', 10, true]])
+  assert.equal(state.data.subjectSheetClosing, true)
 })
 
 test('browsing a subject never selects all; only explicit scope staging plus confirmation commits', () => {
@@ -191,6 +217,10 @@ test('browsing a subject never selects all; only explicit scope staging plus con
   assert.equal(state.data.subjectSheetPages[1].node_id, 71)
   assert.equal(state.data.subjectSheetDraft.subject_id, 72)
   assert.deepEqual(state.selections, [])
+  controller.browse(state.data.subjectSheetPages[1].back_id)
+  assert.equal(state.data.subjectSheetPages[1].node_id, 70)
+  assert.equal(state.data.subjectSheetDraft.subject_id, 72, 'returning preserves the draft')
+  controller.chooseCard(71)
   controller.stage(71)
   assert.equal(state.data.subjectSheetDraft.display_name, '数据结构（全部）')
   assert.deepEqual(state.selections, [])
@@ -255,6 +285,17 @@ for (const guestMode of [false, true]) {
     page.openSubjectSheet()
     page.toggleParentExpansion({ detail: { current: 1, source: '' } })
     assert.equal(page.data.subjectSheetCurrent, 0, 'programmatic events cannot undo the 408 default')
+    assert.equal(page.data.subjectSheetDraft.subject_id, 70)
+    page.toggleParentExpansion({ detail: { current: 1, source: 'touch' } })
+    assert.equal(page.data.subjectSheetDraft, null)
+    page.chooseChildSubject({ currentTarget: { dataset: { action: 'confirm' } } })
+    assert.equal(page.data.selectedSubjectId, 70, 'swiping cannot change the committed practice subject')
+    assert.equal(page._launchKnowledgePointId, 999)
+    page.closeSubjectSheet()
+    timers.at(-1).callback()
+    page.openSubjectSheet()
+    assert.equal(page.data.subjectSheetCurrent, 0, 'cancel and reopen restore the committed discipline')
+    assert.equal(page.data.subjectSheetDraft.subject_id, 70)
     page.chooseChildSubject({ currentTarget: { dataset: { subjectId: 71 } } })
     assert.equal(page.data.selectedSubjectId, 70, 'a card tap only previews')
     assert.equal(page._launchKnowledgePointId, 999)
@@ -287,7 +328,7 @@ for (const guestMode of [false, true]) {
   })
 }
 
-test('sheet markup keeps one native discipline per swipe and leaf cards contain no repeated action captions', () => {
+test('sheet keeps native swiping, a compact title action and square text options without repeated copy', () => {
   const fs = require('node:fs'), path = require('node:path')
   const root = path.resolve(__dirname, '../subpackages/study/practice')
   const wxml = fs.readFileSync(path.join(root, 'practice.wxml'), 'utf8')
@@ -296,16 +337,19 @@ test('sheet markup keeps one native discipline per swipe and leaf cards contain 
   assert.match(wxml, /bindchange="toggleParentExpansion"/)
   assert.match(wxml, /data-action="confirm">确定选择/)
   const gridMarkup = wxml.slice(wxml.indexOf('<view class="subject-options-grid"'), wxml.indexOf('</swiper>'))
-  assert.ok(!/subject-option-action|>选择科目<\/text>|>已预选<\/text>/.test(gridMarkup),
-    'subject cards have no repeated visual action captions')
+  assert.ok(!/subject-option-action|subject-option-icon|>选择科目<\/text>|>已预选<\/text>/.test(gridMarkup),
+    'subject cards have no repeated icons or action captions')
+  const sheetMarkup = wxml.slice(wxml.indexOf('<view class="subject-sheet-layer'), wxml.indexOf('<view class="practice route-enter-task'))
+  assert.ok(!/subject-discipline-hint|subject-sheet-selection|左右滑动切换学科/.test(sheetMarkup))
+  assert.match(sheetMarkup, /class="subject-discipline-dots" wx:if="\{\{subjectSheetPages.length > 1\}\}"/)
+  assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetPages\[subjectSheetCurrent\].grid_rows/)
   assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
-  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:76vh/)
+  assert.match(css, /\.subject-option\{[^}]*min-height:288rpx/)
+  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:calc\([^}]*max-height:82vh/)
   assert.match(css, /\.subject-sheet \.subject-discipline-scroll\{[^}]*height:100%;width:100%/)
   assert.match(css, /\.subject-sheet \.sheet-close\{[^}]*width:44px;height:44px/)
-  for (const selector of ['subject-discipline-hint', 'subject-sheet-selection', 'subject-empty-hint']) {
-    assert.ok(new RegExp(`\\.${selector}\\{[^}]*font-size:max\\(24rpx,12px\\)`).test(css),
-      `${selector} remains at least 12px on narrow devices`)
-  }
+  assert.match(css, /\.subject-scope-option\{[^}]*display:inline-flex[^}]*min-width:44px;min-height:44px[^}]*background:transparent/)
+  assert.match(css, /\.subject-empty-hint\{[^}]*font-size:max\(24rpx,12px\)/)
   for (const selector of ['subject-option-name', 'subject-sheet-confirm']) {
     assert.ok(new RegExp(`\\.${selector}\\{[^}]*font-size:max\\(28rpx,14px\\)`).test(css),
       `${selector} remains at least 14px on narrow devices`)
@@ -325,6 +369,7 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   assert.equal(typeof render, 'function')
   const all = node => [node, ...(node.children || []).flatMap(child => child && typeof child === 'object' ? all(child) : [])]
   const byClass = (node, name) => all(node).filter(item => String((item.attr || {}).class || '').split(/\s+/).includes(name))
+  const text = node => node == null ? '' : typeof node === 'object' ? (node.children || []).map(text).join('') : String(node)
   const base = { entryResolved: true, started: false, subjectSheetVisible: true }
   const catalog = tree.normalizeSubjectTree(subjectCatalogFixture())
   const many = render({ ...base, ...buildSubjectSheetView(catalog, 71) })
@@ -333,12 +378,35 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   assert.equal(swiper.attr.autoplay, false)
   assert.equal(Number(swiper.attr.displayMultipleItems), 1)
   assert.equal(byClass(many, 'subject-discipline-item').length, 4)
-  assert.equal(byClass(byClass(many, 'subject-discipline-item')[0], 'subject-option').length, 4)
+  const computer = byClass(many, 'subject-discipline-item')[0]
+  assert.equal(byClass(computer, 'subject-option').length, 4)
+  assert.equal(byClass(computer, 'subject-option-icon').length, 0)
+  assert.equal(byClass(byClass(computer, 'subject-discipline-heading')[0], 'subject-scope-option').length, 1)
+  assert.equal(text(byClass(computer, 'subject-scope-option')[0]), '选整科')
+  assert.equal(byClass(many, 'subject-discipline-dot').length, 4)
+  assert.equal(byClass(many, 'subject-discipline-dot').filter(dot => dot.attr.class.includes('active')).length, 1)
+  assert.equal(text(byClass(many, 'subject-sheet-footer')[0]), '确定选择')
+  assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.ariaLabel, '确认选择数据结构')
   assert.equal(byClass(many, 'subject-option-check').length, 1)
   assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.disabled, false)
+  const swiped = render({ ...base, ...buildSubjectSheetView(catalog, 71), subjectSheetCurrent: 1, subjectSheetDraft: null })
+  assert.equal(byClass(swiped, 'subject-sheet-confirm')[0].attr.disabled, true,
+    'swiping to another available discipline disables confirmation until explicit staging')
   const single = render({ ...base, ...buildSubjectSheetView(catalog.slice(0, 1), 70) })
   assert.equal(byClass(single, 'subject-discipline-swiper')[0].attr.circular, false)
-  assert.equal(byClass(single, 'subject-discipline-hint').length, 0)
+  assert.equal(byClass(single, 'subject-discipline-dots').length, 0)
+  const rawBranch = subjectCatalogFixture()
+  rawBranch[1].children[0].children = [{ subject_id: 83, display_name: '微积分', children: [] }]
+  const branchView = buildSubjectSheetView(tree.normalizeSubjectTree(rawBranch), 83)
+  const branch = render({ ...base, ...branchView })
+  const math = byClass(branch, 'subject-discipline-item')[branchView.subjectSheetCurrent]
+  assert.equal(text(byClass(math, 'subject-discipline-title')[0]), '高等数学')
+  assert.equal(byClass(math, 'subject-branch-back')[0].attr['data-subject-id'], 80)
+  assert.equal(text(byClass(math, 'subject-scope-option')[0]), '选全部')
+  assert.equal(text(byClass(math, 'subject-option-name')[0]), '微积分')
+  const leaf = render({ ...base, ...buildSubjectSheetView(catalog.slice(2, 3), 90) })
+  assert.equal(text(byClass(leaf, 'subject-scope-option')[0]), '选择')
+  assert.equal(byClass(leaf, 'subject-options-grid').length, 0)
   const empty = render({ ...base, ...buildSubjectSheetView([]) })
   assert.equal(byClass(empty, 'subject-discipline-swiper').length, 0)
   assert.equal(byClass(empty, 'subject-empty').length, 1)

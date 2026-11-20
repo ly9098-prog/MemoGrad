@@ -55,7 +55,7 @@ async function withPage(kind, run) {
     }
     if (kind === 'subject') {
       Object.assign(page, { subjectId: 10, _pageVisible: true, _expandedNodeIds: new Set() })
-      page.applyView = (_reset, _fit, done) => done()
+      page.applyView = (_reset, done) => { if (done) done() }
       page.enterPage = () => {}
     } else {
       Object.assign(page, {
@@ -152,24 +152,21 @@ test('subject pending receipts clear only when the direct counter resolves them'
   })
 })
 
-test('subject hide and unload cancel a pending force reflow', async () => {
+test('subject hide and unload cancel a pending branch transition', async () => {
   await withPage('subject', async ({ page, timers }) => {
     page.data.subject = { subject_id: 10, subject_name: '操作系统' }
-    page._forces = { center: 0.52, repel: 10, link: 1, distance: 250 }
-    page.changeForce({ currentTarget: { dataset: { key: 'center' } }, detail: { value: 0.6 } })
+    page.transitionLabelView({ activeGroupKey: 'process' })
     const hideTimer = [...timers.keys()][0]
     assert.ok(hideTimer)
     page.onHide()
     assert.equal(timers.has(hideTimer), false)
-    assert.equal(page._forceTimer, null)
 
     page._pageVisible = true
-    page.changeForce({ currentTarget: { dataset: { key: 'repel' } }, detail: { value: 18 } })
+    page.transitionLabelView({ activeGroupKey: 'memory' })
     const unloadTimer = [...timers.keys()][0]
     assert.ok(unloadTimer)
     page.onUnload()
     assert.equal(timers.has(unloadTimer), false)
-    assert.equal(page._forceTimer, null)
   })
 })
 

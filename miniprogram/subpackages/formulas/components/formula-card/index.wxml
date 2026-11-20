@@ -80,6 +80,7 @@
 <view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
   <view class="fc-flip-shell {{recitationMode ? 'is-recite' : ''}}">
     <view class="fc-flip-stage {{recitationMode ? 'is-recite' : 'is-browse'}} {{recitationMode && isFlipped ? 'is-flipped' : ''}}"
+      style="{{recitationMode && readingHeight > 0 ? 'height:' + readingHeight + 'px;' : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
         <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}">

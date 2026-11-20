@@ -147,13 +147,28 @@ test('sheet defaults to the exam408 code, never a hard-coded subject id, and sho
   assert.equal(view.subjectSheetCurrent, 1)
   assert.match(view.subjectSheetPages[1].root_name, /408/)
   assert.deepEqual(view.subjectSheetPages[1].options.map(item => item.subject_id), [72, 74, 75, 76])
+  assert.equal(view.subjectSheetPages[1].grid_rows, 2)
   const nested = buildSubjectSheetPage(tree[1], 72)
   assert.equal(nested.node_id, 72)
   assert.equal(nested.back_id, 71)
   assert.deepEqual(nested.options.map(item => item.subject_id), [73])
+  assert.equal(nested.grid_rows, 1)
   assert.equal(nested.has_children, true)
   const restored = buildSubjectSheetView(tree, 73)
   assert.equal(restored.subjectSheetCurrent, 1)
   assert.equal(restored.subjectSheetPages[1].node_id, 72)
   assert.equal(restored.subjectSheetDraft.subject_id, 73)
+})
+
+test('sheet height follows enabled child rows and keeps larger catalogs scrollable', () => {
+  const [root] = normalizeSubjectTree([{ subject_id: 70, display_name: '综合科目', children: [
+    { subject_id: 71, display_name: '可用科目' },
+    { subject_id: 72, display_name: '已停用', is_active: false },
+  ] }])
+  assert.equal(buildSubjectSheetPage(root, 70).grid_rows, 1)
+  assert.equal(buildSubjectSheetPage(root, 71).grid_rows, 0)
+  root.children = Array.from({ length: 9 }, (_, i) => ({ subject_id: 80 + i, display_name: `科目${i}` }))
+  const long = buildSubjectSheetPage(root, 70)
+  assert.equal(long.grid_rows, 2, 'the sheet height stops at two rows')
+  assert.equal(long.options.length, 9, 'remaining subjects stay reachable in the native scroll-view')
 })

@@ -30,6 +30,8 @@ function buildSubjectSheetPage(root, subjectId) {
   const path = findSubjectPath([root], subjectId)
   const node = path[path.length - 1] || root
   const is408 = String(root.subject_code || '').toLowerCase() === 'exam408'
+  const options = (node.children || []).filter(child => child.is_active !== false)
+    .map(child => subjectSheetOption(child, root))
   return {
     root_id: root.subject_id,
     root_name: is408 && !/408/.test(root.display_name) ? `408 ${root.display_name}` : root.display_name,
@@ -40,8 +42,8 @@ function buildSubjectSheetPage(root, subjectId) {
     has_children: (node.children || []).length > 0,
     icon_src: root.icon_src,
     icon_mark: root.icon_mark,
-    options: (node.children || []).filter(child => child.is_active !== false)
-      .map(child => subjectSheetOption(child, root)),
+    options,
+    grid_rows: Math.min(2, Math.ceil(options.length / 2)),
   }
 }
 

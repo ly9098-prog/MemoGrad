@@ -3,26 +3,10 @@
   <premium-nav title="速记卡" variant="mint" bind:back="goBack" />
 
   <view class="fl-content {{!initialLoading ? 'route-enter-page' : ''}}">
-    <view class="fl-compact-head">
-      <view class="fl-compact-copy">
-        <text class="fl-compact-title">速记卡</text>
-        <text class="fl-compact-note">{{activeLibraryType === 'function_graph' ? '函数图像速查' : '公式 · 定义 · 易混点 · 陷阱'}}</text>
-      </view>
-      <view class="fl-head-actions">
-        <view class="fl-compact-total" wx:if="{{!initialLoading && !loadError}}">
-          <text class="fl-compact-total-number">{{total || formulas.length || 0}}</text>
-          <text class="fl-compact-total-unit">{{activeLibraryType === 'function_graph' ? '张' : '条'}}</text>
-        </view>
-      </view>
-    </view>
-
     <view class="fl-sticky-tools" style="top: {{navHeight}}px;">
       <view class="fl-filter-row">
-        <view class="fl-subject-select" hover-class="fl-pressed" bindtap="toggleSubjectPicker">
-          <view class="fl-subject-select-copy">
-            <text class="fl-control-label">学科</text>
-            <text class="fl-subject-select-name">{{activeSubjectName}}</text>
-          </view>
+        <view class="fl-subject-select" hover-class="fl-pressed" bindtap="toggleSubjectPicker" role="button" aria-label="选择学科，当前{{activeSubjectName}}" aria-expanded="{{showSubjectPicker}}">
+          <text class="fl-subject-select-name">{{activeSubjectName}}</text>
           <text class="line-icon icon-chevron-down fl-control-chevron"></text>
         </view>
 
@@ -42,103 +26,53 @@
       </view>
     </view>
 
-    <view class="fl-search-tools">
-      <view class="fl-search-box">
-        <view class="fl-search-icon"></view>
-        <input
-          class="fl-search-input"
-          placeholder="{{activeLibraryType === 'function_graph' ? '搜索函数图像' : '搜索名称或关键词'}}"
-          placeholder-class="fl-search-placeholder"
-          aria-label="{{activeLibraryType === 'function_graph' ? '搜索函数图像名称或关键词' : '搜索速记卡名称或关键词'}}"
-          value="{{searchValue}}"
-          bindinput="onSearchInput"
-          confirm-type="search"
-          bindconfirm="onSearchConfirm"
-        />
-        <view class="fl-search-clear" wx:if="{{searchValue}}" hover-class="fl-pressed" bindtap="onSearchClear" role="button" aria-label="清除搜索">
-          <text class="line-icon icon-close"></text>
-        </view>
+    <view class="fl-search-box">
+      <view class="fl-search-icon"></view>
+      <input
+        class="fl-search-input"
+        placeholder="{{activeLibraryType === 'function_graph' ? '搜索函数图像' : '搜索名称或关键词'}}"
+        placeholder-class="fl-search-placeholder"
+        aria-label="{{activeLibraryType === 'function_graph' ? '搜索函数图像名称或关键词' : '搜索速记卡名称或关键词'}}"
+        value="{{searchValue}}"
+        bindinput="onSearchInput"
+        confirm-type="search"
+        bindconfirm="onSearchConfirm"
+      />
+      <view class="fl-search-clear" wx:if="{{searchValue}}" hover-class="fl-pressed" bindtap="onSearchClear" role="button" aria-label="清除搜索">
+        <text class="line-icon icon-close"></text>
       </view>
-      <button class="fl-settings-button" hover-class="fl-pressed" bindtap="toggleMoreSheet" aria-label="阅读与筛选设置，当前{{recitationMode ? '背诵' : '浏览'}}模式" aria-expanded="{{showMoreSheet}}">
-        <text class="fl-settings-label">设置</text>
-        <text class="fl-settings-mode">{{recitationMode ? '背诵' : '浏览'}}<text wx:if="{{activeTags.length}}"> · {{activeTags.length}} 标签</text></text>
+    </view>
+
+    <view class="fl-reading-tools">
+      <view class="fl-mode-switch" aria-role="group" aria-label="阅读模式">
+        <button class="fl-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{!recitationMode}}">浏览</button>
+        <button class="fl-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{recitationMode}}">背诵</button>
+      </view>
+      <button class="fl-filter-button" hover-class="fl-pressed" bindtap="toggleMoreSheet" aria-label="筛选卡片{{activeChapterId || activeTags.length || onlyFavorites || activeStudyCardType ? '，已应用筛选' : ''}}" aria-expanded="{{showMoreSheet}}">
+        <text>筛选</text>
+        <view class="fl-filter-dot" wx:if="{{activeChapterId || activeTags.length || onlyFavorites || activeStudyCardType}}"></view>
+        <text class="line-icon icon-chevron-down fl-control-chevron"></text>
       </button>
     </view>
 
-    <view class="fl-quick-row">
-      <view wx:if="{{!guestMode}}"
-        class="fl-quick-action {{onlyFavorites ? 'active' : ''}}"
-        hover-class="fl-pressed"
-        bindtap="toggleFavoritesOnly"
-      >
-        <view class="fl-quick-icon"><text class="line-icon icon-book"></text></view>
-        <text class="fl-quick-title">{{onlyFavorites ? '已筛选收藏' : '只看收藏'}}</text>
-        <view class="fl-quick-status" wx:if="{{onlyFavorites}}"></view>
+    <view class="fl-active-tags" wx:if="{{activeChapterId || activeStudyCardType || onlyFavorites || _shownActiveTags.length}}">
+      <view class="fl-active-tag" wx:for="{{chapters}}" wx:for-item="chapter" wx:key="id" wx:if="{{chapter.active}}" data-id="0" bindtap="onChapterSelect" role="button" aria-label="移除章节筛选{{chapter.name}}">
+        <text>{{chapter.name}}</text><text class="fl-active-tag-close">×</text>
       </view>
-      <view wx:else class="fl-quick-action is-locked" aria-disabled="true">
-        <view class="fl-quick-icon"><text class="line-icon icon-book"></text></view>
-        <text class="fl-quick-title">收藏筛选</text><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+      <view class="fl-active-tag" wx:for="{{studyTypeTabs}}" wx:for-item="type" wx:key="key" wx:if="{{type.active && type.key}}" data-type="" bindtap="onStudyCardTypeChange" role="button" aria-label="移除内容类型筛选{{type.name}}">
+        <text>{{type.name}}</text><text class="fl-active-tag-close">×</text>
       </view>
-
-      <view class="fl-quick-action fl-random-action" hover-class="fl-pressed" bindtap="goToRandom">
-        <view class="fl-quick-icon"><text class="line-icon icon-review"></text></view>
-        <text class="fl-quick-title">{{recitationMode ? '随机背诵' : '随机浏览'}}</text>
-        <text class="line-icon icon-chevron-right fl-quick-arrow"></text>
+      <view class="fl-active-tag" wx:if="{{onlyFavorites}}" bindtap="toggleFavoritesOnly" role="button" aria-label="移除收藏筛选">
+        <text>收藏</text><text class="fl-active-tag-close">×</text>
       </view>
-    </view>
-
-    <view class="fl-study-type-head" wx:if="{{activeSubject === 'exam408' && activeLibraryType !== 'function_graph'}}">
-      <text class="fl-study-type-title">内容类型</text>
-      <text class="fl-study-type-note">按记忆用途筛选</text>
-    </view>
-    <scroll-view wx:if="{{activeSubject === 'exam408' && activeLibraryType !== 'function_graph'}}" scroll-x enhanced show-scrollbar="{{false}}" class="fl-study-type-scroll">
-      <view class="fl-study-type-row">
-        <view
-          class="fl-study-type-chip {{item.active ? 'active' : ''}}"
-          wx:for="{{studyTypeTabs}}"
-          wx:key="key"
-          data-type="{{item.key}}"
-          hover-class="fl-pressed"
-          bindtap="onStudyCardTypeChange"
-        >{{item.name}}</view>
-      </view>
-    </scroll-view>
-
-    <view class="fl-section-head">
-      <view>
-        <text class="fl-section-title">章节筛选</text>
-      </view>
-      <text class="fl-section-filter-note" wx:if="{{activeTags.length}}">已选 {{activeTags.length}} 个标签</text>
-    </view>
-
-    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="fl-chapter-scroll">
-      <view class="fl-chapter-row">
-        <view
-          class="fl-chapter-chip {{!activeChapterId ? 'active' : ''}}"
-          hover-class="fl-pressed"
-          bindtap="onChapterSelect"
-          data-id="0"
-        >全部章节</view>
-        <view
-          class="fl-chapter-chip {{c.active ? 'active' : ''}}"
-          wx:for="{{chapters}}"
-          wx:for-item="c"
-          wx:key="id"
-          data-id="{{c.id}}"
-          hover-class="fl-pressed"
-          bindtap="onChapterSelect"
-        >{{c.name}}<text wx:if="{{c.available_count > 0}}" class="fl-chapter-count"> {{c.available_count}}</text></view>
-      </view>
-    </scroll-view>
-
-    <view class="fl-active-tags" wx:if="{{_shownActiveTags.length}}">
-      <text class="fl-active-tags-label">当前标签</text>
       <view
         class="fl-active-tag"
         wx:for="{{_shownActiveTags}}"
         wx:key="id"
         data-id="{{item.id}}"
         bindtap="onTagSelect"
+        role="button"
+        aria-label="移除标签筛选{{item.name}}"
       >
         <text>{{item.name}}</text>
         <text class="fl-active-tag-close">×</text>
@@ -146,8 +80,11 @@
     </view>
 
     <view class="fl-list-head" wx:if="{{!initialLoading && !loadError}}">
-      <text class="fl-list-title">{{activeLibraryType === 'function_graph' ? '函数图像' : '速记卡列表'}}</text>
-      <text class="fl-list-meta">{{formulas.length}} / {{total || formulas.length || 0}}</text>
+      <view class="fl-list-caption">
+        <text class="fl-list-title">{{activeLibraryType === 'function_graph' ? '函数图像' : '速记卡'}}</text>
+        <text class="fl-list-meta">{{formulas.length}} / {{total || formulas.length || 0}}</text>
+      </view>
+      <button class="fl-random-action" hover-class="fl-pressed" bindtap="goToRandom">{{recitationMode ? '随机背诵' : '随机浏览'}}</button>
     </view>
 
     <view class="fl-loading" wx:if="{{initialLoading}}">
@@ -295,39 +232,62 @@
     <view class="fl-bottom-sheet fl-more-sheet" catchtap="noop">
       <view class="fl-sheet-handle"></view>
       <view class="fl-sheet-head">
-        <view>
-          <text class="fl-sheet-title">阅读与筛选设置</text>
-        </view>
-        <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed" role="button" aria-label="关闭设置">
+        <text class="fl-sheet-title">筛选</text>
+        <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed" role="button" aria-label="关闭筛选">
           <text class="line-icon icon-close"></text>
         </view>
       </view>
-      <view class="fl-reading-settings">
-        <text class="fl-mode-label">打开卡片时</text>
-        <view class="fl-mode-switch" aria-role="group" aria-label="阅读模式">
-          <button class="fl-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{!recitationMode}}">浏览</button>
-          <button class="fl-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{recitationMode}}">背诵</button>
-        </view>
-        <text class="fl-mode-description">{{recitationMode ? '先看题面，回想后翻面核对答案' : '直接阅读公式、适用条件与例题'}}</text>
-      </view>
-      <view class="fl-more-list">
-        <view class="fl-more-item" hover-class="fl-pressed" bindtap="openTagPickerFromMore">
-          <view class="fl-more-item-icon fl-more-tag-icon"><view class="fl-filter-bar fl-filter-bar-one"></view><view class="fl-filter-bar fl-filter-bar-two"></view><view class="fl-filter-bar fl-filter-bar-three"></view></view>
-          <view class="fl-more-item-copy">
-            <text class="fl-more-item-title">标签筛选</text>
-            <text class="fl-more-item-desc">{{activeTags.length ? '已选择 ' + activeTags.length + ' 个标签' : '按高频、易错等标签筛选'}}</text>
+      <scroll-view class="fl-filter-body" scroll-y enhanced show-scrollbar="{{true}}">
+        <view class="fl-filter-section" wx:if="{{activeSubject === 'exam408' && activeLibraryType !== 'function_graph'}}">
+          <text class="fl-filter-heading">内容类型</text>
+          <view class="fl-study-type-row">
+            <view
+              class="fl-study-type-chip {{item.active ? 'active' : ''}}"
+              wx:for="{{studyTypeTabs}}"
+              wx:key="key"
+              data-type="{{item.key}}"
+              hover-class="fl-pressed"
+              bindtap="onStudyCardTypeChange"
+              role="button"
+              aria-pressed="{{item.active}}"
+            >{{item.name}}</view>
           </view>
-          <view class="fl-more-item-badge" wx:if="{{activeTags.length}}">{{activeTags.length}}</view>
-          <text class="line-icon icon-chevron-right fl-more-item-arrow"></text>
         </view>
-        <view class="fl-more-item {{!searchValue && !activeChapterId && !activeTags.length && !onlyFavorites ? 'disabled' : ''}}" hover-class="fl-pressed" bindtap="resetFilters">
-          <view class="fl-more-item-icon fl-more-reset-icon"><view class="fl-reset-ring"></view><view class="fl-reset-arrow"></view></view>
-          <view class="fl-more-item-copy">
-            <text class="fl-more-item-title">清除当前筛选</text>
-            <text class="fl-more-item-desc">保留学科与内容分类，恢复全部章节</text>
+        <view class="fl-filter-section">
+          <text class="fl-filter-heading">章节</text>
+          <view class="fl-chapter-row">
+            <view class="fl-chapter-chip {{!activeChapterId ? 'active' : ''}}" hover-class="fl-pressed" bindtap="onChapterSelect" data-id="0" role="button" aria-pressed="{{!activeChapterId}}">全部章节</view>
+            <view
+              class="fl-chapter-chip {{c.active ? 'active' : ''}}"
+              wx:for="{{chapters}}"
+              wx:for-item="c"
+              wx:key="id"
+              data-id="{{c.id}}"
+              hover-class="fl-pressed"
+              bindtap="onChapterSelect"
+              role="button"
+              aria-pressed="{{c.active}}"
+            >{{c.name}}<text wx:if="{{c.available_count > 0}}" class="fl-chapter-count"> {{c.available_count}}</text></view>
           </view>
-          <text class="line-icon icon-chevron-right fl-more-item-arrow"></text>
         </view>
+        <view class="fl-filter-section fl-filter-options">
+          <button class="fl-filter-option {{onlyFavorites ? 'is-active' : ''}}" hover-class="fl-pressed" bindtap="toggleFavoritesOnly" disabled="{{guestMode}}" aria-pressed="{{onlyFavorites}}" aria-label="{{guestMode ? '登录后可筛选收藏' : '只看收藏'}}">
+            <text>只看收藏</text>
+            <image wx:if="{{guestMode}}" class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+            <text wx:elif="{{onlyFavorites}}" class="line-icon icon-check"></text>
+          </button>
+          <view class="fl-filter-option" hover-class="fl-pressed" bindtap="openTagPickerFromMore" role="button">
+            <text>标签</text>
+            <view class="fl-filter-option-end">
+              <text class="fl-filter-value">{{activeTags.length ? '已选 ' + activeTags.length + ' 个' : '全部'}}</text>
+              <text class="line-icon icon-chevron-right"></text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="fl-filter-footer">
+        <button class="fl-filter-reset" hover-class="fl-pressed" bindtap="resetFilters" disabled="{{!searchValue && !activeChapterId && !activeTags.length && !onlyFavorites && !activeStudyCardType}}">重置筛选</button>
+        <button class="fl-filter-done" hover-class="fl-pressed" bindtap="toggleMoreSheet">完成</button>
       </view>
     </view>
   </view>

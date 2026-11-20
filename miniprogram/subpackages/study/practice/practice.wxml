@@ -178,16 +178,13 @@
 </scroll-view>
 <view class="subject-sheet-layer {{subjectSheetClosing ? 'closing' : ''}}" wx:if="{{subjectSheetVisible}}">
 <view class="subject-sheet-backdrop" catchtap="closeSubjectSheet" catchtouchmove="noop"></view>
-<view class="subject-sheet" catchtap="noop">
+<view class="subject-sheet subject-sheet-rows-{{subjectSheetPages[subjectSheetCurrent].grid_rows || 0}}" catchtap="noop">
 <view class="sheet-handle"></view>
 <view class="sheet-header">
 <view>
 <text class="sheet-title">选择科目</text>
 </view>
 <view class="sheet-close" aria-role="button" aria-label="取消选科" hover-class="soft-pressed" catchtap="closeSubjectSheet"><text class="line-icon icon-close" aria-hidden="true"></text></view>
-</view>
-<view class="subject-discipline-hint" wx:if="{{subjectSheetPages.length > 1}}">
-<text>左右滑动切换学科</text><text>{{subjectSheetCurrent + 1}} / {{subjectSheetPages.length}}</text>
 </view>
 <view class="subject-empty" wx:if="{{!subjectSheetPages || subjectSheetPages.length === 0}}">
 <text class="subject-empty-text">暂无可练习科目</text>
@@ -198,22 +195,17 @@
 <scroll-view class="subject-discipline-scroll" scroll-y enhanced bounces="{{false}}" show-scrollbar="{{false}}">
 <view class="subject-discipline-page">
 <view class="subject-discipline-heading">
-<image wx:if="{{discipline.icon_src}}" class="discipline-icon" src="{{discipline.icon_src}}" mode="aspectFit" aria-hidden="true" />
-<text class="subject-discipline-title">{{discipline.root_name}}</text>
+<view wx:if="{{!discipline.is_root}}" class="subject-branch-back" aria-role="button" aria-label="返回上级科目" hover-class="soft-pressed" catchtap="toggleParentExpansion" data-subject-id="{{discipline.back_id}}">
+<text class="line-icon icon-chevron-right" aria-hidden="true"></text>
 </view>
-<view class="subject-branch-header" wx:if="{{!discipline.is_root}}">
-<view class="subject-branch-back" aria-role="button" aria-label="返回上级科目" hover-class="soft-pressed" catchtap="toggleParentExpansion" data-subject-id="{{discipline.back_id}}">
-<text class="line-icon icon-chevron-right" aria-hidden="true"></text><text>上一级</text>
-</view>
-<text class="subject-branch-name">{{discipline.node_name}}</text>
-</view>
-<view class="subject-scope-option {{subjectSheetDraft.subject_id === discipline.node_id ? 'active' : ''}}" aria-role="button" aria-pressed="{{subjectSheetDraft.subject_id === discipline.node_id}}" hover-class="subject-option-pressed" catchtap="chooseParentSubject" data-subject-id="{{discipline.node_id}}">
-<text>{{discipline.has_children ? (discipline.is_root ? '选择本学科全部' : '选择本科目全部') : '选择' + discipline.node_name}}</text>
+<text class="subject-discipline-title">{{discipline.is_root ? discipline.root_name : discipline.node_name}}</text>
+<view class="subject-scope-option {{subjectSheetDraft.subject_id === discipline.node_id ? 'active' : ''}}" aria-role="button" aria-label="{{discipline.has_children ? '选择' + discipline.node_name + '全部科目' : '选择' + discipline.node_name}}" aria-pressed="{{subjectSheetDraft.subject_id === discipline.node_id}}" hover-class="subject-scope-pressed" catchtap="chooseParentSubject" data-subject-id="{{discipline.node_id}}">
+<text>{{discipline.has_children ? (discipline.is_root ? '选整科' : '选全部') : '选择'}}</text>
 <image wx:if="{{subjectSheetDraft.subject_id === discipline.node_id}}" class="subject-scope-check" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" aria-hidden="true" />
+</view>
 </view>
 <view class="subject-options-grid" wx:if="{{discipline.options.length}}">
 <view wx:for="{{discipline.options}}" wx:for-item="subject" wx:key="subject_id" class="subject-option {{subjectSheetDraft.subject_id === subject.subject_id ? 'active' : ''}}" aria-role="button" aria-label="{{subject.display_name}}，{{subject.has_children ? '查看下级科目' : '选择科目'}}" aria-pressed="{{subjectSheetDraft.subject_id === subject.subject_id}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-subject-id="{{subject.subject_id}}">
-<image wx:if="{{subject.icon_src}}" class="subject-option-icon" src="{{subject.icon_src}}" mode="aspectFit" aria-hidden="true" />
 <text class="subject-option-name">{{subject.display_name}}</text>
 <text wx:if="{{subject.has_children}}" class="subject-option-arrow line-icon icon-chevron-right" aria-hidden="true"></text>
 <image wx:elif="{{subjectSheetDraft.subject_id === subject.subject_id}}" class="subject-option-check" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" aria-hidden="true" />
@@ -223,9 +215,11 @@
 </scroll-view>
 </swiper-item>
 </swiper>
+<view class="subject-discipline-dots" wx:if="{{subjectSheetPages.length > 1}}" aria-label="第{{subjectSheetCurrent + 1}}个学科，共{{subjectSheetPages.length}}个，可左右滑动切换">
+<view wx:for="{{subjectSheetPages}}" wx:key="root_id" class="subject-discipline-dot {{subjectSheetCurrent === index ? 'active' : ''}}" aria-hidden="true"></view>
+</view>
 <view class="subject-sheet-footer">
-<text class="subject-sheet-selection">{{subjectSheetDraft ? subjectSheetDraft.display_name : '请选择练习科目'}}</text>
-<button class="subject-sheet-confirm" disabled="{{!subjectSheetDraft}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
+<button class="subject-sheet-confirm" disabled="{{!subjectSheetDraft}}" aria-label="{{subjectSheetDraft ? '确认选择' + subjectSheetDraft.display_name : '请先选择科目'}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
 </view>
 </view>
 </view>

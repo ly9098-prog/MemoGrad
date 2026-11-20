@@ -35,7 +35,7 @@ function change(options, event) {
   // Programmatic current updates emit change too. Only acknowledge touch, once.
   if (detail.source !== 'touch' || !Number.isInteger(index) || index === options.getCurrentIndex() ||
       index < 0 || index >= options.getSheetPages().length) return
-  options.setData({ subjectSheetCurrent: index })
+  options.setData({ subjectSheetCurrent: index, subjectSheetDraft: null })
 }
 
 function browse(options, subjectId) {

@@ -132,18 +132,12 @@ global.Page = value => { pageDefinition = value }
 require('../subpackages/knowledge/knowledge-subject/index')
 global.Page = originalPage
 
-test('label preference and settled camera gestures preserve scene positions', () => {
+test('settled camera gestures preserve scene positions and reveal labels with zoom', () => {
   const frame = { left: 0, top: 0, width: 365, height: 343 }
   const scene = buildScene([groupWithLeaves(8)], subject)
   const positions = scene.nodes.map(node => [node.cx, node.cy])
   const page = { ...pageDefinition, data: { ...pageDefinition.data, scene }, _frame: frame,
     _camera: fitCamera(frame), _pageVisible: true, setData(patch) { Object.assign(this.data, patch) } }
-  page.setGraphLabels({ currentTarget: { dataset: { mode: 'all' } } })
-  assert.equal(page.data.showAllGraphLabels, true)
-  page.setGraphLabels({ currentTarget: { dataset: { mode: 'all' } } })
-  assert.equal(page.data.showAllGraphLabels, true, 'choosing the active option is idempotent')
-  page.setGraphLabels({ currentTarget: { dataset: { mode: 'invalid' } } })
-  assert.equal(page.data.showAllGraphLabels, true)
   page.setCamera(page._camera)
   page.commitGraphMotion({ revision: page.data.graphMotionState.revision, sequence: 1, camera: { ...page._camera, scale: page._camera.scale * 2 } })
   assert.equal(page.data.graphLabelMode, 'detail')
@@ -169,17 +163,6 @@ test('index location on a large chapter retains the requested selection and deta
   assert.equal(page._selectedId, 81)
   assert.equal(page.data.selectedPoint.knowledge_point_id, 81)
   assert.ok(page.data.scene.nodes.some(node => node.pointId === 81))
-})
-
-test('hidden pages cancel pending force work', () => {
-  const page = { ...pageDefinition, data: { subject }, _pageVisible: true, _forces: { ...DEFAULT_FORCES }, setData() {} }
-  page.changeForce({ currentTarget: { dataset: { key: 'repel' } }, detail: { value: 20 } })
-  const timer = page._forceTimer
-  assert.ok(timer)
-  page.onHide()
-  assert.equal(page._forceTimer, null)
-  assert.equal(page._forceDirty, true)
-  assert.equal(page._pageVisible, false)
 })
 
 test('panning only publishes the camera while zoom and node changes refresh labels', () => {
@@ -342,7 +325,16 @@ function selectionPage() {
     _nodeById: new Map(group.nodes.map(node => [node.knowledge_point_id, node])),
     _visibleNodes: group.nodes, _selectedId: 2, _pageVisible: true,
     _frame: frame, _camera: fitCamera(frame),
-    setData(patch, callback) { writes.push(patch); Object.assign(this.data, patch); if (callback) callback() },
+    setData(patch, callback) {
+      writes.push(patch)
+      for (const [key, value] of Object.entries(patch)) {
+        const parts = key.replace(/\[(\d+)\]/g, '.$1').split('.')
+        let target = this.data
+        for (const part of parts.slice(0, -1)) target = target[part]
+        target[parts.at(-1)] = value
+      }
+      if (callback) callback()
+    },
     applyView() { assert.fail('selection must not rebuild the scene, filters or index tree') },
     cancelGraphMotion() {}, measureViewport() {},
   }
@@ -368,6 +360,52 @@ test('point selection preserves geometry and camera while detail waits for its e
   t.mock.timers.tick(220)
   assert.equal(page.data.selectionSwitching, false)
   assert.equal(page.data.selectionSwitchPhase, '')
+})
+
+test('point taps keep mounted scene and gesture geometry while updating only selection state', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const page = selectionPage()
+  const scene = page.data.scene
+  const nodes = scene.nodes
+  const edges = scene.edges
+  const positions = nodes.map(node => node.style)
+  page.selectGraphPoint(3)
+  assert.equal(page.data.scene, scene, 'a point tap must not replace the rendered scene')
+  assert.equal(page.data.scene.nodes, nodes, 'WXS keeps references to mounted nodes')
+  assert.equal(page.data.scene.edges, edges)
+  assert.deepEqual(nodes.map(node => node.style), positions)
+  assert.equal(nodes.find(node => node.pointId === 3).selected, true)
+  assert.equal(nodes.find(node => node.pointId === 2).selected, false)
+  assert.ok(page.writes.every(patch => !('scene' in patch) && !('scene.nodes' in patch) && !('scene.edges' in patch)))
+  assert.ok(page.writes.every(patch => Object.keys(patch).every(key => !/\.(?:style|cx|cy)$/.test(key))))
+  t.mock.timers.tick(500)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 3)
+})
+
+test('paging and branch navigation never restart node entrance motion or reset the current camera', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const previousWx = global.wx
+  global.wx = { nextTick: callback => callback() }
+  t.after(() => { global.wx = previousWx })
+  const page = selectionPage()
+  const group = groupWithLeaves(16)
+  Object.assign(page, {
+    _groups: [group], _filteredGroups: [group], _expandedNodeIds: new Set([1]),
+    _nodeById: new Map(group.nodes.map(node => [node.knowledge_point_id, node])),
+    _layoutCache: {}, _manualPositions: {}, _focusNodeId: 1,
+    applyView: pageDefinition.applyView,
+  })
+  page.applyView()
+  page._camera = { ...page._camera, x: page._camera.x + 24 }
+  const camera = { ...page._camera }
+  page.changeGraphPage({ currentTarget: { dataset: { step: 1 } } })
+  assert.equal(page.data.scene.page, 1)
+  page.navigateToFocus('', 0)
+  t.mock.timers.tick(500)
+  assert.equal(page.data.scene.focused, false)
+  assert.deepEqual(page._camera, camera)
+  assert.ok(page.writes.every(patch => !patch.sceneAnimating), 'no subsequent scene can replay a node entrance')
+  page.onUnload()
 })
 
 test('rapid point taps publish only the latest detail and cannot replay an earlier selection', t => {
@@ -406,7 +444,7 @@ test('a full view update supersedes pending selected details', t => {
   t.after(() => originalWx ? Object.defineProperty(global, 'wx', originalWx) : delete global.wx)
   const page = selectionPage()
   page.selectGraphPoint(3)
-  page._commitView({ selectedPoint: null, scene: { nodes: [], edges: [] } }, false)
+  page._commitView({ selectedPoint: null, scene: { nodes: [], edges: [] } })
   t.mock.timers.tick(1000)
   assert.equal(page.data.selectedPoint, null)
   assert.equal(page.data.selectionSwitching, false)

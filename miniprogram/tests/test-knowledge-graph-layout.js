@@ -118,11 +118,10 @@ test('knowledge graph presentation keeps motion fallbacks and accessible control
   const homeMarkup = fs.readFileSync(path.join(root, 'pages', 'home', 'home.wxml'), 'utf8')
   const homeStyles = fs.readFileSync(path.join(root, 'pages', 'home', 'home.wxss'), 'utf8')
 
-  assert.match(markup, /scene-animating/)
+  assert.doesNotMatch(markup, /scene-animating|forcePanel|force-sheet|图谱设置/)
   assert.match(markup, /point-card-reveal-\{\{indexDetailRevealPhase/)
-  assert.match(markup, /<slider\b[^>]*bindchange="changeForce"[^>]*aria-label="\{\{item\.label\}\}，\{\{item\.hint\}\}，当前值 \{\{item\.valueText\}\}"/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\{\.page-reveal[\s\S]*?\.atlas-stage,\.atlas-node/)
-  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)\{[\s\S]*?\.scene-animating \.atlas-node/)
+  assert.doesNotMatch(styles, /scene-animating|force-panel|graph-force-toggle/)
   assert.match(homeMarkup, /brand-mark-image[^>]*aria-hidden="true"/)
   assert.doesNotMatch(homeStyles, /#76968B/)
   assert.doesNotMatch(styles, /#76968B/)
