@@ -181,12 +181,12 @@
 </scroll-view>
 <!-- (1,4) Same physical surface grows from the capsule and owns handle gestures. -->
 <motion-sheet class="subject-sheet-layer" show="{{subjectSheetVisible}}" closing="{{subjectSheetClosing}}" anchor="#practice-subject-trigger" variant="dock" label="选择科目" bind:close="closeSubjectSheet">
-<view class="subject-sheet subject-sheet-rows-{{subjectSheetGridRows || 0}}" catchtap="noop">
-<view class="sheet-header">
-<view>
-<text class="sheet-title">选择科目</text>
+<view class="subject-sheet subject-sheet-rows-{{subjectSheetGridRows || 0}} mini-choice-sheet" catchtap="noop">
+<view class="sheet-header mini-choice-sheet-header">
+<view class="mini-choice-sheet-heading">
+<text class="sheet-title mini-choice-sheet-title">选择科目</text>
 </view>
-<view class="sheet-close" aria-role="button" aria-label="取消选科" hover-class="soft-pressed" catchtap="closeSubjectSheet"><image class="sheet-close-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></view>
+<view class="sheet-close mini-choice-sheet-close" aria-role="button" aria-label="取消选科" hover-class="soft-pressed" catchtap="closeSubjectSheet"><image class="sheet-close-icon mini-choice-sheet-close-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="subject-empty" wx:if="{{!subjectSheetPages || subjectSheetPages.length === 0}}">
 <text class="subject-empty-text">暂无可练习科目</text>
@@ -206,11 +206,11 @@
 <image wx:if="{{subjectSheetDraft.subject_id === discipline.node_id}}" class="subject-scope-check" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 </view>
-<view class="subject-options-grid" wx:if="{{discipline.options.length}}">
-<view wx:for="{{discipline.options}}" wx:for-item="subject" wx:key="subject_id" class="subject-option {{subjectSheetDraft.subject_id === subject.subject_id ? 'active' : ''}}" aria-role="button" aria-label="{{subject.display_name}}，{{subject.has_children ? '查看下级科目' : '选择科目'}}" aria-pressed="{{subjectSheetDraft.subject_id === subject.subject_id}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-subject-id="{{subject.subject_id}}">
-<text class="subject-option-name">{{subject.display_name}}</text>
-<image wx:if="{{subject.has_children}}" class="subject-option-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
-<image wx:elif="{{subjectSheetDraft.subject_id === subject.subject_id}}" class="subject-option-check" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" aria-hidden="true" />
+<view class="subject-options-grid mini-choice-grid" wx:if="{{discipline.options.length}}">
+<view wx:for="{{discipline.options}}" wx:for-item="subject" wx:key="subject_id" class="subject-option mini-choice-option {{subjectSheetDraft.subject_id === subject.subject_id ? 'active is-selected' : ''}} {{subject.has_children || subjectSheetDraft.subject_id === subject.subject_id ? 'has-trailing' : ''}}" aria-role="button" aria-label="{{subject.display_name}}，{{subject.has_children ? '查看下级科目' : '选择科目'}}" aria-pressed="{{subjectSheetDraft.subject_id === subject.subject_id}}" hover-class="subject-option-pressed mini-choice-pressed" catchtap="chooseChildSubject" data-subject-id="{{subject.subject_id}}">
+<view class="subject-option-copy mini-choice-option-copy"><text class="subject-option-name mini-choice-option-title">{{subject.display_name}}</text></view>
+<view wx:if="{{subject.has_children}}" class="subject-option-arrow mini-choice-option-chevron" aria-hidden="true"><image class="mini-choice-option-chevron-icon" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" /></view>
+<view wx:elif="{{subjectSheetDraft.subject_id === subject.subject_id}}" class="subject-option-check mini-choice-selection-mark" aria-hidden="true"><image class="mini-choice-selection-icon" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" /></view>
 </view>
 </view>
 </view>
@@ -220,8 +220,8 @@
 <view class="subject-discipline-dots" wx:if="{{subjectSheetPages.length > 1}}" aria-label="第{{subjectSheetCurrent + 1}}个学科，共{{subjectSheetPages.length}}个，可左右滑动切换">
 <view wx:for="{{subjectSheetPages}}" wx:key="root_id" class="subject-discipline-dot {{subjectSheetCurrent === index ? 'active' : ''}}" aria-hidden="true"></view>
 </view>
-<view class="subject-sheet-footer">
-<button class="subject-sheet-confirm motion-press" bindtouchstart="{{press.start}}" bindtouchend="{{press.end}}" bindtouchcancel="{{press.end}}" disabled="{{!subjectSheetDraft}}" data-motion-disabled="{{!subjectSheetDraft}}" aria-label="{{subjectSheetDraft ? '确认选择' + subjectSheetDraft.display_name : '请先选择科目'}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
+<view class="subject-sheet-footer mini-choice-sheet-actions is-single">
+<button class="subject-sheet-confirm mini-choice-sheet-action mini-choice-sheet-action-primary motion-press" bindtouchstart="{{press.start}}" bindtouchend="{{press.end}}" bindtouchcancel="{{press.end}}" disabled="{{!subjectSheetDraft}}" data-motion-disabled="{{!subjectSheetDraft}}" aria-label="{{subjectSheetDraft ? '确认选择' + subjectSheetDraft.display_name : '请先选择科目'}}" hover-class="subject-option-pressed mini-choice-sheet-action-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
 </view>
 </view>
 </motion-sheet>

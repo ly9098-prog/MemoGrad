@@ -42,7 +42,7 @@
 
   <!-- Mint home: data-driven circular daily-goal hero -->
   <view class="focus-card route-enter-page delay-one">
-    <image class="focus-card-texture" src="/assets/images/home/hero-brush-texture.webp" mode="aspectFill" aria-hidden="true"></image>
+    <image class="focus-card-texture" src="/assets/images/home/hero-brush-texture.jpg" mode="aspectFill" aria-hidden="true"></image>
     <view class="focus-card-texture-shade" aria-hidden="true"></view>
     <view class="focus-content {{guestMode ? 'focus-content-guest' : ''}}">
       <view class="focus-topline">

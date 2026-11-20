@@ -312,17 +312,21 @@
 </scroll-view>
 </view>
 </motion-sheet>
-<motion-sheet show="{{diagnosisSheetVisible}}" dismissible="{{!diagnosisSaving}}" label="记录错因" background="#FFFEFA" safe-area="{{false}}" layer="{{300}}" bind:close="closeDiagnosisSheet">
-<view class="diagnosis-sheet-shell motion-sheet-panel" catchtap="noop">
+<motion-sheet show="{{diagnosisSheetVisible}}" dismissible="{{!diagnosisSaving}}" label="记录错因" background="#FAFCF8" safe-area="{{false}}" layer="{{300}}" bind:close="closeDiagnosisSheet">
+<view class="diagnosis-sheet-shell motion-sheet-panel mini-choice-sheet" catchtap="noop">
 <scroll-view class="diagnosis-sheet-scroll" scroll-y enhanced bounces="{{false}}" show-scrollbar="{{false}}">
-<text class="decision-kicker">ERROR CAUSE</text>
-<text class="decision-title">这次为什么做错？</text>
-<text class="decision-desc">选择一个主错因，可再补充最多 3 个次级错因。</text>
+<view class="mini-choice-sheet-header diagnosis-sheet-header">
+<view class="mini-choice-sheet-heading">
+<text class="decision-title mini-choice-sheet-title">这次为什么做错？</text>
+<text class="decision-desc mini-choice-sheet-description">选择一个主错因，可再补充最多 3 个次级错因。</text>
+</view>
+</view>
 <text class="diagnosis-sheet-label">主错因</text>
-<view class="diagnosis-option-grid">
-<view wx:for="{{diagnosisOptions}}" wx:key="type" data-type="{{item.type}}" bindtap="selectDiagnosisPrimary" class="diagnosis-option {{diagnosisPrimary === item.type ? 'selected' : ''}}">
-<text class="diagnosis-option-title">{{item.label}}</text>
-<text class="diagnosis-option-desc">{{item.description}}</text>
+<view class="diagnosis-option-grid mini-choice-grid">
+<view wx:for="{{diagnosisOptions}}" wx:key="type" data-type="{{item.type}}" bindtap="selectDiagnosisPrimary" class="diagnosis-option mini-choice-option {{diagnosisPrimary === item.type ? 'selected is-selected has-trailing' : ''}}" aria-role="button" aria-pressed="{{diagnosisPrimary === item.type}}" hover-class="diagnosis-option-pressed mini-choice-pressed">
+<view class="mini-choice-option-copy"><text class="diagnosis-option-title mini-choice-option-title">{{item.label}}</text>
+<text class="diagnosis-option-desc mini-choice-option-description">{{item.description}}</text></view>
+<view wx:if="{{diagnosisPrimary === item.type}}" class="mini-choice-selection-mark" aria-hidden="true"><image class="mini-choice-selection-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" /></view>
 </view>
 </view>
 <text class="diagnosis-sheet-label secondary-label">次级错因（可选）</text>
@@ -331,7 +335,7 @@
 </view>
 <view class="diagnosis-sheet-scroll-space"></view>
 </scroll-view>
-<view class="diagnosis-sheet-footer">
+<view class="diagnosis-sheet-footer mini-choice-sheet-actions">
 <button class="decision-secondary" bindtap="closeDiagnosisSheet">取消</button>
 <button class="decision-primary" loading="{{diagnosisSaving}}" disabled="{{diagnosisSaving}}" bindtap="saveDiagnosis">保存错因</button>
 </view>

@@ -730,22 +730,33 @@
 
 <!-- Keep fixed overlays outside the animated dashboard container. -->
 <motion-sheet show="{{knowledgeSubjectSheetVisible}}" closing="{{knowledgeSubjectSheetClosing}}" label="选择学科" background="#FAFDFB" layer="{{110}}" safe-area="{{false}}" bind:close="closeKnowledgeSubjectSheet">
-  <view class="knowledge-subject-sheet motion-sheet-panel">
-    <view class="knowledge-subject-sheet-header">
-      <text class="knowledge-subject-sheet-title">选择学科</text>
-      <button class="knowledge-subject-sheet-close" bindtap="closeKnowledgeSubjectSheet"
+  <view class="knowledge-subject-sheet motion-sheet-panel mini-choice-sheet">
+    <view class="knowledge-subject-sheet-header mini-choice-sheet-header">
+      <view class="mini-choice-sheet-heading">
+        <text class="knowledge-subject-sheet-title mini-choice-sheet-title">选择学科</text>
+      </view>
+      <button class="knowledge-subject-sheet-close mini-choice-sheet-close" bindtap="closeKnowledgeSubjectSheet"
         hover-class="surface-pressed" aria-label="关闭学科选择">
-        <text class="line-icon icon-close" aria-hidden="true"></text>
+        <image class="knowledge-subject-close-icon mini-choice-sheet-close-icon"
+          src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </button>
     </view>
-    <view class="knowledge-subject-grid">
+    <view class="knowledge-subject-grid mini-choice-grid">
       <button wx:for="{{knowledgeDiagnosisSubjects}}" wx:key="subjectId"
-        class="knowledge-subject-tile {{knowledgeSubjectSheetSelectedId === item.subjectId ? 'is-selected' : ''}}"
+        class="knowledge-subject-tile mini-choice-option {{knowledgeSubjectSheetSelectedId === item.subjectId ? 'is-selected has-trailing' : ''}}"
         bindtap="selectKnowledgeDiagnosisSubject" data-subject-id="{{item.subjectId}}"
         aria-label="{{item.name}}{{knowledgeSubjectSheetSelectedId === item.subjectId ? '，当前已选' : ''}}"
-        hover-class="surface-pressed">
-        <image class="knowledge-subject-tile-icon" src="{{knowledgeSubjectSheetSelectedId === item.subjectId ? item.selectedIcon : item.icon}}" mode="aspectFit" aria-hidden="true" />
-        <text class="knowledge-subject-tile-name">{{item.name}}</text>
+        aria-pressed="{{knowledgeSubjectSheetSelectedId === item.subjectId}}"
+        hover-class="surface-pressed mini-choice-pressed">
+        <view class="knowledge-subject-tile-main mini-choice-option-main">
+          <image class="knowledge-subject-tile-icon" src="{{knowledgeSubjectSheetSelectedId === item.subjectId ? item.selectedIcon : item.icon}}" mode="aspectFit" aria-hidden="true" />
+          <text class="knowledge-subject-tile-name mini-choice-option-title">{{item.name}}</text>
+        </view>
+        <view wx:if="{{knowledgeSubjectSheetSelectedId === item.subjectId}}"
+          class="mini-choice-selection-mark" aria-hidden="true">
+          <image class="mini-choice-selection-icon" src="/assets/icons/mobile-controls/check.svg"
+            mode="aspectFit" />
+        </view>
       </button>
     </view>
   </view>

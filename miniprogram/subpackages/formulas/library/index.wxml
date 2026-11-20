@@ -291,31 +291,39 @@
   </motion-sheet>
 
   <motion-sheet show="{{showTagPicker}}" label="筛选{{activeLibraryType === 'function_graph' ? '图像' : '公式'}}标签" background="#F3FBF8" safe-area="{{false}}" layer="{{120}}" bind:close="toggleTagPicker">
-    <view class="fl-tag-sheet motion-sheet-panel" catchtap="noop">
-      <view class="fl-sheet-head">
-        <view>
-          <text class="fl-sheet-title">筛选{{activeLibraryType === 'function_graph' ? '图像' : '公式'}}标签</text>
-          <text class="fl-sheet-subtitle">可同时选择多个标签</text>
+    <view class="fl-tag-sheet motion-sheet-panel mini-choice-sheet" catchtap="noop">
+      <view class="fl-sheet-head mini-choice-sheet-header">
+        <view class="mini-choice-sheet-heading">
+          <text class="fl-sheet-title mini-choice-sheet-title">筛选{{activeLibraryType === 'function_graph' ? '图像' : '公式'}}标签</text>
+          <text class="fl-sheet-subtitle mini-choice-sheet-description">可同时选择多个标签</text>
         </view>
-        <view class="fl-sheet-close" bindtap="toggleTagPicker" hover-class="fl-pressed">
-          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
+        <view class="fl-sheet-close mini-choice-sheet-close" bindtap="toggleTagPicker" hover-class="fl-pressed"
+          role="button" aria-label="关闭标签筛选">
+          <image class="fl-ui-icon mini-choice-sheet-close-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
-      <view class="fl-tag-grid">
+      <view class="fl-tag-grid mini-choice-grid mini-choice-grid-scroll">
         <view
-          class="fl-tag-item {{t._active ? 'active' : ''}}"
+          class="fl-tag-item mini-choice-option {{t._active ? 'active is-selected has-trailing' : ''}}"
           wx:for="{{tags}}"
           wx:for-item="t"
           wx:key="id"
           data-id="{{t.id}}"
-          hover-class="fl-pressed"
+          hover-class="fl-pressed mini-choice-pressed"
           bindtap="onTagSelect"
+          role="button"
+          aria-pressed="{{t._active}}"
         >
-          <text>{{t.name}}</text>
-          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" wx:if="{{t._active}}" />
+          <text class="mini-choice-option-title">{{t.name}}</text>
+          <view class="mini-choice-selection-mark" aria-hidden="true" wx:if="{{t._active}}">
+            <image class="fl-ui-icon mini-choice-selection-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" />
+          </view>
         </view>
       </view>
-      <view class="fl-sheet-done" hover-class="fl-pressed" bindtap="toggleTagPicker">完成筛选</view>
+      <view class="mini-choice-sheet-actions is-single">
+        <button class="fl-sheet-done mini-choice-sheet-action mini-choice-sheet-action-primary"
+          hover-class="fl-pressed mini-choice-sheet-action-pressed" bindtap="toggleTagPicker">完成筛选</button>
+      </view>
     </view>
   </motion-sheet>
 </view>

@@ -349,6 +349,7 @@ test('sheet keeps native swiping, compact text options and image controls withou
   const root = path.resolve(__dirname, '../subpackages/study/practice')
   const wxml = fs.readFileSync(path.join(root, 'practice.wxml'), 'utf8')
   const css = fs.readFileSync(path.join(root, 'practice.wxss'), 'utf8')
+  const sharedCss = fs.readFileSync(path.resolve(__dirname, '../styles/choice-grid-sheet.wxss'), 'utf8')
   assert.match(wxml, /<swiper[^>]*circular="\{\{subjectSheetPages\.length > 1\}\}"[^>]*autoplay="\{\{false\}\}"[^>]*display-multiple-items="1"/)
   assert.match(wxml, /bindchange="toggleParentExpansion"/)
   assert.match(wxml, /data-action="confirm">确定选择/)
@@ -361,8 +362,12 @@ test('sheet keeps native swiping, compact text options and image controls withou
   assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetGridRows \|\| 0\}\}/,
     'the sheet height comes from the whole swiper, not the active page')
   assert.ok(!/line-icon|icon-chevron|icon-close/.test(sheetMarkup), 'sheet controls use the shared SVG images')
+  assert.match(wxml, /class="subject-options-grid mini-choice-grid"/)
+  assert.match(wxml, /class="subject-option mini-choice-option /)
   assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
-  assert.match(css, /\.subject-option\{[^}]*min-height:64px[^}]*background:transparent/)
+  assert.match(css, /\.subject-option\{[^}]*min-height:64px[^}]*background:#FFFFFF/)
+  assert.match(sharedCss, /\.mini-choice-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/)
+  assert.match(sharedCss, /\.mini-choice-option\.is-selected\s*\{[^}]*background:\s*#EAF9F4/)
   assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:auto;max-height:80vh/)
   assert.match(css, /\.subject-sheet \.subject-discipline-scroll\{[^}]*height:100%;width:100%/)
   assert.match(css, /\.subject-sheet \.sheet-close\{[^}]*width:44px;height:44px/)
@@ -415,7 +420,8 @@ test('two-row sheet keeps a stable swiper height while retaining compact safe-ar
   for (const safeArea of [0, 34]) {
     const height = 28 + Number(padding[1]) + header + twoRows + px(dots['min-height']) + px(dots['margin-top']) +
       px(dots['margin-bottom']) +
-      px(footer['padding-top']) + px(confirm['min-height']) + Number(padding[3]) + safeArea
+      px(footer['margin-top']) + px(footer['padding-top']) + px(confirm['min-height']) +
+      Number(padding[3]) + safeArea
     assert.ok(height >= 300 && height <= 390, `sheet including ${safeArea}px safe area: ${height}px`)
     assert.ok(height <= 568 * .8, 'short screens retain the footer outside the scroll viewport')
   }
@@ -423,8 +429,8 @@ test('two-row sheet keeps a stable swiper height while retaining compact safe-ar
     'page dots use a readable, evenly spaced pagination group')
   assert.match(css, /\.subject-discipline-dot\{[^}]*width:8px;height:8px;/,
     'page dots remain legible on a phone')
-  assert.match(css, /\.subject-sheet-footer\{[^}]*padding-top:16px/,
-    'the confirmation action keeps clear separation below pagination')
+  assert.match(css, /\.subject-sheet-footer\{[^}]*margin-top:12px;padding-top:0px/,
+    'the shared action rhythm replaces the old duplicated footer padding')
   const itemPadding = item.padding.split(' ').map(px)
   for (const width of [320, 390, 430]) {
     const tileWidth = (width - 2 * Number(padding[2]) - gap) / 2
@@ -473,7 +479,8 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   assert.equal(text(byClass(many, 'subject-sheet-footer')[0]), '确定选择')
   assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.ariaLabel, '确认选择数据结构')
   assert.equal(byClass(many, 'subject-option-check').length, 1)
-  assert.equal(byClass(many, 'subject-option-check')[0].attr.src, '/assets/icons/practice-subject/check.svg')
+  assert.equal(byClass(byClass(many, 'subject-option-check')[0], 'mini-choice-selection-icon')[0].attr.src,
+    '/assets/icons/practice-subject/check.svg')
   assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.disabled, false)
   const swiped = render({ ...base, ...buildSubjectSheetView(catalog, 71), subjectSheetCurrent: 1, subjectSheetDraft: null })
   assert.equal(byClass(swiped, 'subject-sheet-confirm')[0].attr.disabled, true,
@@ -492,7 +499,8 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   rawBranch[1].children[0].children = [{ subject_id: 83, display_name: '微积分', children: [] }]
   const branchCatalog = tree.normalizeSubjectTree(rawBranch)
   const parent = render({ ...base, ...buildSubjectSheetView(branchCatalog, 80) })
-  assert.equal(byClass(parent, 'subject-option-arrow')[0].attr.src, '/assets/icons/mobile-controls/chevron-right.svg')
+  assert.equal(byClass(byClass(parent, 'subject-option-arrow')[0], 'mini-choice-option-chevron-icon')[0].attr.src,
+    '/assets/icons/mobile-controls/chevron-right.svg')
   const branchView = buildSubjectSheetView(branchCatalog, 83)
   const branch = render({ ...base, ...branchView })
   const math = byClass(branch, 'subject-discipline-item')[branchView.subjectSheetCurrent]
