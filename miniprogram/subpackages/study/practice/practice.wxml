@@ -1,3 +1,4 @@
+<wxs module="press" src="../../../utils/press-motion.wxs" />
 <view class="page">
 <submit-confirm id="submitConfirm" theme="mint" />
 <app-dialog id="appDialog" theme="mint"></app-dialog>
@@ -31,7 +32,7 @@
 <view class="guest-notice" wx:if="{{guestNotice}}">{{guestNotice}}</view>
 <view class="practice-hero">
 <view class="hero-head">
-<view class="hero-subject-action" hover-class="soft-pressed" bindtap="openSubjectSheet">
+<view id="practice-subject-trigger" class="hero-subject-action motion-press" bindtouchstart="{{press.start}}" bindtouchend="{{press.end}}" bindtouchcancel="{{press.end}}" hover-class="soft-pressed" bindtap="openSubjectSheet">
 <text class="hero-subject">{{selectedSubjectName || '选择科目'}}</text>
 <view class="hero-subject-arrow"><image class="hero-chevron-image" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
@@ -55,7 +56,8 @@
 </view>
 </view>
 <button
-          class="hero-start"
+          class="hero-start motion-press"
+          bindtouchstart="{{press.start}}" bindtouchend="{{press.end}}" bindtouchcancel="{{press.end}}" data-motion-disabled="{{!selectedSubjectId}}"
           disabled="{{!selectedSubjectId}}"
           hover-class="{{!selectedSubjectId ? 'none' : 'hero-start-pressed'}}"
           bindtap="startPractice"
@@ -86,20 +88,21 @@
 <text class="setting-desc">选择适合当前复习阶段的出题方式</text>
 </view>
 <view class="mode-row">
-<view class="mode-card {{selectedMode==='random' ? 'active' : ''}}" hover-class="option-pressed" bindtap="chooseMode" data-mode="random">
+<!-- (5) Plain-text choices can safely use the shared staggered rise. -->
+<view class="mode-card motion-list-item {{selectedMode==='random' ? 'active' : ''}}" hover-class="option-pressed" bindtap="chooseMode" data-mode="random">
 <image class="mode-icon-image" src="/assets/icons/practice/shuffle.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">随机挑战</text>
 <text class="mode-desc">综合查漏</text>
 <view class="option-check" wx:if="{{selectedMode==='random'}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
-<view class="mode-card {{guestMode ? 'mode-card-locked' : (selectedMode==='sequential' ? 'active' : '')}}" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="sequential" aria-disabled="{{guestMode}}">
+<view class="mode-card motion-list-item {{guestMode ? 'mode-card-locked' : (selectedMode==='sequential' ? 'active' : '')}}" style="animation-delay:42ms;" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="sequential" aria-disabled="{{guestMode}}">
 <image class="mode-icon-image" src="/assets/icons/practice/list-ordered.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">顺序推进</text>
 <text class="mode-desc">按题库顺序续刷</text>
 <image class="mode-lock" wx:if="{{guestMode}}" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
 <view class="option-check" wx:if="{{!guestMode && selectedMode==='sequential'}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
-<view class="mode-card {{guestMode ? 'mode-card-locked' : (selectedMode==='smart' ? 'active' : '')}}" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="smart" aria-disabled="{{guestMode}}">
+<view class="mode-card motion-list-item {{guestMode ? 'mode-card-locked' : (selectedMode==='smart' ? 'active' : '')}}" style="animation-delay:84ms;" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="smart" aria-disabled="{{guestMode}}">
 <image class="mode-icon-image" src="/assets/icons/practice/target.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">智能推荐</text>
 <text class="mode-desc">薄弱优先</text>
@@ -176,10 +179,9 @@
 </view>
 </view>
 </scroll-view>
-<view class="subject-sheet-layer {{subjectSheetClosing ? 'closing' : ''}}" wx:if="{{subjectSheetVisible}}">
-<view class="subject-sheet-backdrop" catchtap="closeSubjectSheet" catchtouchmove="noop"></view>
+<!-- (1,4) Same physical surface grows from the capsule and owns handle gestures. -->
+<motion-sheet class="subject-sheet-layer" show="{{subjectSheetVisible}}" closing="{{subjectSheetClosing}}" anchor="#practice-subject-trigger" label="选择科目" bind:close="closeSubjectSheet">
 <view class="subject-sheet subject-sheet-rows-{{subjectSheetGridRows || 0}}" catchtap="noop">
-<view class="sheet-handle" aria-hidden="true"></view>
 <view class="sheet-header">
 <view>
 <text class="sheet-title">选择科目</text>
@@ -219,10 +221,10 @@
 <view wx:for="{{subjectSheetPages}}" wx:key="root_id" class="subject-discipline-dot {{subjectSheetCurrent === index ? 'active' : ''}}" aria-hidden="true"></view>
 </view>
 <view class="subject-sheet-footer">
-<button class="subject-sheet-confirm" disabled="{{!subjectSheetDraft}}" aria-label="{{subjectSheetDraft ? '确认选择' + subjectSheetDraft.display_name : '请先选择科目'}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
+<button class="subject-sheet-confirm motion-press" bindtouchstart="{{press.start}}" bindtouchend="{{press.end}}" bindtouchcancel="{{press.end}}" disabled="{{!subjectSheetDraft}}" data-motion-disabled="{{!subjectSheetDraft}}" aria-label="{{subjectSheetDraft ? '确认选择' + subjectSheetDraft.display_name : '请先选择科目'}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-action="confirm">确定选择</button>
 </view>
 </view>
-</view>
+</motion-sheet>
 </view>
 <view class="practice route-enter-task {{guestMode ? 'guest-practice' : ''}}" wx:if="{{started && !loading}}" style="padding-top: {{statusBarHeight}}px;">
 <view class="guest-notice" wx:if="{{guestMode && guestNotice}}">{{guestNotice}}</view>

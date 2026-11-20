@@ -102,13 +102,14 @@
     </view>
 
     <view class="fl-list {{activeLibraryType === 'function_graph' ? 'fl-graph-list' : ''}}" wx:if="{{!initialLoading && !loadError && formulas.length > 0}}">
+      <!-- (5) Native rich-text stays on opacity-only ancestors. -->
+      <view wx:for="{{formulas}}" wx:key="id" class="motion-list-item {{item.titleNodes && item.titleNodes.length ? 'motion-list-fade' : ''}}" style="animation-delay:{{(index < 5 ? index : 5) * 42}}ms;">
       <view
+        id="formula-card-{{item.id}}"
         class="fl-card {{activeLibraryType === 'function_graph' ? 'fl-card-graph' : ''}}"
-        wx:for="{{formulas}}"
-        wx:key="id"
         data-id="{{item.id}}"
         bindtap="goToReader"
-        hover-class="fl-card-pressed"
+        hover-class="{{item.titleNodes && item.titleNodes.length ? 'motion-content-pressed' : 'fl-card-pressed'}}"
       >
         <view class="fl-card-head">
           <view class="fl-card-title-wrap">
@@ -180,6 +181,7 @@
           <text class="fl-card-hint">{{activeLibraryType === 'function_graph' ? '查看大图、适用条件与完整解析' : '查看核心记忆、易混点与考试陷阱'}}</text>
           <image class="fl-ui-icon fl-card-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
         </view>
+      </view>
       </view>
 
       <view class="fl-loading-more" wx:if="{{loadingMore}}">

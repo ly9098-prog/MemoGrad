@@ -1,0 +1,7 @@
+.shared-scene { position: fixed; inset: 0; z-index: 190; pointer-events: none; }
+.shared-background { position: absolute; inset: 0; background: #FAFCFB; transform-origin: center; }
+.shared-surface { position: absolute; inset: 0; overflow: hidden; background: #FBFFFD; transform-origin: 0 0; }
+.shared-title { display: block; margin: 28px 20px; color: #23483C; font-size: 18px; font-weight: 600; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) {
+  .shared-background,.shared-surface { transform: none !important; border-radius: 0 !important; }
+}

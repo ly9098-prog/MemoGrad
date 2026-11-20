@@ -1,0 +1,23 @@
+/* (5) Only newly mounted siblings enter; the capped delay never stalls a list. */
+.motion-list-item {
+  animation: motion-list-arrive 420ms cubic-bezier(.2,.85,.24,1.12) backwards;
+}
+@keyframes motion-list-arrive {
+  from { opacity: .45; transform: translate3d(0,14px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+/* Native rich-text/math is never moved through a transformed ancestor. */
+.motion-list-fade { animation-name: motion-list-fade; }
+@keyframes motion-list-fade {
+  from { opacity: .45; }
+  to { opacity: 1; }
+}
+.motion-content-pressed { opacity: .78; }
+/* (6) WXS owns the physical trajectory; CSS covers runtimes without touch WXS. */
+.motion-press { transform-origin: center; -webkit-tap-highlight-color: transparent; }
+.motion-press.motion-press { transition: none; }
+.motion-press:active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) {
+  .motion-list-item { animation: none; }
+  .motion-press { transform: none !important; will-change: auto !important; }
+}

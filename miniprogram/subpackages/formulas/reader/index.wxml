@@ -1,4 +1,5 @@
 <app-dialog id="appDialog" theme="mint"></app-dialog>
+<shared-card-transition id="readerSharedTransition" transition-key="{{sharedCardKey}}" />
 <view class="fr-page">
   <premium-nav title="速记" variant="mint" bind:back="goBack" />
 

@@ -1,0 +1,51 @@
+var physics = require('./motion-physics.wxs');
+function time() { return getDate().getTime(); }
+
+// (6) Press to 0.96; release preserves velocity and gently overshoots 1.
+function animate(owner, state, target) {
+  var run = state.run = (state.run || 0) + 1;
+  var last = time();
+  var elapsed = 0;
+  function frame() {
+    if (run !== state.run || !state.node) return;
+    var current = time();
+    var dt = physics.clamp((current - last) / 1000, 0.001, 0.032);
+    last = current;
+    elapsed = elapsed + dt;
+    var step = physics.spring(state.x, state.v, target, dt, 520, target < 1 ? 45 : 23);
+    state.x = step.x; state.v = step.v;
+    var finished = elapsed > 0.55 || (Math.abs(state.x - target) < 0.0002 && Math.abs(state.v) < 0.003);
+    if (finished) { state.x = target; state.v = 0; }
+    var depth = physics.clamp((1 - state.x) / 0.04, 0, 1);
+    var shadow = 'inset 0 ' + (2 * depth) + 'px ' + (6 * depth) + 'px rgba(12,49,35,' + (0.18 * depth) + ')';
+    if (state.shadow && state.shadow !== 'none') shadow = shadow + ',' + state.shadow;
+    state.node.setStyle({
+      transform: 'scale(' + state.x + ')',
+      'box-shadow': finished && target === 1 ? state.shadow : shadow,
+      'will-change': finished ? 'auto' : 'transform'
+    });
+    if (!finished) owner.requestAnimationFrame(frame);
+  }
+  owner.requestAnimationFrame(frame);
+}
+function start(event, owner) {
+  var node = event.instance;
+  if (!node || event.currentTarget.dataset.motionDisabled) return;
+  var previous = owner.getState().press;
+  if (previous && previous.node !== node) {
+    previous.run = (previous.run || 0) + 1;
+    previous.node.setStyle({ transform: 'none', 'box-shadow': previous.shadow, 'will-change': 'auto' });
+  }
+  var base = node.getComputedStyle ? node.getComputedStyle(['box-shadow']) : {};
+  var state = previous && previous.node === node ? previous : { node: node, x: 1, v: 0, run: 0, shadow: base['box-shadow'] || '' };
+  owner.getState().press = state;
+  state.node = node;
+  // Override native hover/:active scaling in the same event, before frame one.
+  state.node.setStyle({ transform: 'scale(' + state.x + ')' });
+  animate(owner, state, 0.96);
+}
+function end(event, owner) {
+  var state = owner.getState().press;
+  if (state) animate(owner, state, 1);
+}
+module.exports = { start: start, end: end };

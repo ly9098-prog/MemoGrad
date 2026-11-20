@@ -2,6 +2,7 @@ const api = require('../../../utils/api')
 const auth = require('../../../utils/auth')
 const storage = require('../../../utils/storage')
 const readerState = require('../utils/formula-reader-state')
+const sharedCard = require('../../../utils/shared-card-navigation')
 const formulaContent = require('../utils/formula-content')
 const Parser = require('../utils/mp-html-parser')
 const LatexPlugin = require('../utils/katex/index')
@@ -1001,14 +1002,14 @@ Page({
       hasMore: this.data.hasMore,
     }, formulaNowMs())
 
-    wx.navigateTo({
-      url: '/subpackages/formulas/reader/index?' + readerState.queryString({
+    const selected = (this.data.formulas || []).find(item => String(item.id) === String(formulaId))
+    // (2) Geometry is captured from the tapped card, never from a guessed position.
+    sharedCard.open(this, e, '/subpackages/formulas/reader/index?' + readerState.queryString({
         ...params, id: formulaId, index: sequenceIndex, source: 'library',
         mode: this.data.recitationMode ? 'recite' : 'browse',
         sequence_page: Math.floor(sequenceIndex / this.data.pageSize) + 1,
         page_size: this.data.pageSize,
-      }),
-    })
+      }), selected && selected.title, () => this.librarySessionValid())
   },
 
   goToFavorites() {

@@ -1,0 +1,87 @@
+var P = require('../../utils/motion-physics.wxs');
+function now() { return getDate().getTime(); }
+
+// (1) FLIP the empty surface, not its text. Compensate elliptical corner radii
+// so the capsule and the final panel keep their real on-screen curvature.
+function paint(state) {
+  var p = P.clamp(state.p, 0, 1), m = state.model;
+  var sx = m.origin.width / m.panel.width * (1 - p) + p;
+  var sy = m.origin.height / m.panel.height * (1 - p) + p;
+  var x = (m.origin.left - m.panel.left) * (1 - p);
+  var y = (m.origin.top - m.panel.top) * (1 - p);
+  var radius = m.origin.height / 2 * (1 - p) + 24 * p;
+  state.surface.setStyle({ transform: 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + sx + ',' + sy + ')',
+    'border-radius': (radius / Math.max(0.001, sx)) + 'px / ' + (radius / Math.max(0.001, sy)) + 'px' });
+  state.shell.setStyle({ transform: 'translate3d(0,' + (state.y * p) + 'px,0)' });
+  state.content.setStyle({ opacity: P.clamp((p - 0.5) * 2, 0, 1) });
+  state.mask.setStyle({ opacity: p * P.clamp(1 - state.y / m.panel.height, 0, 1) });
+}
+function animate(owner, state, target, drag) {
+  var run = state.run = (state.run || 0) + 1, last = now(), elapsed = 0;
+  function step() {
+    if (run !== state.run || !state.model.active) return;
+    var t = now(), dt = P.clamp((t - last) / 1000, 0.001, 0.032);
+    last = t; elapsed = elapsed + dt;
+    var result = P.spring(drag ? state.y : state.p, state.v, target, dt, drag ? 380 : 500, drag ? 32 : 45);
+    if (drag) state.y = result.x; else state.p = result.x;
+    state.v = result.v;
+    var done = elapsed >= 0.48 || (Math.abs(result.x - target) < (drag ? 0.2 : 0.001) && Math.abs(state.v) < (drag ? 2 : 0.01));
+    if (done) { if (drag) state.y = target; else state.p = target; state.v = 0; }
+    paint(state);
+    if (!done) owner.requestAnimationFrame(step);
+    else if (drag && target >= state.model.panel.height) {
+      state.dismissed = true;
+      owner.callMethod('dismissFromGesture', { id: state.model.id });
+    }
+  }
+  owner.requestAnimationFrame(step);
+}
+function sync(model, old, owner) {
+  var state = owner.getState();
+  state.run = (state.run || 0) + 1;
+  state.gesture = null;
+  state.model = model || { active: false };
+  if (!state.model.active) return;
+  state.surface = owner.selectComponent('.motion-sheet-surface');
+  state.shell = owner.selectComponent('.motion-sheet-shell');
+  state.content = owner.selectComponent('.motion-sheet-content');
+  state.mask = owner.selectComponent('.motion-sheet-mask');
+  if (!state.surface || !model.panel.height) return;
+  if (state.phase === 'drag') state.v = 0;
+  state.phase = 'morph';
+  if (!old || old.id !== model.id) { state.p = model.immediate ? 1 : 0; state.y = 0; state.v = 0; state.dismissed = false; }
+  if (state.dismissed) return;
+  paint(state);
+  animate(owner, state, model.close ? 0 : 1, false);
+}
+// (4) Only the handle owns vertical drag; inner scroll-views retain native scroll.
+function start(event, owner) {
+  var s = owner.getState();
+  if (!s.model || !s.model.active || s.model.close || !event.touches.length) return;
+  s.run = (s.run || 0) + 1; s.p = 1; s.v = 0; s.phase = 'drag';
+  s.gesture = { start: event.touches[0].clientY, y: s.y, last: event.touches[0].clientY, time: now(), v: 0 };
+}
+function move(event, owner) {
+  var s = owner.getState(), g = s.gesture;
+  if (!g || !event.touches.length) return;
+  var y = event.touches[0].clientY, t = now();
+  g.v = 0.65 * g.v + 0.35 * P.clamp((y - g.last) / Math.max(0.008, (t - g.time) / 1000), -2200, 2200);
+  g.last = y; g.time = t;
+  s.y = P.rubber(g.y + y - g.start, 0, s.model.panel.height + 24, s.model.panel.height);
+  if (!s.pending) {
+    s.pending = true;
+    owner.requestAnimationFrame(function () { s.pending = false; if (s.model.active) paint(s); });
+  }
+  return false;
+}
+function end(event, owner) {
+  var s = owner.getState(), g = s.gesture;
+  if (!g) return;
+  s.gesture = null;
+  s.v = now() - g.time > 100 ? 0 : g.v;
+  var h = s.model.panel.height;
+  animate(owner, s, P.snap(s.y, s.v, [0, Math.min(112, h * 0.28), h + 24]), true);
+}
+function cancel(event, owner) { var s = owner.getState(); s.gesture = null; s.v = 0; if (s.model && s.model.active) animate(owner, s, 0, true); }
+function expand(event, owner) { var s = owner.getState(); if (!s.gesture && s.model && s.model.active && !s.dismissed) animate(owner, s, 0, true); }
+module.exports = { sync: sync, start: start, move: move, end: end, cancel: cancel, expand: expand };

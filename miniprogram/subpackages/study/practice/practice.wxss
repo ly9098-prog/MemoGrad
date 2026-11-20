@@ -71,29 +71,7 @@ to{opacity:1;transform:translateY(0)}
 .count-check{right:8rpx;bottom:8rpx}
 .section-heading-row{padding:0 6rpx;align-items:center}
 .surface-action{gap:5rpx}
-.subject-sheet-layer{position:fixed;left:0;right:0;top:0;bottom:0;z-index:100;pointer-events:auto}
-.subject-sheet-backdrop{position:absolute;left:0;right:0;top:0;bottom:0;animation:maskFadeIn .2s ease-out both}
-
-@keyframes maskFadeIn{from{opacity:0}
-to{opacity:1}
-}
-
-@keyframes maskFadeOut{from{opacity:1}
-to{opacity:0}
-}
-.subject-sheet{position:absolute;left:0;right:0;bottom:0;box-sizing:border-box;animation:sheetUp .24s ease-out backwards;display:flex;flex-direction:column;overflow:hidden}
-.subject-sheet-layer.closing{pointer-events:none}
-.subject-sheet-layer.closing .subject-sheet-backdrop{animation:maskFadeOut .18s ease-in both}
-.subject-sheet-layer.closing .subject-sheet{animation:sheetDown .18s ease-in both}
-
-@keyframes sheetUp{from{transform:translateY(45rpx);opacity:.6}
-to{transform:translateY(0);opacity:1}
-}
-
-@keyframes sheetDown{from{transform:translateY(0);opacity:1}
-to{transform:translateY(36rpx);opacity:.76}
-}
-.sheet-handle{width:72rpx;height:8rpx;margin:2rpx auto 18rpx;border-radius:999rpx;flex-shrink:0}
+.subject-sheet{box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}
 .sheet-header{align-items:center;padding:0 4rpx;flex-shrink:0}
 .sheet-close{width:44px;height:44px;flex:0 0 44px;border-radius:12rpx;border:0;color:#23483C;font-weight:400}
 .subject-empty{flex:1;min-height:0;padding:24rpx 20rpx;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8rpx}
@@ -127,7 +105,6 @@ to{transform:translateY(36rpx);opacity:.76}
 .subject-sheet-confirm::after{border:0}
 .subject-sheet-confirm[disabled]{background:#EDF3EF;color:#61796C}
 .subject-sheet-confirm.subject-option-pressed{background:#315D4D}
-@media (prefers-reduced-motion:reduce){.subject-sheet,.subject-sheet-backdrop,.subject-sheet-layer.closing .subject-sheet,.subject-sheet-layer.closing .subject-sheet-backdrop{animation:none !important}}
 .submit-loading-mask{position:fixed;inset:0;z-index:180;display:flex;align-items:center;justify-content:center;padding:32rpx;backdrop-filter:blur(16rpx);-webkit-backdrop-filter:blur(16rpx);box-sizing:border-box}
 .submit-loading-card{position:relative;width:430rpx;padding:42rpx 36rpx 38rpx;border:1rpx solid rgba(255,255,255,.82);border-radius:38rpx;display:flex;flex-direction:column;align-items:center;overflow:hidden;box-sizing:border-box}
 .submit-loading-card::before{content:'';position:absolute;top:0;left:0;right:0;height:8rpx}
@@ -149,7 +126,6 @@ to{transform:translateY(36rpx);opacity:.76}
 }
 .setup-content{padding:22rpx 24rpx calc(46rpx + env(safe-area-inset-bottom))}
 .settings-panel{border-radius:34rpx}
-.subject-sheet{border-radius:40rpx 40rpx 0 0}
 .sheet-close{display:flex;align-items:center;justify-content:center}
 .practice{height:100vh;min-height:0;overflow:hidden;box-sizing:border-box}
 .practice-runner{display:block;width:100%;height:100%;min-height:0}
@@ -182,9 +158,6 @@ to{transform:translateY(36rpx);opacity:.76}
 .count-main{color:#3A6F5B}
 .mode-title{color:#2D5D4C}
 .recent-section{margin-top:28rpx}
-.subject-sheet-backdrop{background:rgba(35,72,60,.42)}
-.subject-sheet{background:#FBFFFD;box-shadow:0 -20rpx 48rpx rgba(43,117,91,.14)}
-.sheet-handle{background:#B9DCCE}
 .setup-error-card{background:#FFF6F3;border-color:#F0C3B9}
 .setup-error-icon{color:#C36C5C}
 .setup-error-text{color:#A85648}
@@ -220,12 +193,14 @@ to{transform:translateY(36rpx);opacity:.76}
 .hero-config-edit{display:inline-flex;align-items:center;gap:6rpx;padding:14rpx 18rpx;border-radius:999rpx;background:transparent;font-size:24rpx;font-weight:500;white-space:nowrap}
 .mode-icon-image{width:42rpx;height:42rpx;display:block;flex:0 0 42rpx}
 /* The Drawer surface sizes to its content; native swiper keeps a row-sized viewport. */
-.subject-sheet-layer .subject-sheet{width:100%;height:auto;max-height:74vh;min-height:0;padding:8px 16px max(8px,env(safe-area-inset-bottom));border-top:1px solid #E0EAE4;background:#FBFFFD;box-shadow:none}
-.subject-sheet .sheet-handle{position:absolute;top:5px;left:50%;width:32px;height:3px;margin:0;transform:translateX(-50%)}
+.subject-sheet-layer .subject-sheet{position:relative;width:100%;height:auto;max-height:80vh;min-height:0;padding:0 16px 12px;border:0;background:transparent;box-shadow:none}
 .subject-sheet .sheet-header{min-height:44px;padding:0}
 .subject-sheet .sheet-close{width:44px;height:44px;background:transparent}
 .subject-sheet .sheet-close-icon{display:block;width:18px;height:18px}
 .subject-sheet .sheet-title{font-size:max(32rpx,16px);font-weight:600}
+/* (1,4) motion-sheet owns the sole background, bounds and gesture transform. */
+.subject-sheet-layer{position:static;pointer-events:none}
+.hero-subject-action.motion-press{border-radius:999rpx}
 .reward-strip{display:flex;align-items:center;gap:12rpx;margin-top:16rpx;padding:16rpx 4rpx}
 .reward-strip-icon{width:28rpx;height:28rpx;flex-shrink:0}
 .reward-strip-text{min-width:0;color:#507568;font-size:24rpx;line-height:1.6;white-space:normal}

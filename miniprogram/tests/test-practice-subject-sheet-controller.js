@@ -65,7 +65,7 @@ test('hide invokes callback immediately when already hidden', () => {
   assert.deepEqual(state.patches, [])
 })
 
-test('hide schedules one 180ms close and invokes callback after commit', () => {
+test('hide gives the physical close one bounded 520ms window and commits once', () => {
   const { controller, state } = createHarness()
   state.visible = true
   let called = false
@@ -75,7 +75,7 @@ test('hide schedules one 180ms close and invokes callback after commit', () => {
   assert.deepEqual(state.patches, [{ subjectSheetClosing: true }])
   state.callbacks[0]()
   assert.equal(state.timers.length, 1)
-  assert.equal(state.timers[0].delay, 180)
+  assert.equal(state.timers[0].delay, 520)
   state.timers[0].callback()
   assert.deepEqual(state.patches[1], {
     subjectSheetVisible: false,
@@ -83,6 +83,14 @@ test('hide schedules one 180ms close and invokes callback after commit', () => {
   })
   state.callbacks[1]()
   assert.equal(called, true)
+})
+
+test('a completed drag dismisses immediately without a second close timer', () => {
+  const { controller, state } = createHarness()
+  state.visible = true
+  controller.hide(undefined, true)
+  assert.equal(state.timers.length, 0)
+  assert.deepEqual(state.patches, [{ subjectSheetVisible: false, subjectSheetClosing: false }])
 })
 
 test('hide is idempotent while closing and ignores page death', () => {
@@ -347,7 +355,7 @@ test('sheet keeps native swiping, compact text options and image controls withou
   const gridMarkup = wxml.slice(wxml.indexOf('<view class="subject-options-grid"'), wxml.indexOf('</swiper>'))
   assert.ok(!/subject-option-action|subject-option-icon|>选择科目<\/text>|>已预选<\/text>/.test(gridMarkup),
     'subject cards have no repeated icons or action captions')
-  const sheetMarkup = wxml.slice(wxml.indexOf('<view class="subject-sheet-layer'), wxml.indexOf('<view class="practice route-enter-task'))
+  const sheetMarkup = wxml.slice(wxml.indexOf('<motion-sheet class="subject-sheet-layer'), wxml.indexOf('<view class="practice route-enter-task'))
   assert.ok(!/subject-discipline-hint|subject-sheet-selection|左右滑动切换学科/.test(sheetMarkup))
   assert.match(sheetMarkup, /class="subject-discipline-dots" wx:if="\{\{subjectSheetPages.length > 1\}\}"/)
   assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetGridRows \|\| 0\}\}/,
@@ -355,7 +363,7 @@ test('sheet keeps native swiping, compact text options and image controls withou
   assert.ok(!/line-icon|icon-chevron|icon-close/.test(sheetMarkup), 'sheet controls use the shared SVG images')
   assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
   assert.match(css, /\.subject-option\{[^}]*min-height:64px[^}]*background:transparent/)
-  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:auto;max-height:74vh/)
+  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:auto;max-height:80vh/)
   assert.match(css, /\.subject-sheet \.subject-discipline-scroll\{[^}]*height:100%;width:100%/)
   assert.match(css, /\.subject-sheet \.sheet-close\{[^}]*width:44px;height:44px/)
   assert.match(css, /\.subject-discipline-heading\{[^}]*min-height:44px/)
@@ -382,11 +390,14 @@ test('two-row sheet keeps a stable swiper height while retaining compact safe-ar
     return parseFloat(value)
   }
   const surface = rule('.subject-sheet-layer .subject-sheet')
-  const padding = surface.padding.match(/^(\d+)px (\d+)px max\((\d+)px,env\(safe-area-inset-bottom\)\)$/)
-  assert.ok(padding, 'bottom padding uses the larger of ordinary spacing and the safe area, never their sum')
+  const padding = surface.padding.match(/^(\d+) (\d+)px (\d+)px$/)
+  assert.ok(padding, 'slot spacing is separate from the wrapper-owned safe area')
+  const motionCss = fs.readFileSync(path.resolve(__dirname, '../components/motion-sheet/index.wxss'), 'utf8')
+  assert.match(motionCss, /padding-bottom: env\(safe-area-inset-bottom\)/)
   assert.equal(surface.height, 'auto', 'the Drawer has no reserved empty height')
   assert.equal(surface['box-shadow'], 'none')
-  assert.equal(rule('.subject-sheet .sheet-handle').position, 'absolute', 'handle shares top padding instead of adding a separate row')
+  assert.ok(!/sheet-handle|subject-sheet-backdrop|@keyframes (?:sheetUp|sheetDown|maskFade)/.test(css),
+    'removed drawer owns its only handle, backdrop and motion')
   const header = px(rule('.subject-sheet .sheet-header')['min-height'])
   const twoRows = px(rule('.subject-sheet.subject-sheet-rows-2 .subject-discipline-swiper').height)
   const oneRow = px(rule('.subject-sheet.subject-sheet-rows-1 .subject-discipline-swiper').height)
@@ -402,11 +413,11 @@ test('two-row sheet keeps a stable swiper height while retaining compact safe-ar
   const confirm = rule('.subject-sheet-confirm')
   assert.ok(header >= 44 && px(heading['min-height']) >= 44 && px(confirm['min-height']) >= 44)
   for (const safeArea of [0, 34]) {
-    const height = Number(padding[1]) + header + twoRows + px(dots['min-height']) + px(dots['margin-top']) +
+    const height = 28 + Number(padding[1]) + header + twoRows + px(dots['min-height']) + px(dots['margin-top']) +
       px(dots['margin-bottom']) +
-      px(footer['padding-top']) + px(confirm['min-height']) + parseFloat(surface['border-top']) + Math.max(Number(padding[3]), safeArea)
-    assert.ok(height >= 300 && height <= 360, `sheet including ${safeArea}px safe area: ${height}px`)
-    assert.ok(height <= 568 * .74, 'short screens retain the footer outside the scroll viewport')
+      px(footer['padding-top']) + px(confirm['min-height']) + Number(padding[3]) + safeArea
+    assert.ok(height >= 300 && height <= 390, `sheet including ${safeArea}px safe area: ${height}px`)
+    assert.ok(height <= 568 * .8, 'short screens retain the footer outside the scroll viewport')
   }
   assert.match(css, /\.subject-discipline-dots\{[^}]*gap:8px;min-height:8px;margin-top:12px;margin-bottom:12px;/,
     'page dots use a readable, evenly spaced pagination group')

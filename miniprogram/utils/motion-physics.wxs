@@ -1,0 +1,51 @@
+// Shared physical model. Units: px, seconds and px/s; no logic-layer timers.
+var M = Math;
+function clamp(x, low, high) { return M.max(low, M.min(high, x)); }
+
+// Exact damped oscillator solution: stable on 60/90/120Hz and dropped frames.
+function spring(x, velocity, target, dt, stiffness, damping) {
+  var t = clamp(dt, 0, 0.064);
+  var w = M.sqrt(stiffness);
+  var z = damping / (2 * w);
+  var d = x - target;
+  var next;
+  var speed;
+  if (z < 0.999) {
+    var wd = w * M.sqrt(1 - z * z);
+    var a = d;
+    var b = (velocity + z * w * d) / wd;
+    var decay = M.exp(-z * w * t);
+    var sine = M.sin(wd * t);
+    var cosine = M.cos(wd * t);
+    next = decay * (a * cosine + b * sine);
+    speed = decay * ((b * wd - z * w * a) * cosine - (a * wd + z * w * b) * sine);
+  } else {
+    // High damping is intentionally critically damped: fluid without wobble.
+    var c = velocity + w * d;
+    var falloff = M.exp(-w * t);
+    next = (d + c * t) * falloff;
+    speed = (velocity - w * c * t) * falloff;
+  }
+  return { x: target + next, v: speed };
+}
+
+// (4) Bounded rubber-band travel, continuous at both drag limits.
+function rubber(x, low, high, extent) {
+  var edge = x < low ? low : high;
+  if (x >= low && x <= high) return x;
+  var distance = M.abs(x - edge);
+  var resistance = 0.55 * distance * extent / (extent + 0.55 * distance);
+  return edge + (x < low ? -resistance : resistance);
+}
+
+// (4) Project momentum before choosing an anchor; quick flicks advance one stop.
+function snap(x, velocity, anchors) {
+  var projected = x + clamp(velocity, -2200, 2200) * 0.16;
+  var best = anchors[0];
+  for (var i = 1; i < anchors.length; i++) {
+    if (M.abs(anchors[i] - projected) < M.abs(best - projected)) best = anchors[i];
+  }
+  return best;
+}
+
+module.exports = { spring: spring, rubber: rubber, snap: snap, clamp: clamp };

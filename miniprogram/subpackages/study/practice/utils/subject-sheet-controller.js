@@ -4,7 +4,7 @@ const SUBJECT_DOUBLE_TAP_INTERVAL = 320
 function createSubjectSheetController(options) {
   return {
     open: () => open(options),
-    hide: afterClose => hide(options, afterClose),
+    hide: (afterClose, completed) => hide(options, afterClose, completed),
     handleOptionTap: (subjectId, source) => handleOptionTap(options, subjectId, source),
     change: event => change(options, event),
     browse: subjectId => browse(options, subjectId),
@@ -81,9 +81,19 @@ function confirm(options) {
   hide(options)
 }
 
-function hide(options, afterClose) {
+function hide(options, afterClose, completed = false) {
   if (!options.isVisible()) {
     if (typeof afterClose === 'function') afterClose()
+    return
+  }
+  if (completed) {
+    const timer = options.getCloseTimer()
+    if (timer) options.clearTimeout(timer)
+    options.setCloseTimer(null)
+    if (!options.isPageAlive()) return
+    options.setData({ subjectSheetVisible: false, subjectSheetClosing: false }, () => {
+      if (typeof afterClose === 'function') afterClose()
+    })
     return
   }
   if (options.isClosing()) return
@@ -99,7 +109,7 @@ function hide(options, afterClose) {
           if (typeof afterClose === 'function') afterClose()
         },
       )
-    }, 180))
+    }, 520))
   })
 }
 

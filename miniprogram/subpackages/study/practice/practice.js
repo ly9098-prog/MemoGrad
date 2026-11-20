@@ -328,8 +328,8 @@ return subjectPage._subjectSheetController(this, { createSubjectSheetController,
 _hideSubjectSheet(afterClose) {
 this._subjectSheetController().hide(afterClose)
 },
-closeSubjectSheet() {
-this._subjectSheetController().hide()
+closeSubjectSheet(event) {
+this._subjectSheetController().hide(undefined, Boolean(event && event.detail && event.detail.completed))
 },
 _handleSubjectOptionTap(subjectId, source) {
 this._subjectSheetController().handleOptionTap(subjectId, source)

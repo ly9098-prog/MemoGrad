@@ -1,0 +1,6 @@
+<wxs module="motion" src="./shared-motion.wxs" />
+<!-- (2) A separate opaque surface preserves continuity without scaling rich-text. -->
+<view wx:if="{{visible}}" class="shared-scene" command="{{command}}" change:command="{{motion.sync}}" aria-hidden="true">
+  <view class="shared-background"></view>
+  <view class="shared-surface"><text class="shared-title">{{title}}</text></view>
+</view>

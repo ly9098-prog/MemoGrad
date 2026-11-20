@@ -1,0 +1,47 @@
+var P = require('../../utils/motion-physics.wxs');
+function now() { return getDate().getTime(); }
+function paint(s) {
+  var p = P.clamp(s.p, 0, 1), m = s.model;
+  var sx = m.origin.width / m.width * (1 - p) + p;
+  var sy = m.origin.height / m.height * (1 - p) + p;
+  s.surface.setStyle({ transform: 'translate3d(' + m.origin.left * (1 - p) + 'px,' + m.origin.top * (1 - p) + 'px,0) scale(' + sx + ',' + sy + ')',
+    'border-radius': (16 * (1 - p) / Math.max(0.001, sx)) + 'px / ' + (16 * (1 - p) / Math.max(0.001, sy)) + 'px' });
+  s.background.setStyle({ opacity: p, transform: 'scale(' + (1.025 - 0.025 * p) + ')' });
+  s.title.setStyle({ opacity: 1 - p });
+}
+function sync(model, old, owner) {
+  var s = owner.getState(), run = s.run = (s.run || 0) + 1;
+  s.model = model || { active: false };
+  if (!s.model.active) return;
+  s.scene = owner.selectComponent('.shared-scene');
+  s.surface = owner.selectComponent('.shared-surface');
+  s.background = owner.selectComponent('.shared-background');
+  s.title = owner.selectComponent('.shared-title');
+  if (!s.scene || !s.surface) return;
+  s.scene.setStyle({ opacity: 1 });
+  if (s.p === undefined || !old || !old.active) { s.p = model.close ? 1 : 0; s.v = 0; }
+  var last = now(), elapsed = 0;
+  paint(s);
+  function step() {
+    if (run !== s.run || !s.model.active) return;
+    var t = now(), dt = P.clamp((t - last) / 1000, 0.001, 0.032);
+    last = t; elapsed = elapsed + dt;
+    if (model.reveal) {
+      s.scene.setStyle({ opacity: 1 - P.clamp(elapsed / 0.12, 0, 1) });
+      if (elapsed >= 0.12) return owner.callMethod('revealed', {});
+    } else {
+      var target = model.close ? 0 : 1;
+      var result = P.spring(s.p, s.v, target, dt, 460, 43);
+      s.p = result.x; s.v = result.v;
+      if (elapsed >= 0.5 || (Math.abs(s.p - target) < 0.001 && Math.abs(s.v) < 0.01)) {
+        s.p = target; paint(s);
+        owner.callMethod(model.close ? 'departed' : 'arrived', {});
+        return;
+      }
+      paint(s);
+    }
+    owner.requestAnimationFrame(step);
+  }
+  owner.requestAnimationFrame(step);
+}
+module.exports = { sync: sync };

@@ -2,6 +2,7 @@ const api = require('../../../utils/api')
 const auth = require('../../../utils/auth')
 const storage = require('../../../utils/storage')
 const readerState = require('../utils/formula-reader-state')
+const sharedCard = require('../../../utils/shared-card-navigation')
 const { resolveGraphImageUrl, resolveGraphThumbnailUrl } = require('../utils/formula-graph')
 const { parseServerUtc, getChinaWallParts } = require('../../../utils/china-time')
 
@@ -64,6 +65,7 @@ function normalizeSequence(values) {
 
 Page({
   data: {
+    sharedCardKey: '',
     guestMode: false,
     displayCards: [],
     currentCard: null,
@@ -92,6 +94,7 @@ Page({
   },
 
   onLoad(options = {}) {
+    this.setData({ sharedCardKey: options._motion || '' })
     this._readerAlive = true
     this._readerVisible = true
     this._navigatingBack = false
@@ -231,7 +234,7 @@ Page({
     const fail = () => {
       if (this._readerAlive) this._navigatingBack = false
     }
-    if (pages.length > 1) wx.navigateBack({ fail })
+    if (pages.length > 1) sharedCard.back(this, (morphed, restore) => wx.navigateBack({ fail: restore, ...(morphed ? { animationDuration: 0 } : {}) }), fail)
     else wx.reLaunch({ url: '/subpackages/formulas/library/index', fail })
   },
 
@@ -264,7 +267,7 @@ Page({
     const outClass = goingNext ? 'fr-slide-out-left' : 'fr-slide-out-right'
     const inClass = goingNext ? 'fr-slide-in-right' : 'fr-slide-in-left'
 
-    this.setData({ transitionClass: outClass })
+    this.setData({ transitionClass: outClass, sharedCardKey: '' })
     this._transitionTimer = setTimeout(() => {
       if (!this._readerAlive || !this.readerSessionValid()) return
       this.setData({
