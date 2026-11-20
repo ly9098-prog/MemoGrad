@@ -56,6 +56,7 @@ const MODULES = {
     './result-dock-controller',
     './submit-confirm-page-adapter',
   ],
+  'review-result-payload-builder.js': [],
   'review-progress-page-adapter.js': [
     './review-active-state',
     './review-runner-support',
@@ -73,7 +74,8 @@ const MODULE_BUDGETS = {
   'review-answer-page-adapter.js': 67,
   'review-overview-page-adapter.js': 84,
   'review-session-page-adapter.js': 95,
-  'review-submit-page-adapter.js': 106,
+  'review-submit-page-adapter.js': 116,
+  'review-result-payload-builder.js': 138,
   'review-progress-page-adapter.js': 126,
 }
 const FUNCTION_BUDGET = 50

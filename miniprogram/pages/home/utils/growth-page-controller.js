@@ -130,12 +130,17 @@ const growthPageMethods = {
     const week = ['日', '一', '二', '三', '四', '五', '六']
     return `${d.month}月${d.day}日 · 星期${week[d.weekday]}`
   },
-  async loadGrowthSnapshot(showSeq = this._showSeq) {
+  async loadGrowthSnapshot(showSeq = this._showSeq, options = {}) {
     if (!this._alive || !this._visible) return
     const requestSeq = ++this._growthSeq
     this._clearAnimTimer()
     try {
-      const growthResponses = await this._fetchGrowthResponses()
+      let growthResponses = await this._fetchGrowthResponses()
+      if (options.refreshAfterReview && growthClient.needsReviewCompletionRetry(growthResponses)) {
+        await new Promise(resolve => setTimeout(resolve, 320))
+        if (this._isGrowthStale(requestSeq, showSeq)) return
+        growthResponses = await this._fetchGrowthResponses()
+      }
       if (this._isGrowthStale(requestSeq, showSeq)) return
       this._applyGrowthResponses(growthResponses, requestSeq)
     } catch (error) {
@@ -146,6 +151,13 @@ const growthPageMethods = {
 
   _fetchGrowthResponses() {
     return growthClient.fetchGrowthResponses(this._growthApi || api)
+  },
+
+  _takeReviewGrowthRefresh() {
+    const app = typeof getApp === 'function' ? getApp() : null
+    if (!app || !app.globalData || !app.globalData.homeGrowthRefreshAfterReview) return false
+    app.globalData.homeGrowthRefreshAfterReview = 0
+    return true
   },
 
   _isGrowthStale(requestSeq, showSeq) {

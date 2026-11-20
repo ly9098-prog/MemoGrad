@@ -1182,10 +1182,10 @@ to{transform:translate3d(0,0,0);opacity:1;}
 .atlas-filter .filter-count{color:#507568;font-size:22rpx;}
 .theme-quick-chip,.theme-overview-card{height:124rpx!important;min-height:124rpx!important;}
 .theme-card-count,.graph-count{color:#507568;font-size:24rpx;}
-.graph-card-head{display:flex;align-items:center;gap:12rpx;padding:16rpx 20rpx;}
+.graph-card-head{display:flex;align-items:center;gap:12rpx;padding:10rpx 20rpx;}
 .graph-card-copy{min-width:0;flex:1;}
-.graph-card-title{display:block;max-width:none;margin:0;overflow:visible;white-space:normal;overflow-wrap:anywhere;font-size:30rpx;line-height:1.4;}
-.graph-card-copy .graph-count{display:block;min-width:0;margin-top:6rpx;padding:0;white-space:normal;line-height:1.5;}
+.graph-card-title{display:block;max-width:none;margin:0;overflow:visible;white-space:normal;overflow-wrap:anywhere;font-size:28rpx;line-height:1.35;}
+.graph-card-copy .graph-count{display:block;min-width:0;margin-top:2rpx;padding:0;white-space:normal;line-height:1.4;}
 .graph-back{display:flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;min-width:44px;margin:0!important;padding:0;border:0;background:transparent;line-height:1;}
 .theme-active-summary{display:flex;min-height:44px;gap:8px;padding:4rpx 0 0;border:0;border-top:1rpx solid #E1EFE8;border-radius:0;background:transparent;box-shadow:none;}
 .theme-graduation-summary{flex:0 0 auto;color:#507568;font-size:max(22rpx,12px);line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;}
@@ -1231,8 +1231,8 @@ to{transform:translate3d(0,0,0);opacity:1;}
 .theme-active-summary{height:48px;min-height:48px;box-sizing:border-box;}
 .theme-active-copy{min-width:0;}
 .theme-clear[disabled]{visibility:hidden;}
-.graph-card-head{min-height:92px;box-sizing:border-box;}
-.graph-card-copy{display:flex;min-height:68px;flex-direction:column;justify-content:center;}
+.graph-card-head{min-height:76px;box-sizing:border-box;}
+.graph-card-copy{display:flex;min-height:56px;flex-direction:column;justify-content:center;}
 .graph-card-title{display:-webkit-box;height:2.8em;max-height:2.8em;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:max(30rpx,14px);line-height:1.4;}
 .graph-card-copy .graph-count{overflow:hidden;font-size:max(24rpx,12px);white-space:nowrap;text-overflow:ellipsis;}
 .graph-back-hidden{visibility:hidden;pointer-events:none;}

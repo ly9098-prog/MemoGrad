@@ -10,19 +10,19 @@
 }
 
 .number-reveal-playing .reveal-digit-top {
-  animation: numberRevealTop 380ms cubic-bezier(.22, 1, .36, 1) backwards;
+  animation: numberRevealTop 620ms cubic-bezier(.22, 1, .36, 1) backwards;
 }
 
 .number-reveal-playing .reveal-digit-bottom {
-  animation: numberRevealBottom 380ms cubic-bezier(.22, 1, .36, 1) backwards;
+  animation: numberRevealBottom 620ms cubic-bezier(.22, 1, .36, 1) backwards;
 }
 
 .duration-reveal-playing .daily-duration-digit-top {
-  animation: numberRevealTop 320ms cubic-bezier(.22, 1, .36, 1) backwards;
+  animation: numberRevealTop 620ms cubic-bezier(.22, 1, .36, 1) backwards;
 }
 
 .duration-reveal-playing .daily-duration-digit-bottom {
-  animation: numberRevealBottom 320ms cubic-bezier(.22, 1, .36, 1) backwards;
+  animation: numberRevealBottom 620ms cubic-bezier(.22, 1, .36, 1) backwards;
 }
 
 @keyframes numberRevealTop {

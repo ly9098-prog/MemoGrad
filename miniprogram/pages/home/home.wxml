@@ -42,6 +42,8 @@
 
   <!-- Mint home: data-driven circular daily-goal hero -->
   <view class="focus-card route-enter-page delay-one">
+    <image class="focus-card-texture" src="/assets/images/home/hero-brush-texture.webp" mode="aspectFill" aria-hidden="true"></image>
+    <view class="focus-card-texture-shade" aria-hidden="true"></view>
     <view class="focus-content {{guestMode ? 'focus-content-guest' : ''}}">
       <view class="focus-topline">
         <text class="focus-status">{{guestMode ? '体验练习' : '今日学习'}}</text>
@@ -60,7 +62,7 @@
         </view>
 
         <view wx:if="{{!guestMode}}" class="focus-ring-wrap" bindtap="goStudyPlan" hover-class="soft-pressed" aria-role="button" aria-label="今日刷题进度 {{_animGoalDone}} / {{todayGoalTotal}}，完成 {{_animLevelProgress}}%，查看学习目标">
-          <view class="focus-ring" style="background: conic-gradient(#7ED8B5 0deg, #55C89B {{_animLevelProgress * 3.6}}deg, #E0F1EB {{_animLevelProgress * 3.6}}deg 360deg);">
+          <view class="focus-ring" style="background: conic-gradient(#7AD9B4 0deg, #4DBA8D {{_animLevelProgress * 3.6}}deg, #DCEDE6 {{_animLevelProgress * 3.6}}deg 360deg);">
             <view class="focus-ring-inner">
               <view class="focus-ring-value"><text>{{_animGoalDone}}</text><text class="focus-ring-goal">/ {{todayGoalTotal}}</text></view>
               <text class="focus-ring-label">今日题量</text>

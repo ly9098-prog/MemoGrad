@@ -43,6 +43,7 @@ function applyOverviewWithDayResetImpl(options, overview, vm) {
   session.totalCorrect = 0
   session.totalWrong = 0
   session.totalCompleted = 0
+  session.reviewTotalElapsedMs = 0
   session.todayTaskTotalCount = Math.max(0, Number(vm.todayDueCount || 0))
   session.completedBeforeSession = Math.max(0, Number(vm.todayCompletedCount || 0))
 }

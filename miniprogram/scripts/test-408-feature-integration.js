@@ -67,7 +67,7 @@ assert.strictEqual((wrongCss.match(/\.diagnosis-next-action\{/g) || []).length, 
 
 // P0: 130 choice-only loss budget is calculated and committed to dashboard state.
 has('pages/dashboard/dashboard.js', [/buildChoiceLossBudget/, /choiceLossBudget,/])
-has('pages/dashboard/dashboard.wxml', [/选择题失分预算/, /CHOICE ONLY/, /maxWrongQuestions/])
+has('pages/dashboard/dashboard.wxml', [/选择题失分预算/, /选择题允许失分/, /maxWrongQuestions/])
 
 // P1: Pomodoro task types survive sessions and appear in stats.
 has('pages/pomodoro/pomodoro.js', [/pomodoroTaskTypes/, /selectTaskType/, /selectedTaskTypeLabel/])
@@ -95,12 +95,12 @@ has('utils/storage.js', [/require\('\.\/pomodoro-task-types'\)/, /^\s+pomodoroTa
 // P1: chapter graduation is computed next to tree grouping and shown on the map.
 has('subpackages/knowledge/knowledge-subject/tree-groups.js', [/evaluateChapter/, /summarizeGroups/, /value == null/])
 has('subpackages/knowledge/knowledge-subject/index.js', [/summarizeGroups/, /graduationLabel/])
-has('subpackages/knowledge/knowledge-subject/index.wxml', [/章节毕业/, /graduationLabel/])
+has('subpackages/knowledge/knowledge-subject/index.wxml', [/chapterGraduation\.text/, /graduationLabel/])
 
 // P1: Study Hub is a true Next Best Action and can target no-data subjects by canonical code.
 has('pages/home/utils/growth-view.js', [/buildNextBestAction/])
 has('pages/home/home.js', [/primaryTaskRoute === 'pomodoro'/])
-has('pages/home/home.wxml', [/primaryTaskTitle/, /primaryTaskAction/, /primaryTaskKicker/, /今日刷题进度/])
+has('pages/home/home.wxml', [/primaryTaskTitle/, /primaryTaskAction/, /今日刷题进度/])
 has('subpackages/study/practice/utils/practice-launch-flow.js', [/subjectCode/, /preset\.subjectCode/])
 has('pages/pomodoro/pomodoro.js', [/fromSubjectCode/, /opts && opts\.subject_code/])
 

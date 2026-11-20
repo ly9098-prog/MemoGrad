@@ -14,6 +14,7 @@ function createHarness(overrides = {}) {
       totalWrong: 3,
       totalCompleted: 8,
       completedBeforeSession: 5,
+      reviewTotalElapsedMs: 90000,
     },
     phase: 'reviewing',
     todayDueCount: 20,
@@ -51,7 +52,8 @@ test('applyOverviewWithDayReset resets session counters', () => {
   assert.equal(state.session.taskDate, '2026-10-24')
   assert.deepEqual(state.session.allGroupResults, [])
   assert.equal(state.session.totalCorrect, 0)
-assert.equal(state.session.totalWrong, 0)
+  assert.equal(state.session.totalWrong, 0)
+  assert.equal(state.session.reviewTotalElapsedMs, 0)
   assert.equal(state.session.todayTaskTotalCount, 15)
   assert.equal(state.session.completedBeforeSession, 3)
 })

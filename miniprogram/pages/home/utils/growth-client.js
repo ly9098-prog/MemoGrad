@@ -30,4 +30,19 @@ function isGrowthStale(options = {}) {
   )
 }
 
-module.exports = { fetchGrowthResponses, isGrowthStale }
+function reviewRemainingCount(responses = {}) {
+  const hub = responses.hub
+  if (hub && hub.scope_ready !== false && hub.review) {
+    const remaining = Number(hub.review.remaining_count)
+    if (Number.isFinite(remaining)) return remaining
+  }
+  const overview = responses.dashboard && responses.dashboard.overview
+  const fallback = Number(overview && overview.due_review_count)
+  return Number.isFinite(fallback) ? fallback : 0
+}
+
+function needsReviewCompletionRetry(responses) {
+  return reviewRemainingCount(responses) > 0
+}
+
+module.exports = { fetchGrowthResponses, isGrowthStale, needsReviewCompletionRetry }

@@ -1,9 +1,9 @@
 {
   "navigationStyle": "custom",
   "navigationBarTitleText": "学习计划",
-  "navigationBarBackgroundColor": "#F4F4EE",
+  "navigationBarBackgroundColor": "#FAFCFB",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#F4F4EE",
+  "backgroundColor": "#FAFCFB",
   "enablePullDownRefresh": false,
   "usingComponents": {
     "app-dialog": "/components/app-dialog/index",

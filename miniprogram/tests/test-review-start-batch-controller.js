@@ -49,6 +49,7 @@ function createHarness(overrides = {}) {
       totalCorrect: 1,
       totalWrong: 1,
       totalCompleted: 1,
+      reviewTotalElapsedMs: 90000,
       safeModeActive: true,
       renderTraces: [{}],
       allQuestions: [],
@@ -133,6 +134,7 @@ test('starts a batch and restores draft state without changing ordering', async 
   assert.equal(state.session.todayTaskTotalCount, 8)
   assert.equal(state.session.completedBeforeSession, 2)
   assert.deepEqual(state.session.allGroupResults, [])
+  assert.equal(state.session.reviewTotalElapsedMs, 0)
   assert.deepEqual(state.session.renderTraces, [])
   assert.equal(state.session.safeModeActive, false)
   assert.deepEqual(state.data, {

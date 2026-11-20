@@ -79,6 +79,15 @@ function buildGroupSubmitResultPageCapabilities(page, deps) {
       pauseTimer: () => page._pauseReviewTimer(),
       setData: createReviewStateWriter(page),
       showResultDockAndRefreshTimer: () => page._showResultDockAndRefreshTimer(),
+      writeResultCache: payload => wx.setStorageSync('lastPracticeResult', payload),
+      openResultUrl: url => wx.redirectTo({ url, fail: () => wx.navigateTo({ url }) }),
+      markHomeGrowthRefresh: () => {
+        const app = typeof getApp === 'function' ? getApp() : null
+        if (!app) return
+        app.globalData = app.globalData || {}
+        app.globalData.homeGrowthRefreshAfterReview = Date.now()
+      },
+      isGuestMode: () => Boolean(page._guestMode),
   }
 }
 

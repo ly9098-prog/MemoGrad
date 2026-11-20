@@ -1,180 +1,216 @@
 <view class="plan-page {{configured ? 'is-configured' : 'is-setup'}}" capture-bind:touchstart="onPlanInteraction">
-<app-dialog id="appDialog"></app-dialog>
-<premium-nav title="学习计划" variant="light" bind:back="goBack" />
-<view wx:if="{{guestMode}}" class="state-card guest-plan-empty">
-<text class="guest-plan-title">登录后使用学习计划</text>
-<text class="setting-desc">计划与个人练习数据绑定，请从首页顶部进入登录。</text>
-</view>
-<view wx:else class="plan-shell {{!loading ? 'route-enter-opacity' : ''}}">
-<view class="plan-hero">
-<view class="plan-hero-copy">
-<text class="plan-hero-kicker">PLAN YOUR STUDY</text>
-<text class="plan-hero-title">把每天的学习，连成一条备考节奏</text>
-<text class="plan-hero-subtitle">计划只负责组织复习、弱项、新题和选择题套卷；你的真实完成记录仍来自现有学习流程。</text>
-</view>
-<view class="plan-hero-stepper" aria-hidden="true">
-<text class="plan-hero-step-current">01</text>
-<text class="plan-hero-step-divider">/</text>
-<text class="plan-hero-step-total">06</text>
-</view>
-</view>
-<view wx:if="{{loading}}" class="state-card">正在生成今天的计划…</view>
-<view wx:elif="{{errorText}}" class="state-card error-card" bindtap="loadOverview">{{errorText}} · 点击重试</view>
-<block wx:else>
-<view class="plan-overview-card" wx:if="{{configured}}">
-<image class="plan-overview-bg-art" src="/assets/icons/home-hero/top-card-background-cropped.png" mode="heightFix" aria-hidden="true" />
-<view class="plan-overview-bg-wash" aria-hidden="true"></view>
-<view class="plan-overview-visual" aria-hidden="true">
-<image class="plan-overview-curve" src="/assets/icons/home-hero/smart-study-curve.png" mode="aspectFit" />
-</view>
-<view class="overview-grid"></view>
-<view class="overview-topline">
-<view class="overview-brand">
-<image class="overview-brand-icon" src="/assets/icons/home-hero/smart-study-leaf.png" mode="aspectFit" aria-hidden="true" />
-<text>SMART STUDY · 今日节奏</text>
-</view>
-<view class="overview-target-chip">
-<text>目标日</text>
-<text>{{targetDateText}}</text>
-</view>
-</view>
-<text class="overview-title">{{todayTargetText}}</text>
-<text class="overview-desc">{{phaseLabel}} · {{weeklyText}}</text>
-<view class="overview-progress-row">
-<text>今日进度</text>
-<text>{{todayProgressText}}</text>
-</view>
-<view class="overview-progress-track"><view class="overview-progress-fill" style="width: {{todayProgressPercent}}%;"></view></view>
-<view class="overview-progress-foot">
-<text>{{isRestDay ? '本周学习天数已经达标，今天更适合轻量复盘。' : '已完成的学习事实会自动回流到今天的计划。'}}</text>
-<text>{{todayProgressPercent}}%</text>
-</view>
-<view class="overview-metrics">
-<view class="overview-metric">
-<text class="overview-metric-value">{{daysRemaining}}</text>
-<text class="overview-metric-label">距离目标日</text>
-</view>
-<view class="overview-divider"></view>
-<view class="overview-metric">
-<text class="overview-metric-value">{{focusMinutes}}</text>
-<text class="overview-metric-label">建议专注分钟</text>
-</view>
-<view class="overview-divider"></view>
-<view class="overview-metric overview-metric-compact">
-<text class="overview-metric-value">{{weeklyOptions[weeklyIndex]}}</text>
-<text class="overview-metric-label">每周学习天数</text>
-</view>
-</view>
-</view>
-<view class="settings-card">
-<view class="settings-head">
-<view>
-<text class="settings-kicker">PLAN SETTINGS</text>
-<text class="settings-title">计划设置</text>
-</view>
-</view>
-<view class="settings-list">
-<view class="setting-row setting-row-switch">
-<view class="setting-index">01</view>
-<view class="setting-icon setting-icon-flag"></view>
-<view class="setting-copy">
-<text class="setting-label">建立长期计划</text>
-<text class="setting-desc">不创建复杂课程表</text>
-</view>
-<switch class="plan-switch" checked="{{configured}}" color="#3BCF57" bindchange="onPlanEnabledChange" />
-</view>
-<picker class="setting-picker" mode="date" value="{{targetDate}}" start="{{minDate}}" bindchange="onTargetDateChange">
-<view class="setting-row" hover-class="setting-row-pressed">
-<view class="setting-index">02</view>
-<view class="setting-icon setting-icon-date"></view>
-<view class="setting-copy">
-<text class="setting-label">目标日期</text>
-<text class="setting-desc">考试 / 阶段性考试日期</text>
-</view>
-<view class="setting-value {{targetDate ? '' : 'is-placeholder'}}">{{targetDateText}}</view>
-<text class="setting-arrow">›</text>
-</view>
-</picker>
-<picker class="setting-picker" range="{{dailyOptions}}" value="{{dailyIndex}}" bindchange="onDailyChange">
-<view class="setting-row" hover-class="setting-row-pressed">
-<view class="setting-index">03</view>
-<view class="setting-icon setting-icon-clock"></view>
-<view class="setting-copy">
-<text class="setting-label">每日学习时长</text>
-<text class="setting-desc">系统按这个预算分配任务</text>
-</view>
-<view class="setting-value">{{dailyOptions[dailyIndex]}} 分钟</view>
-<text class="setting-arrow">›</text>
-</view>
-</picker>
-<picker class="setting-picker" range="{{questionGoalOptions}}" value="{{questionGoalIndex}}" bindchange="onQuestionGoalChange">
-<view class="setting-row" hover-class="setting-row-pressed">
-<view class="setting-index">04</view>
-<view class="setting-icon setting-icon-question"></view>
-<view class="setting-copy">
-<text class="setting-label">每日目标题数</text>
-<text class="setting-desc">同步首页今日刷题目标</text>
-</view>
-<view class="setting-value">{{questionGoalOptions[questionGoalIndex]}} 题</view>
-<text class="setting-arrow">›</text>
-</view>
-</picker>
-<picker class="setting-picker" range="{{weeklyOptions}}" value="{{weeklyIndex}}" bindchange="onWeeklyChange">
-<view class="setting-row" hover-class="setting-row-pressed">
-<view class="setting-index">05</view>
-<view class="setting-icon setting-icon-week"></view>
-<view class="setting-copy">
-<text class="setting-label">每周学习天数</text>
-<text class="setting-desc">达到后允许安排轻复盘日</text>
-</view>
-<view class="setting-value">{{weeklyOptions[weeklyIndex]}} 天</view>
-<text class="setting-arrow">›</text>
-</view>
-</picker>
-<picker class="setting-picker" range="{{priorityOptions}}" value="{{priorityIndex}}" bindchange="onPriorityChange">
-<view class="setting-row setting-row-last" hover-class="setting-row-pressed">
-<view class="setting-index">06</view>
-<view class="setting-icon setting-icon-priority"></view>
-<view class="setting-copy">
-<text class="setting-label">目标优先级</text>
-<text class="setting-desc">影响四类任务的分钟配比</text>
-</view>
-<view class="setting-value">{{priorityOptions[priorityIndex]}}</view>
-<text class="setting-arrow">›</text>
-</view>
-</picker>
-</view>
-<view wx:if="{{configured}}" class="pause-link" bindtap="deletePlan">暂停长期计划</view>
-</view>
-<view class="strategy-card">
-<view class="strategy-head">
-<view><text class="settings-kicker">408 STRATEGY</text><text class="strategy-title">四科阶段与权重</text></view>
-<text class="strategy-total {{strategyWeightValid ? 'is-valid' : 'is-invalid'}}">合计 {{strategyWeightTotal}}%</text>
-</view>
-<text class="strategy-note">阶段决定推荐动作，权重决定科目优先级；四科权重合计需为 100%。</text>
-<view class="strategy-list">
-<view class="strategy-row" wx:for="{{subjectStrategies}}" wx:key="code">
-<view class="strategy-subject"><text class="strategy-name">{{item.name}}</text><text class="strategy-weight">{{item.weight}}%</text></view>
-<view class="strategy-controls">
-<picker class="strategy-stage-picker" range="{{stageOptions}}" value="{{item.stageIndex}}" data-index="{{index}}" bindchange="onStrategyStageChange">
-<view class="strategy-stage">{{item.stageLabel}}<text>›</text></view>
-</picker>
-<slider class="strategy-slider" min="0" max="100" step="5" value="{{item.weight}}" data-index="{{index}}" bindchanging="onStrategyWeightChange" bindchange="onStrategyWeightChange" aria-label="{{item.name}}权重 {{item.weight}}%" activeColor="#2F6F4A" backgroundColor="#E3EBE4" block-color="#FFFFFF" block-size="18" />
-</view>
-</view>
-</view>
-<text wx:if="{{!strategyWeightValid}}" class="strategy-warning">请调整为 100% 后保存</text>
-</view>
-<view class="allocation-section" wx:if="{{configured}}">
-<view class="section-head">
-<view>
-<text class="section-kicker">DYNAMIC MIX</text>
-<text class="section-title">今日任务配比</text>
-</view>
-<text class="section-note">完成后自动重排剩余时间</text>
-</view>
-<view class="allocation-list">
-<view
+  <app-dialog id="appDialog" theme="mint"></app-dialog>
+  <premium-nav title="学习计划" variant="mint" bind:back="goBack" />
+
+  <view wx:if="{{guestMode}}" class="state-card guest-plan-empty">
+    <view class="state-icon">
+      <image src="/assets/icons/home-actions/route.svg" mode="aspectFit" aria-hidden="true" />
+    </view>
+    <text class="guest-plan-title">登录后使用学习计划</text>
+    <text class="guest-plan-desc">计划与个人练习数据绑定，请从首页顶部进入登录。</text>
+  </view>
+
+  <view wx:else class="plan-shell {{!loading ? 'route-enter-opacity' : ''}}">
+    <view wx:if="{{!configured && !loading && !errorText}}" class="plan-intro">
+      <view class="plan-intro-head">
+        <view class="plan-intro-icon">
+          <image src="/assets/icons/home-actions/route.svg" mode="aspectFit" aria-hidden="true" />
+        </view>
+        <text class="plan-intro-title">把复习安排进每天</text>
+      </view>
+      <text class="plan-intro-desc">设置目标日期和每日投入，系统会把复习、弱项、新题与真题分配到当天任务中。</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="state-card plan-loading-card">
+      <text>正在载入今日计划…</text>
+    </view>
+    <view wx:elif="{{errorText}}" class="state-card error-card">
+      <image class="state-icon-image" src="/assets/icons/mobile-controls/circle-exclamation-point.svg" mode="aspectFit" aria-hidden="true" />
+      <text class="state-message">{{errorText}}</text>
+      <button class="state-retry" bindtap="loadOverview">重新加载</button>
+    </view>
+
+    <block wx:else>
+      <view wx:if="{{configured}}" class="plan-overview-card">
+        <view class="overview-topline">
+          <text class="overview-label">今日计划</text>
+          <view class="overview-target">
+            <text>目标日</text>
+            <text>{{targetDateText}}</text>
+          </view>
+        </view>
+        <text class="overview-title">{{todayTargetText}}</text>
+        <text class="overview-desc">{{phaseLabel}} · {{weeklyText}}</text>
+
+        <view class="overview-progress-row">
+          <text>今日进度</text>
+          <text>{{todayProgressText}}</text>
+        </view>
+        <view class="overview-progress-track">
+          <view class="overview-progress-fill" style="width: {{todayProgressPercent}}%;"></view>
+        </view>
+        <view class="overview-progress-foot">
+          <text>{{isRestDay ? '本周学习天数已经达标，今天更适合轻量复盘。' : '已完成的学习记录会自动计入今日进度。'}}</text>
+          <text class="overview-percent">{{todayProgressPercent}}%</text>
+        </view>
+
+        <view class="overview-metrics">
+          <view class="overview-metric">
+            <text class="overview-metric-value">{{daysRemaining}}<text class="overview-metric-unit">天</text></text>
+            <text class="overview-metric-label">距离目标日</text>
+          </view>
+          <view class="overview-divider"></view>
+          <view class="overview-metric">
+            <text class="overview-metric-value">{{focusMinutes}}<text class="overview-metric-unit">分钟</text></text>
+            <text class="overview-metric-label">建议专注</text>
+          </view>
+          <view class="overview-divider"></view>
+          <view class="overview-metric">
+            <text class="overview-metric-value">{{weeklyOptions[weeklyIndex]}}<text class="overview-metric-unit">天</text></text>
+            <text class="overview-metric-label">每周学习</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="settings-card">
+        <view class="settings-head">
+          <text class="settings-title">计划设置</text>
+          <text class="settings-status">{{configured ? '已创建' : '待设置'}}</text>
+        </view>
+
+        <view class="settings-list">
+          <view class="setting-row setting-row-switch">
+            <view class="setting-icon">
+              <image src="/assets/icons/home-actions/route.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+            <view class="setting-copy">
+              <text class="setting-label">建立长期计划</text>
+              <text class="setting-desc">不创建复杂课程表</text>
+            </view>
+            <switch class="plan-switch" checked="{{configured}}" color="#3A6F5B" bindchange="onPlanEnabledChange" />
+          </view>
+
+          <picker class="setting-picker" mode="date" value="{{targetDate}}" start="{{minDate}}" bindchange="onTargetDateChange">
+            <view class="setting-row" hover-class="setting-row-pressed">
+              <view class="setting-icon">
+                <image src="/assets/icons/study-plan/calendar-days.svg" mode="aspectFit" aria-hidden="true" />
+              </view>
+              <view class="setting-copy">
+                <text class="setting-label">目标日期</text>
+                <text class="setting-desc">考试或阶段性考试日期</text>
+              </view>
+              <text class="setting-value {{targetDate ? '' : 'is-placeholder'}}">{{targetDateText}}</text>
+              <image class="setting-chevron" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </picker>
+
+          <picker class="setting-picker" range="{{dailyOptions}}" value="{{dailyIndex}}" bindchange="onDailyChange">
+            <view class="setting-row" hover-class="setting-row-pressed">
+              <view class="setting-icon">
+                <image src="/assets/icons/study-plan/clock-3.svg" mode="aspectFit" aria-hidden="true" />
+              </view>
+              <view class="setting-copy">
+                <text class="setting-label">每日学习时长</text>
+                <text class="setting-desc">系统按这个预算分配任务</text>
+              </view>
+              <text class="setting-value">{{dailyOptions[dailyIndex]}} 分钟</text>
+              <image class="setting-chevron" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </picker>
+
+          <picker class="setting-picker" range="{{questionGoalOptions}}" value="{{questionGoalIndex}}" bindchange="onQuestionGoalChange">
+            <view class="setting-row" hover-class="setting-row-pressed">
+              <view class="setting-icon">
+                <image src="/assets/icons/home-actions/list-checks.svg" mode="aspectFit" aria-hidden="true" />
+              </view>
+              <view class="setting-copy">
+                <text class="setting-label">每日目标题数</text>
+                <text class="setting-desc">同步首页今日刷题目标</text>
+              </view>
+              <text class="setting-value">{{questionGoalOptions[questionGoalIndex]}} 题</text>
+              <image class="setting-chevron" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </picker>
+
+          <picker class="setting-picker" range="{{weeklyOptions}}" value="{{weeklyIndex}}" bindchange="onWeeklyChange">
+            <view class="setting-row" hover-class="setting-row-pressed">
+              <view class="setting-icon">
+                <image src="/assets/icons/study-plan/calendar-range.svg" mode="aspectFit" aria-hidden="true" />
+              </view>
+              <view class="setting-copy">
+                <text class="setting-label">每周学习天数</text>
+                <text class="setting-desc">达到后允许安排轻复盘日</text>
+              </view>
+              <text class="setting-value">{{weeklyOptions[weeklyIndex]}} 天</text>
+              <image class="setting-chevron" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </picker>
+
+          <picker class="setting-picker" range="{{priorityOptions}}" value="{{priorityIndex}}" bindchange="onPriorityChange">
+            <view class="setting-row setting-row-last" hover-class="setting-row-pressed">
+              <view class="setting-icon">
+                <image src="/assets/icons/study-plan/signal.svg" mode="aspectFit" aria-hidden="true" />
+              </view>
+              <view class="setting-copy">
+                <text class="setting-label">目标优先级</text>
+                <text class="setting-desc">影响四类任务的分钟配比</text>
+              </view>
+              <text class="setting-value">{{priorityOptions[priorityIndex]}}</text>
+              <image class="setting-chevron" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+            </view>
+          </picker>
+        </view>
+
+        <view wx:if="{{configured}}" class="pause-link" hover-class="pause-link-pressed" bindtap="deletePlan">暂停长期计划</view>
+      </view>
+
+      <view class="strategy-card">
+        <view class="strategy-head">
+          <text class="strategy-title">四科阶段与权重</text>
+          <text class="strategy-total {{strategyWeightValid ? 'is-valid' : 'is-invalid'}}">合计 {{strategyWeightTotal}}%</text>
+        </view>
+        <text class="strategy-note">阶段决定推荐动作，权重决定科目优先级；四科权重合计需为 100%。</text>
+        <view class="strategy-list">
+          <view class="strategy-row" wx:for="{{subjectStrategies}}" wx:key="code">
+            <view class="strategy-subject">
+              <text class="strategy-name">{{item.name}}</text>
+              <text class="strategy-weight">{{item.weight}}%</text>
+            </view>
+            <view class="strategy-controls">
+              <picker class="strategy-stage-picker" range="{{stageOptions}}" value="{{item.stageIndex}}" data-index="{{index}}" bindchange="onStrategyStageChange">
+                <view class="strategy-stage">
+                  <text>{{item.stageLabel}}</text>
+                  <image src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
+                </view>
+              </picker>
+              <slider
+                class="strategy-slider"
+                min="0"
+                max="100"
+                step="5"
+                value="{{item.weight}}"
+                data-index="{{index}}"
+                bindchanging="onStrategyWeightChange"
+                bindchange="onStrategyWeightChange"
+                aria-label="{{item.name}}权重 {{item.weight}}%"
+                activeColor="#3A6F5B"
+                backgroundColor="#D8EEE6"
+                block-color="#FFFFFF"
+                block-size="18"
+              />
+            </view>
+          </view>
+        </view>
+        <text wx:if="{{!strategyWeightValid}}" class="strategy-warning">请调整为 100% 后保存</text>
+      </view>
+
+      <view class="allocation-section" wx:if="{{configured}}">
+        <view class="section-head">
+          <text class="section-title">今日任务配比</text>
+          <text class="section-note">完成后自动重排剩余时间</text>
+        </view>
+        <view class="allocation-list">
+          <view
             wx:for="{{allocations}}"
             wx:key="category"
             class="allocation-card allocation-{{item.category}} {{item.canOpen ? 'is-actionable' : ''}}"
@@ -182,35 +218,59 @@
             bindtap="openAllocation"
             hover-class="{{item.canOpen ? 'allocation-pressed' : ''}}"
           >
-<view class="allocation-code">{{item.code}}</view>
-<view class="allocation-main">
-<view class="allocation-topline">
-<text class="allocation-label">{{item.label}}</text>
-<text class="allocation-status status-{{item.status}}">{{item.statusText}}</text>
-</view>
-<text class="allocation-title">{{item.title}}</text>
-<text class="allocation-reason">{{item.reason}}</text>
-<view class="allocation-metrics">
-<text>原始分配 {{item.plannedMinutes}} 分钟</text>
-<text>实际完成 {{item.completedMinutes}} 分钟</text>
-</view>
-</view>
-<text wx:if="{{item.canOpen}}" class="allocation-arrow">→</text>
-</view>
-</view>
-</view>
-<view class="explain-card">
-<view class="explain-head">
-<view class="explain-mark"></view>
-<text class="explain-title">时间预算是怎么分配的？</text>
-</view>
-<text class="explain-text">每日学习时长是当天的时间预算，不是付费额度或积分。系统先按目标优先级分给复习、弱项、新题和真题；“实际完成”直接读取已有学习记录。某类已完成或当天无可做任务时，剩余时间会自动转给仍可执行的任务，不需要再次打卡。</text>
-</view>
-<movable-area class="fab-drag-layer">
-<movable-view wx:if="{{fabReady}}" class="fab-drag-view {{fabIdle ? 'fab-idle' : ''}}" direction="all" inertia="{{false}}" out-of-bounds="{{false}}" x="{{fabX}}" y="{{fabY}}" damping="40" friction="2" bindchange="onFabMove" bindtouchstart="onFabTouchStart" bindtouchend="onFabTouchEnd">
-<view class="save-fab {{saving ? 'is-saving' : ''}}" bindtap="onFabTap" hover-class="save-fab-pressed" aria-role="button" aria-label="保存四科策略和学习计划，可拖动"><text wx:if="{{saving}}" class="save-fab-loading">…</text><image wx:else class="save-fab-icon" src="/assets/icons/study-plan/save-arrow.svg" mode="aspectFit" aria-hidden="true" /></view>
-</movable-view>
-</movable-area>
-</block>
-</view>
+            <text class="allocation-code">{{item.code}}</text>
+            <view class="allocation-main">
+              <view class="allocation-topline">
+                <text class="allocation-label">{{item.label}}</text>
+                <text class="allocation-status status-{{item.status}}">{{item.statusText}}</text>
+              </view>
+              <text class="allocation-title">{{item.title}}</text>
+              <text class="allocation-reason">{{item.reason}}</text>
+              <view class="allocation-metrics">
+                <text>原始分配 {{item.plannedMinutes}} 分钟</text>
+                <text>已完成 {{item.completedMinutes}} 分钟</text>
+              </view>
+            </view>
+            <image wx:if="{{item.canOpen}}" class="allocation-arrow" src="/assets/icons/wrong-detail/circle-arrow-right.svg" mode="aspectFit" aria-hidden="true" />
+          </view>
+        </view>
+      </view>
+
+      <view class="explain-card">
+        <view class="explain-head">
+          <image class="explain-icon" src="/assets/icons/wrong-detail/circle-question-mark.svg" mode="aspectFit" aria-hidden="true" />
+          <text class="explain-title">时间预算是怎么分配的？</text>
+        </view>
+        <text class="explain-text">每日学习时长是当天的时间预算，不是付费额度或积分。系统先按目标优先级分给复习、弱项、新题和真题；“实际完成”直接读取已有学习记录。某类已完成或当天无可做任务时，剩余时间会自动转给仍可执行的任务，不需要再次打卡。</text>
+      </view>
+
+      <movable-area class="fab-drag-layer">
+        <movable-view
+          wx:if="{{fabReady}}"
+          class="fab-drag-view {{fabIdle ? 'fab-idle' : ''}}"
+          direction="all"
+          inertia="{{false}}"
+          out-of-bounds="{{false}}"
+          x="{{fabX}}"
+          y="{{fabY}}"
+          damping="40"
+          friction="2"
+          bindchange="onFabMove"
+          bindtouchstart="onFabTouchStart"
+          bindtouchend="onFabTouchEnd"
+        >
+          <view
+            class="save-fab {{saving ? 'is-saving' : ''}}"
+            bindtap="onFabTap"
+            hover-class="save-fab-pressed"
+            aria-role="button"
+            aria-label="保存四科策略和学习计划，可拖动"
+          >
+            <text wx:if="{{saving}}" class="save-fab-loading">…</text>
+            <image wx:else class="save-fab-icon" src="/assets/icons/study-plan/save-arrow.svg" mode="aspectFit" aria-hidden="true" />
+          </view>
+        </movable-view>
+      </movable-area>
+    </block>
+  </view>
 </view>

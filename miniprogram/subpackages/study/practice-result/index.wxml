@@ -21,9 +21,9 @@
 </view>
 <view class="hero-content">
 <view class="hero-copy">
-<text class="eyebrow">{{guestMode ? 'GUEST REPORT' : 'PRACTICE REPORT'}}</text>
-<text class="hero-title">{{guestMode ? '本组体验完成' : '本组练习完成'}}</text>
-<text class="hero-subject">{{subjectName || '本次练习'}}</text>
+<text class="eyebrow">{{guestMode ? 'GUEST REPORT' : (isReviewResult ? 'REVIEW REPORT' : 'PRACTICE REPORT')}}</text>
+<text class="hero-title">{{guestMode ? '本组体验完成' : (isReviewResult ? (reviewSessionOnly ? '本次复习完成' : '今日复习完成') : '本组练习完成')}}</text>
+<text class="hero-subject">{{isReviewResult ? '记忆计划已更新' : (subjectName || '本次练习')}}</text>
 <text class="hero-tip">{{resultTip}}</text>
 </view>
 <view

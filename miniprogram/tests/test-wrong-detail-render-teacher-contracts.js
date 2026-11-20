@@ -1,10 +1,12 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const { test } = require('node:test')
 const { fixture, deferred } = require('./helpers/wrong-detail-ai-recovery-fixture')
 const plain = value => JSON.parse(JSON.stringify(value))
 
 if (process.argv[2]) test('compiled AI states retain recovery controls and accurate analysis source hints', () => {
-  const fs = require('node:fs'), vm = require('node:vm')
+  const vm = require('node:vm')
   const context = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
   vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), context)
   const render = context.$gwx('subpackages/study/wrong-detail/wrong-detail.wxml')
@@ -55,6 +57,14 @@ if (process.argv[2]) test('compiled AI states retain recovery controls and accur
       aiFromCache: cached, aiFromQuestionAnalysis: questionAnalysis })
     assert.equal(byClass(tree, 'ai-hint')[0].children.join(''), hint)
   }
+})
+
+test('AI analysis source hint keeps the cached explanation on one line', () => {
+  const wxss = fs.readFileSync(path.join(
+    __dirname,
+    '../subpackages/study/wrong-detail/wrong-detail.wxss'
+  ), 'utf8')
+  assert.match(wxss, /\.ai-result-tools \.ai-hint\s*\{[^}]*white-space:\s*nowrap;/)
 })
 
 function setup() {

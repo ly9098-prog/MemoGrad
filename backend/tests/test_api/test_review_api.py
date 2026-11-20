@@ -73,7 +73,9 @@ class TestGradeBatchAPI:
             "correct_count": 1,
             "wrong_count": 0,
         })
+        cache_delete = AsyncMock()
         monkeypatch.setattr(review.review_scheduler, "grade_batch_review", service)
+        monkeypatch.setattr(review.cache, "delete", cache_delete)
         response = client.post("/api/v1/review/grade-batch", json={"reviews": [_review_item()]})
 
         assert response.status_code == 200
@@ -83,6 +85,10 @@ class TestGradeBatchAPI:
         assert body["results"][0]["request_id"] == "review-request-123"
         service.assert_awaited_once()
         assert service.await_args.kwargs["session_meta"] is None
+        assert [call.args[0] for call in cache_delete.await_args_list] == [
+            "review:*:1*",
+            "stats:*:1*",
+        ]
 
     def test_forwards_review_timing_session(self, monkeypatch):
         service = AsyncMock(return_value={

@@ -89,6 +89,27 @@ test('builds data patch with all expected fields', () => {
   assert.ok(patch.reviewItems.length === 2)
 })
 
+test('marks the shared result page as a review-day summary when requested', () => {
+  const { ports: p } = ports()
+  const payload = {
+    ...samplePayload(),
+    _source: 'review_today',
+    subject_name: '今日复习',
+    review_session_only: true,
+  }
+  const mapped = mapPracticePayload(payload, p)
+  const patch = buildPracticeDataPatch(mapped, p)
+  assert.equal(mapped.isReviewResult, true)
+  assert.equal(mapped.reviewSessionOnly, true)
+  assert.equal(patch.isReviewResult, true)
+  assert.equal(patch.reviewSessionOnly, true)
+  assert.equal(mapPracticePayload({
+    ...samplePayload(),
+    _source: 'review_today',
+    review_session_only: '0',
+  }, p).reviewSessionOnly, false)
+})
+
 test('knowledge sync is recorded when launch conditions are met', () => {
   const { ports: p, calls } = ports({
     getLaunchSource: () => 'knowledge_map',

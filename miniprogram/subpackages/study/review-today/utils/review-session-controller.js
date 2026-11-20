@@ -47,6 +47,7 @@ function createSessionImpl() {
     timerStartedAt: 0,
     timerLastTickAt: 0,
     timerElapsedMs: 0,
+    reviewTotalElapsedMs: 0,
     timerRunning: false,
     timingSegmentId: '',
     timingStartedAtMs: 0,

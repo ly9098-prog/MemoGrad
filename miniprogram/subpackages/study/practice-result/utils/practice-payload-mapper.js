@@ -1,7 +1,6 @@
 // Pure mapper for applyPracticePayload. Extracted from
 // subpackages/study/practice-result/index.js to keep the page a thin delegate.
 // All helpers are injected as ports so the mapper has no page state.
-
 function mapPracticePayload(payload, ports) {
   const source = extractSource(payload)
   const embeddedKnowledgeSession = source.knowledge_session || source.knowledgeSession || null
@@ -28,6 +27,8 @@ function mapPracticePayload(payload, ports) {
     source, reviewItems, counts, accuracyPct, usedTime, subjectName,
     growthGain, embeddedGrowth, wrongReviewItems, localErrorDistribution,
     resultTip, knowledge,
+    isReviewResult: source._source === 'review_today' || source.source === 'review_today',
+    reviewSessionOnly: [true, 1, '1'].includes(source.review_session_only ?? source.reviewSessionOnly),
   }
 }
 
@@ -121,7 +122,7 @@ function buildPracticeDataPatch(mapped, ports) {
   const { counts, accuracyPct, usedTime, subjectName, growthGain,
     embeddedGrowth, reviewItems, wrongReviewItems, localErrorDistribution, resultTip } = mapped
   return {
-    subjectName,
+    isReviewResult: mapped.isReviewResult, reviewSessionOnly: mapped.reviewSessionOnly, subjectName,
     correctCount: counts.correctCount,
     wrongCount: counts.wrongCount,
     skippedCount: counts.skippedCount,
@@ -168,7 +169,6 @@ function maybeRecordKnowledgeSync(mapped, ports) {
     rootName: knowledge.knowledgeRootName,
   })
 }
-
 
 function applyPracticePayloadOrchestration(payload, ports, pageState) {
   pageState.incrementDiagnosisRefreshSeq()

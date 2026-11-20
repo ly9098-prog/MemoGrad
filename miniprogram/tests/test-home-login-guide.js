@@ -65,6 +65,7 @@ function launch(memory = new Map(), options = {}) {
     _clearAnimTimer() {},
     clearGrowthLifecycleTimers() {},
     openLoginFromHome() { navigation.push(this.data.showLoginGuide) },
+    _takeReviewGrowthRefresh() { return false },
   }
   const mocks = {
     '../../utils/auth': {

@@ -133,3 +133,8 @@
 .ai-mark.is-error .ai-mark-dot {
   background: #C06A55;
 }
+
+/* Keep the AI source hint on one line so the status copy stays scannable. */
+.ai-result-tools .ai-hint {
+  white-space: nowrap;
+}

@@ -65,7 +65,7 @@ const EXPECTED_PORTS = {
   GroupSubmitFlow: ['applyResult', 'begin', 'buildTimingSession', 'confirm', 'enrichForResult', 'failureNeedsRefresh', 'getGroupQuestions', 'getRequestId', 'isPageAlive', 'isQuestionAnswered', 'logError', 'request', 'setSubmitting', 'showResultFailureToast'],
   GroupSubmitEntry: ['clearMasterUndo', 'computeAnsweredCount', 'confirmController', 'getData', 'getSession', 'isConfirmPending', 'isMasterUndoInFlight', 'isPageAlive', 'setSubmitting', 'showToast', 'syncReviewSessionDay'],
   GroupSubmitRequest: ['isPageAlive', 'postGrade', 'setSubmitting', 'showToast'],
-  GroupSubmitResult: ['clearSubmittedDraft', 'getCurrentGroupIdx', 'getGroups', 'getSession', 'getTodayCompletedCount', 'getTodayDueCount', 'pauseTimer', 'setData', 'showResultDockAndRefreshTimer', 'showToast'],
+  GroupSubmitResult: ['clearSubmittedDraft', 'getCurrentGroupIdx', 'getGroups', 'getSession', 'getTodayCompletedCount', 'getTodayDueCount', 'isGuestMode', 'markHomeGrowthRefresh', 'openResultUrl', 'pauseTimer', 'setData', 'showResultDockAndRefreshTimer', 'showToast', 'writeResultCache'],
   ResultDock: ['clearFadeTimer', 'clearTimeout', 'getFadeDelay', 'getPhase', 'getResultDockVisible', 'getTodayRemainingCount', 'isPageAlive', 'setData', 'setFadeTimer', 'setTimeout'],
 }
 
@@ -215,6 +215,22 @@ test('controller ports stay delegated to the page helpers', () => {
   const overviewSync = buildOverviewSyncPageCapabilities(page, deps())
   assert.equal(overviewSync.getTodayDueCount(), 5)
   assert.equal(overviewSync.getPhase(), 'reviewing')
+})
+
+test('completed review results mark home growth data for a fresh refresh', () => {
+  const { page } = recordingPage()
+  const result = buildGroupSubmitResultPageCapabilities(page, deps())
+  const app = { globalData: {} }
+  const originalGetApp = global.getApp
+  global.getApp = () => app
+  try {
+    result.markHomeGrowthRefresh()
+  } finally {
+    if (originalGetApp === undefined) delete global.getApp
+    else global.getApp = originalGetApp
+  }
+  assert.equal(typeof app.globalData.homeGrowthRefreshAfterReview, 'number')
+  assert.ok(app.globalData.homeGrowthRefreshAfterReview > 0)
 })
 
 test('nav-back exit confirm uses the shared dialog selector and degrades to a toast', async () => {

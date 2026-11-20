@@ -14,6 +14,7 @@ const { test } = require('node:test')
 const HOME_PAGE = path.resolve(__dirname, '../pages/home/home.js')
 const HOME_UTILS = path.resolve(__dirname, '../pages/home/utils')
 const growthAnimation = require('../pages/home/utils/growth-animation')
+const growthClient = require('../pages/home/utils/growth-client')
 const { buildSubjectMastery } = require('../pages/home/utils/growth-mastery')
 
 const SUBJECT_STATS = [
@@ -450,5 +451,58 @@ test('home goal entry opens study plan and reads its saved daily target on refre
     assert.equal(page._growthTargets.levelProgress, 26)
     require('../utils/storage').set('home_today_goal_total', 999)
     assert.equal(page.getStoredTodayGoal(), 30)
+  })
+})
+
+test('review completion retries only while the server still reports due reviews', () => {
+  assert.equal(growthClient.needsReviewCompletionRetry({
+    dashboard: { overview: { due_review_count: 0 } },
+    hub: { scope_ready: true, review: { remaining_count: 4 } },
+  }), true)
+  assert.equal(growthClient.needsReviewCompletionRetry({
+    dashboard: { overview: { due_review_count: 1 } },
+    hub: { scope_ready: true, review: { remaining_count: 0 } },
+  }), false)
+  assert.equal(growthClient.needsReviewCompletionRetry({
+    dashboard: { overview: { due_review_count: 2 } },
+    hub: null,
+  }), true)
+})
+
+test('review completion immediately refetches a stale home hub snapshot', async () => {
+  await withHomePage(async ({ page }) => {
+    let hubCalls = 0
+    const originalSetTimeout = global.setTimeout
+    global.setTimeout = callback => {
+      callback()
+      return 1
+    }
+    page._growthApi = {
+      get(url) {
+        if (url === '/stats/dashboard') {
+          return Promise.resolve({ overview: { due_review_count: 0 }, subject_stats: [] })
+        }
+        if (url === '/stats/growth') return Promise.resolve({})
+        if (url === '/study-hub/overview') {
+          hubCalls += 1
+          return Promise.resolve({
+            scope_ready: true,
+            today_question_count: 6,
+            review: { remaining_count: hubCalls === 1 ? 3 : 0 },
+          })
+        }
+        if (url === '/study-plan/overview') return Promise.resolve({})
+        return Promise.reject(new Error(`unexpected route ${url}`))
+      },
+    }
+
+    try {
+      await page.loadGrowthSnapshot(1, { refreshAfterReview: true })
+    } finally {
+      global.setTimeout = originalSetTimeout
+    }
+
+    assert.equal(hubCalls, 2)
+    assert.equal(page.data._animDueReviewCount, 0)
   })
 })

@@ -114,8 +114,9 @@ Page({
     if (!this._authed) return
     const canContinue = await this._syncHomeUser(showSeq)
     if (!canContinue) return
+    const refreshAfterReview = this._takeReviewGrowthRefresh()
     // 个人资料仅在用户主动点击首页头像入口时打开，不在首页自动弹出。
-    await this.loadGrowthSnapshot(showSeq)
+    await this.loadGrowthSnapshot(showSeq, { refreshAfterReview })
   },
 
   _applyHomeBasePatch() {
