@@ -230,11 +230,6 @@
   border-radius: 8px;
 }
 
-.profileLink:hover,
-.profileLink[aria-current="page"] {
-  background: var(--sidebar-accent);
-}
-
 .profileLink:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
