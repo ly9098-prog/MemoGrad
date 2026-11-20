@@ -15,7 +15,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  KeyRound,
   Loader2,
   LockKeyhole,
   Mail,
@@ -268,7 +267,6 @@ function LoginForm() {
                   disabled={loading || captchaOpen}
                   onClick={() => selectMode("password")}
                 >
-                  <KeyRound aria-hidden="true" />
                   密码登录
                 </button>
                 <button
@@ -278,7 +276,6 @@ function LoginForm() {
                   disabled={loading || captchaOpen}
                   onClick={() => selectMode("email")}
                 >
-                  <Mail aria-hidden="true" />
                   邮箱验证码
                 </button>
               </div>
