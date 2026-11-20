@@ -47,6 +47,19 @@ function buildSubjectSheetPage(root, subjectId) {
   }
 }
 
+function subjectSheetGridRows(subjectTree) {
+  let rows = 0
+  const visit = node => {
+    if (!node || node.is_active === false) return
+    const children = (node.children || []).filter(child => child.is_active !== false)
+    rows = Math.max(rows, Math.min(2, Math.ceil(children.length / 2)))
+    children.forEach(visit)
+  }
+  const roots = subjectTree || []
+  roots.forEach(visit)
+  return rows
+}
+
 function buildSubjectSheetView(subjectTree, selectedSubjectId) {
   const path = findSubjectPath(subjectTree, selectedSubjectId)
   const selected = path[path.length - 1]
@@ -60,6 +73,7 @@ function buildSubjectSheetView(subjectTree, selectedSubjectId) {
   return {
     subjectSheetPages: pages,
     subjectSheetCurrent: Math.max(0, pages.findIndex(page => root && page.root_id === root.subject_id)),
+    subjectSheetGridRows: subjectSheetGridRows(subjectTree),
     subjectSheetDraft: selected ? {
       subject_id: selected.subject_id,
       display_name: (selected.children || []).length ? `${selected.display_name}（全部）` : selected.display_name,
@@ -71,5 +85,6 @@ module.exports = {
   findSubjectPath,
   preferredSubjectRoot,
   buildSubjectSheetPage,
+  subjectSheetGridRows,
   buildSubjectSheetView,
 }

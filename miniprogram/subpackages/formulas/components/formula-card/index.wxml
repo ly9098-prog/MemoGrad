@@ -20,7 +20,6 @@
         <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
           <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
             scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}"
-            bindscroll="onContentScroll"
             bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
             <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
               <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
@@ -81,7 +80,7 @@
       style="{{recitationMode && readingHeight > 0 ? 'height:' + readingHeight + 'px;' : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}" bindscroll="onContentScroll">
+        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}">
           <view class="fc-recall-question {{card.title.length > 48 ? 'is-long-question' : ''}}">
             <template is="card-heading" data="{{card: card, content: content}}" />
           </view>
@@ -92,7 +91,7 @@
       <view class="fc-flip-face {{recitationMode ? 'fc-flip-back' : 'fc-browse-face'}}" aria-hidden="{{recitationMode && !isFlipped}}">
         <block wx:if="{{recitationMode}}">
           <view class="fc-answer-heading"><text class="fc-face-label">答案</text><text class="fc-scroll-note">卡内上下滑动</text></view>
-          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}" bindscroll="onContentScroll" catchtap="containFormulaReading">
+          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}" catchtap="containFormulaReading">
             <template is="card-heading" data="{{card: card, content: content}}" />
             <template is="card-content" data="{{card: card, content: content, formulaBlocks: formulaBlocks, graphImageUrl: graphImageUrl, displayGraphUrl: displayGraphUrl, graphViewportRatio: graphViewportRatio, graphLoadError: graphLoadError}}" />
           </scroll-view>

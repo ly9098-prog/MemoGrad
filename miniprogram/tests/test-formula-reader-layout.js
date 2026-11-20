@@ -84,7 +84,6 @@ definition.properties.card.observer.call(target, { id: 2, formula_blocks: [{ lat
 assert.equal(target.data.expandedBlock, null, 'switching card dismisses stale expanded content')
 assert.equal(target.events.at(-1), 'formulaend')
 assert.equal(target.data.formulaBlocks[0].readingRows[0].lineItems.length, 1)
-assert.match(read('subpackages/formulas/reader/index.wxml'), /currentCard && !formulaReadingExpanded/)
 // Reader must not interpret horizontal formula scrolling as card navigation.
 let readerDefinition
 require('node:vm').runInNewContext(read('subpackages/formulas/reader/index.js'), {
@@ -218,7 +217,7 @@ for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-ex
   [libraryStyles, 'fl-filter-button'], [libraryStyles, 'fl-search-clear'], [libraryStyles, 'fl-random-action'],
   [libraryStyles, 'fl-chapter-chip'], [libraryStyles, 'fl-study-type-chip'], [libraryStyles, 'fl-filter-option'],
   [libraryStyles, 'fl-filter-reset'], [libraryStyles, 'fl-filter-done'],
-  [readerStyles, 'fr-card-favorite'], [readerStyles, 'fr-nav-hit']]) {
+  [readerStyles, 'fr-card-favorite']]) {
   assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
     control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
 }
@@ -228,15 +227,11 @@ for (const control of ['fc-flip-front-scroll', 'fc-flip-back-scroll']) {
     'card vertical reading must let page swipe events bubble: ' + control)
   assert.match(tag, /scroll-y/, 'long content stays scrollable: ' + control)
   assert.match(tag, /show-scrollbar="\{\{false\}\}"/, 'reading scrollbars are hidden without clipping content: ' + control)
-  assert.match(tag, /bindscroll="onContentScroll"/, 'inertial card scrolling wakes navigation: ' + control)
 }
-const navigationTag = read('subpackages/formulas/reader/index.wxml').match(/<view[^>]*class="fr-nav-capsule[^>]*>/)[0]
-assert.doesNotMatch(navigationTag, /wx:if="\{\{navigationVisible/,
-  'idle navigation keeps its node so it can fade without changing content geometry')
-assert.match(navigationTag, /aria-hidden="\{\{!navigationVisible\}\}"/,
-  'idle navigation leaves the accessibility tree immediately')
-assert.match(readerStyles, /\.fr-nav-capsule\.is-hidden\s*\{[^}]*opacity:\s*0;[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/,
-  'idle navigation cannot intercept a touch while its opacity fades')
+assert.doesNotMatch(read('subpackages/formulas/reader/index.wxml'), /fr-nav-capsule|fr-nav-hit|fr-nav-status/,
+  'reader has no floating navigation capsule')
+assert.doesNotMatch(readerStyles, /fr-nav-capsule|fr-nav-hit|fr-nav-status|fr-bottom-space/,
+  'capsule layout and idle states are removed from the reader stylesheet')
 assert.match(template, /class="fc-formula-line-scroll"[\s\S]*?bindtouchstart="onFormulaTouchStart"/,
   'actual horizontal formula scroll views still isolate card switching')
 assert.match(readerStyles, /\.fr-transition-stage\s*\{[^}]*transform:\s*none\s*!important;/,
@@ -343,27 +338,10 @@ if (process.argv[2]) {
     assert.equal(byClass(graphTree, 'fc-graph-viewport')[0].attr.style, 'padding-bottom:75%;',
       'image loading and failure retain exactly the same reserved viewport')
   }
-  for (const navigationVisible of [false, true]) {
-    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card,
-      navigationVisible, canGoPrev: true, canGoNext: true })
-    const capsule = byClass(readerTree, 'fr-nav-capsule')
-    assert.equal(capsule.length, 1, 'idle visibility does not recreate the floating controls')
-    assert.equal(capsule[0].attr.ariaHidden, !navigationVisible)
-    assert.equal(byClass(readerTree, 'is-hidden').length, navigationVisible ? 0 : 1,
-      'hidden floating controls receive the non-interactive fading state')
-    for (const hit of byClass(capsule[0], 'fr-nav-hit')) {
-      assert.equal(hit.attr.ariaDisabled, !navigationVisible, 'available controls become inaccessible while idle-hidden')
-    }
-  }
-  function visibleText(node) {
-    return typeof node === 'string' || typeof node === 'number' ? String(node) : (node && node.children || []).map(visibleText).join('')
-  }
-  for (const total of [120, 12345]) {
-    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card,
-      sequenceIds: Array.from({ length: total }, (_, index) => index + 1), sequenceIndex: total - 1 })
-    assert.equal(visibleText(byClass(readerTree, 'fr-nav-status')[0]).trim(), total + ' / ' + total,
-      'long navigation counts keep every digit')
-  }
+  const swipeReader = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card,
+    sequenceIds: [1, 2, 3], sequenceIndex: 0, canGoPrev: false, canGoNext: true })
+  assert.equal(byClass(swipeReader, 'fr-nav-capsule').length, 0,
+    'native reader template contains no floating switching capsule')
 
   for (const recitationMode of [false, true]) {
     const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode, recitationHeight: 600 })

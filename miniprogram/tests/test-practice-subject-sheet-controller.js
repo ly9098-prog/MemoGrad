@@ -216,14 +216,17 @@ test('browsing a subject never selects all; only explicit scope staging plus con
   const { state, controller } = sheetHarness()
   controller.browse(70)
   assert.equal(state.data.subjectSheetPages[1].grid_rows, 2, 'four subjects use the compact two-row height')
+  assert.equal(state.data.subjectSheetGridRows, 2, 'the swiper reserves the tallest page height')
   controller.chooseCard(71)
   assert.equal(state.data.subjectSheetPages[1].node_id, 71)
-  assert.equal(state.data.subjectSheetPages[1].grid_rows, 1, 'a nested page shrinks to its direct child rows')
+  assert.equal(state.data.subjectSheetPages[1].grid_rows, 1, 'the direct child page records its own one-row content')
+  assert.equal(state.data.subjectSheetGridRows, 2, 'browsing a one-row branch never shrinks the shared swiper')
   assert.equal(state.data.subjectSheetDraft.subject_id, 72)
   assert.deepEqual(state.selections, [])
   controller.browse(state.data.subjectSheetPages[1].back_id)
   assert.equal(state.data.subjectSheetPages[1].node_id, 70)
   assert.equal(state.data.subjectSheetPages[1].grid_rows, 2)
+  assert.equal(state.data.subjectSheetGridRows, 2)
   assert.equal(state.data.subjectSheetDraft.subject_id, 72, 'returning preserves the draft')
   controller.chooseCard(71)
   controller.stage(71)
@@ -347,7 +350,8 @@ test('sheet keeps native swiping, compact text options and image controls withou
   const sheetMarkup = wxml.slice(wxml.indexOf('<view class="subject-sheet-layer'), wxml.indexOf('<view class="practice route-enter-task'))
   assert.ok(!/subject-discipline-hint|subject-sheet-selection|左右滑动切换学科/.test(sheetMarkup))
   assert.match(sheetMarkup, /class="subject-discipline-dots" wx:if="\{\{subjectSheetPages.length > 1\}\}"/)
-  assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetPages\[subjectSheetCurrent\].grid_rows/)
+  assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetGridRows \|\| 0\}\}/,
+    'the sheet height comes from the whole swiper, not the active page')
   assert.ok(!/line-icon|icon-chevron|icon-close/.test(sheetMarkup), 'sheet controls use the shared SVG images')
   assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
   assert.match(css, /\.subject-option\{[^}]*min-height:64px[^}]*background:transparent/)
@@ -364,7 +368,7 @@ test('sheet keeps native swiping, compact text options and image controls withou
   }
 })
 
-test('two-row sheet stays within the compact height budget including safe area and readable 408 labels', () => {
+test('two-row sheet keeps a stable swiper height while retaining compact safe-area and readable 408 labels', () => {
   const fs = require('node:fs'), path = require('node:path')
   const css = fs.readFileSync(path.resolve(__dirname, '../subpackages/study/practice/practice.wxss'), 'utf8')
   const rule = selector => {
@@ -391,7 +395,8 @@ test('two-row sheet stays within the compact height budget including safe area a
   const heading = rule('.subject-discipline-heading')
   assert.equal(twoRows, px(heading['min-height']) + px(heading['margin-bottom']) + 2 * px(item['min-height']) + gap,
     'native viewport fits the heading and two option rows without extra whitespace')
-  assert.equal(twoRows - oneRow, px(item['min-height']) + gap, 'one-row branches release the unused option row')
+  assert.equal(twoRows - oneRow, px(item['min-height']) + gap,
+    'page-local row counts remain available while the view binds to the shared maximum')
   const dots = rule('.subject-discipline-dots')
   const footer = rule('.subject-sheet-footer')
   const confirm = rule('.subject-sheet-confirm')
@@ -473,7 +478,10 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   const branchView = buildSubjectSheetView(branchCatalog, 83)
   const branch = render({ ...base, ...branchView })
   const math = byClass(branch, 'subject-discipline-item')[branchView.subjectSheetCurrent]
-  assert.ok(byClass(branch, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-1'))
+  assert.equal(branchView.subjectSheetPages[branchView.subjectSheetCurrent].grid_rows, 1)
+  assert.equal(branchView.subjectSheetGridRows, 2)
+  assert.ok(byClass(branch, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-2'),
+    'the 408 page keeps the shared swiper height while a one-row branch is visible')
   assert.equal(text(byClass(math, 'subject-discipline-title')[0]), '高等数学')
   assert.equal(byClass(math, 'subject-branch-back')[0].attr['data-subject-id'], 80)
   assert.equal(byClass(math, 'subject-branch-icon')[0].attr.src, '/assets/icons/mobile-controls/chevron-left.svg')

@@ -1,4 +1,4 @@
-const { buildSubjectSheetView, buildSubjectSheetPage, findSubjectPath } = require('./subject-sheet-view')
+const { buildSubjectSheetView, buildSubjectSheetPage, findSubjectPath, subjectSheetGridRows } = require('./subject-sheet-view')
 const SUBJECT_DOUBLE_TAP_INTERVAL = 320
 
 function createSubjectSheetController(options) {
@@ -47,7 +47,7 @@ function browse(options, subjectId) {
   if (!path.length) return
   const pages = options.getSheetPages().slice()
   pages[options.getCurrentIndex()] = buildSubjectSheetPage(root, subjectId)
-  options.setData({ subjectSheetPages: pages })
+  options.setData({ subjectSheetPages: pages, subjectSheetGridRows: subjectSheetGridRows(options.getSubjectTree()) })
 }
 
 function chooseCard(options, subjectId) {

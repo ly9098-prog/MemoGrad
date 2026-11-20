@@ -218,7 +218,7 @@
 <view class="theme-sheet-brand-icon" aria-hidden="true"><image class="theme-icon-image theme-brand-image" src="/assets/icons/mobile-controls/layers.svg" mode="aspectFit" /></view>
 <text class="theme-sheet-title">选择主题</text>
 </view>
-<text class="theme-sheet-caption">{{themeGroupCount}} 个可用主题 · 选择后返回图谱</text>
+<text class="theme-sheet-caption">{{themeGroupCount}} 个可用主题</text>
 </view>
 <view class="theme-sheet-close" bindtap="closeThemeSheet" hover-class="search-clear-pressed" aria-role="button" aria-label="关闭主题选择"><image class="clear-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" /></view>
 </view>
@@ -229,23 +229,20 @@
 </view>
 <scroll-view class="theme-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
 <view class="theme-sheet-list">
-<button class="theme-sheet-featured {{themeSheetPendingKey === '' || (themeSheetPendingKey === '__idle__' && !activeGroupKey) ? 'theme-sheet-active' : ''}}" data-key="" bindtap="chooseThemeFromSheet" hover-class="atlas-pressed">
+<button class="theme-sheet-featured {{themeSheetPendingKey === '' || (themeSheetPendingKey === '__idle__' && !activeGroupKey) ? 'theme-sheet-active' : ''}}" data-key="" bindtap="chooseThemeFromSheet" hover-class="atlas-pressed" aria-pressed="{{themeSheetPendingKey === '' || (themeSheetPendingKey === '__idle__' && !activeGroupKey)}}">
 <view class="theme-sheet-featured-icon" aria-hidden="true"><image class="theme-icon-image" src="/assets/icons/mobile-controls/layers.svg" mode="aspectFit" /></view>
 <view class="theme-sheet-featured-copy"><text class="theme-sheet-featured-name">全部主题</text><text class="theme-sheet-featured-note">查看当前筛选下全部知识点</text></view>
 <text class="theme-sheet-chip-count">{{searchResultCount}}</text>
-<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/{{themeSheetPendingKey === '' || (themeSheetPendingKey === '__idle__' && !activeGroupKey) ? 'check' : 'chevron-right'}}.svg" mode="aspectFit" aria-hidden="true" />
 </button>
 <view class="theme-sheet-rows" wx:if="{{themeSheetGroups.length}}">
 <block wx:for="{{themeSheetGroups}}" wx:key="key">
-<view class="theme-sheet-row">
-<view class="theme-sheet-order"><text>{{item.orderText}}</text></view>
-<button class="theme-sheet-item {{themeSheetPendingKey === item.key || (themeSheetPendingKey === '__idle__' && activeGroupKey === item.key) ? 'theme-sheet-active' : ''}} {{!item.count ? 'theme-sheet-disabled' : ''}}" disabled="{{!item.count}}" data-key="{{item.key}}" bindtap="chooseThemeFromSheet" hover-class="atlas-pressed">
+<button class="theme-sheet-item {{themeSheetPendingKey === item.key || (themeSheetPendingKey === '__idle__' && activeGroupKey === item.key) ? 'theme-sheet-active' : ''}} {{!item.count ? 'theme-sheet-disabled' : ''}}" disabled="{{!item.count}}" data-key="{{item.key}}" bindtap="chooseThemeFromSheet" hover-class="atlas-pressed" aria-pressed="{{themeSheetPendingKey === item.key || (themeSheetPendingKey === '__idle__' && activeGroupKey === item.key)}}">
 <view class="theme-sheet-item-icon" aria-hidden="true"><image class="theme-icon-image" src="{{item.iconSrc}}" mode="aspectFit" /></view>
 <view class="theme-sheet-item-copy"><text class="theme-sheet-item-name">{{item.name}}</text><text class="theme-sheet-item-note">主题 {{item.orderText}}</text></view>
 <text class="theme-sheet-chip-count">{{item.count}}</text>
-<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
+<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/{{themeSheetPendingKey === item.key || (themeSheetPendingKey === '__idle__' && activeGroupKey === item.key) ? 'check' : 'chevron-right'}}.svg" mode="aspectFit" aria-hidden="true" />
 </button>
-</view>
 </block>
 </view>
 <view class="theme-sheet-empty" wx:if="{{themeQuery && !themeSheetGroups.length}}"><image class="theme-empty-icon" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" /><text>没有匹配的主题</text><text>换个关键词试试</text></view>

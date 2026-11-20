@@ -586,14 +586,12 @@ Component({
       if (!this.data.recitationMode || this.data.expandedBlock || this._readingOpening ||
           Date.now() < (this._flipTapSuppressedUntil || 0)) return
       this.setData({ isFlipped: !this.data.isFlipped })
-      this.onContentScroll()
     },
     onCardTouchStart(event) {
       var touches = event && event.touches || []
       var touch = touches[0]
       this._flipGesture = touch ? { x: touch.clientX, y: touch.clientY } : null
       if (touches.length > 1) this._flipTapSuppressedUntil = Date.now() + 500
-      this.triggerEvent('readeractivity', { phase: 'start' })
     },
     onCardTouchMove(event) {
       var touches = event && event.touches || []
@@ -607,12 +605,10 @@ Component({
     onCardTouchEnd(event) {
       this.onCardTouchMove({ touches: event && event.changedTouches || [] })
       this._flipGesture = null
-      this.triggerEvent('readeractivity', { phase: 'end', touching: Boolean(event && event.touches && event.touches.length) })
     },
     onCardTouchCancel() {
       this._flipGesture = null
       this._flipTapSuppressedUntil = Date.now() + 500
-      this.triggerEvent('readeractivity', { phase: 'end' })
     },
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)
@@ -661,13 +657,7 @@ Component({
       this.onFormulaTouchEnd()
     },
 
-    containFormulaReading() {
-      this.onContentScroll()
-    },
-
-    onContentScroll() {
-      this.triggerEvent('readeractivity', { phase: 'activity' })
-    },
+    containFormulaReading() {},
 
     // Keep the viewport ratio in sync with the card currently mounted. Called
     // from the card observer so switching cards (reader swipes between cards

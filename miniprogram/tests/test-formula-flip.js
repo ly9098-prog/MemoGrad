@@ -269,143 +269,6 @@ function navigationRuntime() {
 }
 const settleNavigation = () => new Promise(resolve => setImmediate(resolve))
 
-function floatingReaderRuntime() {
-  let clock = 0, nextId = 0, definition
-  const timers = new Map()
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../subpackages/formulas/reader/index.js'), 'utf8'), {
-    require: () => ({}), Page: value => { definition = value }, console,
-    setTimeout(callback, delay) { const id = ++nextId; timers.set(id, { callback, at: clock + delay }); return id },
-    clearTimeout(id) { timers.delete(id) },
-  })
-  const reader = { ...definition, _readerAlive: true, _readerVisible: true,
-    data: { ...structuredClone(definition.data), loading: false, currentCard: { id: 201 }, recitationMode: true },
-    readerSessionValid: () => true,
-    writes: [], setData(patch, callback) { this.writes.push(patch); Object.assign(this.data, patch); if (callback) callback() },
-  }
-  return { reader, timers,
-    advance(ms) {
-      const end = clock + ms
-      let next
-      while ((next = Array.from(timers).filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0])) {
-        timers.delete(next[0]); clock = next[1].at; next[1].callback()
-      }
-      clock = end
-    },
-  }
-}
-
-test('floating navigation hides after five idle seconds and activity restarts one deadline without resizing content', () => {
-  const { reader, advance, timers } = floatingReaderRuntime()
-  reader.data.recitationHeight = 600
-  reader.resetReaderScroll()
-  assert.equal(reader.data.navigationVisible, true)
-  advance(4999)
-  assert.equal(reader.data.navigationVisible, true)
-  advance(1)
-  assert.equal(reader.data.navigationVisible, false)
-  reader.onReaderActivity()
-  assert.equal(reader.data.navigationVisible, true)
-  advance(3000)
-  reader.onReaderActivity()
-  assert.equal(timers.size, 1, 'repeated scrolling replaces the deadline instead of adding timers')
-  advance(4999)
-  assert.equal(reader.data.navigationVisible, true)
-  advance(1)
-  assert.equal(reader.data.navigationVisible, false)
-  assert.equal(reader.data.recitationHeight, 600, 'showing controls never changes either face height')
-})
-
-test('floating navigation stays awake through long multi-touch and formula gestures then restarts after release', () => {
-  const { reader, advance } = floatingReaderRuntime()
-  reader.resetReaderScroll()
-  advance(4900)
-  reader.onReaderTouchStart({ touches: [{ clientX: 100, clientY: 100 }] })
-  advance(6000)
-  assert.equal(reader.data.navigationVisible, true, 'a held touch must not lose its controls')
-  reader.onReaderTouchEnd({ touches: [{ clientX: 100, clientY: 100 }], changedTouches: [{ clientX: 120, clientY: 100 }] })
-  advance(6000)
-  assert.equal(reader.data.navigationVisible, true, 'another finger is still down')
-  reader.onReaderTouchCancel()
-  advance(5000)
-  assert.equal(reader.data.navigationVisible, false)
-  reader.onFormulaGestureStart()
-  advance(10000)
-  assert.equal(reader.data.navigationVisible, true)
-  reader.onFormulaGestureEnd()
-  advance(70 + 4999)
-  assert.equal(reader.data.navigationVisible, true)
-  advance(1)
-  assert.equal(reader.data.navigationVisible, false)
-})
-
-test('prompt, answer, caught taps and inertial scroll wake the floating navigation through the card boundary', () => {
-  const { reader, advance } = floatingReaderRuntime()
-  const card = cardInstance(true)
-  card.triggerEvent = (name, detail) => {
-    if (name === 'readeractivity') reader.onCardActivity({ detail })
-  }
-  reader.resetReaderScroll()
-  advance(5000)
-  card.onCardTouchStart({ touches: [{ clientX: 100, clientY: 100 }] })
-  assert.equal(reader.data.navigationVisible, true)
-  advance(6000)
-  assert.equal(reader.data.navigationVisible, true)
-  card.onCardTouchEnd({ touches: [], changedTouches: [{ clientX: 100, clientY: 100 }] })
-  advance(5000)
-  assert.equal(reader.data.navigationVisible, false)
-  for (const action of ['onContentScroll', 'toggleCardFlip', 'containFormulaReading']) {
-    card[action]()
-    assert.equal(reader.data.navigationVisible, true, action)
-    advance(5000)
-    assert.equal(reader.data.navigationVisible, false, action)
-  }
-})
-
-test('page hide pauses navigation timers, return restarts them and late unload callbacks cannot write', () => {
-  const { reader, advance, timers } = floatingReaderRuntime()
-  reader.resetReaderScroll()
-  const oldCallback = Array.from(timers.values())[0].callback
-  reader.onHide()
-  reader.onNavigationTouchEnd({ touches: [{ clientX: 120, clientY: 100 }] })
-  const writes = reader.writes.length
-  oldCallback()
-  advance(10000)
-  assert.equal(timers.size, 0)
-  assert.equal(reader.writes.length, writes, 'background pages perform no idle update')
-  reader.onShow()
-  assert.equal(reader.data.navigationVisible, true)
-  advance(5000)
-  assert.equal(reader.data.navigationVisible, false)
-  reader.onShow()
-  const pending = Array.from(timers.values())[0].callback
-  reader.onUnload()
-  const afterUnload = reader.writes.length
-  pending()
-  reader.onReaderActivity()
-  advance(10000)
-  assert.equal(reader.writes.length, afterUnload)
-  assert.equal(timers.size, 0)
-})
-
-test('native expanded reading owns navigation until it closes without resetting the current content', () => {
-  const { reader, advance, timers } = floatingReaderRuntime()
-  reader.resetReaderScroll()
-  const card = reader.data.currentCard
-  reader.data.readerScrollTop = 420
-  reader.onFormulaGestureStart()
-  reader.onFormulaReadingChange({ detail: { expanded: true } })
-  advance(10000)
-  assert.equal(timers.size, 0)
-  reader.onFormulaReadingChange({ detail: { expanded: false } })
-  reader.onFormulaGestureEnd()
-  advance(70 + 4999)
-  assert.equal(reader.data.navigationVisible, true)
-  advance(1)
-  assert.equal(reader.data.navigationVisible, false)
-  assert.equal(reader.data.currentCard, card)
-  assert.equal(reader.data.readerScrollTop, 420)
-})
-
 test('switching graph cards ignores old load and error events while preserving the reserved image ratio', () => {
   const card = cardInstance(true)
   card.data.graphImageUrl = '/fixture-first.svg'
@@ -436,7 +299,7 @@ test('switching graph cards ignores old load and error events while preserving t
   assert.equal(card.data.recitationScrollTop, 420, 'image state never resets the scroll position')
 })
 
-test('real library entry enables both capsule and swipe navigation with real session storage', async () => {
+test('real library entry keeps swipe navigation with real session storage after removing the floating capsule', async () => {
   const runtime = navigationRuntime()
   const library = runtime.loadPage('library')
   library.data.formulas = [{ id: 201 }, { id: 202 }, { id: 203 }]
@@ -447,17 +310,19 @@ test('real library entry enables both capsule and swipe navigation with real ses
   await settleNavigation()
   assert.deepEqual(Array.from(reader.data.sequenceIds), [201, 202, 203])
   assert.equal(reader.data.canGoNext, true)
-  reader.goNext()
-  await settleNavigation()
-  assert.equal(reader.data.currentCard.id, 202, 'capsule loads the next card')
   reader.onReaderTouchStart({ touches: [{ clientX: 240, clientY: 100 }] })
   reader.onReaderTouchMove({ touches: [{ clientX: 100, clientY: 103 }] })
   reader.onReaderTouchEnd({ changedTouches: [{ clientX: 100, clientY: 103 }] })
   await settleNavigation()
-  assert.equal(reader.data.currentCard.id, 203, 'page swipe loads the next card')
+  assert.equal(reader.data.currentCard.id, 202, 'page swipe loads the next card')
+  reader.onReaderTouchStart({ touches: [{ clientX: 240, clientY: 100 }] })
+  reader.onReaderTouchMove({ touches: [{ clientX: 100, clientY: 103 }] })
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 100, clientY: 103 }] })
+  await settleNavigation()
+  assert.equal(reader.data.currentCard.id, 203, 'a second page swipe continues through the sequence')
   reader.goPrev()
   await settleNavigation()
-  assert.equal(reader.data.currentCard.id, 202, 'previous card remains reachable')
+  assert.equal(reader.data.currentCard.id, 202, 'the retained previous helper still supports swipe direction handling')
 })
 
 test('mode reaches list, random, favorite and direct entries without persisting auth fragments', async () => {

@@ -178,7 +178,7 @@
 </scroll-view>
 <view class="subject-sheet-layer {{subjectSheetClosing ? 'closing' : ''}}" wx:if="{{subjectSheetVisible}}">
 <view class="subject-sheet-backdrop" catchtap="closeSubjectSheet" catchtouchmove="noop"></view>
-<view class="subject-sheet subject-sheet-rows-{{subjectSheetPages[subjectSheetCurrent].grid_rows || 0}}" catchtap="noop">
+<view class="subject-sheet subject-sheet-rows-{{subjectSheetGridRows || 0}}" catchtap="noop">
 <view class="sheet-handle" aria-hidden="true"></view>
 <view class="sheet-header">
 <view>

@@ -4,7 +4,7 @@
  * - formula mixed-content normalization still emits correct LaTeX
  * - Pomodoro free timer restores its original fluorescent gradient text
  * - obsolete CSS replacement-ring code is gone
- * - formula reader has one bottom spacer with enough fixed-nav clearance
+ * - formula reader no longer reserves space for the removed floating navigation
  */
 /* eslint-disable no-console */
 const assert = require('assert')
@@ -101,10 +101,10 @@ assert.ok(/\.theme-dark\.page-focus \.ring-time\s*\{[\s\S]*?color:\s*#72DDF2;[\s
 assert.ok(/\.theme-light\.page-free \.ring-time-free\s*\{[\s\S]*?color:\s*#10B981;[\s\S]*?text-shadow:/.test(pomodoroWxss))
 assert.ok(/\.theme-dark\.page-free \.ring-time-free\s*\{[\s\S]*?color:\s*#6EE7B7;[\s\S]*?text-shadow:/.test(pomodoroWxss))
 
-// 4) Reader fixed navigation gets a single effective bottom spacer so the last
-// content can scroll fully above the nav capsule.
+// 4) The floating navigation capsule and its old bottom spacer stay removed.
 const readerWxss = source('subpackages/formulas/reader/index.wxss')
-assert.strictEqual((readerWxss.match(/\.fr-bottom-space\s*\{/g) || []).length, 1)
-assert.ok(/\.fr-bottom-space\s*\{\s*height:\s*calc\(152rpx \+ env\(safe-area-inset-bottom\)\);\s*\}/.test(readerWxss))
+const readerWxml = source('subpackages/formulas/reader/index.wxml')
+assert.ok(!/fr-nav-capsule|fr-nav-hit|fr-nav-status|fr-bottom-space/.test(readerWxml))
+assert.ok(!/fr-nav-capsule|fr-nav-hit|fr-nav-status|fr-bottom-space/.test(readerWxss))
 
 console.log('v9 formula layout / pomodoro glow / dead-code cleanup checks passed')

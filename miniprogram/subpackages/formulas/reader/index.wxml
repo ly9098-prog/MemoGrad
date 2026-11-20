@@ -1,5 +1,5 @@
 <app-dialog id="appDialog" theme="mint"></app-dialog>
-<view class="fr-page" bindtap="onReaderActivity" bindtouchstart="onNavigationTouchStart" bindtouchend="onNavigationTouchEnd" bindtouchcancel="onNavigationTouchCancel">
+<view class="fr-page">
   <premium-nav title="速记" variant="mint" bind:back="goBack" />
 
   <view class="fr-loading" wx:if="{{loading}}">
@@ -80,37 +80,8 @@
           bind:readingchange="onFormulaReadingChange"
           bind:formulastart="onFormulaGestureStart"
           bind:formulaend="onFormulaGestureEnd"
-          bind:readeractivity="onCardActivity"
         />
       </view>
-      <view class="fr-bottom-space" wx:if="{{!recitationMode}}"></view>
     </view>
   </scroll-view>
-
-  <view class="fr-nav-capsule {{navigationVisible ? '' : 'is-hidden'}}" wx:if="{{!loading && !loadError && currentCard && !formulaReadingExpanded}}" aria-hidden="{{!navigationVisible}}">
-    <view
-      class="fr-nav-hit {{!canGoPrev || loadingNext ? 'disabled' : ''}}"
-      hover-class="fr-nav-pressed"
-      bindtap="goPrev"
-      role="button"
-      aria-label="上一张速记卡"
-      aria-disabled="{{!navigationVisible || !canGoPrev || loadingNext}}"
-    >
-      <image class="fr-arrow" src="/assets/icons/mobile-controls/chevron-left.svg" mode="aspectFit" aria-hidden="true" />
-    </view>
-    <view class="fr-nav-status">
-      <image class="fr-nav-loader" wx:if="{{loadingNext}}" src="/assets/icons/mobile-controls/loader-circle.svg" mode="aspectFit" aria-hidden="true" />
-      <text wx:else>{{isRandom ? currentIndex + 1 : sequenceIndex + 1}} / {{isRandom ? displayCards.length : sequenceIds.length || 1}}</text>
-    </view>
-    <view
-      class="fr-nav-hit next {{!canGoNext || loadingNext ? 'disabled' : ''}}"
-      hover-class="fr-nav-pressed"
-      bindtap="goNext"
-      role="button"
-      aria-label="下一张速记卡"
-      aria-disabled="{{!navigationVisible || !canGoNext || loadingNext}}"
-    >
-      <image class="fr-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
-    </view>
-  </view>
 </view>
