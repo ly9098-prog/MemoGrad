@@ -819,10 +819,6 @@ function LoginForm() {
 
                 {mode === "email" && !emailCodeSent ? (
                   <>
-                    <div className={styles.emailIntro}>
-                      <Mail aria-hidden="true" />
-                      <p>验证码仅发送给已绑定并验证的邮箱；首次验证会创建普通用户账号。</p>
-                    </div>
                     <div className={styles.field}>
                       <label htmlFor="user-email">邮箱地址</label>
                       <div className={styles.inputShell} data-invalid={error?.field === "email" || undefined}>
