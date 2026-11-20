@@ -439,4 +439,16 @@ describe("sidebar disclosure continuity", () => {
     });
     expect(logoutInAccount).toBe(true);
   });
+
+  it("opens personal information from the account area and closes mobile navigation", () => {
+    const onNavigate = vi.fn();
+    const tree = renderSidebar({ variant: "mobile", onNavigate });
+    let profileLink: Element | undefined;
+    walk(tree, (element) => {
+      if (element.props.href === "/profile" && element.props["aria-label"] === "个人信息") profileLink = element;
+    });
+    expect(profileLink).toBeDefined();
+    (profileLink!.props.onClick as () => void)();
+    expect(onNavigate).toHaveBeenCalledOnce();
+  });
 });

@@ -94,4 +94,19 @@ describe("login glass interaction", () => {
     (tilt.props.onPointerLeave as PointerHandler)(event);
     expect(properties.size).toBe(0);
   });
+
+  it("keeps inactive login forms inert and outside the accessibility tree", () => {
+    const wrapper = LoginPage() as ReactElement<{ children: ReactElement }>;
+    const forms: Element[] = [];
+    function visit(node: unknown) {
+      if (Array.isArray(node)) { node.forEach(visit); return; }
+      if (!isValidElement<Record<string, unknown>>(node)) return;
+      if (node.type === "form") forms.push(node);
+      visit(node.props.children);
+    }
+    visit((wrapper.props.children.type as () => unknown)());
+    expect(forms).toHaveLength(3);
+    expect(forms.map((form) => form.props.inert)).toEqual([false, true, true]);
+    expect(forms.map((form) => form.props["aria-hidden"])).toEqual([false, true, true]);
+  });
 });

@@ -59,6 +59,19 @@ class AdminMeResponse(BaseModel):
     permissions: list[str]
 
 
+class AdminProfileUpdateRequest(BaseModel):
+    """Self-service fields only. Email changes require the verified OTP flow."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str = Field(max_length=64)
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def normalize_display_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
 class AdminEmailStartRequest(BaseModel):
     email: str = Field(min_length=3, max_length=128)
 

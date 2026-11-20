@@ -119,9 +119,10 @@ const adminUsersRoute: AdminRoute = {
 };
 
 const securityRoute: AdminRoute = {
-  href: "/security",
-  label: "账号安全",
-  description: "邮箱与登录凭据",
+  href: "/profile",
+  label: "个人信息",
+  description: "资料、邮箱与登录凭据",
+  activePrefixes: ["/security"],
   icon: UserRoundCog,
 };
 

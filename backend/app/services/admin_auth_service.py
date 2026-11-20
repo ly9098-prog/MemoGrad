@@ -14,7 +14,11 @@ from app.core.admin_security import (
 )
 from app.core.time_utils import unix_timestamp, utcnow
 from app.models.admin import AdminUser, Permission, Role, RolePermission
-from app.schemas.admin_auth import AdminChangePasswordRequest, AdminLoginRequest
+from app.schemas.admin_auth import (
+    AdminChangePasswordRequest,
+    AdminLoginRequest,
+    AdminProfileUpdateRequest,
+)
 from app.services.admin_audit_service import write_admin_audit
 
 
@@ -65,6 +69,28 @@ async def get_admin_me_response(db: AsyncSession, admin_user: AdminUser) -> dict
         "role": role,
         "permissions": permissions,
     }
+
+
+async def update_admin_profile(
+    db: AsyncSession,
+    principal: AdminPrincipal,
+    data: AdminProfileUpdateRequest,
+    request: Request,
+) -> dict:
+    user = principal.user
+    previous_name = user.display_name
+    user.display_name = data.display_name or None
+    await write_admin_audit(
+        db,
+        principal,
+        "admin_user.update_profile",
+        "admin_user",
+        user.id,
+        detail={"old_display_name": previous_name, "display_name": user.display_name},
+        request=request,
+    )
+    await db.commit()
+    return await get_admin_me_response(db, user)
 
 
 async def refresh_admin_access_token(

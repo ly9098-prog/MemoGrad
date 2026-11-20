@@ -12,6 +12,7 @@ from app.core.admin_security import (
     consume_admin_refresh_token,
     decode_admin_refresh_token,
     delete_refresh_cookie,
+    get_current_admin,
     get_current_admin_any_scope,
     set_refresh_cookie,
 )
@@ -25,6 +26,7 @@ from app.schemas.admin_auth import (
     AdminChangePasswordRequest,
     AdminLoginRequest,
     AdminMeResponse,
+    AdminProfileUpdateRequest,
     AdminTokenResponse,
 )
 from app.services.admin_audit_service import write_admin_audit
@@ -33,6 +35,7 @@ from app.services.admin_auth_service import (
     build_admin_login_response,
     change_admin_password,
     get_admin_me_response,
+    update_admin_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -225,6 +228,17 @@ async def me(
     db: AsyncSession = Depends(get_db),
 ):
     return await get_admin_me_response(db, current_admin.user)
+
+
+@router.patch("/me", response_model=AdminMeResponse)
+async def update_profile(
+    data: AdminProfileUpdateRequest,
+    request: Request,
+    current_admin=Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _enforce_trusted_browser_origin(request)
+    return await update_admin_profile(db, current_admin, data, request)
 
 
 @router.post("/change-password")

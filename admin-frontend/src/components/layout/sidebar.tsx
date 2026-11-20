@@ -78,9 +78,8 @@ export function Sidebar({
   const permissions = useAuthStore((state) => state.permissions);
   const role = useAuthStore((state) => state.role);
   const isSuperAdmin = role?.name === "super_admin";
-  const userName = user && typeof user === "object" && "username" in user && typeof user.username === "string"
-    ? user.username
-    : "Admin";
+  const accountUser = user && ("username" in user ? user : user.user);
+  const userName = accountUser?.display_name || accountUser?.username || "Admin";
   const roleLabel = role?.display_name ?? role?.name ?? "管理员";
 
   const visibleNavigation = useMemo(
@@ -346,11 +345,13 @@ export function Sidebar({
           title={isRail ? `${userName} · ${roleLabel}` : undefined}
           aria-label={`当前用户：${userName}，${roleLabel}`}
         >
-          <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
-          <span className={cn(styles.copy, styles.accountCopy)}>
-            <span className={styles.accountName}>{userName}</span>
-            <span className={styles.accountRole}>{roleLabel}</span>
-          </span>
+          <Link href="/profile" onClick={navigate} aria-label="个人信息" aria-current={pathname === "/profile" ? "page" : undefined} title="个人信息" className={styles.profileLink}>
+            <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
+            <span className={cn(styles.copy, styles.accountCopy)}>
+              <span className={styles.accountName}>{userName}</span>
+              <span className={styles.accountRole}>{roleLabel}</span>
+            </span>
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

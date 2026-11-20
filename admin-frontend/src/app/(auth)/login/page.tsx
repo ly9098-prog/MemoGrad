@@ -270,8 +270,9 @@ function LoginForm() {
                 </button>
               </div>
 
-              {mode === "password" ? (
-                <form onSubmit={handlePasswordSubmit} className={styles.form} aria-busy={loading}>
+              <div className={styles.loginPanel}>
+                <form onSubmit={handlePasswordSubmit} className={styles.form} aria-busy={loading}
+                  inert={mode !== "password"} aria-hidden={mode !== "password"}>
                   <div className={styles.field}>
                     <label htmlFor="username">用户名</label>
                     <div className={styles.inputShell} data-invalid={hasError || undefined}>
@@ -318,8 +319,8 @@ function LoginForm() {
                     )}
                   </button>
                 </form>
-              ) : !emailCodeSent ? (
-                <form onSubmit={handleEmailStart} className={styles.form} aria-busy={loading}>
+                <form onSubmit={handleEmailStart} className={styles.form} aria-busy={loading}
+                  inert={mode !== "email" || emailCodeSent} aria-hidden={mode !== "email" || emailCodeSent}>
                   <div className={styles.emailIntro}>
                     <Mail aria-hidden="true" />
                     <p>验证码仅发送给已登录并主动验证过的管理员邮箱，不会创建新账号。</p>
@@ -358,11 +359,11 @@ function LoginForm() {
                     )}
                   </button>
                 </form>
-              ) : (
-                <form onSubmit={handleEmailVerify} className={styles.form} aria-busy={loading}>
+                <form onSubmit={handleEmailVerify} className={styles.form} aria-busy={loading}
+                  inert={mode !== "email" || !emailCodeSent} aria-hidden={mode !== "email" || !emailCodeSent}>
                   <div className={styles.emailIntro} data-success>
                     <ShieldCheck aria-hidden="true" />
-                    <p>验证码已发送至 <strong>{email}</strong>，5 分钟内有效。</p>
+                    <p>验证码已发送至 <strong className={styles.sentEmail} title={email}>{email || "管理员邮箱"}</strong>，5 分钟内有效。</p>
                   </div>
                   <div className={styles.field}>
                     <label htmlFor="email-code">6 位验证码</label>
@@ -411,7 +412,7 @@ function LoginForm() {
                     )}
                   </button>
                 </form>
-              )}
+              </div>
 
               <div
                 id={hasError ? "login-error" : undefined}

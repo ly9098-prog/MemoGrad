@@ -132,6 +132,7 @@
 
 .cardTilt:focus-within {
   transform: none;
+  transition: none;
 }
 
 .cardGlow {
@@ -197,7 +198,7 @@
 
 .card {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--login-border);
   border-top-color: rgb(235 248 255 / 26%);
   border-left-color: rgb(218 240 253 / 16%);
@@ -277,6 +278,34 @@
   display: grid;
   gap: 19px;
   margin-top: 30px;
+}
+
+/* Reserve the largest form in normal layout so switching never recenters the
+   glass card. Inactive forms retain their size but leave focus and AT trees. */
+.loginPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.loginPanel > .form {
+  grid-area: 1 / 1;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  align-content: start;
+}
+
+.loginPanel > .form[aria-hidden="true"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sentEmail {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modeTabs {
@@ -395,6 +424,11 @@
   color: #eaf8ff;
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+
+.emailIntro p {
+  min-width: 0;
+  flex: 1;
 }
 
 .inputShell {
