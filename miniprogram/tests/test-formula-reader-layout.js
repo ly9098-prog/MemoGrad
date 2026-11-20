@@ -13,6 +13,12 @@ assert.equal(fixture.readingRows.length, 1)
 assert.equal(fixture.readingRows[0].lines.length, 2, 'long equality breaks at its equals sign')
 assert.equal(fixture.readingRows[0].lines.join('').replace(/\s/g, ''), fixture.latex.replace(/\s/g, ''),
   'layout must not drop operands, constants or conditions')
+const longCjkText = prepare(String.raw`\text{${'长'.repeat(30)}}`)
+const longLatinText = prepare('x'.repeat(80))
+assert.equal(longCjkText.readingRows[0].isScrollable, false,
+  'complexity remains a hint, not proof that long CJK text fits the viewport')
+assert.equal(longLatinText.readingRows[0].isScrollable, false,
+  'complexity remains a hint, not proof that long Latin text fits the viewport')
 const grouped = prepare(String.raw`\int x\,dx=\frac{x^2}{2}+C\\\int x^2\,dx=\frac{x^3}{3}+C\\\int x^3\,dx=\frac{x^4}{4}+C`)
 assert.equal(grouped.readingRows.length, 3, 'independent identities become separate rows')
 assert.equal(prepare(String.raw`\begin{aligned}a&=b\\c&=d\end{aligned}`).readingRows.length, 2)
@@ -57,6 +63,7 @@ try { require('../subpackages/formulas/components/formula-card/index') } finally
 }
 const runtimeFixture = Object.assign({}, fixture, {
   readingRows: fixture.readingRows.map(row => Object.assign({}, row, {
+    canScrollX: true,
     lineItems: row.lines.map((line, index) => ({ _key: String(index), mathNodes: [] })),
     fullLineItem: { _key: row._key + '-full', mathNodes: [] },
   })),
@@ -134,10 +141,14 @@ assert.match(cardWxss, /\.fc-example-notes\s*\{[^}]*padding:\s*2rpx 16rpx;[^}]*b
 assert.match(cardWxss, /\.fc-example-detail\s*\{[^}]*padding:\s*12rpx 0;[^}]*background:\s*transparent;/,
   'individual detail rows use spacing and separators instead of cards')
 assert.match(cardWxss, /\.fc-flip-stage\.is-recite\s*\{[^}]*will-change:\s*transform;/)
+assert.doesNotMatch(cardWxss, /\.fc-flip-stage\.is-flipped\s*\{[^}]*transform:/,
+  'flip rotation must use the cumulative inline angle instead of a fixed class angle')
 assert.match(cardWxss, /\.fc-flip-stage\.is-recite,\s*\.fc-flip-face\s*\{\s*transition: none !important;\s*will-change: auto !important;/)
 assert.match(template, /class="fc-formula-line-scroll"/)
 assert.match(template, /<page-container[\s\S]*bind:afterleave="closeFormulaReading"/)
 assert.match(template, /bindtouchstart="onFormulaTouchStart"/)
+assert.match(template, /scroll-x data-scrollable="\{\{row\.canScrollX\}\}"/,
+  'every formula row keeps native horizontal scrolling while only measured overflow claims reader swipes')
 assert.doesNotMatch(template, /bind:afterenter|fitFormulaReading/)
 assert.doesNotMatch(template, /height:90vh|>完成<|>展开阅读<|<button[^>]*fc-(?:reading-close|expand-button)/)
 assert.match(template, /role="button" aria-label="关闭公式阅读"/)
@@ -324,11 +335,14 @@ if (process.argv[2]) {
   assertCompleteContent(browse)
 
   for (const isFlipped of [false, true]) {
-    const recite = renderCard({ ...fixtureData, recitationMode: true, readingHeight: 600, isFlipped })
+    const flipAngle = isFlipped ? 180 : 360
+    const recite = renderCard({ ...fixtureData, recitationMode: true, readingHeight: 600, isFlipped, flipAngle })
     const front = byClass(recite, 'fc-flip-front')[0]
     const back = byClass(recite, 'fc-flip-back')[0]
     assert.equal(byClass(recite, 'fc-flip-face').length, 2)
-    assert.match(byClass(recite, 'fc-flip-stage')[0].attr.style, /height:600px;/, 'both faces use the current reader viewport')
+    assert.match(byClass(recite, 'fc-flip-stage')[0].attr.style,
+      new RegExp(`transform:rotateY\\(${flipAngle}deg\\);height:600px;`),
+      'both faces use the current cumulative transform and reader viewport')
     assert.equal(front.attr.ariaHidden, isFlipped)
     assert.equal(back.attr.ariaHidden, !isFlipped)
     assert.equal(byClass(front, 'fc-formula-rich').length, 0, 'prompt does not expose answer content')

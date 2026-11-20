@@ -179,6 +179,12 @@ function _xRepeat(count) {
   return out
 }
 
+function frontFacingFlipAngle(angle, isFlipped) {
+  var current = Number(angle)
+  if (!Number.isFinite(current)) current = 0
+  return isFlipped ? current + 180 : current
+}
+
 /**
  * Keep KaTeX's radical SVG inside the natural width of the radicand.
  *
@@ -419,6 +425,9 @@ function prepareFormulaBlocks(card) {
         })
         return Object.assign({}, row, {
           lineItems: items,
+          // Keep horizontal scrolling available until native layout measures
+          // whether this row actually overflows the viewport.
+          canScrollX: true,
           fullLineItem: items.length === 1 ? items[0] : {
             _key: row._key + '-full', mathNodes: renderFormulaNodes(row.latex),
           },
@@ -459,12 +468,15 @@ Component({
           var renderKey = formulaContent.createRenderKey(nextCard)
           var idChanged = !nextCard || !previousCard || String(nextCard.id) !== String(previousCard.id)
           var patch = {}
+          var frontFlipAngle = frontFacingFlipAngle(this.data.flipAngle, this.data.isFlipped)
 
           if (renderKey !== this.data.cardRenderKey) {
             this._flipGesture = null
             this._flipTapSuppressedUntil = 0
             patch.isFlipped = false
+            patch.flipAngle = frontFlipAngle
             if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
+            this.cancelFormulaGesture()
             this._readingLayouts = {}
             patch.cardRenderKey = renderKey
             patch.formulaBlocks = prepareFormulaBlocks(nextCard)
@@ -474,23 +486,30 @@ Component({
           this._syncGraphViewportRatio()
 
           if (idChanged) {
+            this.cancelFormulaGesture()
             patch.isFlipped = false
+            patch.flipAngle = frontFlipAngle
             patch.graphLoadError = false
             patch.graphLoaded = false
             patch.displayGraphUrl = ''
           }
 
           if (Object.keys(patch).length) {
+            var shouldMeasureFormulaOverflow =
+              Object.prototype.hasOwnProperty.call(patch, 'formulaBlocks')
             this.setData(patch, () => {
               if (patch.isFlipped === false) this.resetRecitationScroll()
+              if (shouldMeasureFormulaOverflow) this.measureFormulaOverflow()
             })
           }
         } catch (e) {
+          this.cancelFormulaGesture()
           console.error('[formula-card] observer error', e)
           // Fallback: set empty data so the component renders as plain text
           this.setData({
             cardRenderKey: '',
             isFlipped: false,
+            flipAngle: 0,
             formulaBlocks: [],
             content: {
               titleNodes: [],
@@ -512,19 +531,27 @@ Component({
         this._flipGesture = null
         this._flipTapSuppressedUntil = 0
         if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
+        this.cancelFormulaGesture()
         this._readingLayouts = {}
-        this.setData({ isFlipped: false })
+        this.setData({ isFlipped: false, flipAngle: 0 })
         this.resetRecitationScroll()
       },
     },
     graphImageUrl: { type: String, value: '' },
-    readingHeight: { type: Number, value: 0 },
+    readingHeight: {
+      type: Number,
+      value: 0,
+      observer() {
+        this.measureFormulaOverflow()
+      },
+    },
     graphThumbnailUrl: { type: String, value: '' },
     graphViewportRatio: { type: Number, value: 75 },
   },
 
   data: {
     isFlipped: false,
+    flipAngle: 0,
     recitationScrollTop: 0,
     expandedBlock: null,
     expandedHeight: 0,
@@ -559,7 +586,9 @@ Component({
 
   lifetimes: {
     detached() {
+      this.cancelFormulaGesture()
       this._readingToken = (this._readingToken || 0) + 1
+      this._formulaOverflowToken = (this._formulaOverflowToken || 0) + 1
       this._readingOpening = false
       this._readingLayouts = null
     },
@@ -570,8 +599,16 @@ Component({
           cardRenderKey: formulaContent.createRenderKey(this.data.card),
           formulaBlocks: prepareFormulaBlocks(this.data.card),
           content: prepareContent(this.data.card),
+        }, () => {
+          this.measureFormulaOverflow()
         })
       }
+    },
+  },
+
+  pageLifetimes: {
+    hide() {
+      this.cancelFormulaGesture()
     },
   },
 
@@ -585,7 +622,12 @@ Component({
     toggleCardFlip() {
       if (!this.data.recitationMode || this.data.expandedBlock || this._readingOpening ||
           Date.now() < (this._flipTapSuppressedUntil || 0)) return
-      this.setData({ isFlipped: !this.data.isFlipped })
+      var currentAngle = Number(this.data.flipAngle)
+      if (!Number.isFinite(currentAngle)) currentAngle = 0
+      this.setData({
+        isFlipped: !this.data.isFlipped,
+        flipAngle: currentAngle + 180,
+      })
     },
     onCardTouchStart(event) {
       var touches = event && event.touches || []
@@ -609,6 +651,58 @@ Component({
     onCardTouchCancel() {
       this._flipGesture = null
       this._flipTapSuppressedUntil = Date.now() + 500
+    },
+    cancelFormulaGesture() {
+      if (!this._formulaTouchBlocksNavigation) return
+      this._formulaTouchBlocksNavigation = false
+      this.triggerEvent('formulaend', {}, { bubbles: true, composed: true })
+    },
+    measureFormulaOverflow() {
+      if (!this.createSelectorQuery || !(this.data.formulaBlocks || []).length) return
+      var token = this._formulaOverflowToken = (this._formulaOverflowToken || 0) + 1
+      var renderKey = this.data.cardRenderKey
+      var query = this.createSelectorQuery()
+      query.selectAll('.fc-flip-stage .fc-formula-line-scroll').boundingClientRect()
+      query.selectAll('.fc-flip-stage .fc-formula-line-scroll .fc-formula-rich').boundingClientRect()
+      query.exec((rects) => {
+        if (token !== this._formulaOverflowToken || renderKey !== this.data.cardRenderKey) return
+        this.applyFormulaOverflowMeasurements(rects && rects[0], rects && rects[1])
+      })
+    },
+    applyFormulaOverflowMeasurements(scrollRects, formulaRects) {
+      var frames = Array.isArray(scrollRects) ? scrollRects : []
+      var formulas = Array.isArray(formulaRects) ? formulaRects : []
+      var expected = 0
+      ;(this.data.formulaBlocks || []).forEach(function (block) {
+        ;(block.readingRows || []).forEach(function (row) {
+          expected += (row.lineItems || []).length
+        })
+      })
+      if (!expected || frames.length < expected || formulas.length < expected) return
+      for (var i = 0; i < expected; i++) {
+        if (!(frames[i] && Number(frames[i].width) > 0 && formulas[i] && Number(formulas[i].width) > 0)) return
+      }
+
+      var cursor = 0
+      var changed = false
+      var blocks = (this.data.formulaBlocks || []).map(function (block) {
+        var blockChanged = false
+        var rows = (block.readingRows || []).map(function (row) {
+          var canScrollX = false
+          ;(row.lineItems || []).forEach(function () {
+            if (Number(formulas[cursor].width) > Number(frames[cursor].width) + 1) canScrollX = true
+            cursor++
+          })
+          if (row.canScrollX === canScrollX && row.isScrollable === canScrollX) return row
+          blockChanged = true
+          return Object.assign({}, row, { canScrollX: canScrollX, isScrollable: canScrollX })
+        })
+        var hasWideRows = rows.some(function (row) { return row.canScrollX })
+        if (!blockChanged && block.hasWideRows === hasWideRows) return block
+        changed = true
+        return Object.assign({}, block, { readingRows: rows, hasWideRows: hasWideRows })
+      })
+      if (changed) this.setData({ formulaBlocks: blocks })
     },
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)
@@ -731,12 +825,19 @@ Component({
       this.setData({ graphLoadError: true, graphLoaded: false })
     },
 
-    onFormulaTouchStart() {
+    onFormulaTouchStart(event) {
+      if (event) {
+        var scrollable = event.currentTarget && event.currentTarget.dataset
+          ? event.currentTarget.dataset.scrollable : undefined
+        if (scrollable !== true && scrollable !== 'true' && scrollable !== 1 && scrollable !== '1') return
+      }
+      if (this._formulaTouchBlocksNavigation) return
+      this._formulaTouchBlocksNavigation = true
       this.triggerEvent('formulastart', {}, { bubbles: true, composed: true })
     },
 
     onFormulaTouchEnd() {
-      this.triggerEvent('formulaend', {}, { bubbles: true, composed: true })
+      this.cancelFormulaGesture()
     },
   },
 })

@@ -46,25 +46,34 @@ test('browsing is the default and cannot accidentally flip', () => {
   assert.equal(definition.properties.recitationMode.value, false)
   card.toggleCardFlip()
   assert.equal(card.data.isFlipped, false)
+  assert.equal(card.data.flipAngle, 0)
   assert.equal(card.writes.length, 0)
 })
 
-test('recitation flips the same prepared content and returns to the prompt', () => {
+test('recitation flips the same prepared content forward through a continuous loop', () => {
   const card = cardInstance(true)
   const formulas = [{ readingRows: [{ lineItems: [{ mathNodes: [{ type: 'text', text: 'x = y' }] }] }] }]
   card.data.formulaBlocks = formulas
   card.toggleCardFlip()
   assert.equal(card.data.isFlipped, true)
+  assert.equal(card.data.flipAngle, 180)
   assert.equal(card.data.formulaBlocks, formulas)
   card.toggleCardFlip()
   assert.equal(card.data.isFlipped, false)
-  card.data.expandedBlock = {}
+  assert.equal(card.data.flipAngle, 360, 'returning to the prompt continues forward instead of rotating backwards')
   card.toggleCardFlip()
-  assert.equal(card.data.isFlipped, false, 'expanded native reading owns the interaction')
+  assert.equal(card.data.isFlipped, true)
+  assert.equal(card.data.flipAngle, 540)
+  card.data.expandedBlock = {}
+  const angleBeforeReading = card.data.flipAngle
+  card.toggleCardFlip()
+  assert.equal(card.data.isFlipped, true, 'expanded native reading owns the interaction')
+  assert.equal(card.data.flipAngle, angleBeforeReading)
   card.data.expandedBlock = null
   card._readingOpening = true
   card.toggleCardFlip()
-  assert.equal(card.data.isFlipped, false, 'pending native reading also owns the interaction')
+  assert.equal(card.data.isFlipped, true, 'pending native reading also owns the interaction')
+  assert.equal(card.data.flipAngle, angleBeforeReading)
 })
 
 test('swiping, multi-touch and cancellation cannot accidentally flip the card', () => {
@@ -96,6 +105,7 @@ test('updating the same card content resets its face and stale gesture state', (
   const updated = { ...original, title: '乘法法则', formula_blocks: [{ latex: 'a b = b a' }] }
   changeCard(card, updated)
   assert.equal(card.data.isFlipped, false)
+  assert.equal(card.data.flipAngle, 360, 'content changes finish the forward turn onto a new prompt')
   assert.equal(card._flipTapSuppressedUntil, 0)
   assert.equal(card._flipGesture, null)
   assert.ok(card.data.formulaBlocks[0].readingRows.length)
@@ -111,9 +121,11 @@ test('switching cards resets the answer while favorite metadata keeps the curren
   const formulas = card.data.formulaBlocks
   changeCard(card, { ...original, isFavorited: true })
   assert.equal(card.data.isFlipped, true)
+  assert.equal(card.data.flipAngle, 180)
   assert.equal(card.data.formulaBlocks, formulas, 'favorite updates do not reparse formulas')
   changeCard(card, { ...original, id: 2 })
   assert.equal(card.data.isFlipped, false)
+  assert.equal(card.data.flipAngle, 360, 'switching cards reaches the new prompt without reversing')
   assert.equal(card.data.recitationMode, true, 'card navigation preserves the chosen mode')
 })
 
@@ -137,6 +149,7 @@ test('changing modes resets the face and cancels stale expanded reading measurem
   assert.equal(card._readingOpening, false)
   assert.equal(card.data.expandedBlock, null)
   assert.equal(card.data.isFlipped, false)
+  assert.equal(card.data.flipAngle, 0)
   assert.equal(card._flipGesture, null)
   assert.equal(card._flipTapSuppressedUntil, 0)
   assert.equal(card.data.formulaBlocks, formulas, 'mode changes reuse prepared math nodes')
@@ -151,6 +164,81 @@ test('changing modes resets the face and cancels stale expanded reading measurem
   assert.equal(card.data.expandedBlock, null)
   assert.equal(card.events.at(-2).name, 'readingchange')
   assert.equal(card.events.at(-2).detail.expanded, false)
+})
+
+test('only scrollable formula rows claim card navigation gestures', () => {
+  const card = cardInstance()
+  card.onFormulaTouchStart({ currentTarget: { dataset: { scrollable: false } } })
+  card.onFormulaTouchEnd()
+  assert.deepEqual(card.events, [], 'a short formula must not capture the reader swipe')
+
+  card.onFormulaTouchStart({ currentTarget: { dataset: { scrollable: 'true' } } })
+  card.onFormulaTouchStart({ currentTarget: { dataset: { scrollable: true } } })
+  card.onFormulaTouchEnd()
+  assert.deepEqual(card.events.map(event => event.name), ['formulastart', 'formulaend'],
+    'one overflowing formula emits one balanced gesture pair')
+  card.onFormulaTouchEnd()
+  assert.deepEqual(card.events.map(event => event.name), ['formulastart', 'formulaend'],
+    'an unmatched end cannot leave stale reader gesture state')
+})
+
+test('native formula measurements distinguish fitting rows from visual overflow', () => {
+  const card = cardInstance()
+  card.data.cardRenderKey = 'measured-formula-card'
+  card.data.formulaBlocks = [{
+    hasWideRows: false,
+    readingRows: [
+      { _key: 'fitting', isScrollable: false, canScrollX: true, lineItems: [{ _key: 'fitting-line' }] },
+      { _key: 'overflow', isScrollable: false, canScrollX: true, lineItems: [{ _key: 'overflow-line' }] },
+    ],
+  }]
+  let finishMeasurement
+  card.createSelectorQuery = () => ({
+    selectAll() { return this },
+    boundingClientRect() { return this },
+    exec(callback) { finishMeasurement = callback },
+  })
+  card.measureFormulaOverflow()
+  finishMeasurement([[{ width: 280 }, { width: 280 }], [{ width: 210 }, { width: 520 }]])
+  const rows = card.data.formulaBlocks[0].readingRows
+  assert.equal(rows[0].canScrollX, false, 'a fitting row lets card swipes through')
+  assert.equal(rows[1].canScrollX, true, 'a visually overflowing row owns the horizontal gesture')
+  assert.equal(card.data.formulaBlocks[0].hasWideRows, true)
+
+  changeCard(card, {
+    id: 9,
+    formula_blocks: [
+      { latex: String.raw`\text{${'长'.repeat(30)}}` },
+      { latex: 'x'.repeat(80) },
+      { latex: String.raw`\frac{${'a'.repeat(30)}}{b}` },
+    ],
+  })
+  assert.ok(card.data.formulaBlocks.every(block => block.readingRows.every(row => row.canScrollX)),
+    'CJK, Latin and structured text start conservatively before native width measurement')
+})
+
+test('formula gesture cancellation releases stale locks across card and page lifecycle changes', () => {
+  const mutations = [
+    card => changeCard(card, { id: 2, title: '新卡', formula_blocks: [] }),
+    card => changeMode(card, false),
+    card => definition.pageLifetimes.hide.call(card),
+  ]
+  for (const mutate of mutations) {
+    const card = cardInstance(true)
+    card.data.card = { id: 1, title: '旧卡', formula_blocks: [] }
+    card.onFormulaTouchStart({ currentTarget: { dataset: { scrollable: true } } })
+    assert.deepEqual(card.events.map(event => event.name), ['formulastart'])
+    mutate(card)
+    assert.deepEqual(card.events.map(event => event.name), ['formulastart', 'formulaend'])
+    assert.equal(card._formulaTouchBlocksNavigation, false)
+
+    card.onFormulaTouchStart({ currentTarget: { dataset: { scrollable: true } } })
+    assert.deepEqual(card.events.map(event => event.name),
+      ['formulastart', 'formulaend', 'formulastart'], 'the next gesture is not swallowed')
+    card.onFormulaTouchEnd()
+    assert.deepEqual(card.events.map(event => event.name),
+      ['formulastart', 'formulaend', 'formulastart', 'formulaend'])
+  }
 })
 
 let readerDefinition
@@ -468,14 +556,50 @@ test('random navigation sends the selected scope instead of dropping its paramet
   })
 })
 
-test('reader accepts an endpoint-only swipe but rejects vertical, multi-touch, cancelled and expanded gestures', () => {
+test('reader accepts clear swipes, fast short flicks and gestures with an imprecise start', () => {
+  const reader = readerInstance()
+  reader.goNext = () => { reader.nextCount = (reader.nextCount || 0) + 1 }
+  reader.goPrev = () => { reader.prevCount = (reader.prevCount || 0) + 1 }
+
+  reader.onReaderTouchStart({ touches: [{ clientX: 240, clientY: 100 }] })
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 100, clientY: 103 }] })
+  assert.equal(reader.nextCount, 1, 'native platforms may coalesce move events')
+
+  reader.onReaderTouchStart({ touches: [{ clientX: 240, clientY: 100 }] })
+  reader._readerGesture.startedAt -= 50
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 214, clientY: 102 }] })
+  assert.equal(reader.nextCount, 2, 'a 26px fast flick should not be lost')
+
+  reader.onReaderTouchStart({ touches: [{ clientX: 240, clientY: 100 }] })
+  reader.onReaderTouchMove({ touches: [{ clientX: 236, clientY: 112 }] })
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 170, clientY: 114 }] })
+  assert.equal(reader.nextCount, 3, 'the final horizontal displacement wins over an imprecise first sample')
+
+  reader.onReaderTouchStart({ touches: [{ clientX: 100, clientY: 100 }] })
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 140, clientY: 102 }] })
+  assert.equal(reader.prevCount, 1, 'right swipes retain the previous-card direction')
+})
+
+test('reader rejects slow short drags, vertical, multi-touch, cancelled and blocked gestures', () => {
   const reader = readerInstance()
   reader.goNext = () => { reader.nextCount = (reader.nextCount || 0) + 1 }
   const start = { touches: [{ clientX: 240, clientY: 100 }] }
   const end = { changedTouches: [{ clientX: 100, clientY: 103 }] }
+
   reader.onReaderTouchStart(start)
-  reader.onReaderTouchEnd(end)
-  assert.equal(reader.nextCount, 1, 'native platforms may coalesce move events')
+  reader._readerGesture.startedAt -= 500
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 213, clientY: 102 }] })
+  assert.equal(reader.nextCount, undefined, 'a slow 27px drag stays below the displacement floor')
+
+  reader.onReaderTouchStart(start)
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 210, clientY: 127 }] })
+  assert.equal(reader.nextCount, undefined, 'a near-square diagonal remains a vertical scroll')
+
+  reader.onReaderTouchStart(start)
+  reader._readerGesture.startedAt -= 50
+  reader.onReaderTouchEnd({ changedTouches: [{ clientX: 218, clientY: 120 }] })
+  assert.equal(reader.nextCount, undefined, 'a fast flick still needs a clear horizontal axis')
+
   for (const gesture of ['vertical', 'multi', 'cancel', 'expanded', 'formula']) {
     reader.onReaderTouchStart(start)
     if (gesture === 'vertical') reader.onReaderTouchMove({ touches: [{ clientX: 235, clientY: 180 }] })
@@ -483,8 +607,10 @@ test('reader accepts an endpoint-only swipe but rejects vertical, multi-touch, c
     if (gesture === 'cancel') reader.onReaderTouchCancel()
     if (gesture === 'expanded') reader.data.formulaReadingExpanded = true
     if (gesture === 'formula') reader.onFormulaGestureStart()
-    reader.onReaderTouchEnd(end)
-    assert.equal(reader.nextCount, 1, gesture)
+    reader.onReaderTouchEnd(gesture === 'vertical'
+      ? { changedTouches: [{ clientX: 235, clientY: 180 }] }
+      : end)
+    assert.equal(reader.nextCount, undefined, gesture)
     reader.data.formulaReadingExpanded = false
     reader._formulaGestureActive = false
   }

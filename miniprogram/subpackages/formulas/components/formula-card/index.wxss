@@ -27,7 +27,7 @@
   transition: transform 520ms cubic-bezier(.4, 0, .2, 1);
   will-change: transform;
 }
-.fc-flip-stage.is-flipped { transform: rotateY(180deg); }
+/* Rotation is cumulative and supplied inline, so the card always turns forward. */
 .fc-flip-face {
   box-sizing: border-box;
   min-width: 0;

@@ -19,7 +19,7 @@
       <view class="fc-formula-list">
         <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
           <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
-            scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}"
+            scroll-x data-scrollable="{{row.canScrollX}}" enhanced show-scrollbar="{{false}}" bounces="{{false}}"
             bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
             <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
               <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
@@ -79,7 +79,9 @@
 <view class="formula-card-wrap template-{{card.template_type || 'standard'}} study-{{card.study_card_type || 'formula'}}">
   <view class="fc-flip-shell {{recitationMode ? 'is-recite' : ''}}">
     <view class="fc-flip-stage {{recitationMode ? 'is-recite' : 'is-browse'}} {{recitationMode && isFlipped ? 'is-flipped' : ''}}"
-      style="{{recitationMode && readingHeight > 0 ? 'height:' + readingHeight + 'px;' : ''}}"
+      style="{{recitationMode
+        ? 'transform:rotateY(' + flipAngle + 'deg);' + (readingHeight > 0 ? 'height:' + readingHeight + 'px;' : '')
+        : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
         <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}">

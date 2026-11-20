@@ -22,6 +22,10 @@ const MAX_RANDOM_HISTORY = 24
 const MAX_SEQUENCE_SEARCH_PAGES = 10
 const TRANSITION_OUT_MS = 150
 const TRANSITION_IN_DELAY_MS = 36
+const READER_SWIPE_MIN_DISTANCE = 28
+const READER_SWIPE_FLICK_MIN_DISTANCE = 18
+const READER_SWIPE_FLICK_VELOCITY = 0.3
+const READER_SWIPE_HORIZONTAL_DOMINANCE = 1.2
 
 const STUDY_CARD_TYPE_LABEL = {
   formula: '公式',
@@ -523,7 +527,13 @@ Page({
     if (!e.touches || e.touches.length !== 1) return
     const touch = e.touches && e.touches[0]
     if (!touch) return
-    this._readerGesture = { startX: touch.clientX, startY: touch.clientY, dx: 0, dy: 0, axis: '' }
+    this._readerGesture = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dx: 0,
+      dy: 0,
+      startedAt: Date.now(),
+    }
   },
 
   onReaderTouchMove(e = {}) {
@@ -536,15 +546,12 @@ Page({
     if (!gesture || !touch) return
     gesture.dx = touch.clientX - gesture.startX
     gesture.dy = touch.clientY - gesture.startY
-    if (!gesture.axis && (Math.abs(gesture.dx) > 8 || Math.abs(gesture.dy) > 8)) {
-      gesture.axis = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.12 ? 'x' : 'y'
-    }
   },
 
   onReaderTouchEnd(e = {}) {
     const gesture = this._readerGesture
     this._readerGesture = null
-    if (this._formulaGestureActive || !gesture || gesture.axis === 'y' || this.data.loadingNext || this.data.formulaReadingExpanded) return
+    if (this._formulaGestureActive || !gesture || this.data.loadingNext || this.data.formulaReadingExpanded) return
 
     const touch = e.changedTouches && e.changedTouches[0]
     if (touch) {
@@ -553,7 +560,12 @@ Page({
     }
     const horizontalDistance = Math.abs(gesture.dx)
     const verticalDistance = Math.abs(gesture.dy)
-    if (horizontalDistance < 40 || verticalDistance > horizontalDistance * 0.8) return
+    const elapsed = Math.max(1, Date.now() - Number(gesture.startedAt || Date.now()))
+    const hasReliableDistance = horizontalDistance >= READER_SWIPE_MIN_DISTANCE
+    const isFastFlick = horizontalDistance >= READER_SWIPE_FLICK_MIN_DISTANCE &&
+      horizontalDistance / elapsed >= READER_SWIPE_FLICK_VELOCITY
+    if ((!hasReliableDistance && !isFastFlick) ||
+        horizontalDistance < verticalDistance * READER_SWIPE_HORIZONTAL_DOMINANCE) return
 
     if (gesture.dx < 0) this.goNext()
     else this.goPrev()
