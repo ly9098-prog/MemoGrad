@@ -10,6 +10,10 @@ import { QuestionListPagination } from "./question-list-pagination";
 import { QuestionListToolbar } from "./question-list-toolbar";
 import { DEFAULT_QUESTION_FILTERS, type QuestionListFilters } from "./question-list-state";
 
+vi.mock("@/components/motion/staggered-entrance", () => ({
+  useStaggeredEntrance: () => ({ current: null }),
+}));
+
 type Element = ReactElement<Record<string, unknown>>;
 type PureComponent = (props: Record<string, unknown>) => ReactNode;
 const hookComponents = new Set<unknown>([CustomCheckbox, MathFormula, QuestionListToolbar, QuestionListFeedback, QuestionListPagination]);

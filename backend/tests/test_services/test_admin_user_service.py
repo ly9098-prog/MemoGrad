@@ -19,7 +19,7 @@ from app.services.admin_user_service import (
 
 class _Db:
     def __init__(self, roles=None, users=None):
-        self.roles = roles or {}
+        self.roles = {1: _role(1, "super_admin"), **(roles or {})}
         self.users = users or {}
         self.added = []
         self.flush = AsyncMock()
@@ -48,8 +48,14 @@ class _Result:
         return self.value
 
 
-def _principal(user_id=1):
-    user = AdminUser(id=user_id, username="operator", password_hash="hash", is_active=True, role_id=2)
+def _principal(user_id=1, role_id=1):
+    user = AdminUser(
+        id=user_id,
+        username="operator",
+        password_hash="hash",
+        is_active=True,
+        role_id=role_id,
+    )
     return AdminPrincipal(user, {})
 
 
@@ -134,3 +140,21 @@ async def test_reset_password_updates_hash_and_nbf(monkeypatch):
     assert verify_admin_password("NewPassword123", target.password_hash)
     nbf.assert_awaited_once_with(2)
     assert "NewPassword123" not in str(audit.await_args.kwargs["detail"])
+
+
+@pytest.mark.asyncio
+async def test_reset_password_rejects_non_super_admin_even_with_legacy_permission():
+    target = _admin_user()
+    db = _Db(roles={1: _role(1, "super_admin"), 2: _role()}, users={2: target})
+
+    async def execute(_statement):
+        return _Result(target)
+
+    db.execute = execute
+    with pytest.raises(PermissionError, match="仅超级管理员"):
+        await reset_admin_user_password(
+            db,
+            2,
+            AdminUserResetPasswordRequest(new_password="NewPassword123"),
+            _principal(user_id=9, role_id=2),
+        )

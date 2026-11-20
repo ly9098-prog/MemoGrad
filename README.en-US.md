@@ -147,6 +147,18 @@ cp .env.example .env.local
 npm run dev
 ```
 
+The Admin console runs at `http://localhost:3002`.
+
+### User Web
+
+```bash
+cd web-frontend
+npm ci
+npm run dev
+```
+
+The user site runs at `http://localhost:3000` and proxies `/api/v1` to the local backend. GitHub OAuth callbacks must use this same user origin so the browser can restore its session.
+
 ### Mini Program
 
 ```bash

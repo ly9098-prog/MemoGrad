@@ -15,7 +15,9 @@ from app.core.security import issue_user_token
 from app.models.admin import AdminUser, Permission, Role, RolePermission
 from app.models.app_user_admin_binding import AppUserAdminBinding
 from app.models.user import User
+from app.models.user_auth import UserAuthIdentity
 from app.schemas.user import UserResponse
+from app.services import identity_service
 from app.services.storage_backend import (
     LEGACY_USER_AVATAR_PREFIX,
     get_legacy_user_avatar_storage,
@@ -35,13 +37,10 @@ def _dev_openid(code: str) -> str:
     return "dev_" + hashlib.md5(code.encode()).hexdigest()[:16]
 
 
-async def wechat_login(db: AsyncSession, code: str) -> tuple[str, int, User]:
-    """Returns (token, expires_at, user) tuple."""
+async def _resolve_wechat_openid(code: str) -> str:
     code = code.strip()
     if not code:
         raise ValueError("微信登录凭证不能为空")
-
-    openid: str | None = None
 
     has_app_id = bool(
         settings.WECHAT_APP_ID and settings.WECHAT_APP_ID != "your-app-id-here"
@@ -72,32 +71,80 @@ async def wechat_login(db: AsyncSession, code: str) -> tuple[str, int, User]:
 
         if "openid" not in data:
             raise ValueError("微信登录凭证无效")
-        openid = str(data["openid"])
-        # The WeChat session_key is not needed after jscode2session succeeds.
-        # Do not persist it: it is a short-lived sensitive credential.
-    elif settings.APP_ENV.lower() in LOCAL_APP_ENVS:
+        return str(data["openid"])
+    if settings.APP_ENV.lower() in LOCAL_APP_ENVS:
         # 开发环境：从 code 派生 openid
-        openid = _dev_openid(code)
-    else:
-        # 生产环境禁止回退到可预测的开发身份。
-        raise ValueError("微信登录服务未配置")
+        return _dev_openid(code)
+    # 生产环境禁止回退到可预测的开发身份。
+    raise ValueError("微信登录服务未配置")
 
-    # 查找或创建用户
-    result = await db.execute(select(User).where(User.openid == openid))
-    user = result.scalar_one_or_none()
 
-    if user:
-        if user.deleted_at is not None:
-            raise ValueError("账号已注销")
-        if user.is_banned:
-            raise ValueError("账号已封禁")
-    else:
-        user = User(openid=openid)
-        db.add(user)
+async def resolve_wechat_subject(code: str) -> str:
+    return await _resolve_wechat_openid(code)
 
-    await db.commit()
-    await db.refresh(user)
 
+async def resolve_wechat_identity(
+    db: AsyncSession, code: str, *, allow_register: bool = True
+) -> tuple[User, UserAuthIdentity]:
+    openid = await _resolve_wechat_openid(code)
+    namespace = identity_service.wechat_namespace()
+    identity, user = await identity_service.find_identity_user(
+        db, provider="wechat", namespace=namespace, subject=openid
+    )
+    if identity and user:
+        try:
+            await identity_service.validate_identity_user(user)
+        except identity_service.IdentityUnavailableError as exc:
+            raise ValueError(str(exc)) from exc
+        return user, identity
+
+    # Lazy repair covers local databases created before v24 and migration rows
+    # whose namespace was necessarily recorded as ``legacy-v1``.
+    legacy_user = await db.scalar(select(User).where(User.openid == openid))
+    if legacy_user is not None:
+        try:
+            await identity_service.validate_identity_user(legacy_user)
+        except identity_service.IdentityUnavailableError as exc:
+            raise ValueError(str(exc)) from exc
+        legacy_identity = await db.scalar(
+            select(UserAuthIdentity).where(
+                UserAuthIdentity.provider == "wechat",
+                UserAuthIdentity.subject == openid,
+                UserAuthIdentity.user_id == legacy_user.id,
+            )
+        )
+        if legacy_identity is None:
+            legacy_identity = UserAuthIdentity(
+                user_id=legacy_user.id,
+                provider="wechat",
+                namespace=namespace,
+                subject=openid,
+                verified_at=legacy_user.created_at,
+            )
+            db.add(legacy_identity)
+        else:
+            legacy_identity.namespace = namespace
+        await db.commit()
+        return legacy_user, legacy_identity
+
+    if not allow_register:
+        raise ValueError("该微信尚未绑定任何账号")
+
+    try:
+        return await identity_service.authenticate_identity(
+            db,
+            provider="wechat",
+            namespace=namespace,
+            subject=openid,
+            allow_register=True,
+        )
+    except identity_service.IdentityUnavailableError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+async def wechat_login(db: AsyncSession, code: str) -> tuple[str, int, User]:
+    """Resolve a WeChat identity, then issue a user access token."""
+    user, _identity = await resolve_wechat_identity(db, code)
     token, expires_at = await issue_user_token(user.id)
     return token, expires_at, user
 
@@ -105,19 +152,48 @@ async def wechat_login(db: AsyncSession, code: str) -> tuple[str, int, User]:
 async def get_user_response(db: AsyncSession, user: User) -> UserResponse:
     """Build app user payload with miniprogram permission metadata.
 
-    AppUser identity remains WeChat-openid based.  A miniprogram user receives
+    AppUser login identities are managed independently. A miniprogram user receives
     admin-like metadata only through an explicit app_user_admin_bindings row.
     """
+    identities = await identity_service.list_user_identities(db, user.id)
+    email_identity = next(
+        (
+            identity
+            for identity in identities
+            if identity.provider == "email" and identity.namespace == "user"
+        ),
+        None,
+    )
+    identity_payload = [
+        {
+            "id": identity.id,
+            "provider": identity.provider,
+            "namespace": identity.namespace,
+            "masked_subject": (
+                f"{identity.subject[:2]}***@{identity.subject.split('@', 1)[1]}"
+                if identity.provider == "email" and "@" in identity.subject
+                else identity.subject
+                if identity.provider == "password"
+                else f"{identity.provider}:***"
+            ),
+            "verified": identity.verified_at is not None,
+        }
+        for identity in identities
+    ]
+
     if settings.APP_ENV.lower() in {
         "development",
         "local",
         "test",
-    } and user.openid.startswith("dev_"):
+    } and str(user.openid or "").startswith("dev_"):
         return UserResponse(
             id=user.id,
             nickname=user.nickname,
             avatar_url=user.avatar_url,
             profile_completed=bool(user.nickname and user.nickname.strip()),
+            email=email_identity.subject if email_identity else None,
+            email_verified=bool(email_identity and email_identity.verified_at),
+            identities=identity_payload,
             is_admin=True,
             role="super_admin",
             role_name="super_admin",
@@ -153,6 +229,9 @@ async def get_user_response(db: AsyncSession, user: User) -> UserResponse:
         nickname=user.nickname,
         avatar_url=user.avatar_url,
         profile_completed=bool(user.nickname and user.nickname.strip()),
+        email=email_identity.subject if email_identity else None,
+        email_verified=bool(email_identity and email_identity.verified_at),
+        identities=identity_payload,
         is_admin=is_admin,
         role=role_name,
         role_name=role_name,

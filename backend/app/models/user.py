@@ -10,8 +10,10 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    openid: Mapped[str] = mapped_column(
-        String(64), unique=True, nullable=False, index=True
+    # Legacy column retained while consumers move to user_auth_identities. New
+    # users created from GitHub or email do not receive a synthetic openid.
+    openid: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True, index=True
     )
     nickname: Mapped[str | None] = mapped_column(String(64), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -22,6 +24,13 @@ class User(Base):
         ForeignKey("admin_users.id"), nullable=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lifecycle_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="active",
+        server_default="active",
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

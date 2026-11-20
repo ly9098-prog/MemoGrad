@@ -32,6 +32,7 @@ vi.mock("react", async (original) => ({
   useMemo: (compute: () => unknown) => compute(),
   useCallback: (callback: unknown) => callback,
   useRef: (current: unknown) => ({ current }),
+  useLayoutEffect: () => undefined,
   useEffect: (effect: () => unknown) => { h.effects.push(effect); },
   useState: (initial: unknown) => {
     const index = h.index++;

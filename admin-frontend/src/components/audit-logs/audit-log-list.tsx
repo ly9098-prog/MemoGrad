@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AuditLogItem } from "./audit-log-item";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle, FileSearch } from "lucide-react";
 import type { AuditLogListItem, PaginatedResponse } from "@/lib/api/types";
@@ -41,6 +42,11 @@ export function AuditLogList({
     if (total === 0) return "共 0 条";
     return `共 ${total} 条 · 第 ${Math.min(page, totalPages)}/${totalPages} 页`;
   }, [data, page, totalPages]);
+  const listEntranceRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: Boolean(data?.items.length),
+    itemCount: data?.items.length ?? 0,
+    animationKey: page,
+  });
 
   // Only show skeleton on initial load (no cached data at all)
   const showInitialLoading = isLoading && !data;
@@ -127,7 +133,7 @@ export function AuditLogList({
         </div>
       </div>
 
-      <div>
+      <div ref={listEntranceRef}>
         {data.items.map((log) => (
           <AuditLogItem key={log.id} log={log} onOpen={onOpenDetail} />
         ))}

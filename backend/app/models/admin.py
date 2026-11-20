@@ -24,9 +24,7 @@ class Role(Base):
     __table_args__ = (UniqueConstraint("name", name="roles_name_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
     display_name: Mapped[str] = mapped_column(String(64), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -47,9 +45,7 @@ class Permission(Base):
     __table_args__ = (UniqueConstraint("name", name="permissions_name_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(
-        String(128), nullable=False
-    )
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
     resource: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
@@ -85,17 +81,20 @@ class RolePermission(Base):
 
 class AdminUser(Base):
     __tablename__ = "admin_users"
-    __table_args__ = (
-        UniqueConstraint("username", name="admin_users_username_key"),
-    )
+    __table_args__ = (UniqueConstraint("username", name="admin_users_username_key"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )
+    username: Mapped[str] = mapped_column(String(64), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    email_normalized: Mapped[str | None] = mapped_column(
+        String(128), unique=True, nullable=True, index=True
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     role_id: Mapped[int] = mapped_column(
         ForeignKey("roles.id"), nullable=False, index=True
@@ -112,6 +111,10 @@ class AdminUser(Base):
     question_versions: Mapped[list["QuestionVersion"]] = relationship(
         back_populates="editor"
     )
+
+    @property
+    def email_verified(self) -> bool:
+        return self.email_verified_at is not None
 
 
 class AuditLog(Base):
@@ -151,9 +154,7 @@ class Subject(Base):
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("subjects.id"), nullable=True, index=True
     )
-    code: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     level: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     path: Mapped[str] = mapped_column(String(128), nullable=False, index=True)

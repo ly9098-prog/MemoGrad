@@ -7,6 +7,10 @@
 ## 功能检查
 
 - [ ] 微信登录完整流程（wx.login → token → 自动创建用户）
+- [ ] 邮箱验证码登录、自动注册、重发倒计时和错误次数限制正常
+- [ ] GitHub OAuth 登录、绑定、取消授权和错误回跳正常
+- [ ] 用户可在已验证身份条件下绑定邮箱 / GitHub / 微信，并至少保留一种身份
+- [ ] Admin 用户名密码、邮箱 OTP、首登改密和邮箱密码恢复正常
 - [ ] 刷题 / 交卷 / 判分
 - [ ] 错题本 / 标记掌握 / SM-2 质量评分
 - [ ] 复习计划 / 今日待复习列表
@@ -19,7 +23,7 @@
 
 - [ ] 所有 API 有认证保护（除 `/auth/login` 和 `/health`）
 - [ ] JWT 过期（7天）后处理正常
-- [ ] CORS 配置仅允许小程序域名
+- [ ] CORS 只包含用户 Web 与 Admin Web 的精确 HTTPS Origin
 - [ ] 数据库使用最小权限用户
 - [ ] `.env` 不在代码仓库中（已配置 `.gitignore`）
 - [ ] Nginx 安全头已配置（X-Frame-Options, X-Content-Type-Options 等）
@@ -32,17 +36,24 @@
 - [ ] `WECHAT_APP_ID` / `WECHAT_APP_SECRET` 已填写
 - [ ] `DEEPSEEK_API_KEY` 已配置（如使用 AI 功能）
 - [ ] `PRODUCTION_DOMAIN` / `ALLOWED_HOSTS` / `PUBLIC_BASE_URL` / `HEALTH_HOST` 已配置
+- [ ] `USER_WEB_BASE_URL=https://<apex>` 与 `ADMIN_WEB_BASE_URL=https://admin.<apex>` 已配置
+- [ ] `AUTH_EMAIL_ENABLED`、SMTP 主机、账号、发件地址和 TLS 模式已核验
+- [ ] `GITHUB_CLIENT_ID` / Secret / 固定回调地址已在 GitHub App/OAuth 中逐字一致
 - [ ] `CORS_ORIGINS` 已限制为具体域名
 
 ## 部署检查
 
 - [ ] 云服务器规格按 Web 并发与数据库连接预算评估；OCR 不在生产运行本地 PaddleOCR
 - [ ] 域名已购买并 DNS 解析到服务器 IP
-- [ ] HTTPS 证书已配置，且 `PRODUCTION_CERT_NAME` 与挂载到 nginx `/etc/nginx/ssl/` 的 `.pem` / `.key` 文件名一致
+- [ ] apex、`www`、`admin`、`api` 四个主机名指向服务器
+- [ ] HTTPS 证书 SAN 覆盖四个主机名，且 `PRODUCTION_CERT_NAME` 与挂载到 nginx `/etc/nginx/ssl/` 的 `.pem` / `.key` 文件名一致
 - [ ] Docker + Docker Compose 已安装
 - [ ] 生产环境 `backend/.env` 文件已在服务器侧配置，且不会由本地同步覆盖
 - [ ] 使用 `.deployignore` 同步代码，不上传本地 `.env`、密钥、数据库、`.claude/`、虚拟环境和缓存
 - [ ] 日常后端更新使用 `bash deploy/scripts/deploy.sh update`
+- [ ] 用户 Web 单独更新使用 `bash deploy/scripts/deploy.sh update-web`
+- [ ] Admin 单独更新使用 `bash deploy/scripts/deploy.sh update-admin`
+- [ ] 三端全量更新使用 `bash deploy/scripts/deploy.sh update-all`
 - [ ] `bash deploy/scripts/deploy.sh status` 状态和健康检查正常
 - [ ] 仅在 schema 变更确认后执行 `bash deploy/scripts/deploy.sh migrate`
 - [ ] `/health` 端点返回 `{"status":"ok","env":"production"}`
@@ -51,9 +62,11 @@
 
 ## 小程序端检查
 
-- [ ] `miniprogram/config.js` 的 `BASE_URL` 改为生产域名
+- [ ] `miniprogram/config.js` 的 trial/release `BASE_URL` 为 `https://api.<apex>/api/v1`
 - [ ] `DEV` 设为 `false`
-- [ ] 微信小程序管理后台已配置合法域名
+- [ ] 微信小程序管理后台已配置 request、uploadFile、downloadFile、WebSocket 的 `api.<apex>` 合法域名
+- [ ] `www` HTTPS 请求以 301 保留路径和查询参数跳转 apex
+- [ ] apex 只提供用户 Web / `/api/v1`，admin 只提供 Admin Web / `/api/admin/v1`，api 不返回前端页面
 - [ ] 小程序提交审核前完成全流程自测
 
 ## 性能检查

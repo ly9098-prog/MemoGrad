@@ -6,6 +6,9 @@ from app.api.v1.adaptive_learning import router as adaptive_learning_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.ai_import import router as ai_import_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.auth_email import router as auth_email_router
+from app.api.v1.auth_oauth import router as auth_oauth_router
+from app.api.v1.auth_password import router as auth_password_router
 from app.api.v1.behavior import router as behavior_router
 from app.api.v1.cache import router as cache_router
 from app.api.v1.exams import router as exams_router
@@ -34,6 +37,9 @@ from app.core.deployment_profile import is_restricted_environment
 public_api_router = APIRouter()
 
 public_api_router.include_router(auth_router)
+public_api_router.include_router(auth_email_router)
+public_api_router.include_router(auth_oauth_router)
+public_api_router.include_router(auth_password_router)
 public_api_router.include_router(questions_router)
 public_api_router.include_router(practice_router)
 public_api_router.include_router(wrong_questions_router)

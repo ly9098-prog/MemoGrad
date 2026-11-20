@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from app.schemas.base import BaseModel
 
@@ -21,12 +21,19 @@ class AdminUserListItem(BaseModel):
     username: str
     display_name: str | None = None
     email: str | None = None
+    email_verified: bool = False
+    must_change_password: bool = False
     is_active: bool
     role_id: int
     last_login_at: datetime | None = None
     last_login_ip: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("must_change_password", mode="before")
+    @classmethod
+    def default_first_login_flag(cls, value):
+        return False if value is None else value
 
 
 class AdminUserDetail(AdminUserListItem):

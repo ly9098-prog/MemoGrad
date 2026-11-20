@@ -8,6 +8,8 @@ type PointerHandler = (event: unknown) => void;
 
 vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
+  useEffect: () => undefined,
+  useRef: (current: unknown) => ({ current }),
   useState: (initial: unknown) => [initial, vi.fn()],
 }));
 vi.mock("next/navigation", () => ({
@@ -26,8 +28,8 @@ function findTilt(node: unknown): Element | undefined {
 }
 
 function renderTilt() {
-  const wrapper = LoginPage() as ReactElement<{ children: ReactElement }>;
-  return findTilt((wrapper.props.children.type as () => unknown)())!;
+  const element = LoginPage() as ReactElement<Record<string, unknown>>;
+  return findTilt((element.type as (props: Record<string, unknown>) => unknown)(element.props))!;
 }
 
 function pointerFixture() {
@@ -93,5 +95,20 @@ describe("login glass interaction", () => {
     expect(properties.size).toBe(4);
     (tilt.props.onPointerLeave as PointerHandler)(event);
     expect(properties.size).toBe(0);
+  });
+
+  it("renders the credential forms directly so refresh has no Suspense blank frame", () => {
+    const element = LoginPage() as ReactElement<Record<string, unknown>>;
+    const forms: Element[] = [];
+    function visit(node: unknown) {
+      if (Array.isArray(node)) { node.forEach(visit); return; }
+      if (!isValidElement<Record<string, unknown>>(node)) return;
+      if (node.type === "form") forms.push(node);
+      visit(node.props.children);
+    }
+    visit((element.type as (props: Record<string, unknown>) => unknown)(element.props));
+    expect(forms).toHaveLength(3);
+    expect(forms.map((form) => form.props.inert)).toEqual([false, true, true]);
+    expect(forms.map((form) => form.props["aria-hidden"])).toEqual([false, true, true]);
   });
 });

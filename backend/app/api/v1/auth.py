@@ -24,7 +24,12 @@ from app.schemas.user import (
     UserUpdate,
     WechatLogin,
 )
-from app.services import account_erasure_service, token_service, user_service
+from app.services import (
+    account_erasure_service,
+    token_service,
+    user_auth_service,
+    user_service,
+)
 
 router = APIRouter(prefix=f"{API_V1_PREFIX}")
 MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -40,6 +45,15 @@ def _user_login_rate_key(request: Request) -> str:
 async def login(
     data: WechatLogin, request: Request, db: AsyncSession = Depends(get_db)
 ):
+    try:
+        consent = user_auth_service.validate_registration_consent(
+            accepted_terms=data.accepted_terms,
+            agreement_version=data.agreement_version,
+            privacy_version=data.privacy_version,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     rate_key = _user_login_rate_key(request)
     try:
         failures = int(await cache.get_strict(rate_key) or 0)
@@ -76,6 +90,7 @@ async def login(
         ) from exc
 
     refresh_token = await token_service.create_refresh_token(db, user.id)
+    await user_auth_service.record_consents(db, user.id, consent)
 
     return TokenResponse(
         access_token=token,
@@ -96,7 +111,8 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="用户不存在")
-    if user.deleted_at is not None:
+    lifecycle = getattr(user, "lifecycle_status", "active") or "active"
+    if user.deleted_at is not None or lifecycle != "active":
         await token_service.revoke_all_user_tokens(db, user.id)
         raise HTTPException(status_code=401, detail="账号已注销")
     if user.is_banned:
@@ -233,6 +249,10 @@ async def request_deletion(
     now = utcnow_aware()
     previous_avatar_url = current_user.avatar_url
     account_erasure_service.tombstone_cancelled_user(current_user)
+    if not current_user.is_banned:
+        from app.services.identity_service import tombstone_user_identities
+
+        await tombstone_user_identities(db, current_user.id)
     current_user.deleted_at = normalize_to_naive_utc(now)
     await db.commit()
 

@@ -31,6 +31,7 @@ vi.mock("react", async (original) => ({
   useMemo: (compute: () => unknown) => compute(),
   useCallback: (callback: unknown) => callback,
   useRef: (current: unknown) => ({ current }),
+  useLayoutEffect: () => undefined,
   useEffect: (effect: () => unknown) => { h.effects.push(effect); },
   useState: (initial: unknown) => {
     const index = h.stateIndex++;
@@ -73,8 +74,14 @@ function findElement(node: unknown, type: string): Element | undefined {
   return findElement(node.props.children, type);
 }
 function renderLogin() {
-  const wrapper = LoginPage() as ReactElement<{ children: ReactElement }>;
-  const form = findElement((wrapper.props.children.type as () => unknown)(), "form")!;
+  vi.stubGlobal("window", {
+    location: { search: `?next=${encodeURIComponent(h.next)}` },
+  });
+  const element = LoginPage() as ReactElement<Record<string, unknown>>;
+  const form = findElement(
+    (element.type as (props: Record<string, unknown>) => unknown)(element.props),
+    "form",
+  )!;
   return form.props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>;
 }
 beforeEach(() => {

@@ -9,7 +9,7 @@ class AdminAppUserListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    openid: str
+    openid: str | None = None
     nickname: str | None = None
     avatar_url: str | None = None
     is_banned: bool
@@ -18,12 +18,14 @@ class AdminAppUserListItem(BaseModel):
     banned_by: int | None = None
     created_at: datetime
     updated_at: datetime
+    lifecycle_status: str = "active"
 
 
 class AdminAppUserDetail(AdminAppUserListItem):
     practice_count: int
     wrong_count: int
     recent_active_at: datetime | None = None
+    login_identities: list[dict] = Field(default_factory=list)
 
 
 class AdminAppUserUpdateRequest(BaseModel):

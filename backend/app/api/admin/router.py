@@ -7,6 +7,7 @@ from app.api.v1.admin_ai_settings import router as admin_ai_settings_router
 from app.api.v1.admin_app_users import router as admin_app_users_router
 from app.api.v1.admin_audit_logs import router as admin_audit_logs_router
 from app.api.v1.admin_auth import router as admin_auth_router
+from app.api.v1.admin_auth_email import router as admin_auth_email_router
 from app.api.v1.admin_coverage import router as admin_coverage_router
 from app.api.v1.admin_dashboard import router as admin_dashboard_router
 from app.api.v1.admin_exams import router as admin_exams_router
@@ -30,6 +31,7 @@ from app.api.v1.admin_watermark_rules import router as admin_watermark_rules_rou
 admin_api_router = APIRouter()
 
 admin_api_router.include_router(admin_auth_router)
+admin_api_router.include_router(admin_auth_email_router)
 admin_api_router.include_router(admin_ai_settings_router)
 admin_api_router.include_router(admin_app_users_router)
 admin_api_router.include_router(admin_audit_logs_router)

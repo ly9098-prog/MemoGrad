@@ -1,4 +1,4 @@
-.PHONY: up down restart logs status build backup backup-redis redis-restore deploy update migrate health-check
+.PHONY: up down restart logs status build build-admin build-web backup backup-redis redis-restore deploy update migrate health-check
 
 COMPOSE = docker compose --env-file backend/.env -f deploy/docker-compose.prod.yml
 
@@ -19,6 +19,12 @@ status:
 
 build:
 	$(COMPOSE) build app
+
+build-admin:
+	$(COMPOSE) build admin
+
+build-web:
+	$(COMPOSE) build web
 
 # 生产备份：PostgreSQL + Redis RDB
 backup:

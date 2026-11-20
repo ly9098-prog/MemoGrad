@@ -30,6 +30,7 @@ import {
   ManagementPage,
   ManagementPageHeader,
 } from "@/components/admin/management-ui";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -125,6 +126,10 @@ export default function RolesPage() {
   });
 
   const roleItems = useMemo(() => roles.data?.items ?? [], [roles.data]);
+  const roleListRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: roleItems.length > 0,
+    itemCount: roleItems.length,
+  });
   const activeRoleId =
     selectedRoleId ?? roleItems.find((role) => role.name === "admin")?.id ?? roleItems.find((role) => role.name !== "super_admin")?.id ?? roleItems[0]?.id ?? null;
   const selectedRole = useMemo(() => roleItems.find((role) => role.id === activeRoleId) ?? null, [roleItems, activeRoleId]);
@@ -335,7 +340,7 @@ export default function RolesPage() {
               ) : roles.isError ? (
                 <div className="px-5 py-6 text-sm text-destructive">角色加载失败，请刷新后重试。</div>
               ) : (
-                <div className="divide-y divide-border/60">
+                <div ref={roleListRef} className="divide-y divide-border/60">
                   {roleItems.map((role) => {
                     const active = role.id === activeRoleId;
                     const pendingOverride = permissionOverrides[role.id];

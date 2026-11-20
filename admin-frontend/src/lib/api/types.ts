@@ -248,6 +248,8 @@ export type AdminUserSummary = {
   username: string;
   display_name?: string | null;
   email?: string | null;
+  email_verified?: boolean;
+  must_change_password?: boolean;
   is_active: boolean;
   role_id: number;
   last_login_at?: string | null;

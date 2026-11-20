@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from app.api.v1 import auth as routes
 from app.models.user import User
 from app.schemas.user import RefreshRequest, UserResponse, UserUpdate, WechatLogin
-from app.services import token_service, user_service
+from app.services import token_service, user_auth_service, user_service
 from app.services.token_service import _hash_token
 from app.services.user_service import _dev_openid
 
@@ -96,17 +96,30 @@ async def test_login_protocol_preserves_rate_clear_token_and_profile_order(monke
         calls.append(("profile", actual.id))
         return UserResponse(id=actual.id)
 
+    async def record_consents(db, user_id, versions):
+        calls.append(("consent", user_id, versions))
+
     monkeypatch.setattr(routes.cache, "get_strict", AsyncMock(return_value=0))
     monkeypatch.setattr(routes.cache, "delete_strict", clear)
     monkeypatch.setattr(user_service, "wechat_login", login)
     monkeypatch.setattr(token_service, "create_refresh_token", refresh)
     monkeypatch.setattr(user_service, "get_user_response", profile)
+    monkeypatch.setattr(user_auth_service, "record_consents", record_consents)
     actual = await routes.login(
-        WechatLogin(code="test-code"),
+        WechatLogin(
+            code="test-code",
+            accepted_terms=True,
+            agreement_version="2026-11-20",
+            privacy_version="2026-11-20",
+        ),
         SimpleNamespace(client=SimpleNamespace(host="127.0.0.1")),
         object(),
     )
-    assert [item[0] for item in calls] == ["login", "clear", "refresh", "profile"]
+    assert [item[0] for item in calls] == ["login", "clear", "refresh", "consent", "profile"]
+    assert calls[3][2] == {
+        "user_agreement": "2026-11-20",
+        "privacy_policy": "2026-11-20",
+    }
     assert actual.access_token == "access-test"
     assert actual.refresh_token == "r" * 32
     assert actual.user.id == 17

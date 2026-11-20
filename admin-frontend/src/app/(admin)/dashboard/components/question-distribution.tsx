@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { DashboardQuestionStats } from "@/lib/api/types";
+import { springPressHandlers } from "@/components/motion/spring-press";
 import { computeReviewRate, numberValue, toPieData } from "@/lib/dashboard-utils";
 import { layoutDistribution } from "./activity-model";
 import styles from "../dashboard-workspace.module.css";
@@ -37,7 +38,7 @@ export function QuestionDistribution({ data, loading, error }: { data?: Dashboar
       <header className={styles.panelHeader}>
         <div><h2 id="dashboard-distribution-title">题库分布</h2><p className={styles.panelSubtitle}>面积对应题量，查看当前题库构成</p></div>
         <div className={styles.segmented} role="group" aria-label="题库分布维度">
-          {DIMENSIONS.map((item) => <button key={item.key} type="button" aria-pressed={dimension === item.key} onClick={() => { setDimension(item.key); setActive(null); }}>{item.label}</button>)}
+          {DIMENSIONS.map((item) => <button key={item.key} type="button" aria-pressed={dimension === item.key} onClick={() => { setDimension(item.key); setActive(null); }} {...springPressHandlers()}>{item.label}</button>)}
         </div>
       </header>
       <div className={styles.distributionSummary}>
@@ -54,7 +55,8 @@ export function QuestionDistribution({ data, loading, error }: { data?: Dashboar
               data-active={active === tile.name}
               style={{ left: `${tile.x}%`, top: `${tile.y}%`, width: `${tile.width}%`, height: `${tile.height}%`, backgroundColor: color(tile.name, index) }}
               aria-label={`${label(tile.name, dimension)}，${numberValue(tile.count)}题，占${(tile.count / total * 100).toFixed(1)}%`}
-              onPointerEnter={() => setActive(tile.name)} onFocus={() => setActive(tile.name)} onBlur={() => setActive(null)} onClick={() => setActive(tile.name)}
+              onPointerEnter={() => setActive(tile.name)} onFocus={() => setActive(tile.name)} onClick={() => setActive(tile.name)}
+              {...springPressHandlers({ onBlur: () => setActive(null) })}
             >
               {tile.width > 18 && tile.height > 18 ? <span className={styles.treemapContent}><span>{label(tile.name, dimension)}</span><strong>{numberValue(tile.count)}</strong>{tile.width > 25 && tile.height > 30 ? <small>{(tile.count / total * 100).toFixed(1)}%</small> : null}</span> : null}
             </button>)}

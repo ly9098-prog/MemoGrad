@@ -44,6 +44,8 @@ def factory():
 
 
 async def _seed_user(db, openid, **kw):
+    if kw.get("deleted_at") is not None and "lifecycle_status" not in kw:
+        kw["lifecycle_status"] = "erasing"
     user = User(openid=openid, **kw)
     db.add(user)
     await db.flush()
@@ -63,9 +65,7 @@ def test_cancellation_tombstones_openid():
 
     user = User(openid="wx-real-openid")
     svc.tombstone_cancelled_user(user)
-    assert user.openid.startswith(svc.ERASING_PREFIX)
-    assert "wx-real-openid" not in user.openid
-    assert len(user.openid) <= 64
+    assert user.lifecycle_status == "erasing"
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,8 @@ async def test_sweep_purges_cancelled_user_data_and_marks_erased(factory, monkey
         assert await _count(db, AiChat, other.id) == 1
         storage.delete.assert_awaited_once_with("exports/a.docx")
         refreshed = (await db.execute(select(User).where(User.id == user.id))).scalar_one()
-        assert refreshed.openid.startswith(svc.ERASED_PREFIX)
+        assert refreshed.lifecycle_status == "erased"
+        assert refreshed.openid is None
         assert refreshed.nickname is None
 
 
@@ -237,7 +238,7 @@ async def test_storage_failure_keeps_user_pending_for_retry(factory, monkeypatch
         assert result["purged"] == 0 and result["failed"] == 1
         assert await _count(db, AiChat, uid) == 1
         refreshed = (await db.execute(select(User).where(User.id == uid))).scalar_one()
-        assert not refreshed.openid.startswith(svc.ERASED_PREFIX)
+        assert refreshed.lifecycle_status == "erasing"
 
 
 @pytest.mark.asyncio
@@ -258,7 +259,8 @@ async def test_inactive_accounts_get_login_identifier_anonymized(factory, monkey
         assert result["anonymized"] == 1
         s = (await db.execute(select(User).where(User.id == stale.id))).scalar_one()
         a = (await db.execute(select(User).where(User.id == active.id))).scalar_one()
-        assert s.openid.startswith(svc.ANONYMIZED_PREFIX)
+        assert s.lifecycle_status == "anonymized"
+        assert s.openid is None
         assert a.openid == "wx-active"
         assert await _count(db, RefreshToken, stale.id) == 0
 
@@ -313,8 +315,8 @@ async def test_deletion_request_tombstones_openid_and_revokes_sessions(factory, 
         assert response.deleted_at > 0
         row = (await db.execute(select(User).where(User.id == uid))).scalar_one()
         assert row.deleted_at is not None
-        assert row.openid.startswith("erasing:")
-        assert "wx-real-openid" not in row.openid
+        assert row.lifecycle_status == "erasing"
+        assert row.openid == "wx-real-openid"
         assert row.nickname is None and row.avatar_url is None
         tokens = (await db.execute(select(RefreshToken).where(RefreshToken.user_id == uid))).scalars().all()
         assert tokens and all(t.revoked_at is not None for t in tokens)

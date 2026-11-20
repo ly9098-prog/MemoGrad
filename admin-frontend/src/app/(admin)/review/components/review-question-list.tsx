@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   AlertCircle,
   BookOpen,
@@ -16,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { MathFormula } from "@/components/ui/math-formula";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { StatusBadge } from "@/components/status-badge";
 import type { AdminQuestion } from "@/lib/api/types";
 import { ApiError } from "@/lib/api/errors";
@@ -253,15 +253,11 @@ export function ReviewQuestionList({
       ? "网络连接失败，请检查网络后重试。"
       : "请检查网络或后端服务后重试。";
 
-  // Entrance animation is for the first data render only. Re-running it on
-  // every filter change made the whole list fade from opacity 0 and read as
-  // flicker, so the stagger class is removed once the first pass completes.
-  const [animateEnter, setAnimateEnter] = useState(true);
-  useEffect(() => {
-    if (items.length === 0) return;
-    const timer = setTimeout(() => setAnimateEnter(false), 900);
-    return () => clearTimeout(timer);
-  }, [items.length]);
+  const listEntranceRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: items.length > 0,
+    itemCount: items.length,
+    animationKey: `${tab}-${items[0]?.id ?? "empty"}-${items.at(-1)?.id ?? "empty"}`,
+  });
 
   return (
     <section className="space-y-3" aria-busy={isFetching}>
@@ -301,7 +297,8 @@ export function ReviewQuestionList({
 
       {items.length > 0 ? (
         <div
-          className={`divide-y divide-border border-y border-border ${animateEnter ? "stagger-enter" : ""}`}
+          ref={listEntranceRef}
+          className="divide-y divide-border border-y border-border"
         >
           {items.map((question) => (
             <ReviewRow

@@ -1,14 +1,12 @@
 """Account lifecycle: cancelled-account erasure and inactive-account anonymization.
 
-Cancellation tombstones ``users.openid`` immediately (``erasing:``); the sweep then
-purges every user-scoped row and export file and marks the user ``erased:``.
-Accounts inactive for ``INACTIVITY_DAYS`` only have their login identifier
-anonymized (``anonymized:``). The state lives in the openid prefix so no schema
-change is needed; every step is idempotent.
+Cancellation tombstones every login identity immediately; the sweep then purges
+every user-scoped row and export file and marks the user ``erased``. Accounts
+inactive for ``INACTIVITY_DAYS`` have their login identities tombstoned and
+become ``anonymized``. Every step is idempotent.
 """
 
 import logging
-import uuid
 from datetime import timedelta
 
 from sqlalchemy import delete, exists, select
@@ -27,6 +25,7 @@ from app.models.question_import import QuestionImport
 from app.models.refresh_token import RefreshToken
 from app.models.task_outbox import TaskOutbox
 from app.models.user import User
+from app.services import identity_service
 from app.services.storage_backend import get_export_storage
 
 logger = logging.getLogger(__name__)
@@ -47,38 +46,36 @@ _CHILD_TABLES = (
 )
 
 
-def _tombstone(prefix: str) -> str:
-    return f"{prefix}{uuid.uuid4().hex}"
-
-
 def tombstone_cancelled_user(user: User) -> None:
-    """Drop the real WeChat identity at cancellation time (caller commits).
-
-    Banned accounts keep their openid so cancelling cannot shed a ban; they are
-    also left out of the erasure sweep (abuse-prevention retention).
-    """
+    """Clear profile fields and enter the cancellation lifecycle."""
     user.nickname = None
     user.avatar_url = None
     if not user.is_banned:
-        user.openid = _tombstone(ERASING_PREFIX)
+        user.lifecycle_status = "erasing"
 
 
 async def _delete_export_files(db, user_id: int) -> None:
     from app.models.export_task import ExportTask
 
     keys = (
-        await db.execute(
-            select(ExportTask.file_key).where(
-                ExportTask.user_id == user_id, ExportTask.file_key.isnot(None)
+        (
+            await db.execute(
+                select(ExportTask.file_key).where(
+                    ExportTask.user_id == user_id, ExportTask.file_key.isnot(None)
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not keys:
         return
     storage = get_export_storage()
     for key in keys:
         if not await storage.delete(key) and await storage.exists(key):
-            raise RuntimeError(f"export file could not be deleted for user_id={user_id}")
+            raise RuntimeError(
+                f"export file could not be deleted for user_id={user_id}"
+            )
 
 
 def _task_type_for_id(task_id: str, source_type: str | None = None) -> str | None:
@@ -223,7 +220,9 @@ async def _purge_import_registrations(db, user_id: int) -> tuple[list[str], list
         await db.execute(
             delete(ImportBatchJobItem).where(ImportBatchJobItem.job_id.in_(job_ids))
         )
-        await db.execute(delete(ImportBatchJob).where(ImportBatchJob.job_id.in_(job_ids)))
+        await db.execute(
+            delete(ImportBatchJob).where(ImportBatchJob.job_id.in_(job_ids))
+        )
     if pipeline_ids:
         await db.execute(
             delete(ImportPipelineChunk).where(
@@ -308,8 +307,12 @@ async def _purge_user_rows(db, user_id: int) -> None:
     tables = Base.metadata.tables
     for child, fk_column, parent in _CHILD_TABLES:
         if child in tables and parent in tables:
-            parent_ids = select(tables[parent].c.id).where(tables[parent].c.user_id == user_id)
-            await db.execute(delete(tables[child]).where(tables[child].c[fk_column].in_(parent_ids)))
+            parent_ids = select(tables[parent].c.id).where(
+                tables[parent].c.user_id == user_id
+            )
+            await db.execute(
+                delete(tables[child]).where(tables[child].c[fk_column].in_(parent_ids))
+            )
     # Reverse dependency order so referencing rows go before the rows they point at.
     for table in reversed(Base.metadata.sorted_tables):
         if table.name == "users" or "user_id" not in table.columns:
@@ -336,7 +339,8 @@ async def purge_cancelled_user(db, user: User) -> None:
     await async_purge_owned_objects(user.id)
     await _invalidate_user_caches(user.id, pipeline_ids)
     await _purge_user_rows(db, user.id)
-    user.openid = _tombstone(ERASED_PREFIX)
+    user.openid = None
+    user.lifecycle_status = "erased"
     user.nickname = None
     user.avatar_url = None
     await db.commit()
@@ -344,17 +348,21 @@ async def purge_cancelled_user(db, user: User) -> None:
 
 async def _purge_pending(db) -> tuple[int, int]:
     user_ids = (
-        await db.execute(
-            select(User.id)
-            .where(
-                User.deleted_at.isnot(None),
-                User.is_banned.is_(False),
-                ~User.openid.startswith(ERASED_PREFIX),
+        (
+            await db.execute(
+                select(User.id)
+                .where(
+                    User.deleted_at.isnot(None),
+                    User.is_banned.is_(False),
+                    User.lifecycle_status == "erasing",
+                )
+                .order_by(User.id)
+                .limit(_BATCH)
             )
-            .order_by(User.id)
-            .limit(_BATCH)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     purged = failed = 0
     for user_id in user_ids:
         try:
@@ -364,32 +372,42 @@ async def _purge_pending(db) -> tuple[int, int]:
         except Exception:
             await db.rollback()
             failed += 1
-            logger.exception("Account erasure failed for user_id=%s; will retry", user_id)
+            logger.exception(
+                "Account erasure failed for user_id=%s; will retry", user_id
+            )
     return purged, failed
 
 
 async def _anonymize_inactive(db) -> int:
     cutoff = utcnow() - timedelta(days=INACTIVITY_DAYS)
-    recent_token = exists().where(RefreshToken.user_id == User.id, RefreshToken.created_at >= cutoff)
-    recent_practice = exists().where(PracticeRecord.user_id == User.id, PracticeRecord.created_at >= cutoff)
+    recent_token = exists().where(
+        RefreshToken.user_id == User.id, RefreshToken.created_at >= cutoff
+    )
+    recent_practice = exists().where(
+        PracticeRecord.user_id == User.id, PracticeRecord.created_at >= cutoff
+    )
     users = (
-        await db.execute(
-            select(User)
-            .where(
-                User.deleted_at.is_(None),
-                User.is_banned.is_(False),
-                ~User.openid.startswith(ERASING_PREFIX),
-                ~User.openid.startswith(ERASED_PREFIX),
-                ~User.openid.startswith(ANONYMIZED_PREFIX),
-                User.updated_at < cutoff,
-                ~recent_token,
-                ~recent_practice,
+        (
+            await db.execute(
+                select(User)
+                .where(
+                    User.deleted_at.is_(None),
+                    User.is_banned.is_(False),
+                    User.lifecycle_status == "active",
+                    User.updated_at < cutoff,
+                    ~recent_token,
+                    ~recent_practice,
+                )
+                .limit(_BATCH)
             )
-            .limit(_BATCH)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for user in users:
-        user.openid = _tombstone(ANONYMIZED_PREFIX)
+        await identity_service.tombstone_user_identities(db, user.id)
+        user.openid = None
+        user.lifecycle_status = "anonymized"
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     if users:
         await db.commit()

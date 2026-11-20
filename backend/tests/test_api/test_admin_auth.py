@@ -1,5 +1,7 @@
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from fastapi import HTTPException
 from fastapi import Response as FastAPIResponse
 from fastapi.testclient import TestClient
@@ -11,6 +13,8 @@ from app.core.admin_security import (
     PasswordPolicyError,
     create_admin_token,
     delete_refresh_cookie,
+    get_current_admin,
+    get_current_admin_any_scope,
     hash_admin_password,
     set_refresh_cookie,
 )
@@ -45,6 +49,7 @@ def _admin_user(password="old-password"):
         email="admin@example.com",
         is_active=True,
         role_id=1,
+        created_at=datetime(2024, 3, 12),
     )
 
 
@@ -68,6 +73,7 @@ def test_admin_login_success(monkeypatch):
     assert data["access_token"] == token
     assert data["token_type"] == "bearer"
     assert data["user"]["username"] == "admin"
+    assert data["user"]["created_at"] == "2024-03-12T00:00:00Z"
     assert data["role"]["name"] == "super_admin"
     assert data["permissions"] == permissions
     assert resp.cookies.get("admin_refresh_token") == refresh_token
@@ -100,6 +106,173 @@ def test_admin_me_rejects_app_token():
     assert resp.status_code == 401
 
 
+@pytest.mark.parametrize("operation", ["login", "recover"])
+def test_admin_email_rejects_oversized_normalized_address(operation):
+    email = "x@" + ".".join(["例" * 20] * 5) + ".com"
+    assert len(email) < 128
+    app.dependency_overrides[get_db] = _override_db
+    payload = {"email": email}
+    if operation == "login":
+        payload["captcha_ticket"] = "a" * 32
+    try:
+        response = client.post(
+            f"/api/admin/v1/auth/email/{operation}/start", json=payload
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 422
+    assert "captcha_ticket" not in str(response.json())
+
+
+def test_admin_email_login_requires_slider_ticket():
+    response = client.post(
+        "/api/admin/v1/auth/email/login/start",
+        json={"email": "admin@example.com"},
+    )
+    assert response.status_code == 422
+
+
+def test_admin_email_login_consumes_slider_ticket_once(monkeypatch):
+    import asyncio
+
+    from app.core.cache import cache
+    from app.services import (
+        admin_email_auth_service,
+        email_otp_service,
+        slider_captcha_service,
+    )
+
+    monkeypatch.setattr(cache, "_enabled", False)
+    delivery = AsyncMock()
+    monkeypatch.setattr(email_otp_service, "send_auth_email", delivery)
+    monkeypatch.setattr(
+        admin_email_auth_service, "find_active_admin_by_email", AsyncMock(return_value=None)
+    )
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        issued = client.post("/api/admin/v1/auth/captcha/slider/start")
+        assert issued.status_code == 200
+        challenge_id = issued.json()["captcha_id"]
+        challenge = asyncio.run(cache.get_strict(slider_captcha_service._challenge_key(challenge_id)))
+        target = challenge["target_x"]
+        verified = client.post("/api/admin/v1/auth/captcha/slider/verify", json={
+            "captcha_id": challenge_id,
+            "offset": target,
+            "trajectory": [{"x": 0, "y": 0, "t": 0}, {"x": target, "y": 0, "t": 400}],
+        })
+        assert verified.status_code == 200
+        payload = {"email": "admin@example.com", "captcha_ticket": verified.json()["ticket"]}
+        assert client.post("/api/admin/v1/auth/email/login/start", json=payload).status_code == 200
+        assert client.post("/api/admin/v1/auth/email/login/start", json=payload).status_code == 400
+        assert delivery.await_count == 1
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_admin_email_activation_requires_a_fresh_slider_ticket(monkeypatch):
+    import asyncio
+
+    from app.core.cache import cache
+    from app.services import (
+        admin_email_auth_service,
+        email_otp_service,
+        slider_captcha_service,
+    )
+
+    current_admin = AdminPrincipal(
+        _admin_user(password="old-password"),
+        {"jti": "token-id", "exp": 4102444800},
+    )
+
+    async def override_current_admin():
+        return current_admin
+
+    monkeypatch.setattr(cache, "_enabled", False)
+    delivery = AsyncMock()
+    monkeypatch.setattr(email_otp_service, "send_auth_email", delivery)
+    monkeypatch.setattr(
+        admin_email_auth_service,
+        "validate_admin_email_available",
+        AsyncMock(return_value="verified@example.com"),
+    )
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    try:
+        missing_ticket = client.post(
+            "/api/admin/v1/auth/email/activate/start",
+            json={
+                "email": "verified@example.com",
+                "current_password": "old-password",
+            },
+        )
+        assert missing_ticket.status_code == 422
+
+        issued = client.post("/api/admin/v1/auth/captcha/slider/start")
+        assert issued.status_code == 200
+        challenge_id = issued.json()["captcha_id"]
+        challenge = asyncio.run(
+            cache.get_strict(slider_captcha_service._challenge_key(challenge_id))
+        )
+        target = challenge["target_x"]
+        verified = client.post(
+            "/api/admin/v1/auth/captcha/slider/verify",
+            json={
+                "captcha_id": challenge_id,
+                "offset": target,
+                "trajectory": [
+                    {"x": 0, "y": 0, "t": 0},
+                    {"x": target, "y": 0, "t": 400},
+                ],
+            },
+        )
+        assert verified.status_code == 200
+        payload = {
+            "email": "verified@example.com",
+            "current_password": "old-password",
+            "captcha_ticket": verified.json()["ticket"],
+        }
+        started = client.post(
+            "/api/admin/v1/auth/email/activate/start", json=payload
+        )
+        assert started.status_code == 200
+        assert delivery.await_count == 1
+
+        replay = client.post(
+            "/api/admin/v1/auth/email/activate/start", json=payload
+        )
+        assert replay.status_code == 400
+    finally:
+        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_restricted_admin_token_is_only_accepted_by_all_scope_dependency():
+    import asyncio
+
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    user = _admin_user()
+    user.must_change_password = True
+    token = create_admin_token(user)
+    credentials = HTTPAuthorizationCredentials(
+        scheme="Bearer", credentials=token
+    )
+
+    class _Db:
+        async def execute(self, _statement):
+            return type(
+                "Result",
+                (),
+                {"scalar_one_or_none": lambda self: user},
+            )()
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(get_current_admin(credentials, _Db()))
+    assert exc.value.status_code == 403
+    principal = asyncio.run(get_current_admin_any_scope(credentials, _Db()))
+    assert principal.user is user
+
+
 def test_admin_me_returns_current_admin(monkeypatch):
     user = _admin_user()
     role = _role()
@@ -109,12 +282,12 @@ def test_admin_me_returns_current_admin(monkeypatch):
         return AdminPrincipal(user, {"jti": "token-id", "exp": 4102444800})
 
     monkeypatch.setattr(admin_auth, "get_admin_me_response", AsyncMock(return_value={"user": user, "role": role, "permissions": permissions}))
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/auth/me")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
         app.dependency_overrides.pop(get_db, None)
 
     assert resp.status_code == 200
@@ -132,11 +305,11 @@ def test_admin_logout_blacklists_token(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -152,7 +325,7 @@ def test_admin_change_password_success(monkeypatch):
 
     monkeypatch.setattr(admin_auth, "change_admin_password", change_password)
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post(
             "/api/admin/v1/auth/change-password",
@@ -160,7 +333,7 @@ def test_admin_change_password_success(monkeypatch):
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -201,8 +374,8 @@ def test_set_refresh_cookie_lax_for_http(monkeypatch):
     assert "SameSite=lax" in header
 
 
-def test_set_refresh_cookie_none_for_https():
-    """SameSite=None + Secure when request is HTTPS."""
+def test_set_refresh_cookie_is_lax_for_https():
+    """SameSite=Lax + Secure when request is HTTPS."""
     response = FastAPIResponse()
     request = MagicMock()
     request.url.scheme = "https"
@@ -210,7 +383,7 @@ def test_set_refresh_cookie_none_for_https():
     set_refresh_cookie(response, "test", request=request)
     header = response.headers.get("set-cookie", "")
     assert "Secure" in header
-    assert "SameSite=none" in header
+    assert "SameSite=lax" in header
 
 
 def test_set_refresh_cookie_x_forwarded_proto():
@@ -223,7 +396,7 @@ def test_set_refresh_cookie_x_forwarded_proto():
     set_refresh_cookie(response, "test", request=request)
     header = response.headers.get("set-cookie", "")
     assert "Secure" in header
-    assert "SameSite=none" in header
+    assert "SameSite=lax" in header
 
 
 def test_set_refresh_cookie_x_forwarded_proto_http(monkeypatch):
@@ -380,11 +553,11 @@ def test_admin_logout_deletes_refresh_cookie(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -522,7 +695,7 @@ def test_change_password_weak_password_returns_400(monkeypatch):
 
     monkeypatch.setattr(admin_auth, "change_admin_password", _weak)
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
     try:
         resp = client.post(
             "/api/admin/v1/auth/change-password",
@@ -530,7 +703,7 @@ def test_change_password_weak_password_returns_400(monkeypatch):
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
 
     assert resp.status_code == 400
     error = resp.json()["error"]

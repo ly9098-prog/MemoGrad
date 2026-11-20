@@ -22,6 +22,7 @@ security = HTTPBearer()
 optional_security = HTTPBearer(auto_error=False)
 
 _USER_TOKEN_TYPE = "user_access"
+_USER_STEP_UP_TOKEN_TYPE = "user_step_up"
 
 
 def _user_jwt_secret() -> str:
@@ -90,6 +91,48 @@ def decode_token(token: str) -> int:
     performed by :func:`decode_token_payload`.
     """
     return int(decode_token_payload(token)["sub"])
+
+
+def create_user_step_up_token(
+    user_id: int, *, identity_id: int, expires_in_sec: int = 300,
+    issued_at: int | None = None,
+) -> str:
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(user_id),
+        "identity_id": identity_id,
+        "type": _USER_STEP_UP_TOKEN_TYPE,
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.USER_JWT_AUDIENCE,
+        "jti": uuid4().hex,
+        "iat": max(int(now.timestamp()), issued_at or 0),
+        "exp": int((now + timedelta(seconds=expires_in_sec)).timestamp()),
+    }
+    return jwt.encode(payload, _user_jwt_secret(), algorithm="HS256")
+
+
+def decode_user_step_up_token(token: str, *, user_id: int) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(
+            token,
+            _user_jwt_secret(),
+            algorithms=["HS256"],
+            audience=settings.USER_JWT_AUDIENCE,
+            issuer=settings.JWT_ISSUER,
+            options={"require": ["sub", "identity_id", "type", "iss", "aud", "jti", "iat", "exp"]},
+            leeway=2,
+        )
+        if (
+            payload.get("type") != _USER_STEP_UP_TOKEN_TYPE
+            or int(payload["sub"]) != user_id
+        ):
+            raise jwt.InvalidTokenError("wrong step-up token")
+        return payload
+    except (jwt.PyJWTError, ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="安全验证已失效，请重新验证",
+        ) from exc
 
 
 async def read_user_nbf(user_id: int) -> int | None:
@@ -220,7 +263,8 @@ async def authenticate_user_token(
             detail="User not found",
         )
 
-    if user.deleted_at is not None:
+    lifecycle = getattr(user, "lifecycle_status", "active") or "active"
+    if user.deleted_at is not None or lifecycle != "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="账号已注销",

@@ -14,7 +14,11 @@ from app.core.admin_security import (
 )
 from app.core.time_utils import unix_timestamp, utcnow
 from app.models.admin import AdminUser, Permission, Role, RolePermission
-from app.schemas.admin_auth import AdminChangePasswordRequest, AdminLoginRequest
+from app.schemas.admin_auth import (
+    AdminChangePasswordRequest,
+    AdminLoginRequest,
+    AdminProfileUpdateRequest,
+)
 from app.services.admin_audit_service import write_admin_audit
 
 
@@ -65,6 +69,28 @@ async def get_admin_me_response(db: AsyncSession, admin_user: AdminUser) -> dict
         "role": role,
         "permissions": permissions,
     }
+
+
+async def update_admin_profile(
+    db: AsyncSession,
+    principal: AdminPrincipal,
+    data: AdminProfileUpdateRequest,
+    request: Request,
+) -> dict:
+    user = principal.user
+    previous_name = user.display_name
+    user.display_name = data.display_name or None
+    await write_admin_audit(
+        db,
+        principal,
+        "admin_user.update_profile",
+        "admin_user",
+        user.id,
+        detail={"old_display_name": previous_name, "display_name": user.display_name},
+        request=request,
+    )
+    await db.commit()
+    return await get_admin_me_response(db, user)
 
 
 async def refresh_admin_access_token(
@@ -159,6 +185,7 @@ async def change_admin_password(
     validate_admin_password_strength(data.new_password)
     # hash_admin_password 内部已有字节长度校验，超长会抛 ValueError
     admin_user.password_hash = hash_admin_password(data.new_password)
+    admin_user.must_change_password = False
     # 水印取凭据变更时刻（而非操作者 token 的 iat），使此前签发的全部会话失效；
     # 路由随后删除刷新 Cookie，操作者需重新登录。
     await set_admin_user_nbf(admin_user.id, int(unix_timestamp(utcnow())) + 1)

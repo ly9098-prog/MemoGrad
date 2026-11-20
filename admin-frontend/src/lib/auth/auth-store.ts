@@ -19,7 +19,8 @@ type AuthState = {
   permissions: string[];
   isAuthenticated: boolean;
   isBootstrapping: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<LoginResponse>;
+  acceptLogin: (response: LoginResponse) => void;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
   setPermissions: (permissions: string[]) => void;
@@ -39,6 +40,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       skipRefresh: true,
       body: JSON.stringify({ username, password }),
     });
+    get().acceptLogin(data);
+    return data;
+  },
+  acceptLogin(data) {
     set({
       accessToken: data.access_token,
       user: data.user,

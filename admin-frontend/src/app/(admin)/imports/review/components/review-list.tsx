@@ -7,6 +7,7 @@ import {
   getQuestionTypeLabel,
   getQuestionTypeShortLabel,
 } from "@/lib/question-types";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { textFromImport } from "../review-edit-state";
 import { getReviewListBadges, getReviewTableBadges } from "../review-queue-badges";
 import { getSourceLocator, getSourceQuestionNo } from "../review-source-location";
@@ -50,6 +51,18 @@ export function ReviewList({
   onVerifyAnswer,
   onReviewAction,
 }: ReviewListProps) {
+  const animationKey = `${viewMode}-${items[0]?.id ?? "empty"}-${items.at(-1)?.id ?? "empty"}`;
+  const tableEntranceRef = useStaggeredEntrance<HTMLTableSectionElement>({
+    ready: items.length > 0,
+    itemCount: items.length,
+    animationKey,
+  });
+  const listEntranceRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: items.length > 0,
+    itemCount: items.length,
+    animationKey,
+  });
+
   if (items.length === 0) return null;
 
   return (
@@ -77,7 +90,7 @@ export function ReviewList({
                         <th className="w-[136px] px-2 py-2 text-center font-semibold text-muted-foreground">操作</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody ref={tableEntranceRef}>
                       {items.map((item, index) => {
                         const { answerStatusLabel, answerStatusStyle, riskLabel, riskStyle } = getReviewTableBadges(item);
                         const srcNo = getSourceQuestionNo(item);
@@ -216,7 +229,7 @@ export function ReviewList({
                 </div>
               ) : null}
               {items.length > 0 && viewMode === "list" ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div ref={listEntranceRef} className="overflow-hidden rounded-xl border border-border bg-card">
                 <div className="flex items-center gap-3 border-b border-border/50 px-3.5 py-2">
                   <label className="group/cb relative flex cursor-pointer items-center gap-2">
                     <span className="flex h-[16px] w-[16px] items-center justify-center rounded border-2 border-border bg-card transition-all group-hover/cb:border-primary/50 [&:has(input:checked)]:border-primary [&:has(input:checked)]:bg-primary">

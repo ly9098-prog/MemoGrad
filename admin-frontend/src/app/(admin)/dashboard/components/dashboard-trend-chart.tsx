@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { DashboardDailyPoint } from "@/lib/api/types";
+import { springPressHandlers } from "@/components/motion/spring-press";
 import { AnimatedDigits } from "./animated-digits";
 import { getTrendPaths, getTrendScale } from "./trend-geometry";
 import styles from "../dashboard-workspace.module.css";
@@ -203,6 +204,7 @@ export function DashboardTrendChart({
               className={styles.periodButton}
               data-active={period === item}
               aria-pressed={period === item}
+              {...springPressHandlers()}
             >
               {item === "7d" ? "7 天" : "30 天"}
             </button>
@@ -228,6 +230,7 @@ export function DashboardTrendChart({
                   if (!series[item.key]) setFocusKey(item.key);
                   setSeries((current) => ({ ...current, [item.key]: !current[item.key] }));
                 }}
+                {...springPressHandlers()}
               >
                 <span><i className={styles.seriesSample} data-series={item.key} style={{ color: item.color }} />{item.label}</span>
                 <strong aria-label={loading ? "--" : value}>

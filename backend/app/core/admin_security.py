@@ -70,7 +70,7 @@ def set_refresh_cookie(
         key=REFRESH_COOKIE_KEY,
         value=value,
         httponly=True,
-        samesite="none" if secure else "lax",
+        samesite="lax",
         secure=secure,
         path=_REFRESH_COOKIE_PATH,
         max_age=7 * 24 * 60 * 60,
@@ -95,7 +95,7 @@ def delete_refresh_cookie(
         key=REFRESH_COOKIE_KEY,
         value="",
         httponly=True,
-        samesite="none" if secure else "lax",
+        samesite="lax",
         secure=secure,
         path=_REFRESH_COOKIE_PATH,
         max_age=0,
@@ -205,6 +205,7 @@ def create_admin_token(admin_user: AdminUser, *, issued_at: int | None = None) -
         "iss": settings.JWT_ISSUER,
         "aud": settings.ADMIN_JWT_AUDIENCE,
         "roleId": admin_user.role_id,
+        "scope": "password_change" if admin_user.must_change_password else "full",
         "jti": uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=2)).timestamp()),
@@ -415,11 +416,18 @@ async def bump_role_version(db: AsyncSession, role_id: int) -> None:
         pass
 
 
-async def get_current_admin(
+async def _resolve_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(admin_security),
     db: AsyncSession = Depends(get_db),
+    *,
+    allow_restricted: bool,
 ) -> AdminPrincipal:
     payload = decode_admin_token(credentials.credentials)
+    if payload.get("scope") == "password_change" and not allow_restricted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="请先完成首次密码修改",
+        )
     jti = payload.get("jti")
     user_id = int(payload["sub"])
     token_iat = int(payload.get("iat", 0))
@@ -464,6 +472,20 @@ async def get_current_admin(
         pass
 
     return AdminPrincipal(user, payload)
+
+
+async def get_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(admin_security),
+    db: AsyncSession = Depends(get_db),
+) -> AdminPrincipal:
+    return await _resolve_current_admin(credentials, db, allow_restricted=False)
+
+
+async def get_current_admin_any_scope(
+    credentials: HTTPAuthorizationCredentials = Depends(admin_security),
+    db: AsyncSession = Depends(get_db),
+) -> AdminPrincipal:
+    return await _resolve_current_admin(credentials, db, allow_restricted=True)
 
 
 def require_roles(*role_names: str):

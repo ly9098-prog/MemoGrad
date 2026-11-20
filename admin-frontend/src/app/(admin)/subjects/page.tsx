@@ -16,6 +16,7 @@ import {
   ManagementSkeletonRows,
   StatusBadge,
 } from "@/components/admin/management-ui";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import {
   WorkspacePage,
   WorkspaceHeader,
@@ -170,6 +171,11 @@ export default function SubjectsPage() {
   const filteredFlat = useMemo(() => {
     return visibleSubjects(flat, normalizedKeyword, collapsedIds);
   }, [flat, normalizedKeyword, collapsedIds]);
+  const subjectListRef = useStaggeredEntrance<HTMLTableSectionElement>({
+    ready: filteredFlat.length > 0,
+    itemCount: filteredFlat.length,
+    animationKey: normalizedKeyword,
+  });
   const { activeDescendantsById } = useMemo(
     () => buildSubjectRelations(query.data?.items || []),
     [query.data],
@@ -351,7 +357,7 @@ export default function SubjectsPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={subjectListRef}>
                   {filteredFlat.map((subject) => {
                     const isUpdating =
                       mutation.isPending &&

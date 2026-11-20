@@ -160,6 +160,23 @@ jobs:
           STAGING_STORAGE_DIR: ${{ runner.temp }}/queue-recovery-staging
         run: python -m pytest tests/integration/test_queue_redis_recovery.py --run-integration -q
 
+      - name: Verify identity migration, auth transports and domain gate contracts
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DEPLOYMENT_PROFILE: local_import
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          REDIS_URL: ""
+          SENTRY_DSN: ""
+          STAGING_STORAGE_DIR: ${{ runner.temp }}/auth-migration-staging
+        run: >-
+          python -m pytest
+          tests/test_deploy_auth_domains.py
+          tests/integration/test_multi_identity_postgres.py
+          tests/integration/test_auth_transports.py
+          tests/integration/test_login_challenge_security.py
+          --run-integration -q
+
       - name: Retain private Redis recovery evidence
         if: always()
         uses: actions/upload-artifact@v4

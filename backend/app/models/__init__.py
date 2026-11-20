@@ -91,6 +91,12 @@ from app.models.syllabus import (  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
 from app.models.task_outbox import TaskOutbox  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.user_auth import (  # noqa: F401
+    UserAuthIdentity,
+    UserConsentAcceptance,
+    UserIdentityTombstone,
+)
+from app.models.user_password import UserPasswordCredential  # noqa: F401
 from app.models.user_adaptive_profile import UserAdaptiveProfile  # noqa: F401
 from app.models.user_knowledge_adaptive_state import (  # noqa: F401
     UserKnowledgeAdaptiveState,

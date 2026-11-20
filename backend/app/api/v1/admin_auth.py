@@ -1,6 +1,5 @@
 import hashlib
 import logging
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +13,10 @@ from app.core.admin_security import (
     decode_admin_refresh_token,
     delete_refresh_cookie,
     get_current_admin,
+    get_current_admin_any_scope,
     set_refresh_cookie,
 )
+from app.core.browser_origin import enforce_trusted_browser_origin
 from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
 from app.core.database import get_db
@@ -25,6 +26,7 @@ from app.schemas.admin_auth import (
     AdminChangePasswordRequest,
     AdminLoginRequest,
     AdminMeResponse,
+    AdminProfileUpdateRequest,
     AdminTokenResponse,
 )
 from app.services.admin_audit_service import write_admin_audit
@@ -33,6 +35,7 @@ from app.services.admin_auth_service import (
     build_admin_login_response,
     change_admin_password,
     get_admin_me_response,
+    update_admin_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,36 +43,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/auth", tags=["admin-auth"])
 
 
-def _normalized_origin(value: str) -> str | None:
-    try:
-        parsed = urlsplit(value.strip())
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-            return None
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    except ValueError:
-        return None
-    return f"{parsed.scheme.lower()}://{parsed.hostname.lower()}:{port}"
-
-
 def _enforce_trusted_browser_origin(request: Request) -> None:
     """Block cross-site browser requests to cookie-bearing auth endpoints."""
-    origin = request.headers.get("origin")
-    fetch_site = request.headers.get("sec-fetch-site", "").lower()
-    if not origin:
-        if fetch_site == "cross-site":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Invalid request origin"
-            )
-        return
-    allowed = {
-        normalized
-        for value in [*settings.CORS_ORIGINS, settings.PUBLIC_BASE_URL]
-        if (normalized := _normalized_origin(value)) is not None
-    }
-    if _normalized_origin(origin) not in allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid request origin"
-        )
+    enforce_trusted_browser_origin(request, settings.ADMIN_WEB_BASE_URL)
 
 
 def _login_rate_key(request: Request, username: str) -> str:
@@ -224,7 +200,9 @@ async def refresh(
 
 @router.post("/logout")
 async def logout(
-    request: Request, response: Response, current_admin=Depends(get_current_admin)
+    request: Request,
+    response: Response,
+    current_admin=Depends(get_current_admin_any_scope),
 ):
     _enforce_trusted_browser_origin(request)
     payload = current_admin.token_payload
@@ -246,9 +224,21 @@ async def logout(
 
 @router.get("/me", response_model=AdminMeResponse)
 async def me(
-    current_admin=Depends(get_current_admin), db: AsyncSession = Depends(get_db)
+    current_admin=Depends(get_current_admin_any_scope),
+    db: AsyncSession = Depends(get_db),
 ):
     return await get_admin_me_response(db, current_admin.user)
+
+
+@router.patch("/me", response_model=AdminMeResponse)
+async def update_profile(
+    data: AdminProfileUpdateRequest,
+    request: Request,
+    current_admin=Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    _enforce_trusted_browser_origin(request)
+    return await update_admin_profile(db, current_admin, data, request)
 
 
 @router.post("/change-password")
@@ -257,7 +247,7 @@ async def update_password(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    current_admin=Depends(get_current_admin),
+    current_admin=Depends(get_current_admin_any_scope),
 ):
     _enforce_trusted_browser_origin(request)
     try:

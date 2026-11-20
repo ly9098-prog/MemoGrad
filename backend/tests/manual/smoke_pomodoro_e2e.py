@@ -71,7 +71,15 @@ async def main():
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # 登录 → token
-            r = await client.post("/api/v1/auth/login", json={"code": "smoke_user_001"})
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "code": "smoke_user_001",
+                    "accepted_terms": True,
+                    "agreement_version": "2026-11-20",
+                    "privacy_version": "2026-11-20",
+                },
+            )
             assert r.status_code == 200, r.text
             token = r.json()["access_token"]
             print(f"[1] 登录成功，token len={len(token)}")
