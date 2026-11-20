@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { SliderCaptcha } from "@/components/slider-captcha";
 import { ApiError, apiRequest } from "@/lib/api";
 import { useUserAuth } from "@/lib/auth-store";
 import type {
@@ -75,6 +76,7 @@ function LoginForm() {
   const [code, setCode] = useState("");
   const [resendAfter, setResendAfter] = useState(0);
   const [sentEmail, setSentEmail] = useState("");
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const [pending, setPending] = useState<"email" | "github" | null>(null);
   const [error, setError] = useState<LoginError | null>(null);
   const authError = AUTH_ERRORS[params.get("auth_error") ?? ""] ?? "";
@@ -101,20 +103,31 @@ function LoginForm() {
     return false;
   }
 
-  async function startEmail() {
-    if (!requireConsent() || busy) return;
+  function openEmailCaptcha() {
+    if (!requireConsent() || busy || captchaOpen) return;
     const normalized = email.trim();
     if (!normalized) {
       setError({ message: "请输入邮箱地址", field: "email" });
       return;
     }
     setError(null);
+    setCaptchaOpen(true);
+  }
+
+  async function sendEmail(captchaTicket: string) {
+    if (busy || !requireConsent()) {
+      setCaptchaOpen(false);
+      return;
+    }
+    const normalized = email.trim();
+    setCaptchaOpen(false);
     setPending("email");
     try {
       const response = await apiRequest<OtpStartResponse>("/auth/email/start", {
         method: "POST",
         body: JSON.stringify({
           email: normalized,
+          captcha_ticket: captchaTicket,
           client: "web",
           accepted_terms: true,
           agreement_version: USER_AGREEMENT_VERSION,
@@ -135,10 +148,10 @@ function LoginForm() {
   async function submitEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!challengeId) {
-      await startEmail();
+      openEmailCaptcha();
       return;
     }
-    if (code.length !== 6 || busy || !requireConsent()) return;
+    if (code.length !== 6 || busy || captchaOpen || !requireConsent()) return;
     setError(null);
     setPending("email");
     try {
@@ -200,7 +213,7 @@ function LoginForm() {
                   type="button"
                   className={styles.githubButton}
                   onClick={() => void startGithub()}
-                  disabled={busy}
+                  disabled={busy || captchaOpen}
                   aria-busy={pending === "github"}
                 >
                   {pending === "github" ? (
@@ -232,13 +245,14 @@ function LoginForm() {
                     value={email}
                     onChange={(event) => {
                       setEmail(event.target.value);
+                      if (captchaOpen) setCaptchaOpen(false);
                       if (error) setError(null);
                     }}
                     placeholder="name@example.com"
                     autoComplete="email"
                     autoCapitalize="none"
                     spellCheck={false}
-                    disabled={busy}
+                    disabled={busy || captchaOpen}
                     aria-invalid={error?.field === "email" || undefined}
                     aria-describedby={visibleError ? "user-login-feedback" : undefined}
                     required
@@ -251,11 +265,12 @@ function LoginForm() {
                     <button
                       type="button"
                       className={styles.quietButton}
-                      disabled={busy}
+                      disabled={busy || captchaOpen}
                       onClick={() => {
                         setChallengeId("");
                         setCode("");
                         setResendAfter(0);
+                        setCaptchaOpen(false);
                         if (error) setError(null);
                       }}
                     >
@@ -290,16 +305,22 @@ function LoginForm() {
                     <ResendButton
                       key={`${challengeId}-${resendAfter}`}
                       seconds={resendAfter}
-                      busy={busy}
-                      onResend={() => void startEmail()}
+                      busy={busy || captchaOpen}
+                      onResend={openEmailCaptcha}
                     />
                   </div>
                 </>
               )}
+              {captchaOpen && (
+                <SliderCaptcha
+                  onVerified={(ticket) => void sendEmail(ticket)}
+                  onCancel={() => setCaptchaOpen(false)}
+                />
+              )}
               <button
                 type="submit"
                 className={styles.submit}
-                disabled={busy || (Boolean(challengeId) && code.length !== 6)}
+                disabled={busy || captchaOpen || (Boolean(challengeId) && code.length !== 6)}
               >
                 {pending === "email" && <Loader2 className={styles.spinner} aria-hidden="true" />}
                 <span>
@@ -317,7 +338,7 @@ function LoginForm() {
                 ref={consentInput}
                 type="checkbox"
                 checked={agreed}
-                disabled={busy}
+                disabled={busy || captchaOpen}
                 onChange={(event) => {
                   setAgreed(event.target.checked);
                   if (error) setError(null);

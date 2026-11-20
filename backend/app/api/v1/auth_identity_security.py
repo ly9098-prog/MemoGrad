@@ -63,6 +63,7 @@ async def start_email_step_up(
 @router.post("/users/me/identities/email/step-up/verify")
 async def verify_email_step_up(
     data: IdentityEmailVerifyRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -72,6 +73,7 @@ async def verify_email_step_up(
             code=data.code,
             domain="user",
             purpose="step_up",
+            client_ip=_ip(request),
         )
     except email_otp_service.OtpError as exc:
         _raise_otp(exc)
@@ -142,6 +144,7 @@ async def start_email_change(
 @router.post("/users/me/identities/email/change/verify")
 async def verify_email_change(
     data: IdentityEmailVerifyRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -152,6 +155,7 @@ async def verify_email_change(
             code=data.code,
             domain="user",
             purpose="bind",
+            client_ip=_ip(request),
         )
         if challenge.get("metadata", {}).get("operation") != "change_email":
             raise email_otp_service.OtpError("验证码用途不匹配")

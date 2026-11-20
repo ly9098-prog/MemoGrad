@@ -85,6 +85,7 @@ async def verify_email_bind(
             code=data.code,
             domain="user",
             purpose="bind",
+            client_ip=_ip(request),
         )
         if int(challenge.get("user_id") or 0) != current_user.id:
             raise email_otp_service.OtpError("验证码不属于当前账号")

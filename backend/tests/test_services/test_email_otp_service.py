@@ -5,6 +5,7 @@ import pytest
 import pytest_asyncio
 
 from app.core.cache import cache
+from app.core.config import settings
 from app.services import email_otp_service
 
 
@@ -43,6 +44,7 @@ async def test_otp_is_hashed_verified_once_and_not_logged(monkeypatch):
         code="123456",
         domain="user",
         purpose="login",
+        client_ip="127.0.0.1",
     )
     assert challenge["email"] == "user@example.com"
     with pytest.raises(email_otp_service.OtpError, match="无效或已过期"):
@@ -51,6 +53,7 @@ async def test_otp_is_hashed_verified_once_and_not_logged(monkeypatch):
             code="123456",
             domain="user",
             purpose="login",
+            client_ip="127.0.0.1",
         )
 
 
@@ -74,6 +77,7 @@ async def test_otp_invalidates_after_three_wrong_attempts(monkeypatch):
                 code="000000",
                 domain="admin",
                 purpose="recover",
+                client_ip="127.0.0.1",
             )
     with pytest.raises(email_otp_service.OtpError, match="无效或已过期"):
         await email_otp_service.consume_otp(
@@ -81,7 +85,79 @@ async def test_otp_invalidates_after_three_wrong_attempts(monkeypatch):
             code="654321",
             domain="admin",
             purpose="recover",
+            client_ip="127.0.0.1",
         )
+
+
+@pytest.mark.asyncio
+async def test_login_otp_ip_lock_survives_challenge_replacement(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    delivery = AsyncMock()
+    monkeypatch.setattr(email_otp_service, "send_auth_email", delivery)
+    monkeypatch.setattr(email_otp_service.secrets, "randbelow", lambda _limit: 654321)
+    monkeypatch.setattr(settings, "OTP_IP_LOCK_MAX_FAILURES", 3)
+    issued = await email_otp_service.issue_otp(
+        domain="user",
+        email="locked@example.com",
+        purpose="login",
+        client_ip="203.0.113.8",
+    )
+    for _ in range(2):
+        with pytest.raises(email_otp_service.OtpError):
+            await email_otp_service.consume_otp(
+                challenge_id=issued.challenge_id,
+                code="000000",
+                domain="user",
+                purpose="login",
+                client_ip="203.0.113.8",
+            )
+    await cache.delete_strict(
+        email_otp_service._resend_key("user", "login", "locked@example.com")
+    )
+    replacement = await email_otp_service.issue_otp(
+        domain="user",
+        email="locked@example.com",
+        purpose="login",
+        client_ip="203.0.113.8",
+    )
+    with pytest.raises(email_otp_service.OtpIpLockedError):
+        await email_otp_service.consume_otp(
+            challenge_id=replacement.challenge_id,
+            code="000000",
+            domain="user",
+            purpose="login",
+            client_ip="203.0.113.8",
+        )
+    with pytest.raises(email_otp_service.OtpIpLockedError):
+        await email_otp_service.issue_otp(
+            domain="user",
+            email="another@example.com",
+            purpose="login",
+            client_ip="203.0.113.8",
+        )
+    assert delivery.await_count == 2
+    assert await cache.get_strict(
+        email_otp_service._resend_key("user", "login", "another@example.com")
+    ) is None
+    with pytest.raises(
+        email_otp_service.OtpIpLockedError, match="尝试次数过多"
+    ):
+        await email_otp_service.consume_otp(
+            challenge_id=replacement.challenge_id,
+            code="654321",
+            domain="user",
+            purpose="login",
+            client_ip="203.0.113.8",
+        )
+    other_ip = await email_otp_service.consume_otp(
+        challenge_id=replacement.challenge_id,
+        code="654321",
+        domain="user",
+        purpose="login",
+        client_ip="203.0.113.9",
+    )
+    assert other_ip["email"] == "locked@example.com"
 
 
 @pytest.mark.asyncio
@@ -116,12 +192,14 @@ async def test_resend_invalidates_the_previous_challenge(monkeypatch):
             code="111111",
             domain="user",
             purpose="login",
+            client_ip="127.0.0.1",
         )
     challenge = await email_otp_service.consume_otp(
         challenge_id=second.challenge_id,
         code="222222",
         domain="user",
         purpose="login",
+        client_ip="127.0.0.1",
     )
     assert challenge["email"] == "resend@example.com"
 

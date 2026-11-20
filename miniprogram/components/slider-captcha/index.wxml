@@ -1,0 +1,27 @@
+<view class="captcha" aria-label="安全验证">
+  <view class="captcha-heading">
+    <text class="captcha-title">安全验证</text>
+    <text class="captcha-refresh" bindtap="onRefresh" aria-role="button" aria-disabled="{{loading || verifying}}">换一张</text>
+  </view>
+  <view wx:if="{{loading}}" class="captcha-loading" aria-role="status">
+    <view class="captcha-spinner" aria-hidden="true"></view>
+    <text>正在生成拼图</text>
+  </view>
+  <block wx:elif="{{challenge}}">
+    <view class="captcha-image">
+      <image class="captcha-background" src="{{challenge.background_image}}" mode="scaleToFill" aria-hidden="true" />
+      <image class="captcha-piece" src="{{challenge.puzzle_image}}" mode="scaleToFill"
+        style="left: {{pieceLeft}}%; top: {{pieceTop}}%; width: {{pieceWidth}}%; height: {{pieceHeight}}%;"
+        aria-hidden="true" />
+    </view>
+    <slider class="captcha-slider" min="0" max="{{maximum}}" value="{{value}}" step="1"
+      block-size="28" block-color="#305B49" activeColor="#305B49" backgroundColor="#D8E4DD"
+      disabled="{{loading || verifying}}" bindtouchstart="onTouchStart" bindtouchcancel="onTouchCancel"
+      bindchanging="onChanging" bindchange="onChange" aria-label="拖动滑块把拼图移动到缺口" />
+    <text class="captcha-hint">{{verifying ? '正在验证…' : '拖动拼图对齐缺口后松手'}}</text>
+  </block>
+  <view wx:if="{{error}}" class="captcha-error" aria-role="alert">{{error}}</view>
+  <view class="captcha-actions">
+    <text class="captcha-cancel" bindtap="onCancel" aria-role="button">取消</text>
+  </view>
+</view>

@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import wraps
 from typing import Any
 
@@ -36,6 +36,22 @@ if redis.call("GET", KEYS[1]) == ARGV[1] then
     return 1
 end
 return 0
+"""
+
+_GUARDED_MUTATION_SCRIPT = """
+local plan = cjson.decode(ARGV[1])
+for _, check in ipairs(plan.checks) do
+    if redis.call('GET', KEYS[check[1]]) ~= check[2] then return 0 end
+end
+for _, counter in ipairs(plan.increments) do
+    local value = redis.call('INCR', KEYS[counter[1]])
+    if value == 1 then redis.call('EXPIRE', KEYS[counter[1]], counter[2]) end
+end
+for _, entry in ipairs(plan.values) do
+    redis.call('SET', KEYS[entry[1]], entry[2], 'EX', entry[3])
+end
+for _, index in ipairs(plan.deletes) do redis.call('DEL', KEYS[index]) end
+return 1
 """
 
 _ADVANCE_INTEGER_MARKER_SCRIPT = """
@@ -309,6 +325,76 @@ class CacheClient:
                     ttl,
                 )
             )
+        except Exception as exc:
+            raise CacheUnavailableError("Redis unavailable") from exc
+
+    async def commit_guarded_strict(
+        self,
+        *,
+        locks: Sequence[tuple[str, str]],
+        expected: dict[str, Any],
+        values: Sequence[tuple[str, Any, int]] = (),
+        increments: Sequence[tuple[str, int]] = (),
+        deletes: Sequence[str] = (),
+    ) -> bool:
+        """Commit a decision only while all owners and read values still match.
+
+        Checks and mutations run in one Redis script. An expired lease or
+        challenge rejects the entire decision, including counter changes.
+        The explicit local mode performs the same work without yielding.
+        """
+        if not locks:
+            raise ValueError("A guarded mutation requires a lock owner")
+        if not self._enabled:
+            if any(self._local_get(key) != owner for key, owner in locks):
+                return False
+            if any(self._local_get(key) != value for key, value in expected.items()):
+                return False
+            for key, ttl in increments:
+                current = int(self._local_get(key) or 0)
+                expiry = (
+                    self._local[key][0]
+                    if current
+                    else __import__("time").time() + _safe_ttl(ttl)
+                )
+                self._local[key] = (expiry, current + 1)
+            for key, value, ttl in values:
+                self._local_set(key, value, ttl)
+            for key in deletes:
+                self._local.pop(key, None)
+            return True
+        checks = [
+            *locks,
+            *(
+                (key, json.dumps(value, default=str) if value is not None else False)
+                for key, value in expected.items()
+            ),
+        ]
+        keys = list(dict.fromkeys(
+            [
+                *(key for key, _ in checks),
+                *(key for key, _ in increments),
+                *(key for key, _, _ in values),
+                *deletes,
+            ]
+        ))
+        indices = {key: index + 1 for index, key in enumerate(keys)}
+        plan = {
+            "checks": [(indices[key], value) for key, value in checks],
+            "increments": [(indices[key], _safe_ttl(ttl)) for key, ttl in increments],
+            "values": [
+                (indices[key], json.dumps(value, default=str), _safe_ttl(ttl))
+                for key, value, ttl in values
+            ],
+            "deletes": [indices[key] for key in deletes],
+        }
+        client = await self._ensure_client()
+        if client is None:
+            raise CacheUnavailableError("Redis unavailable")
+        try:
+            return bool(await client.eval(
+                _GUARDED_MUTATION_SCRIPT, len(keys), *keys, json.dumps(plan)
+            ))
         except Exception as exc:
             raise CacheUnavailableError("Redis unavailable") from exc
 

@@ -66,6 +66,7 @@ class DeletionResponse(BaseModel):
 
 class EmailOtpStartRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
+    captcha_ticket: str = Field(min_length=32, max_length=64)
     client: str = Field(default="web", pattern="^(web|miniprogram)$")
     accepted_terms: bool = False
     agreement_version: str | None = Field(default=None, max_length=32)

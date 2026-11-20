@@ -23,6 +23,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { AdminFooter } from "@/components/layout/admin-footer";
+import { SliderCaptcha } from "@/components/security/slider-captcha";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
@@ -134,17 +135,19 @@ function LoginForm() {
   const [challengeId, setChallengeId] = useState("");
   const [code, setCode] = useState("");
   const [resendAfter, setResendAfter] = useState(0);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
 
   const hasError = Boolean(error);
   const emailCodeSent = Boolean(challengeId);
 
   function selectMode(nextMode: LoginMode) {
-    if (loading) return;
+    if (loading || captchaOpen) return;
     setMode(nextMode);
     setError("");
     setChallengeId("");
     setCode("");
     setResendAfter(0);
+    setCaptchaOpen(false);
   }
 
   async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
@@ -165,21 +168,31 @@ function LoginForm() {
     }
   }
 
-  async function requestEmailCode() {
-    if (loading) return;
+  function openEmailCaptcha() {
+    if (loading || captchaOpen) return;
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       setError("请输入管理员邮箱");
       return;
     }
     setError("");
+    setCaptchaOpen(true);
+  }
+
+  async function sendEmailCode(captchaTicket: string) {
+    if (loading) return;
+    const normalizedEmail = email.trim();
+    setCaptchaOpen(false);
     setLoading(true);
     try {
       const response = await apiRequest<OtpStartResponse>("/auth/email/login/start", {
         method: "POST",
         skipRefresh: true,
         exposeErrorDetail: true,
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({
+          email: normalizedEmail,
+          captcha_ticket: captchaTicket,
+        }),
       });
       setChallengeId(response.challenge_id);
       setResendAfter(response.resend_after);
@@ -191,14 +204,14 @@ function LoginForm() {
     }
   }
 
-  async function handleEmailStart(event: FormEvent<HTMLFormElement>) {
+  function handleEmailStart(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await requestEmailCode();
+    openEmailCaptcha();
   }
 
   async function handleEmailVerify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (loading || code.length !== 6) return;
+    if (loading || captchaOpen || code.length !== 6) return;
     setError("");
     setLoading(true);
     try {
@@ -252,7 +265,7 @@ function LoginForm() {
                   type="button"
                   aria-pressed={mode === "password"}
                   data-active={mode === "password" || undefined}
-                  disabled={loading}
+                  disabled={loading || captchaOpen}
                   onClick={() => selectMode("password")}
                 >
                   <KeyRound aria-hidden="true" />
@@ -262,7 +275,7 @@ function LoginForm() {
                   type="button"
                   aria-pressed={mode === "email"}
                   data-active={mode === "email" || undefined}
-                  disabled={loading}
+                  disabled={loading || captchaOpen}
                   onClick={() => selectMode("email")}
                 >
                   <Mail aria-hidden="true" />
@@ -330,7 +343,7 @@ function LoginForm() {
                     <div className={styles.inputShell} data-invalid={hasError || undefined}>
                       <Mail className={styles.fieldIcon} aria-hidden="true" strokeWidth={1.7} />
                       <Input
-                        disabled={loading}
+                        disabled={loading || captchaOpen}
                         id="admin-email"
                         name="email"
                         type="email"
@@ -339,6 +352,7 @@ function LoginForm() {
                         value={email}
                         onChange={(event) => {
                           setEmail(event.target.value);
+                          if (captchaOpen) setCaptchaOpen(false);
                           if (error) setError("");
                         }}
                         placeholder="name@example.com"
@@ -351,7 +365,13 @@ function LoginForm() {
                       />
                     </div>
                   </div>
-                  <button type="submit" className={styles.submit} disabled={loading} aria-busy={loading}>
+                  {captchaOpen && !emailCodeSent && (
+                    <SliderCaptcha
+                      onVerified={(ticket) => void sendEmailCode(ticket)}
+                      onCancel={() => setCaptchaOpen(false)}
+                    />
+                  )}
+                  <button type="submit" className={styles.submit} disabled={loading || captchaOpen} aria-busy={loading}>
                     {loading ? (
                       <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
                     ) : (
@@ -392,19 +412,28 @@ function LoginForm() {
                       />
                     </div>
                   </div>
+                  {captchaOpen && emailCodeSent && (
+                    <SliderCaptcha
+                      onVerified={(ticket) => void sendEmailCode(ticket)}
+                      onCancel={() => setCaptchaOpen(false)}
+                    />
+                  )}
                   <div className={styles.otpActions}>
-                    <button type="button" className={styles.backButton} disabled={loading} onClick={() => setChallengeId("")}>
+                    <button type="button" className={styles.backButton} disabled={loading || captchaOpen} onClick={() => {
+                      setCaptchaOpen(false);
+                      setChallengeId("");
+                    }}>
                       <ArrowLeft aria-hidden="true" />
                       修改邮箱
                     </button>
                     <ResendCodeButton
                       key={challengeId}
                       seconds={resendAfter}
-                      loading={loading}
-                      onResend={() => void requestEmailCode()}
+                      loading={loading || captchaOpen}
+                      onResend={openEmailCaptcha}
                     />
                   </div>
-                  <button type="submit" className={styles.submit} disabled={loading || code.length !== 6} aria-busy={loading}>
+                  <button type="submit" className={styles.submit} disabled={loading || captchaOpen || code.length !== 6} aria-busy={loading}>
                     {loading ? (
                       <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证</span></>
                     ) : (

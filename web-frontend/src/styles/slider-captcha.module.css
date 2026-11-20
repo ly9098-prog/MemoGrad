@@ -1,0 +1,174 @@
+.root {
+  display: grid;
+  gap: 9px;
+  border: 1px solid #dbe4eb;
+  border-radius: 10px;
+  background: #f8fafb;
+  padding: 10px;
+}
+
+.heading {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #263842;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.title svg,
+.refresh svg {
+  width: 15px;
+  height: 15px;
+}
+
+.refresh {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #6a7d87;
+}
+
+.refresh:hover:not(:disabled) {
+  background: #edf2f5;
+  color: #243a45;
+}
+
+.placeholder {
+  display: flex;
+  min-height: 108px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #70838d;
+  font-size: 12px;
+}
+
+.placeholder svg {
+  width: 16px;
+  animation: spin 900ms linear infinite;
+}
+
+.image {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #d6e1e7;
+  border-radius: 8px;
+  background-color: #dce5e9;
+  background-position: center;
+  background-size: cover;
+}
+
+.piece {
+  position: absolute;
+  background-position: center;
+  background-size: 100% 100%;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 24%));
+  will-change: left;
+}
+
+.track {
+  position: relative;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid #d7e1e7;
+  border-radius: 9px;
+  background: #eef3f5;
+  color: #637680;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.track[data-dragging] {
+  cursor: grabbing;
+}
+
+.track:focus-visible {
+  outline: 2px solid #32596e;
+  outline-offset: 2px;
+}
+
+.fill {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  background: #d8e8ee;
+}
+
+.handle {
+  position: absolute;
+  top: 3px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #adc3ce;
+  border-radius: 7px;
+  background: #fff;
+  color: #294b5d;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgb(42 67 80 / 14%);
+}
+
+.handle svg {
+  width: 16px;
+}
+
+.hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-inline: 40px;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.error {
+  margin: 0;
+  color: #a43f54;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cancel {
+  justify-self: end;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #71858f;
+  font-size: 11px;
+}
+
+.cancel:hover:not(:disabled) {
+  color: #263c47;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .placeholder svg {
+    animation: none;
+  }
+}

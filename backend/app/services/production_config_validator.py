@@ -312,11 +312,20 @@ def _check_auth_delivery(errors: list[str]) -> None:
         errors.append("OTP_RESEND_SEC 必须在 30 秒到验证码有效期之间")
     if not 1 <= settings.OTP_MAX_ATTEMPTS <= 10:
         errors.append("OTP_MAX_ATTEMPTS 必须在 1~10 之间")
+    if not 1 <= settings.OTP_IP_LOCK_MAX_FAILURES <= 20:
+        errors.append("OTP_IP_LOCK_MAX_FAILURES 必须在 1~20 之间")
+    if not 60 <= settings.OTP_IP_LOCK_SEC <= 86400:
+        errors.append("OTP_IP_LOCK_SEC 必须在 60~86400 秒之间")
+    if not 30 <= settings.SLIDER_CAPTCHA_EXPIRE_SEC <= 600:
+        errors.append("SLIDER_CAPTCHA_EXPIRE_SEC 必须在 30~600 秒之间")
+    if not 1 <= settings.SLIDER_CAPTCHA_MAX_ATTEMPTS <= 10:
+        errors.append("SLIDER_CAPTCHA_MAX_ATTEMPTS 必须在 1~10 之间")
     for name, value in (
         ("OTP_EMAIL_HOURLY_LIMIT", settings.OTP_EMAIL_HOURLY_LIMIT),
         ("OTP_IP_HOURLY_LIMIT", settings.OTP_IP_HOURLY_LIMIT),
         ("OTP_USER_DOMAIN_DAILY_LIMIT", settings.OTP_USER_DOMAIN_DAILY_LIMIT),
         ("OTP_ADMIN_DOMAIN_DAILY_LIMIT", settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT),
+        ("SLIDER_CAPTCHA_IP_HOURLY_LIMIT", settings.SLIDER_CAPTCHA_IP_HOURLY_LIMIT),
     ):
         if value <= 0:
             errors.append(f"{name} 必须大于 0")

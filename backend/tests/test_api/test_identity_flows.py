@@ -20,6 +20,7 @@ from app.services import (
     email_otp_service,
     github_oauth_service,
     identity_service,
+    slider_captcha_service,
     user_auth_service,
 )
 
@@ -411,6 +412,60 @@ async def test_browser_email_login_rejects_admin_origin(flow):
         headers={
             "Origin": "https://admin.example.com",
         },
-        json={"email": "reader@example.com"},
+        json={
+            "email": "reader@example.com",
+            "captcha_ticket": "a" * 32,
+        },
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_browser_email_login_requires_a_slider_ticket(flow):
+    client, *_ = flow
+    missing = await client.post(
+        "/api/v1/auth/email/start",
+        headers={"Origin": "http://user.test"},
+        json={"email": "reader@example.com"},
+    )
+    assert missing.status_code == 422
+
+    challenge_response = await client.post(
+        "/api/v1/auth/captcha/slider/start",
+        headers={"Origin": "http://user.test"},
+    )
+    assert challenge_response.status_code == 200
+    challenge_id = challenge_response.json()["captcha_id"]
+    stored = await cache.get_strict(
+        slider_captcha_service._challenge_key(challenge_id)
+    )
+    target_x = int(stored["target_x"])
+    verification = await client.post(
+        "/api/v1/auth/captcha/slider/verify",
+        headers={"Origin": "http://user.test"},
+        json={
+            "captcha_id": challenge_id,
+            "offset": target_x,
+            "trajectory": [
+                {"x": 0, "y": 16, "t": 0},
+                {"x": target_x // 2, "y": 18, "t": 250},
+                {"x": target_x, "y": 16, "t": 610},
+            ],
+        },
+    )
+    assert verification.status_code == 200, verification.json()
+    ticket = verification.json()["ticket"]
+
+    started = await client.post(
+        "/api/v1/auth/email/start",
+        headers={"Origin": "http://user.test"},
+        json={
+            "email": "reader@example.com",
+            "captcha_ticket": ticket,
+            "accepted_terms": True,
+            "agreement_version": "2026-11-20",
+            "privacy_version": "2026-11-20",
+        },
+    )
+    assert started.status_code == 200
+    assert len(started.json()["challenge_id"]) == 32

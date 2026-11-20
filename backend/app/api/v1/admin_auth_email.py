@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.admin_auth import _enforce_trusted_browser_origin
+from app.api.v1.auth_otp_support import _ip, _raise_otp, _raise_slider_captcha
 from app.core.admin_security import (
     get_current_admin,
     set_refresh_cookie,
@@ -14,30 +15,28 @@ from app.core.time_utils import utcnow
 from app.models.admin import AdminUser
 from app.schemas.admin_auth import (
     AdminEmailActivationRequest,
+    AdminEmailLoginStartRequest,
     AdminEmailStartRequest,
     AdminEmailVerifyRequest,
     AdminPasswordRecoveryRequest,
     AdminRecoveryVerifyResponse,
     AdminTokenResponse,
 )
+from app.schemas.captcha import (
+    SliderCaptchaStartResponse,
+    SliderCaptchaVerifyRequest,
+    SliderCaptchaVerifyResponse,
+)
 from app.schemas.user import IdentityEmailVerifyRequest, OtpStartResponse
-from app.services import admin_email_auth_service, email_otp_service
+from app.services import (
+    admin_email_auth_service,
+    email_otp_service,
+    slider_captcha_service,
+)
 from app.services.admin_audit_service import write_admin_audit
 from app.services.admin_auth_service import build_admin_login_response
 
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/auth", tags=["admin-auth"])
-
-
-def _ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
-
-
-def _raise_otp(exc: email_otp_service.OtpError) -> None:
-    if isinstance(exc, email_otp_service.OtpRateLimitError):
-        raise HTTPException(status_code=429, detail=str(exc))
-    if isinstance(exc, email_otp_service.OtpUnavailableError):
-        raise HTTPException(status_code=503, detail=str(exc))
-    raise HTTPException(status_code=400, detail=str(exc))
 
 
 async def _issue_admin_start(
@@ -61,9 +60,60 @@ async def _issue_admin_start(
     )
 
 
+@router.post(
+    "/captcha/slider/start", response_model=SliderCaptchaStartResponse
+)
+async def start_admin_slider_captcha(request: Request):
+    _enforce_trusted_browser_origin(request)
+    try:
+        challenge = await slider_captcha_service.issue_challenge(
+            domain="admin",
+            client_ip=_ip(request),
+        )
+    except slider_captcha_service.SliderCaptchaError as exc:
+        _raise_slider_captcha(exc)
+    return SliderCaptchaStartResponse(
+        captcha_id=challenge.captcha_id,
+        background_image=challenge.background_image,
+        puzzle_image=challenge.puzzle_image,
+        width=challenge.width,
+        height=challenge.height,
+        piece_size=challenge.piece_size,
+        piece_y=challenge.piece_y,
+        expires_in=challenge.expires_in,
+    )
+
+
+@router.post(
+    "/captcha/slider/verify", response_model=SliderCaptchaVerifyResponse
+)
+async def verify_admin_slider_captcha(
+    data: SliderCaptchaVerifyRequest,
+    request: Request,
+):
+    _enforce_trusted_browser_origin(request)
+    try:
+        ticket = await slider_captcha_service.verify_challenge(
+            captcha_id=data.captcha_id,
+            offset=data.offset,
+            trajectory=[
+                {"x": point.x, "y": point.y, "t": point.t}
+                for point in data.trajectory
+            ],
+            domain="admin",
+            client_ip=_ip(request),
+        )
+    except slider_captcha_service.SliderCaptchaError as exc:
+        _raise_slider_captcha(exc)
+    return SliderCaptchaVerifyResponse(
+        ticket=ticket.ticket,
+        expires_in=ticket.expires_in,
+    )
+
+
 @router.post("/email/login/start", response_model=OtpStartResponse)
 async def start_admin_email_login(
-    data: AdminEmailStartRequest,
+    data: AdminEmailLoginStartRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -73,6 +123,14 @@ async def start_admin_email_login(
         admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        await slider_captcha_service.consume_ticket(
+            ticket=data.captcha_ticket,
+            domain="admin",
+            client_ip=_ip(request),
+        )
+    except slider_captcha_service.SliderCaptchaError as exc:
+        _raise_slider_captcha(exc)
     return await _issue_admin_start(
         email=email,
         purpose="login",
@@ -95,6 +153,7 @@ async def verify_admin_email_login(
             code=data.code,
             domain="admin",
             purpose="login",
+            client_ip=_ip(request),
         )
     except email_otp_service.OtpError as exc:
         _raise_otp(exc)
@@ -169,6 +228,7 @@ async def verify_admin_email_activation(
             code=data.code,
             domain="admin",
             purpose="activate",
+            client_ip=_ip(request),
         )
         if int(challenge.get("user_id") or 0) != current_admin.id:
             raise email_otp_service.OtpError("验证码不属于当前管理员")
@@ -232,6 +292,7 @@ async def verify_admin_email_recovery(
             code=data.code,
             domain="admin",
             purpose="recover",
+            client_ip=_ip(request),
         )
         if challenge.get("metadata", {}).get("operation") != "recover_password":
             raise email_otp_service.OtpError("验证码用途不匹配")

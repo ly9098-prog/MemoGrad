@@ -76,6 +76,10 @@ class AdminEmailStartRequest(BaseModel):
     email: str = Field(min_length=3, max_length=128)
 
 
+class AdminEmailLoginStartRequest(AdminEmailStartRequest):
+    captcha_ticket: str = Field(min_length=32, max_length=64)
+
+
 class AdminEmailActivationRequest(AdminEmailStartRequest):
     current_password: str = Field(min_length=1, max_length=128)
 

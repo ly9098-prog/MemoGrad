@@ -39,8 +39,8 @@
       </view>
       <view class="login-panel route-enter-page delay-one">
         <view class="login-method-tabs" aria-role="tablist" aria-label="选择登录方式">
-          <button class="login-method-tab {{loginMethod === 'wechat' ? 'is-active' : ''}}" data-method="wechat" bindtap="onLoginMethodChange" disabled="{{loading}}" aria-role="tab" aria-selected="{{loginMethod === 'wechat'}}">微信</button>
-          <button class="login-method-tab {{loginMethod === 'email' ? 'is-active' : ''}}" data-method="email" bindtap="onLoginMethodChange" disabled="{{loading}}" aria-role="tab" aria-selected="{{loginMethod === 'email'}}">邮箱</button>
+          <button class="login-method-tab {{loginMethod === 'wechat' ? 'is-active' : ''}}" data-method="wechat" bindtap="onLoginMethodChange" disabled="{{loading || emailCaptchaVisible}}" aria-role="tab" aria-selected="{{loginMethod === 'wechat'}}">微信</button>
+          <button class="login-method-tab {{loginMethod === 'email' ? 'is-active' : ''}}" data-method="email" bindtap="onLoginMethodChange" disabled="{{loading || emailCaptchaVisible}}" aria-role="tab" aria-selected="{{loginMethod === 'email'}}">邮箱</button>
         </view>
 
         <view wx:if="{{loginMethod === 'wechat'}}" class="login-method-panel">
@@ -58,7 +58,7 @@
           <view wx:if="{{!accountMode || !accountEmail}}" class="login-field-row">
             <text class="login-field-label">邮箱</text>
             <view class="login-field {{focusedField === 'email' ? 'is-focused' : ''}}">
-              <input class="login-field-input" type="text" value="{{email}}" placeholder="name@example.com" placeholder-class="login-input-placeholder" maxlength="254" disabled="{{loading}}" bindinput="onEmailInput" bindfocus="onLoginFieldFocus" bindblur="onLoginFieldBlur" data-field="email" confirm-type="next" cursor-spacing="24" aria-label="邮箱地址" />
+              <input class="login-field-input" type="text" value="{{email}}" placeholder="name@example.com" placeholder-class="login-input-placeholder" maxlength="254" disabled="{{loading || emailCaptchaVisible}}" bindinput="onEmailInput" bindfocus="onLoginFieldFocus" bindblur="onLoginFieldBlur" data-field="email" confirm-type="next" cursor-spacing="24" aria-label="邮箱地址" />
             </view>
           </view>
           <view wx:if="{{emailChallengeId}}" class="login-field-row email-code-row">
@@ -70,7 +70,8 @@
               <input class="login-field-input login-code-input" type="number" value="{{emailCode}}" placeholder="6 位数字" placeholder-class="login-input-placeholder" maxlength="6" disabled="{{loading}}" bindinput="onEmailCodeInput" bindfocus="onLoginFieldFocus" bindblur="onLoginFieldBlur" data-field="code" confirm-type="done" cursor-spacing="24" aria-label="邮箱验证码" />
             </view>
           </view>
-          <button wx:if="{{!accountMode || !accountEmail}}" class="login-primary-btn email-login-btn" hover-class="{{loading ? 'none' : 'login-primary-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onEmailSubmit" loading="{{loading}}" disabled="{{loading}}" aria-busy="{{loading}}">
+          <slider-captcha wx:if="{{emailCaptchaVisible && !accountMode}}" bindverified="onEmailCaptchaVerified" bindcancel="onEmailCaptchaCancel" />
+          <button wx:if="{{(!accountMode || !accountEmail) && !emailCaptchaVisible}}" class="login-primary-btn email-login-btn" hover-class="{{loading ? 'none' : 'login-primary-btn-pressed'}}" hover-start-time="20" hover-stay-time="80" bindtap="onEmailSubmit" loading="{{loading}}" disabled="{{loading}}" aria-busy="{{loading}}">
             <text class="login-primary-title">{{loading ? '正在处理…' : (emailChallengeId ? (accountMode ? '验证并绑定' : '验证并登录') : '获取验证码')}}</text>
           </button>
           <view wx:if="{{emailChallengeId}}" class="email-resend-row">
@@ -82,7 +83,7 @@
         <view wx:if="{{!accountMode}}" class="agreement-box">
           <checkbox-group class="agreement-group" bindchange="onAgreementChange">
             <label class="agreement-check">
-              <checkbox id="login-agreement" class="agreement-native" value="agreed" checked="{{agreed}}" disabled="{{loading}}" color="#3A6F5B" aria-label="我已阅读并同意用户协议、隐私政策与AI免责声明" />
+              <checkbox id="login-agreement" class="agreement-native" value="agreed" checked="{{agreed}}" disabled="{{loading || emailCaptchaVisible}}" color="#3A6F5B" aria-label="我已阅读并同意用户协议、隐私政策与AI免责声明" />
               <view class="agreement-indicator {{agreed ? 'is-checked' : ''}}" aria-hidden="true"></view>
               <text class="agreement-text">我已阅读并同意</text>
             </label>
