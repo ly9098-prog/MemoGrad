@@ -33,7 +33,9 @@ test('route transition styles remain reduced-motion and canvas safe', () => {
 })
 
 test('first batch pages use transition classes without return replay', () => {
-  assert.ok(read('subpackages', 'formulas', 'library', 'index.wxml').includes('route-enter-page'))
+  const library = read('subpackages', 'formulas', 'library', 'index.wxml')
+  assert.ok(library.includes('route-enter-opacity'))
+  assert.doesNotMatch(library, /route-enter-page/, 'formula list rich-text must keep an opacity-only page ancestor')
   assert.ok(read('subpackages', 'exam', 'paper-list', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'history', 'index.wxml').includes('route-enter-page'))
   assert.ok(read('subpackages', 'exam', 'result', 'index.wxml').includes('route-enter-opacity'))

@@ -49,6 +49,8 @@ const LIBRARY_TYPE_FUNCTION_GRAPH = 'function_graph'
 const MAX_GRAPH_FALLBACK_PAGES = 10
 const MAX_FAVORITE_PAGES = 50
 const FAVORITE_PAGE_SIZE = 200
+const FORMULA_ENTRY_STAGGER_MS = 42
+const FORMULA_ENTRY_MAX_STAGGER = 5
 
 const MATH_FORMULA_SUBJECT = 'math'
 const BASE_FORMULA_SUBJECTS = [
@@ -211,6 +213,8 @@ Page({
   _favoriteRequestVersion: 0,
   _replaceRequestVersion: 0,
   _favoriteBusyIds: null,
+  _formulaListViewReady: false,
+  _formulaEntryEpoch: 0,
 
   onLoad(options = {}) {
     this._pageAlive = true
@@ -226,6 +230,11 @@ Page({
     this.loadTags()
     this.loadFavoriteIds()
     this.loadFormulas(true)
+  },
+
+  onReady() {
+    this._formulaListViewReady = true
+    this._revealFormulaEntries()
   },
 
   onShow() {
@@ -246,6 +255,7 @@ Page({
       this._hasShownOnce = true
       return
     }
+    this._revealFormulaEntries()
     // onLoad already performs the initial request. Refresh favorites every time
     // the page becomes visible again so a toggle made in the reader is reflected
     // immediately when the user navigates back to the library.
@@ -693,6 +703,7 @@ Page({
 
   onHide() {
     this._visible = false
+    this._formulaEntryEpoch++
     this._typeSwitchVersion = (this._typeSwitchVersion || 0) + 1
     this._pendingLibraryType = ''
   },
@@ -700,6 +711,7 @@ Page({
   onUnload() {
     this._pageAlive = false
     this._visible = false
+    this._formulaEntryEpoch++
     this._catalogRequestVersion++
     this._tagsRequestVersion++
     this._favoriteRequestVersion++
@@ -729,7 +741,10 @@ Page({
   async loadFormulas(replace = false) {
     if (!this._pageAlive || !this.librarySessionValid()) return
     const session = readerState.sessionIdentity()
-    if (replace) this._replaceRequestVersion = (this._replaceRequestVersion || 0) + 1
+    if (replace) {
+      this._replaceRequestVersion = (this._replaceRequestVersion || 0) + 1
+      this._formulaEntryEpoch++
+    }
     var requestVersion = this._replaceRequestVersion || 0
     var d = this.data
     if (!replace && (d.loading || d.loadingMore || d.initialLoading || !d.hasMore)) return
@@ -739,7 +754,7 @@ Page({
       var baseParams = this._buildFormulaParams(d)
       var fetchResult = await this._fetchFormulaPages(baseParams, d.pageSize, d.activeLibraryType)
       if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== (this._replaceRequestVersion || 0)) return
-      this.setData(this._buildFormulaResultPatch(fetchResult, d, replace, requestVersion))
+      this.setData(this._buildFormulaResultPatch(fetchResult, d, replace, requestVersion), () => this._revealFormulaEntries())
     } catch (e) {
       if (!readerState.sameSession(session)) return
       this._handleFormulaLoadError(e, replace, requestVersion)
@@ -786,6 +801,17 @@ Page({
     var mergedFormulas = replace ? fetchResult.items : (d.formulas || []).concat(fetchResult.items).filter(function(item, index, list) {
       return list.findIndex(function(candidate) { return String(candidate.id) === String(item.id) }) === index
     })
+    const existingIds = new Set(replace ? [] : (d.formulas || []).map(item => String(item.id)))
+    let batchIndex = 0
+    mergedFormulas = mergedFormulas.map(item => {
+      if (existingIds.has(String(item.id))) return item
+      return {
+        ...item,
+        _entryState: 'pending',
+        _entryKey: `${requestVersion}:${fetchResult.requestPage}:${item.id}`,
+        _entryDelay: Math.min(batchIndex++, FORMULA_ENTRY_MAX_STAGGER) * FORMULA_ENTRY_STAGGER_MS,
+      }
+    })
     var fetchedThroughPage = Math.max(0, fetchResult.requestPage - 1)
     var totalItems = hasKnownTotal ? parsedTotal : mergedFormulas.length
     var hasMoreByResponse = fetchResult.rawItems.length === fetchResult.pageSize
@@ -794,6 +820,36 @@ Page({
       hasMore: hasKnownTotal ? fetchedThroughPage * fetchResult.pageSize < totalItems : hasMoreByResponse,
       initialLoading: false, loadingMore: false, contentReady: true,
     }
+  },
+
+  _revealFormulaEntries() {
+    if (!this._pageAlive || !this._visible || !this._formulaListViewReady || !this.librarySessionValid()) return
+    if (this.data.initialLoading || this.data.loadError || !this.data.formulas.some(item => item._entryState === 'pending')) return
+    const epoch = ++this._formulaEntryEpoch
+    // setData completion + a real layout query confirms that wx:if mounted the
+    // current batch. nextTick alone only advances the logic-layer timeslice.
+    const query = this.createSelectorQuery ? this.createSelectorQuery() : wx.createSelectorQuery()
+    query.selectAll('.fl-list-entry-pending')
+      .fields({ dataset: true, size: true }).exec(results => {
+        if (epoch !== this._formulaEntryEpoch || !this._pageAlive || !this._visible || !this.librarySessionValid()) return
+        const keys = new Set(((results && results[0]) || [])
+          .filter(node => node.width > 0 && node.height > 0 && node.dataset)
+          .map(node => node.dataset.entryKey))
+        const patch = {}
+        this.data.formulas.forEach((item, index) => {
+          if (item._entryState === 'pending' && keys.has(item._entryKey)) patch[`formulas[${index}]._entryState`] = 'running'
+        })
+        if (Object.keys(patch).length) this.setData(patch)
+      })
+  },
+
+  onFormulaEntryEnd(e) {
+    if (!this._pageAlive || !this.librarySessionValid()) return
+    const name = e.detail && e.detail.animationName
+    if (name !== 'fl-list-entry-rise' && name !== 'fl-list-entry-fade') return
+    const key = e.currentTarget.dataset.entryKey
+    const index = this.data.formulas.findIndex(item => item._entryKey === key && item._entryState === 'running')
+    if (index >= 0) this.setData({ [`formulas[${index}]._entryState`]: 'done' })
   },
 
   _handleFormulaLoadError(e, replace, requestVersion) {
@@ -821,9 +877,13 @@ Page({
       // List cards render at ~360rpx height; loading the full-size master
       // image there is the dominant source of slow graph rendering.
       const graphPreviewUrl = resolveGraphPreviewUrl(item)
+      const titleNodes = renderFormulaTitleNodes(item.title)
+      const titleIsRich = titleNodes.some(node => node.type !== 'text')
       return {
         ...item,
-        titleNodes: renderFormulaTitleNodes(item.title),
+        titleNodes,
+        titleIsRich,
+        titleText: titleIsRich ? '' : (titleNodes.length ? titleNodes.map(node => node.text || '').join('') : String(item.title || '')),
         graphImageUrl,
         graphThumbnailUrl,
         graphPreviewUrl,

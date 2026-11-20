@@ -208,10 +208,8 @@
 </view>
 <view class="index-scroll-retainer" style="{{indexScrollRetentionStyle}}" aria-hidden="true"></view>
 </view>
-<view class="theme-sheet-layer {{themeSheetClosing ? 'theme-sheet-closing' : ''}}" wx:if="{{themeSheetOpen}}">
-<view class="theme-sheet-mask" bindtap="closeThemeSheet" catchtouchmove="preventBackgroundScroll" aria-hidden="true"></view>
-<view class="theme-sheet" catchtap="stopThemeSheetTap">
-<view class="theme-sheet-handle" aria-hidden="true"></view>
+<motion-sheet show="{{themeSheetOpen}}" closing="{{themeSheetClosing}}" label="选择主题" background="#F4FAF7" layer="{{80}}" safe-area="{{false}}" bind:close="closeThemeSheet">
+<view class="theme-sheet motion-sheet-panel" catchtap="stopThemeSheetTap">
 <view class="theme-sheet-head">
 <view class="theme-sheet-title-wrap">
 <view class="theme-sheet-title-row">
@@ -250,6 +248,6 @@
 </view>
 </scroll-view>
 </view>
-</view>
+</motion-sheet>
 </block>
 </view>

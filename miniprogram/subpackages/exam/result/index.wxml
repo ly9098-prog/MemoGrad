@@ -166,9 +166,8 @@
     </view>
   </scroll-view>
 </view>
-<view class="teacher-modal-mask" wx:if="{{teacherSheetVisible}}" catchtouchmove="noop">
-  <view class="teacher-modal-backdrop" bindtap="close408Teacher"></view>
-  <view class="teacher-sheet" catchtap="noop">
+<motion-sheet show="{{teacherSheetVisible}}" label="交卷后专项 AI 老师" background="#FBFAF6" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="close408Teacher">
+  <view class="teacher-sheet motion-sheet-panel" catchtap="noop">
     <view class="teacher-sheet-head">
       <view><text class="teacher-kicker">AI TEACHER</text><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
       <text class="teacher-sheet-close" bindtap="close408Teacher">×</text>
@@ -216,4 +215,4 @@
       <view class="teacher-scroll-space"></view>
     </scroll-view>
   </view>
-</view>
+</motion-sheet>

@@ -2,7 +2,7 @@
 <view class="fl-page">
   <premium-nav title="速记卡" variant="mint" bind:back="goBack" />
 
-  <view class="fl-content {{contentReady ? 'route-enter-page' : ''}}">
+  <view class="fl-content {{contentReady ? 'route-enter-opacity' : ''}}">
     <view class="fl-sticky-tools" style="top: {{navHeight}}px;">
       <view class="fl-filter-row">
         <view class="fl-subject-select" hover-class="fl-pressed" bindtap="toggleSubjectPicker" role="button" aria-label="选择学科，当前{{activeSubjectName}}" aria-expanded="{{showSubjectPicker}}">
@@ -103,23 +103,23 @@
 
     <view class="fl-list {{activeLibraryType === 'function_graph' ? 'fl-graph-list' : ''}}" wx:if="{{!initialLoading && !loadError && formulas.length > 0}}">
       <!-- (5) Native rich-text stays on opacity-only ancestors. -->
-      <view wx:for="{{formulas}}" wx:key="id" class="motion-list-item {{item.titleNodes && item.titleNodes.length ? 'motion-list-fade' : ''}}" style="animation-delay:{{(index < 5 ? index : 5) * 42}}ms;">
+      <view wx:for="{{formulas}}" wx:key="id" class="fl-list-entry {{item._entryState === 'pending' ? 'fl-list-entry-pending' : item._entryState === 'running' ? (item.titleIsRich ? 'fl-list-entry-fade' : 'fl-list-entry-rise') : ''}}" style="animation-delay:{{item._entryDelay}}ms;" data-entry-key="{{item._entryKey}}" bindanimationend="onFormulaEntryEnd">
       <view
         id="formula-card-{{item.id}}"
         class="fl-card {{activeLibraryType === 'function_graph' ? 'fl-card-graph' : ''}}"
         data-id="{{item.id}}"
         bindtap="goToReader"
-        hover-class="{{item.titleNodes && item.titleNodes.length ? 'motion-content-pressed' : 'fl-card-pressed'}}"
+        hover-class="{{item.titleIsRich ? 'motion-content-pressed' : 'fl-card-pressed'}}"
       >
         <view class="fl-card-head">
           <view class="fl-card-title-wrap">
             <rich-text
               class="fl-card-title fl-card-title-rich"
-              wx:if="{{item.titleNodes && item.titleNodes.length}}"
+              wx:if="{{item.titleIsRich}}"
               nodes="{{item.titleNodes}}"
               user-select="{{true}}"
             />
-            <text class="fl-card-title" wx:else>{{item.title}}</text>
+            <text class="fl-card-title" wx:else>{{item.titleText}}</text>
             <view class="fl-card-tags" wx:if="{{item.tags && item.tags.length || item.isFunctionGraph || (activeSubject === 'exam408' && item.studyCardTypeLabel)}}">
               <text class="fl-card-tag tag-study-type" wx:if="{{activeSubject === 'exam408'}}">{{item.studyCardTypeLabel}}</text>
               <text
@@ -198,9 +198,8 @@
     </view>
   </view>
 
-  <view class="fl-picker-overlay" wx:if="{{showSubjectPicker}}" bindtap="toggleSubjectPicker" catchtouchmove="noop">
-    <view class="fl-bottom-sheet fl-subject-sheet" catchtap="noop">
-      <view class="fl-sheet-handle"></view>
+  <motion-sheet show="{{showSubjectPicker}}" label="选择学科" background="#F3FBF8" safe-area="{{false}}" layer="{{120}}" bind:close="toggleSubjectPicker">
+    <view class="fl-bottom-sheet fl-subject-sheet motion-sheet-panel" catchtap="noop">
       <view class="fl-sheet-head">
         <view>
           <text class="fl-sheet-title">选择学科</text>
@@ -226,11 +225,10 @@
         </view>
       </view>
     </view>
-  </view>
+  </motion-sheet>
 
-  <view class="fl-picker-overlay" wx:if="{{showMoreSheet}}" bindtap="toggleMoreSheet" catchtouchmove="noop">
-    <view class="fl-bottom-sheet fl-more-sheet" catchtap="noop">
-      <view class="fl-sheet-handle"></view>
+  <motion-sheet show="{{showMoreSheet}}" label="筛选" background="#F3FBF8" safe-area="{{false}}" layer="{{120}}" bind:close="toggleMoreSheet">
+    <view class="fl-bottom-sheet fl-more-sheet motion-sheet-panel" catchtap="noop">
       <view class="fl-sheet-head">
         <text class="fl-sheet-title">筛选</text>
         <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed" role="button" aria-label="关闭筛选">
@@ -290,11 +288,10 @@
         <button class="fl-filter-done" hover-class="fl-pressed" bindtap="toggleMoreSheet">完成</button>
       </view>
     </view>
-  </view>
+  </motion-sheet>
 
-  <view class="fl-picker-overlay" wx:if="{{showTagPicker}}" bindtap="toggleTagPicker" catchtouchmove="noop">
-    <view class="fl-tag-sheet" catchtap="noop">
-      <view class="fl-sheet-handle"></view>
+  <motion-sheet show="{{showTagPicker}}" label="筛选{{activeLibraryType === 'function_graph' ? '图像' : '公式'}}标签" background="#F3FBF8" safe-area="{{false}}" layer="{{120}}" bind:close="toggleTagPicker">
+    <view class="fl-tag-sheet motion-sheet-panel" catchtap="noop">
       <view class="fl-sheet-head">
         <view>
           <text class="fl-sheet-title">筛选{{activeLibraryType === 'function_graph' ? '图像' : '公式'}}标签</text>
@@ -320,5 +317,5 @@
       </view>
       <view class="fl-sheet-done" hover-class="fl-pressed" bindtap="toggleTagPicker">完成筛选</view>
     </view>
-  </view>
+  </motion-sheet>
 </view>

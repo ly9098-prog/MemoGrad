@@ -729,9 +729,8 @@
 </view>
 
 <!-- Keep fixed overlays outside the animated dashboard container. -->
-<view class="knowledge-subject-sheet-layer {{knowledgeSubjectSheetClosing ? 'is-closing' : ''}}" wx:if="{{knowledgeSubjectSheetVisible}}" catchtouchmove="preventKnowledgeSubjectSheetScroll">
-  <view class="knowledge-subject-sheet-backdrop" catchtap="closeKnowledgeSubjectSheet"></view>
-  <view class="knowledge-subject-sheet" aria-role="dialog" aria-label="选择学科">
+<motion-sheet show="{{knowledgeSubjectSheetVisible}}" closing="{{knowledgeSubjectSheetClosing}}" label="选择学科" background="#FAFDFB" layer="{{110}}" safe-area="{{false}}" bind:close="closeKnowledgeSubjectSheet">
+  <view class="knowledge-subject-sheet motion-sheet-panel">
     <view class="knowledge-subject-sheet-header">
       <text class="knowledge-subject-sheet-title">选择学科</text>
       <button class="knowledge-subject-sheet-close" bindtap="closeKnowledgeSubjectSheet"
@@ -750,4 +749,4 @@
       </button>
     </view>
   </view>
-</view>
+</motion-sheet>

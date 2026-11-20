@@ -1,13 +1,13 @@
 <wxs module="motion" src="./sheet-motion.wxs" />
-<view wx:if="{{rendered}}" class="motion-sheet-root {{measuring ? 'is-measuring' : ''}}" command="{{command}}" change:command="{{motion.sync}}">
+<view wx:if="{{rendered}}" class="motion-sheet-root {{measuring ? 'is-measuring' : ''}} {{command.close ? 'is-leaving' : ''}}" style="z-index:{{layer}}" command="{{command}}" change:command="{{motion.sync}}">
   <view class="motion-sheet-mask" bindtap="requestClose" catchtouchmove="noop"></view>
   <view class="motion-sheet-shell" aria-role="dialog" aria-modal="true" aria-label="{{label}}">
-    <view class="motion-sheet-surface" aria-hidden="true"></view>
-    <view class="motion-sheet-content">
+    <view class="motion-sheet-surface" style="background:{{background}}" aria-hidden="true"></view>
+    <view class="motion-sheet-content {{safeArea ? 'has-safe-area' : ''}}">
       <view class="motion-sheet-grip" bindtouchstart="{{motion.start}}" catchtouchmove="{{motion.move}}" bindtouchend="{{motion.end}}" bindtouchcancel="{{motion.cancel}}">
         <button class="motion-sheet-grip-button" aria-label="展开抽屉，向下拖动可收起" bindtap="{{motion.expand}}"><view class="motion-sheet-handle" aria-hidden="true"></view></button>
       </view>
-      <slot />
+      <view class="motion-sheet-body"><slot /></view>
     </view>
   </view>
 </view>

@@ -298,9 +298,8 @@
 </view>
 </view>
 <submit-confirm id="submitConfirm" theme="mint" />
-<view class="modal-overlay" wx:if="{{masterConfirmId}}" catchtap="cancelMaster" catchtouchmove="noop">
-<view class="decision-sheet" catchtap="noop">
-<view class="sheet-handle"></view>
+<motion-sheet show="{{!!masterConfirmId}}" label="确认掌握" background="#FAFCF8" safe-area="{{false}}" bind:close="cancelMaster">
+<view class="decision-sheet motion-sheet-panel" catchtap="noop">
 <text class="decision-kicker">MASTERED</text>
 <text class="decision-title">确认已经掌握？</text>
 <text class="decision-desc">标记后，这道题会退出当前复习计划并保留在历史错题记录中；以后再次答错时会自动重新加入复习。</text>
@@ -309,22 +308,17 @@
 <button class="decision-primary" bindtap="confirmMaster">确认掌握</button>
 </view>
 </view>
-</view>
+</motion-sheet>
 <view class="undo-toast {{masterUndoVisible ? 'show' : ''}}">
 <text class="undo-toast-text">{{masterUndoText}}</text>
 <view class="undo-divider"></view>
 <text class="undo-action" bindtap="undoMaster">撤销</text>
 </view>
+<motion-sheet show="{{showBatchSizeSheet}}" label="每组题数" background="#FAFCF8" safe-area="{{false}}" bind:close="closeBatchSizeSheet">
 <view
-  wx:if="{{showBatchSizeSheet}}"
-  class="batch-sheet-mask"
-  catchtap="handleBatchSheetMaskTap"
->
-<view
-    class="batch-sheet"
+    class="batch-sheet motion-sheet-panel"
     catchtap="stopBatchSheetPropagation"
   >
-<view class="batch-sheet-handle"></view>
 <view class="batch-sheet-head">
 <text class="batch-sheet-kicker">REVIEW BATCH</text>
 <text class="batch-sheet-title">每组题数</text>
@@ -360,4 +354,4 @@
 <button class="batch-sheet-action batch-sheet-confirm" bindtap="confirmBatchSize">确认使用</button>
 </view>
 </view>
-</view>
+</motion-sheet>

@@ -3001,7 +3001,7 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
   background: #E9EEEB;
 }
 
-.knowledge-subject-sheet-layer{position:fixed;inset:0;z-index:110}
+.knowledge-subject-sheet.motion-sheet-panel { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .knowledge-subject-sheet-backdrop {
   position: absolute;
   inset: 0;

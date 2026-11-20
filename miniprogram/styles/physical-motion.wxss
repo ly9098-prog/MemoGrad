@@ -13,6 +13,10 @@
   to { opacity: 1; }
 }
 .motion-content-pressed { opacity: .78; }
+.motion-sheet-panel.motion-sheet-panel {
+  position: relative; inset: auto; width: 100%; box-sizing: border-box;
+  transform: none; animation: none; border-radius: 0;
+}
 /* (6) WXS owns the physical trajectory; CSS covers runtimes without touch WXS. */
 .motion-press { transform-origin: center; -webkit-tap-highlight-color: transparent; }
 .motion-press.motion-press { transition: none; }

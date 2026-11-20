@@ -27,7 +27,9 @@ for (const pkg of ['study', 'exam']) {
   assert.ok(!navShell.includes('_animating'), 'navigation shell does not visually react to transient animation lock')
   assert.strictEqual((wxml.match(/wx:for="{{\[_displayQuestion\]}}" wx:key="id"/g) || []).length, 2, 'CODE and MIXED remount on question identity, resetting horizontal code scroll')
   const config = JSON.parse(read(dir + 'quiz-runner.json'))
-  assert.ok(Object.values(config.usingComponents).every(p => p.startsWith(`/subpackages/${pkg}/`)), 'component dependencies stay in their own package')
+  assert.ok(Object.entries(config.usingComponents).every(([name, target]) =>
+    target.startsWith(`/subpackages/${pkg}/`) || (name === 'motion-sheet' && target === '/components/motion-sheet/index')),
+  'renderers stay package-local; the lightweight shared drawer is the sole main-package dependency')
   let definition
   const old = global.Component
   global.Component = value => { definition = value }

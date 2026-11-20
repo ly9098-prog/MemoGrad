@@ -29,7 +29,7 @@ test('capsule morph reverses in flight, preserves layout and becomes inert on hi
   h.motion.sync(model, { ...model, close: true }, h.owner); h.flush()
   assert.equal(h.state.p, 1)
   assert.match(h.node('.motion-sheet-surface').style.transform, /scale\(1,1\)/)
-  assert.equal(h.calls.length, 0)
+  assert.deepEqual(h.calls.map(c => c.name), ['finishClose'])
   h.motion.sync({ active: false }, model, h.owner)
   const writes = h.node('.motion-sheet-surface').writes
   h.flush()
@@ -55,12 +55,12 @@ test('drawer velocity chooses an anchor, touchcancel restores full height, close
 test('finished drawer gesture removes its hit layer immediately and emits completion once', () => {
   let definition
   const source = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../components/motion-sheet/index.js'), 'utf8')
-  require('node:vm').runInNewContext(source, { Component: value => { definition = value } })
+  require('node:vm').runInNewContext(source, { Component: value => { definition = value }, clearTimeout })
   const events = []
   const sheet = { ...definition.methods, _attached: true, _sequence: 1,
-    properties: { closing: false }, data: { rendered: true, command: { active: true, id: 1 } },
+    properties: { show: true, closing: false }, data: { rendered: true, command: { active: true, id: 1 } },
     setData(patch) { Object.assign(this.data, patch) },
-    triggerEvent(name, detail) { events.push({ name, completed: detail.completed }) } }
+    triggerEvent(name, detail) { if (name === 'close') events.push({ name, completed: detail.completed }) } }
   sheet.dismissFromGesture({ id: 1 })
   sheet.dismissFromGesture({ id: 1 })
   assert.equal(sheet.data.rendered, false)
@@ -70,7 +70,7 @@ test('finished drawer gesture removes its hit layer immediately and emits comple
 
 test('closing from an interrupted drag returns exactly to the capsule with no stale gesture', () => {
   const h = runtime('components/motion-sheet/sheet-motion.wxs')
-  const model = { active: true, immediate: true, id: 1, panel: { left: 0, top: 500, width: 390, height: 344 }, origin: { left: 32, top: 180, width: 120, height: 44 } }
+  const model = { active: true, anchored: true, immediate: true, id: 1, panel: { left: 0, top: 500, width: 390, height: 344 }, origin: { left: 32, top: 180, width: 120, height: 44 } }
   h.motion.sync(model, null, h.owner); h.flush()
   h.motion.start(h.event(100,500), h.owner)
   h.tick(); h.motion.move(h.event(100,600), h.owner); h.tick()
@@ -112,16 +112,54 @@ test('shared transition runs forward and back, interruption cancels queued frame
 test('a delayed dismissal cannot close a newly measured drawer after hide and show', () => {
   let definition
   const source = require('node:fs').readFileSync(require('node:path').resolve(__dirname, '../components/motion-sheet/index.js'), 'utf8')
-  require('node:vm').runInNewContext(source, { Component: value => { definition = value } })
+  require('node:vm').runInNewContext(source, { Component: value => { definition = value }, clearTimeout })
   const events = []
   const sheet = { ...definition.methods, _attached: true, _sequence: 3,
-    properties: { closing: false }, data: { rendered: true, command: { active: true, id: 3 } },
+    properties: { show: true, closing: false }, data: { rendered: true, command: { active: true, id: 3 } },
     setData(patch) { Object.assign(this.data, patch) },
-    triggerEvent(name, detail) { events.push({ name, completed: detail.completed }) } }
+    triggerEvent(name, detail) { if (name === 'close') events.push({ name, completed: detail.completed }) } }
   sheet.dismissFromGesture({ id: 1 })
   assert.equal(sheet.data.rendered, true)
   assert.equal(events.length, 0)
   sheet.dismissFromGesture({ id: 3 })
   assert.equal(sheet.data.rendered, false)
   assert.equal(events.length, 1)
+})
+
+test('Dock capsule expands continuously with one small overshoot and reverses without a reset', () => {
+  const h = runtime('components/motion-sheet/sheet-motion.wxs')
+  const model = { active: true, anchored: true, dock: true, id: 1,
+    panel: { left: 0, top: 500, width: 390, height: 344 }, origin: { left: 32, top: 180, width: 120, height: 44 } }
+  h.motion.sync(model, null, h.owner)
+  let peak = 0
+  for (let frame = 0; h.frames.length && frame < 160; frame++) { h.tick(); peak = Math.max(peak, h.state.p) }
+  assert.ok(peak > 1.01 && peak < 1.06, `bounded Dock rebound: ${peak}`)
+  assert.equal(h.state.p, 1)
+  assert.equal(h.node('.motion-sheet-surface').style['border-radius'], '24px 24px 0px 0px / 24px 24px 0px 0px')
+  h.motion.sync({ ...model, close: true }, model, h.owner)
+  h.tick(); h.tick()
+  const before = h.state.p
+  h.motion.sync({ ...model, id: 2, resume: true }, { ...model, close: true }, h.owner)
+  assert.equal(h.state.p, before, 'reversal retains the instantaneous position')
+  h.flush()
+  assert.equal(h.state.p, 1)
+})
+
+test('rich-text bodies keep all ancestors untransformed while the surface and handle track drag', () => {
+  const h = runtime('components/motion-sheet/sheet-motion.wxs')
+  const model = { active: true, immediate: true, fade: true, id: 1,
+    panel: { left: 0, top: 500, width: 390, height: 344 }, origin: { left: 0, top: 844, width: 390, height: 344 } }
+  h.motion.sync(model, null, h.owner); h.flush()
+  h.motion.start(h.event(100, 500), h.owner)
+  h.tick(); h.motion.move(h.event(100, 620), h.owner); h.tick()
+  assert.equal(h.node('.motion-sheet-shell').style.transform, 'none')
+  assert.equal(h.node('.motion-sheet-content').style.transform, undefined)
+  assert.equal(h.node('.motion-sheet-body').style.transform, undefined)
+  assert.match(h.node('.motion-sheet-surface').style.transform, /120px/)
+  assert.match(h.node('.motion-sheet-grip').style.transform, /120px/)
+  assert.ok(h.node('.motion-sheet-body').style.opacity < 1)
+  h.motion.sync({ ...model, id: 2, resume: true, resetDrag: true, dismissible: false }, model, h.owner)
+  h.flush()
+  assert.equal(h.state.y, 0, 'a new save lock restores the fully visible body')
+  assert.equal(h.node('.motion-sheet-body').style.opacity, 1)
 })

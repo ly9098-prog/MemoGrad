@@ -382,10 +382,8 @@
 <view class="bottom-space"></view>
 </view>
 </scroll-view>
-<view wx:if="{{reviewDialogVisible}}" class="review-dialog-mask">
-<view class="review-dialog-backdrop" bindtap="closeReviewDialog" catchtouchmove="noop"></view>
-<view class="review-dialog-sheet" catchtap="stopPropagation">
-<view class="review-dialog-handle" catchtouchmove="noop"></view>
+<motion-sheet show="{{reviewDialogVisible}}" label="题目解析与复盘" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" bind:close="closeReviewDialog">
+<view class="review-dialog-sheet motion-sheet-panel" catchtap="stopPropagation">
 <view class="review-dialog-head" catchtouchmove="noop">
 <view class="review-dialog-title-wrap">
 <text class="review-dialog-title">{{reviewDialog.title}}</text>
@@ -460,11 +458,10 @@
         >知道了</view>
 </view>
 </view>
+</motion-sheet>
 </view>
-</view>
-<view class="teacher-modal-mask" wx:if="{{!guestMode && teacherSheetVisible}}" catchtouchmove="noop">
-<view class="teacher-modal-backdrop" bindtap="close408Teacher"></view>
-<view class="teacher-sheet" catchtap="stopPropagation">
+<motion-sheet show="{{!guestMode && teacherSheetVisible}}" label="专项 AI 老师" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="close408Teacher">
+<view class="teacher-sheet motion-sheet-panel" catchtap="stopPropagation">
 <view class="teacher-sheet-head">
 <view><text class="teacher-kicker">AI TEACHER</text><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
 <text class="teacher-sheet-close" bindtap="close408Teacher">×</text>
@@ -521,4 +518,4 @@
 <view class="teacher-scroll-space"></view>
 </scroll-view>
 </view>
-</view>
+</motion-sheet>

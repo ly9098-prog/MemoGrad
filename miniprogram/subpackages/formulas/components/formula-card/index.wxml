@@ -114,10 +114,12 @@
      position remains unchanged because its card is never replaced. -->
 <page-container
   show="{{!!expandedBlock}}" position="bottom" round="{{false}}"
-  close-on-slide-down="{{false}}" bind:afterleave="closeFormulaReading"
-  custom-style="height:{{expandedHeight}}px;background:#FBFFFD;border-radius:24px 24px 0 0;overflow:hidden;"
+  duration="{{0}}" overlay="{{false}}"
+  close-on-slide-down="{{false}}" bind:afterleave="onReadingAfterLeave"
+  custom-style="position:fixed;inset:0;width:100%;height:100%;background:transparent;"
 >
-  <view class="fc-expanded-reading" catchtap="containFormulaReading" catchtouchmove="containFormulaReading">
+  <motion-sheet show="{{expandedVisible}}" label="公式阅读" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" bind:close="closeFormulaReading" bind:closed="onReadingClosed">
+  <view class="fc-expanded-reading motion-sheet-panel" style="height:{{expandedHeight}}px;" catchtap="containFormulaReading" catchtouchmove="containFormulaReading">
     <view class="fc-expanded-header" style="height:{{expandedHeaderHeight}}px;">
       <view class="fc-expanded-heading">
         <rich-text class="fc-expanded-title" wx:if="{{expandedBlock.labelNodes.length}}" nodes="{{expandedBlock.labelNodes}}" />
@@ -142,4 +144,5 @@
       </view>
     </scroll-view>
   </view>
+  </motion-sheet>
 </page-container>

@@ -278,13 +278,8 @@
 
   <view class="safe-bottom"></view>
 
-  <view
-    wx:if="{{showProfileSheet}}"
-    class="profile-sheet-mask"
-    bindtap="closeProfileSheet"
-  >
-    <view class="profile-sheet profile-minimal-sheet profile-native-sheet" catchtap="noop">
-      <view class="profile-sheet-handle"></view>
+  <motion-sheet show="{{showProfileSheet}}" label="设置头像和昵称" background="#FBFCF8" layer="{{999}}" safe-area="{{false}}" dismissible="{{!profileSaving}}" bind:close="closeProfileSheet">
+    <view class="profile-sheet profile-minimal-sheet profile-native-sheet motion-sheet-panel" catchtap="noop">
 
       <view class="profile-sheet-head profile-minimal-head">
         <view class="profile-minimal-heading">
@@ -380,6 +375,6 @@
         <text wx:else>头像和昵称完成后自动保存</text>
       </view>
     </view>
-  </view>
+  </motion-sheet>
 
 </view>

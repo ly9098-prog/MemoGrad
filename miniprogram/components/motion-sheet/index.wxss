@@ -1,15 +1,18 @@
 :host { display: contents; }
 .motion-sheet-root { position: fixed; inset: 0; z-index: 160; pointer-events: auto; }
 .motion-sheet-root.is-measuring { visibility: hidden; }
+.motion-sheet-root.is-leaving .motion-sheet-content { pointer-events: none; }
 .motion-sheet-mask { position: absolute; inset: 0; background: rgba(24,57,44,.38); }
 .motion-sheet-shell { position: absolute; left: 0; right: 0; bottom: 0; max-height: 90vh; }
 .motion-sheet-surface { position: absolute; inset: 0; transform-origin: 0 0; border-radius: 24px 24px 0 0; background: #FBFFFD; pointer-events: none; }
-.motion-sheet-content { position: relative; max-height: 90vh; padding-bottom: env(safe-area-inset-bottom); }
+.motion-sheet-content { position: relative; max-height: 90vh; }
+.motion-sheet-content.has-safe-area { padding-bottom: env(safe-area-inset-bottom); }
+.motion-sheet-body { position: relative; min-height: 0; }
 .motion-sheet-grip { height: 28px; touch-action: none; }
 .motion-sheet-grip-button { display: flex; align-items: center; justify-content: center; width: 96px; height: 44px; min-height: 44px; margin: -8px auto 0; padding: 0; border: 0; background: transparent; }
 .motion-sheet-grip-button::after { border: 0; }
 .motion-sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: #A8CABB; }
 @media (prefers-reduced-motion: reduce) {
   .motion-sheet-surface { transform: none !important; border-radius: 24px 24px 0 0 !important; }
-  .motion-sheet-content { transform: none !important; }
+  .motion-sheet-shell,.motion-sheet-content,.motion-sheet-grip { transform: none !important; }
 }

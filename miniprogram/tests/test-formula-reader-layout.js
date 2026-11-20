@@ -80,10 +80,22 @@ assert.equal(target.data.expandedBlock.latex, fixture.latex)
 assert.equal(target.data.expandedBlock.readingRows[0].lineItems.length, 1, 'panel starts with complete equations')
 assert.equal(runtimeFixture.readingRows[0].lineItems.length, 2, 'panel never mutates the reader source')
 assert.deepEqual(target.events, ['formulastart', 'readingchange'])
+assert.equal(target.data.expandedVisible, true)
+const retainedBlock = target.data.expandedBlock
 target.closeFormulaReading()
-target.closeFormulaReading() // Native afterleave may fire after the close button.
+target.closeFormulaReading()
+assert.equal(target.data.expandedVisible, false)
+assert.equal(target.data.expandedBlock, retainedBlock, 'native Back shell and math survive the sheet exit')
+assert.deepEqual(target.events, ['formulastart', 'readingchange'], 'reader stays locked until physical exit completes')
+target.onReadingClosed()
 assert.equal(target.data.expandedBlock, null)
 assert.deepEqual(target.events, ['formulastart', 'readingchange', 'readingchange', 'formulaend'])
+target.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
+assert.equal(target.data.expandedBlock, null, 'reopening waits for native Back shell removal')
+target.onReadingAfterLeave()
+target.onReadingClosed()
+target.onReadingAfterLeave()
+assert.equal(target.events.length, 4, 'closed and native afterleave are idempotent')
 target.openFormulaReading({ currentTarget: { dataset: { index: 99 } } })
 assert.equal(target.data.expandedBlock, null)
 target.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
@@ -91,6 +103,54 @@ definition.properties.card.observer.call(target, { id: 2, formula_blocks: [{ lat
 assert.equal(target.data.expandedBlock, null, 'switching card dismisses stale expanded content')
 assert.equal(target.events.at(-1), 'formulaend')
 assert.equal(target.data.formulaBlocks[0].readingRows[0].lineItems.length, 1)
+target.onReadingAfterLeave()
+// Physical exits must release native Back ownership exactly once, regardless
+// of whether the exit originated in business logic, the grip, or system Back.
+function readingCard() {
+  return Object.assign({
+    data: { ...definition.data, formulaBlocks: [runtimeFixture], card: {} },
+    events: [],
+    createSelectorQuery: () => queryFixture([[{ width: 200, height: 900 }, { width: 500, height: 900 }], { height: 18 }, null]),
+    setData(patch, callback) { Object.assign(this.data, patch); if (callback) callback() },
+    triggerEvent(name, detail) { this.events.push({ name, detail }) },
+  }, definition.methods)
+}
+for (const reason of ['business', 'gesture', 'back', 'hide']) {
+  const card = readingCard()
+  card.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
+  const math = card.data.expandedBlock
+  assert.equal(card.data.expandedHeight + 28, Math.floor(667 * 0.8), 'grip fits inside the original 80% viewport cap')
+  assert.equal(card.data.expandedScrollHeight + card.data.expandedHeaderHeight, card.data.expandedHeight)
+  if (reason === 'business') {
+    card.closeFormulaReading()
+    card.toggleCardFlip()
+    assert.equal(card.data.expandedBlock, math, 'closing retains the same prepared math nodes')
+    assert.equal(card.events.length, 2, 'scroll/navigation lock remains until closed')
+    card.onReadingClosed()
+  } else if (reason === 'gesture') {
+    card.closeFormulaReading({ detail: { completed: true } })
+  } else if (reason === 'back') {
+    card.onReadingAfterLeave()
+  } else {
+    definition.pageLifetimes.hide.call(card)
+    definition.pageLifetimes.show.call(card)
+  }
+  assert.equal(card.data.expandedVisible, false, reason)
+  assert.equal(card.data.expandedBlock, null, reason)
+  card.onReadingClosed()
+  card.onReadingAfterLeave()
+  assert.deepEqual(card.events.map(event => event.name), ['formulastart', 'readingchange', 'readingchange', 'formulaend'])
+  assert.deepEqual(card.events.filter(event => event.name === 'readingchange').map(event => event.detail.expanded), [true, false])
+  card.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
+  assert.equal(card.data.expandedVisible, true, 'reading can reopen after ' + reason)
+  card.onReadingClosed()
+  assert.ok(card.data.expandedBlock, 'late closed from the previous exit cannot dismiss a reopened sheet')
+  definition.lifetimes.detached.call(card)
+  const eventCount = card.events.length
+  card.onReadingClosed()
+  card.onReadingAfterLeave()
+  assert.equal(card.events.length, eventCount, 'late native/sheet completions cannot write after detach')
+}
 // Reader must not interpret horizontal formula scrolling as card navigation.
 let readerDefinition
 require('node:vm').runInNewContext(read('subpackages/formulas/reader/index.js'), {
@@ -145,7 +205,17 @@ assert.doesNotMatch(cardWxss, /\.fc-flip-stage\.is-flipped\s*\{[^}]*transform:/,
   'flip rotation must use the cumulative inline angle instead of a fixed class angle')
 assert.match(cardWxss, /\.fc-flip-stage\.is-recite,\s*\.fc-flip-face\s*\{\s*transition: none !important;\s*will-change: auto !important;/)
 assert.match(template, /class="fc-formula-line-scroll"/)
-assert.match(template, /<page-container[\s\S]*bind:afterleave="closeFormulaReading"/)
+assert.match(template, /<page-container[\s\S]*bind:afterleave="onReadingAfterLeave"/)
+assert.match(template, /duration="\{\{0\}\}" overlay="\{\{false\}\}"/)
+assert.match(template, /custom-style="position:fixed;inset:0;width:100%;height:100%;background:transparent;"/)
+const readingSheet = template.match(/<motion-sheet[^>]*>/)[0]
+assert.match(readingSheet, /show="\{\{expandedVisible\}\}"/)
+assert.match(readingSheet, /content-motion="fade"/)
+assert.match(readingSheet, /safe-area="\{\{false\}\}"/)
+assert.match(readingSheet, /bind:closed="onReadingClosed"/)
+assert.doesNotMatch(readingSheet, /wx:if/)
+assert.match(cardWxss, /\.fc-expanded-reading\.motion-sheet-panel\s*\{[^}]*transform:\s*none;/)
+assert.equal(JSON.parse(read('subpackages/formulas/components/formula-card/index.json')).usingComponents['motion-sheet'], '/components/motion-sheet/index')
 assert.match(template, /bindtouchstart="onFormulaTouchStart"/)
 assert.match(template, /scroll-x data-scrollable="\{\{row\.canScrollX\}\}"/,
   'every formula row keeps native horizontal scrolling while only measured overflow claims reader swipes')
@@ -211,12 +281,16 @@ assert.ok(target.writes[0].expandedHeaderHeight > 0)
 assert.equal(target.data.expandedBlock.readingRows[0].lineItems.length, 1)
 const cachedHeight = target.data.expandedHeight
 target.closeFormulaReading()
+target.onReadingClosed()
+target.onReadingAfterLeave()
 target.writes = []
 target.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
 assert.equal(queryCount, 1, 'reopening uses cached layout, not a new measurement')
 assert.equal(target.data.expandedHeight, cachedHeight)
 assert.equal(target.writes.length, 1)
 target.closeFormulaReading()
+target.onReadingClosed()
+target.onReadingAfterLeave()
 target._readingLayouts = {}
 target.openFormulaReading({ currentTarget: { dataset: { index: 0 } } })
 target.closeFormulaReading()
@@ -278,7 +352,7 @@ console.log('Formula reader layout, math integrity, expanded reading and mint th
 if (process.argv[2]) {
   const vm = require('node:vm')
   const native = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
-  vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), native)
+  vm.runInContext(fs.readFileSync(process.argv[2] === '-' ? 0 : process.argv[2], 'utf8'), native)
   function nativeRenderer(file) {
     const render = native.$gwx(file)
     return data => {
@@ -334,6 +408,24 @@ if (process.argv[2]) {
   assert.equal(byClass(browse, 'fc-flip-action').length, 0)
   assertCompleteContent(browse)
 
+    for (const expandedVisible of [true, false]) {
+      const expanded = renderCard({ ...fixtureData, expandedBlock: runtimeFixture, expandedVisible,
+        expandedHeight: 420, expandedHeaderHeight: 60, expandedScrollHeight: 360 })
+      const nativeShell = nodes(expanded).find(node => node.tag === 'wx-page-container')
+      const sheet = nodes(nativeShell).find(node => node.tag === 'wx-motion-sheet')
+      assert.equal(nativeShell.attr.show, true, 'native Back shell survives the physical exit')
+      assert.equal(nativeShell.attr.duration, 0)
+      assert.equal(nativeShell.attr.overlay, false)
+      assert.match(nativeShell.attr.customStyle, /height:100%;background:transparent/)
+      assert.equal(sheet.attr.show, expandedVisible)
+      assert.equal(sheet.attr.contentMotion, 'fade')
+      assert.equal(sheet.attr.safeArea, false)
+      assert.equal(sheet.attr['bind:closed'], 'onReadingClosed')
+      assert.equal(byClass(sheet, 'fc-expanded-scroll')[0].attr.scrollY, true)
+      assert.equal(byClass(sheet, 'fc-formula-line-scroll').every(node => node.attr.scrollX), true)
+      assert.equal(byClass(expanded, 'fc-flip-stage').some(stage => nodes(stage).includes(nativeShell)), false)
+    }
+
   for (const isFlipped of [false, true]) {
     const flipAngle = isFlipped ? 180 : 360
     const recite = renderCard({ ...fixtureData, recitationMode: true, readingHeight: 600, isFlipped, flipAngle })
@@ -388,8 +480,10 @@ if (process.argv[2]) {
       assert.equal(tabs[0].attr.ariaPressed, !recitationMode)
       assert.equal(tabs[1].attr.ariaPressed, recitationMode)
       assert.equal(byClass(libraryTree, 'fl-filter-button')[0].attr.ariaExpanded, showMoreSheet)
-      assert.equal(byClass(libraryTree, 'fl-chapter-chip').length, showMoreSheet ? 2 : 0, 'chapter choices appear only when filters are opened')
-      assert.equal(byClass(libraryTree, 'fl-study-type-chip').length, showMoreSheet ? 2 : 0, '408 choices remain available inside the filters')
+        const filterSheet = nodes(libraryTree).find(node => node.tag === 'wx-motion-sheet' && node.attr.label === '筛选')
+        assert.equal(filterSheet.attr.show, showMoreSheet, 'persistent filter wrapper delegates visibility to motion-sheet')
+        assert.equal(byClass(filterSheet, 'fl-chapter-chip').length, 2, 'chapter choices survive a physical close')
+        assert.equal(byClass(filterSheet, 'fl-study-type-chip').length, 2, '408 choices remain available inside the filters')
       if (showMoreSheet) assert.equal(byClass(libraryTree, 'fl-filter-body')[0].attr.scrollY, true, 'filter choices scroll on short phones')
     }
   }

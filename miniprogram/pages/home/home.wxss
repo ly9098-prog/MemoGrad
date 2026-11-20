@@ -3251,3 +3251,7 @@ page { background: #FAFCFB; }
 
 /* Daily target opens the study plan that owns the saved goal. */
 .focus-goal-entry { display: flex; align-items: center; justify-content: flex-end; gap: 12rpx; min-height: 44px; color: #315D49; font-size: max(24rpx, 12px); }
+.profile-native-sheet.motion-sheet-panel {
+  max-height: calc(90vh - 28px);
+  border-radius: 0; box-shadow: none; transform: none; animation: none;
+}

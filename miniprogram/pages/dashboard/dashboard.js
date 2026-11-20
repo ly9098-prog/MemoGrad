@@ -706,7 +706,12 @@ Page({
     }).exec()
   },
 
-  closeKnowledgeSubjectSheet() {
+  closeKnowledgeSubjectSheet(event) {
+    if (event && event.detail && event.detail.completed) {
+      this.setData({ knowledgeSubjectSheetVisible: false, knowledgeSubjectSheetClosing: false })
+      this._cancelKnowledgeSubjectSheetClose()
+      return Promise.resolve()
+    }
     if (this._knowledgeSubjectSheetClosePromise) return this._knowledgeSubjectSheetClosePromise
     if (!this.data.knowledgeSubjectSheetVisible) return Promise.resolve()
     this.setData({ knowledgeSubjectSheetClosing: true })

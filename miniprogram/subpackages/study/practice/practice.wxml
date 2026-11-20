@@ -180,7 +180,7 @@
 </view>
 </scroll-view>
 <!-- (1,4) Same physical surface grows from the capsule and owns handle gestures. -->
-<motion-sheet class="subject-sheet-layer" show="{{subjectSheetVisible}}" closing="{{subjectSheetClosing}}" anchor="#practice-subject-trigger" label="选择科目" bind:close="closeSubjectSheet">
+<motion-sheet class="subject-sheet-layer" show="{{subjectSheetVisible}}" closing="{{subjectSheetClosing}}" anchor="#practice-subject-trigger" variant="dock" label="选择科目" bind:close="closeSubjectSheet">
 <view class="subject-sheet subject-sheet-rows-{{subjectSheetGridRows || 0}}" catchtap="noop">
 <view class="sheet-header">
 <view>

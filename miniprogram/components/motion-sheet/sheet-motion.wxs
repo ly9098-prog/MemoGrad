@@ -4,25 +4,36 @@ function now() { return getDate().getTime(); }
 // (1) FLIP the empty surface, not its text. Compensate elliptical corner radii
 // so the capsule and the final panel keep their real on-screen curvature.
 function paint(state) {
-  var p = P.clamp(state.p, 0, 1), m = state.model;
-  var sx = m.origin.width / m.panel.width * (1 - p) + p;
-  var sy = m.origin.height / m.panel.height * (1 - p) + p;
-  var x = (m.origin.left - m.panel.left) * (1 - p);
-  var y = (m.origin.top - m.panel.top) * (1 - p);
+  var m = state.model, p = P.clamp(state.p, 0, 1);
+  var scale = m.dock ? P.clamp(state.p, 0, 1.035) : p;
+  var sx = m.anchored || m.dock ? m.origin.width / m.panel.width * (1 - scale) + scale : 1;
+  var sy = m.anchored || m.dock ? m.origin.height / m.panel.height * (1 - scale) + scale : 1;
+  var x = (m.origin.left - m.panel.left) * (1 - scale);
+  var y = (m.origin.top - m.panel.top) * (1 - scale);
+  var travel = m.anchored || m.dock ? state.y * p : m.panel.height * (1 - p) + state.y;
+  if (!m.anchored && !m.dock) { x = 0; y = m.fade ? travel : 0; }
+  else if (m.fade) y = y + travel;
   var radius = m.origin.height / 2 * (1 - p) + 24 * p;
+  var bottomRadius = m.origin.height / 2 * (1 - p);
+  var rx = radius / Math.max(0.001, sx), ry = radius / Math.max(0.001, sy);
+  var bx = bottomRadius / Math.max(0.001, sx), by = bottomRadius / Math.max(0.001, sy);
   state.surface.setStyle({ transform: 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + sx + ',' + sy + ')',
-    'border-radius': (radius / Math.max(0.001, sx)) + 'px / ' + (radius / Math.max(0.001, sy)) + 'px' });
-  state.shell.setStyle({ transform: 'translate3d(0,' + (state.y * p) + 'px,0)' });
+    'border-radius': rx + 'px ' + rx + 'px ' + bx + 'px ' + bx + 'px / ' + ry + 'px ' + ry + 'px ' + by + 'px ' + by + 'px' });
+  state.shell.setStyle({ transform: m.fade ? 'none' : 'translate3d(0,' + travel + 'px,0)' });
+  state.grip.setStyle({ transform: m.fade ? 'translate3d(0,' + travel + 'px,0)' : 'none' });
   state.content.setStyle({ opacity: P.clamp((p - 0.5) * 2, 0, 1) });
+  state.body.setStyle({ opacity: m.fade ? P.clamp(p - state.y / (m.panel.height * 0.65), 0, 1) : 1 });
   state.mask.setStyle({ opacity: p * P.clamp(1 - state.y / m.panel.height, 0, 1) });
 }
 function animate(owner, state, target, drag) {
+  state.phase = drag ? 'drag' : 'morph';
   var run = state.run = (state.run || 0) + 1, last = now(), elapsed = 0;
   function step() {
     if (run !== state.run || !state.model.active) return;
     var t = now(), dt = P.clamp((t - last) / 1000, 0.001, 0.032);
     last = t; elapsed = elapsed + dt;
-    var result = P.spring(drag ? state.y : state.p, state.v, target, dt, drag ? 380 : 500, drag ? 32 : 45);
+    var dock = state.model.dock && !drag && target === 1;
+    var result = P.spring(drag ? state.y : state.p, state.v, target, dt, drag ? 380 : (dock ? 420 : 500), drag ? 32 : (dock ? 29 : 45));
     if (drag) state.y = result.x; else state.p = result.x;
     state.v = result.v;
     var done = elapsed >= 0.48 || (Math.abs(result.x - target) < (drag ? 0.2 : 0.001) && Math.abs(state.v) < (drag ? 2 : 0.01));
@@ -32,6 +43,8 @@ function animate(owner, state, target, drag) {
     else if (drag && target >= state.model.panel.height) {
       state.dismissed = true;
       owner.callMethod('dismissFromGesture', { id: state.model.id });
+    } else if (!drag && target === 0) {
+      owner.callMethod('finishClose', { id: state.model.id });
     }
   }
   owner.requestAnimationFrame(step);
@@ -45,19 +58,31 @@ function sync(model, old, owner) {
   state.surface = owner.selectComponent('.motion-sheet-surface');
   state.shell = owner.selectComponent('.motion-sheet-shell');
   state.content = owner.selectComponent('.motion-sheet-content');
+  state.grip = owner.selectComponent('.motion-sheet-grip');
+  state.body = owner.selectComponent('.motion-sheet-body');
   state.mask = owner.selectComponent('.motion-sheet-mask');
   if (!state.surface || !model.panel.height) return;
   if (state.phase === 'drag') state.v = 0;
   state.phase = 'morph';
-  if (!old || old.id !== model.id) { state.p = model.immediate ? 1 : 0; state.y = 0; state.v = 0; state.dismissed = false; }
+  if (!old || (old.id !== model.id && !model.resume)) { state.p = model.immediate ? 1 : 0; state.y = 0; state.v = 0; state.dismissed = false; }
+  // A save lock can arrive after the gesture settles but before its bridge
+  // callback. Its new command must recover the dismissed surface as well.
+  if (model.resetDrag && !model.close) state.dismissed = false;
   if (state.dismissed) return;
   paint(state);
+  if (model.resetDrag && !model.close) {
+    state.p = 1; state.v = 0;
+    animate(owner, state, 0, true);
+    return;
+  }
   animate(owner, state, model.close ? 0 : 1, false);
 }
 // (4) Only the handle owns vertical drag; inner scroll-views retain native scroll.
 function start(event, owner) {
   var s = owner.getState();
-  if (!s.model || !s.model.active || s.model.close || !event.touches.length) return;
+  if (!s.model || !s.model.active || s.model.dismissible === false || s.model.close || !event.touches.length) return;
+  var rect = s.shell.getBoundingClientRect ? s.shell.getBoundingClientRect() : null;
+  if (rect && rect.height > 0) s.model.panel.height = rect.height;
   s.run = (s.run || 0) + 1; s.p = 1; s.v = 0; s.phase = 'drag';
   s.gesture = { start: event.touches[0].clientY, y: s.y, last: event.touches[0].clientY, time: now(), v: 0 };
 }

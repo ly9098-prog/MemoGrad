@@ -1348,7 +1348,13 @@ if (nextGroupKey !== undefined) this.openGroup(nextGroupKey)
 })
 }, THEME_SHEET_CLOSE_MS)
 },
-closeThemeSheet() {
+closeThemeSheet(event) {
+if (event && event.detail && event.detail.completed) {
+clearTimeout(this._themeSheetSelectTimer)
+clearTimeout(this._themeSheetCloseTimer)
+this.setData({ themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '' })
+return
+}
 if (!this.data.themeSheetOpen || this.data.themeSheetClosing) return
 clearTimeout(this._themeSheetSelectTimer)
 this.setData({ themeSheetClosing: true, themeSheetPendingKey: '__idle__' }, () => this.finishThemeSheetClose())

@@ -341,9 +341,8 @@
 
 </scroll-view>
 <template is="runner-navigation" data="{{currentIndex, totalCount, prevDisabled, nextDisabled, showSubmitButton, submitting, submitDisabled, submitText}}" wx:if="{{showNavigation}}" />
-<view class="runner-sheet-overlay" wx:if="{{showSheet && !compactReviewMode}}" bindtap="closeSheet" catchtouchmove="noop">
-<view class="runner-sheet-modal" catchtap="noop">
-<view class="runner-sheet-handle"></view>
+<motion-sheet show="{{showSheet && !compactReviewMode}}" label="答题进度" background="{{!compactReviewMode && (mode === 'practice' || mode === 'review' || mode === 'exam') ? '#FFFFFF' : '#FBFFFD'}}" safe-area="{{false}}" layer="{{100}}" content-motion="fade" bind:close="closeSheet">
+<view class="runner-sheet-modal motion-sheet-panel" catchtap="noop">
 <view class="runner-sheet-head">
 <view>
 <text class="runner-sheet-title">答题进度</text>
@@ -379,5 +378,5 @@
         disabled="{{submitting || submitDisabled || totalCount <= 0}}"
       >{{submitText}}</button>
 </view>
-</view>
+</motion-sheet>
 </view>

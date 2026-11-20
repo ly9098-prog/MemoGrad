@@ -475,7 +475,7 @@ Component({
             this._flipTapSuppressedUntil = 0
             patch.isFlipped = false
             patch.flipAngle = frontFlipAngle
-            if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
+            if (this.data.expandedBlock || this._readingOpening) this.finishFormulaReading()
             this.cancelFormulaGesture()
             this._readingLayouts = {}
             patch.cardRenderKey = renderKey
@@ -530,7 +530,7 @@ Component({
       observer() {
         this._flipGesture = null
         this._flipTapSuppressedUntil = 0
-        if (this.data.expandedBlock || this._readingOpening) this.closeFormulaReading()
+        if (this.data.expandedBlock || this._readingOpening) this.finishFormulaReading()
         this.cancelFormulaGesture()
         this._readingLayouts = {}
         this.setData({ isFlipped: false, flipAngle: 0 })
@@ -554,6 +554,7 @@ Component({
     flipAngle: 0,
     recitationScrollTop: 0,
     expandedBlock: null,
+    expandedVisible: false,
     expandedHeight: 0,
     expandedScrollHeight: 0,
     expandedHeaderHeight: 0,
@@ -586,6 +587,7 @@ Component({
 
   lifetimes: {
     detached() {
+      this._readingDetached = true
       this.cancelFormulaGesture()
       this._readingToken = (this._readingToken || 0) + 1
       this._formulaOverflowToken = (this._formulaOverflowToken || 0) + 1
@@ -593,6 +595,7 @@ Component({
       this._readingLayouts = null
     },
     attached() {
+      this._readingDetached = false
       this._syncGraphViewportRatio()
       if (!this.data.cardRenderKey && this.data.card) {
         this.setData({
@@ -607,7 +610,11 @@ Component({
   },
 
   pageLifetimes: {
+    show() {
+      if (!this.data.expandedBlock) this._readingContainerClosing = false
+    },
     hide() {
+      this.finishFormulaReading()
       this.cancelFormulaGesture()
     },
   },
@@ -707,10 +714,13 @@ Component({
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)
       var block = this.data.formulaBlocks[index]
-      if (!Number.isInteger(index) || !block || this._readingOpening || this.data.expandedBlock) return
+      if (!Number.isInteger(index) || !block || this._readingOpening || this.data.expandedBlock ||
+          this._readingContainerClosing || this._readingDetached) return
       var info = {}
       try { info = wx.getWindowInfo() } catch (_) {}
       var viewport = readingViewport(info)
+      // The shared sheet adds a 28px grip above the original reading layout.
+      viewport.maxHeight = Math.max(1, viewport.maxHeight - 28)
       var token = this._readingToken = (this._readingToken || 0) + 1
       this._readingOpening = true
       this.onFormulaTouchStart()
@@ -724,7 +734,7 @@ Component({
         this._readingLayouts[index] = { source: block, key: cacheKey, layout: layout }
         this._readingOpening = false
         // One update supplies final nodes, header and height before native entry.
-        this.setData(layout)
+        this.setData(Object.assign({}, layout, { expandedVisible: true }))
         this.triggerEvent('readingchange', { expanded: true })
       }
       if ((cache && cache.source === block && cache.key === cacheKey) || !this.createSelectorQuery) {
@@ -739,13 +749,34 @@ Component({
       query.exec(show)
     },
 
-    closeFormulaReading() {
+    closeFormulaReading(event) {
       if (!this.data.expandedBlock && !this._readingOpening) return
+      this._readingToken = (this._readingToken || 0) + 1
+      this._readingOpening = false
+      if (!this.data.expandedBlock) return this.onFormulaTouchEnd()
+      this.setData({ expandedVisible: false })
+      if (event && event.detail && event.detail.completed) this.onReadingClosed()
+    },
+
+    onReadingClosed() {
+      if (this._readingDetached || this.data.expandedVisible) return
+      this.finishFormulaReading()
+    },
+
+    onReadingAfterLeave() {
+      if (this._readingDetached) return
+      this.finishFormulaReading()
+      this._readingContainerClosing = false
+    },
+
+    finishFormulaReading() {
       var wasVisible = Boolean(this.data.expandedBlock)
       this._readingToken = (this._readingToken || 0) + 1
       this._readingOpening = false
       if (wasVisible) {
-        this.setData({ expandedBlock: null })
+        // Wait for native afterleave before allowing another Back interceptor.
+        this._readingContainerClosing = true
+        this.setData({ expandedBlock: null, expandedVisible: false })
         this.triggerEvent('readingchange', { expanded: false })
       }
       this.onFormulaTouchEnd()
