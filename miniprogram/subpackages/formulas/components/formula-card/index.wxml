@@ -66,9 +66,11 @@
     <view class="fc-example" wx:for="{{content.examples}}" wx:for-item="ex" wx:key="_key">
       <text class="fc-example-label">例 {{index + 1}}</text>
       <rich-text class="fc-rich-text" nodes="{{ex.questionNodes}}" user-select="{{true}}" />
-      <view class="fc-example-detail" wx:if="{{ex.solutionNodes.length}}"><text class="fc-example-detail-label">解法</text><rich-text class="fc-rich-text" nodes="{{ex.solutionNodes}}" user-select="{{true}}" /></view>
-      <view class="fc-example-detail" wx:if="{{ex.answerNodes.length}}"><text class="fc-example-detail-label">答案</text><rich-text class="fc-rich-text" nodes="{{ex.answerNodes}}" user-select="{{true}}" /></view>
-      <view class="fc-example-detail" wx:if="{{ex.errorTipNodes.length}}"><text class="fc-example-detail-label">易错</text><rich-text class="fc-rich-text" nodes="{{ex.errorTipNodes}}" user-select="{{true}}" /></view>
+      <view class="fc-example-notes" wx:if="{{ex.solutionNodes.length || ex.answerNodes.length || ex.errorTipNodes.length}}">
+        <view class="fc-example-detail" wx:if="{{ex.solutionNodes.length}}"><text class="fc-example-detail-label">解法</text><rich-text class="fc-rich-text" nodes="{{ex.solutionNodes}}" user-select="{{true}}" /></view>
+        <view class="fc-example-detail" wx:if="{{ex.answerNodes.length}}"><text class="fc-example-detail-label">答案</text><rich-text class="fc-rich-text" nodes="{{ex.answerNodes}}" user-select="{{true}}" /></view>
+        <view class="fc-example-detail" wx:if="{{ex.errorTipNodes.length}}"><text class="fc-example-detail-label">易错</text><rich-text class="fc-rich-text" nodes="{{ex.errorTipNodes}}" user-select="{{true}}" /></view>
+      </view>
     </view>
   </view>
   <text class="fc-content-empty" wx:if="{{!formulaBlocks.length && !content.summaryNodes.length && !content.conditionsNodes.length && !content.symbolNotesNodes.length && !content.secondaryNodes.length && !content.errorTipsNodes.length && !content.examples.length && card.card_type !== 'function_graph' && !card.is_function_graph && !card.isFunctionGraph}}">这张速记卡暂无正文，可切换其他卡片</text>

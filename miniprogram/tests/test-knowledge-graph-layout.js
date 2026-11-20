@@ -134,6 +134,9 @@ test('knowledge graph presentation keeps motion fallbacks and accessible control
     /theme-sheet-featured[\s\S]*?aria-pressed="\{\{themeSheetPendingKey === ''[\s\S]*?theme-sheet-item[\s\S]*?aria-pressed="\{\{themeSheetPendingKey === item\.key/,
     'all-themes and grouped theme rows expose their selected state')
   assert.match(markup,
+    /class="theme-more" bindtap="openThemeSheet"/,
+    'more themes uses a direct page handler instead of a dynamic WXS binding')
+  assert.match(markup,
     /\? 'check' : 'chevron-right'[\s\S]*?theme-sheet-item-arrow[\s\S]*?\? 'check' : 'chevron-right'/,
     'selected rows use a check and unselected rows use a disclosure arrow')
   assert.match(styles,
@@ -143,15 +146,18 @@ test('knowledge graph presentation keeps motion fallbacks and accessible control
     /\.theme-search-clear\{[^}]*width:44px;height:44px/,
     'the visible theme-search clear control keeps a 44px touch target')
   assert.match(styles,
+    /\.theme-sheet\{[\s\S]*?background:radial-gradient\(circle at 92% 0,rgba\(85,200,155,\.16\),transparent 190px\),#F4FAF7/,
+    'the theme sheet uses the graph mint instead of the older green surface')
+  assert.match(styles,
     /\.theme-sheet-item\{[\s\S]*?min-height:58px;[\s\S]*?border-radius:0;[\s\S]*?background:transparent;/,
     'theme rows use the compact single-list treatment')
   assert.match(styles,
-    /\.theme-sheet-item\.theme-sheet-active,[^{]*\{[^}]*background:#E5F1DE/,
+    /\.theme-sheet-item\.theme-sheet-active,[^{]*\{[^}]*background:#E7F6EF/,
     'the selected row inherits the graph mint surface')
   assert.match(styles,
-    /\.theme-sheet-active \.theme-sheet-featured-icon,[^{]*\{[^}]*background:#2F6D48/,
-    'the selected icon uses the graph primary green')
+    /\.theme-sheet-active \.theme-sheet-featured-icon,[^{]*\{[^}]*background:#55C89B/,
+    'the selected icon uses the graph primary mint')
   assert.match(styles,
-    /\.theme-sheet-rows\{[^}]*overflow:hidden;border:1px solid #D4E2CE;border-radius:14px;background:rgba\(255,255,252,\.92\)/,
+    /\.theme-sheet-rows\{[^}]*overflow:hidden;border:1px solid #D8EEE6;border-radius:14px;background:#FFFFFF/,
     'grouped rows share one quiet surface')
 })

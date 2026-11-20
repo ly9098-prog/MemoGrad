@@ -48,7 +48,7 @@
 <view class="theme-section" wx:if="{{groupChips.length}}">
 <view class="theme-section-head">
 <view class="theme-section-title"><view class="theme-rail" aria-hidden="true"></view><view><text>主题范围</text></view></view>
-<button class="theme-more" data-graph-action="openThemeSheet" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="查看全部{{themeGroupCount}}个主题"><text>更多主题</text><image class="theme-more-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></button>
+<button class="theme-more" bindtap="openThemeSheet" hover-class="atlas-pressed" aria-label="查看全部{{themeGroupCount}}个主题"><text>更多主题</text><image class="theme-more-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></button>
 </view>
 <view class="theme-quick-grid">
 <button class="theme-quick-chip theme-quick-overview {{!activeGroupKey ? 'theme-active' : ''}}" data-key="" data-graph-action="chooseGroup" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="全部主题，{{searchResultCount}}个知识点{{!activeGroupKey ? '，已选中' : ''}}">

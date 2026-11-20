@@ -403,10 +403,17 @@ test('two-row sheet keeps a stable swiper height while retaining compact safe-ar
   assert.ok(header >= 44 && px(heading['min-height']) >= 44 && px(confirm['min-height']) >= 44)
   for (const safeArea of [0, 34]) {
     const height = Number(padding[1]) + header + twoRows + px(dots['min-height']) + px(dots['margin-top']) +
+      px(dots['margin-bottom']) +
       px(footer['padding-top']) + px(confirm['min-height']) + parseFloat(surface['border-top']) + Math.max(Number(padding[3]), safeArea)
-    assert.ok(height >= 300 && height <= 330, `sheet including ${safeArea}px safe area: ${height}px`)
+    assert.ok(height >= 300 && height <= 360, `sheet including ${safeArea}px safe area: ${height}px`)
     assert.ok(height <= 568 * .74, 'short screens retain the footer outside the scroll viewport')
   }
+  assert.match(css, /\.subject-discipline-dots\{[^}]*gap:8px;min-height:8px;margin-top:12px;margin-bottom:12px;/,
+    'page dots use a readable, evenly spaced pagination group')
+  assert.match(css, /\.subject-discipline-dot\{[^}]*width:8px;height:8px;/,
+    'page dots remain legible on a phone')
+  assert.match(css, /\.subject-sheet-footer\{[^}]*padding-top:16px/,
+    'the confirmation action keeps clear separation below pagination')
   const itemPadding = item.padding.split(' ').map(px)
   for (const width of [320, 390, 430]) {
     const tileWidth = (width - 2 * Number(padding[2]) - gap) / 2

@@ -132,7 +132,7 @@ test('zoom and reset controls settle the current view before dispatch and cancel
 })
 
 test('theme and index controls flush the visible fling camera before changing the scene', () => {
-  for (const action of ['chooseGroup', 'showOverview', 'setFilter', 'openThemeSheet', 'onGraphNodeTap', 'changeGraphPage', 'handleIndexRowTap', 'handleIndexActionTap', 'focusSearch', 'focusIndexSearch']) {
+  for (const action of ['chooseGroup', 'showOverview', 'setFilter', 'onGraphNodeTap', 'changeGraphPage', 'handleIndexRowTap', 'handleIndexActionTap', 'focusSearch', 'focusIndexSearch']) {
     const h = motionFixture()
     h.motion.start(h.event([h.touch(160, 150)], 'touchstart'), h.owner)
     h.advance(16)

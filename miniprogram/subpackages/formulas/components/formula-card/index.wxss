@@ -60,7 +60,7 @@
   justify-content: center;
   flex-shrink: 0;
   box-sizing: border-box;
-  align-self: flex-end;
+  align-self: center;
   width: auto;
   min-width: 128px;
   max-width: 100%;
@@ -135,10 +135,36 @@
 .fc-rich-text { display: block; min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; color: #23483C; font-size: 30rpx; line-height: 1.8; white-space: normal; word-break: normal; overflow-wrap: anywhere; }
 .fc-rich-text .katex { display: inline-block; width: auto; max-width: none; font-size: 1.12em; line-height: 1.22; vertical-align: middle; white-space: nowrap; }
 .fc-rich-text .katex-html, .fc-rich-text .base { white-space: nowrap; }
-.fc-example { min-width: 0; max-width: 100%; padding: 20rpx 0; box-sizing: border-box; }
-.fc-example + .fc-example { border-top: 1rpx solid #D8EEE6; }
-.fc-example-label, .fc-example-detail-label { display: block; margin-bottom: 8rpx; color: #507568; font-size: 24rpx; font-weight: 500; line-height: 1.5; }
-.fc-example-detail { margin-top: 20rpx; min-width: 0; max-width: 100%; }
+.fc-example {
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 20rpx;
+  padding: 0;
+  box-sizing: border-box;
+}
+.fc-example + .fc-example {
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #E4F0EA;
+}
+.fc-example-label, .fc-example-detail-label { display: block; margin-bottom: 6rpx; color: #507568; font-size: 24rpx; font-weight: 500; line-height: 1.5; }
+.fc-example-notes {
+  margin-top: 16rpx;
+  padding: 2rpx 16rpx;
+  border-radius: 12rpx;
+  background: #F7FAF8;
+  overflow: hidden;
+}
+.fc-example-detail {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  padding: 12rpx 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+.fc-example-detail + .fc-example-detail { border-top: 1rpx solid #E4F0EA; }
+.fc-example-detail .fc-example-detail-label { margin-bottom: 4rpx; color: #3A6F5B; font-weight: 500; }
 .fc-content-empty { display: block; padding: 32rpx 0; color: #507568; font-size: 28rpx; line-height: 1.8; }
 
 .fc-preview-hint { color: #507568; font-size: 22rpx; }

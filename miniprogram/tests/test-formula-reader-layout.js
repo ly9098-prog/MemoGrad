@@ -120,6 +120,19 @@ assert.match(template, /role="button"/)
 assert.match(template, /aria-expanded="\{\{isFlipped\}\}"/)
 assert.match(template, /onFormulaTouchStart/)
 const cardWxss = fs.readFileSync(path.join(root, 'subpackages/formulas/components/formula-card/index.wxss'), 'utf8')
+assert.match(cardWxss, /\.fc-flip-action\s*\{[^}]*align-self:\s*center;/,
+  'the recitation answer action is horizontally centered in the card')
+assert.match(template,
+  /class="fc-example-notes" wx:if="\{\{ex\.solutionNodes\.length \|\| ex\.answerNodes\.length \|\| ex\.errorTipNodes\.length\}\}"/,
+  'worked-example details share one semantic content group')
+assert.match(cardWxss, /\.fc-example\s*\{[^}]*margin-top:\s*20rpx;[^}]*padding:\s*0;/,
+  'the worked example stays on the formula card surface without another outer card')
+assert.doesNotMatch(cardWxss, /\.fc-example\s*\{[^}]*(?:border|border-radius|background):/,
+  'the worked-example question does not add a nested container')
+assert.match(cardWxss, /\.fc-example-notes\s*\{[^}]*padding:\s*2rpx 16rpx;[^}]*border-radius:\s*12rpx;[^}]*background:\s*#F7FAF8;/,
+  'solution, answer and trap blocks share one very light supporting surface')
+assert.match(cardWxss, /\.fc-example-detail\s*\{[^}]*padding:\s*12rpx 0;[^}]*background:\s*transparent;/,
+  'individual detail rows use spacing and separators instead of cards')
 assert.match(cardWxss, /\.fc-flip-stage\.is-recite\s*\{[^}]*will-change:\s*transform;/)
 assert.match(cardWxss, /\.fc-flip-stage\.is-recite,\s*\.fc-flip-face\s*\{\s*transition: none !important;\s*will-change: auto !important;/)
 assert.match(template, /class="fc-formula-line-scroll"/)

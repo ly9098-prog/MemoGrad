@@ -330,7 +330,7 @@ function action(event, owner) {
   var data = event.currentTarget.dataset;
   var allowed = {
     chooseGroup: true, showOverview: true, setFilter: true, resetFilters: true,
-    openThemeSheet: true, onGraphNodeTap: true, changeGraphPage: true,
+    onGraphNodeTap: true, changeGraphPage: true,
     handleIndexRowTap: true, handleIndexActionTap: true,
     focusSearch: true, focusIndexSearch: true
   };
