@@ -811,57 +811,6 @@ test('late login completion commits consent before the destroyed page returns', 
   }
 })
 
-test('email login sends consent, verifies without bearer auth and persists the miniprogram session', async () => {
-  reset({}, { routes: {
-    'POST /auth/email/start': { statusCode: 200, data: {
-      challenge_id: 'challenge-1',
-      expires_in: 300,
-      resend_after: 60,
-    }, header: {} },
-    'POST /auth/email/verify': { statusCode: 200, data: {
-      access_token: 'email-access',
-      refresh_token: 'email-refresh',
-      expires_at: 1900000000,
-      user: { id: 23 },
-    }, header: {} },
-  } })
-
-  const page = loginPage()
-  page.data.email = 'learner@example.com'
-  await page._startEmailOtp()
-  try {
-    assert.deepEqual(calls.requests[0].data, {
-      email: 'learner@example.com',
-      wechat_code: 'wx-code',
-      client: 'miniprogram',
-      accepted_terms: true,
-      agreement_version: '2026-11-20',
-      privacy_version: '2026-11-20',
-    })
-    assert.equal(calls.requests[0].header.Authorization, undefined)
-    assert.equal(page.data.emailChallengeId, 'challenge-1')
-    assert.equal(page.data.emailResendRemaining, 60)
-  } finally {
-    page._clearEmailCountdown()
-  }
-
-  let scheduled = 0
-  page._scheduleHomeRedirect = () => { scheduled++ }
-  page.data.emailCode = '123456'
-  await page.onEmailSubmit()
-  assert.deepEqual(calls.requests[1].data, {
-    challenge_id: 'challenge-1',
-    code: '123456',
-    client: 'miniprogram',
-  })
-  assert.equal(calls.requests[1].header.Authorization, undefined)
-  assert.equal(memory.get('token'), 'email-access')
-  assert.equal(memory.get('refresh_token'), 'email-refresh')
-  assert.equal(memory.get('user').id, 23)
-  assert.equal(memory.get('privacy_acceptance').privacy_version, config.PRIVACY_POLICY_VERSION)
-  assert.equal(scheduled, 1)
-})
-
 test('cancelling login before wx.login finishes does not create or persist a session', async () => {
   reset()
   const originalLogin = wx.login
@@ -877,30 +826,6 @@ test('cancelling login before wx.login finishes does not create or persist a ses
     assert.equal(memory.has('privacy_acceptance'), false)
     assert.equal(calls.requests.length, 0)
     assert.equal(page._homeRedirectTimer, null)
-  } finally {
-    wx.login = originalLogin
-  }
-})
-
-test('cancelling email login while wx.login is pending never requests an OTP', async () => {
-  reset()
-  const originalLogin = wx.login
-  let completeLogin
-  wx.login = () => new Promise(resolve => {
-    completeLogin = resolve
-  })
-  try {
-    const page = loginPage()
-    page.data.email = 'learner@example.com'
-    const completion = page._startEmailOtp()
-    await new Promise(resolve => setImmediate(resolve))
-    assert.ok(completeLogin)
-    page.onGuestBrowse()
-    completeLogin({ code: 'late-wechat-code' })
-    await completion
-    assert.equal(calls.requests.length, 0)
-    assert.equal(memory.has('token'), false)
-    assert.equal(memory.has('privacy_acceptance'), false)
   } finally {
     wx.login = originalLogin
   }

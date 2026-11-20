@@ -4,11 +4,14 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const source = fs.readFileSync(path.join(__dirname, '../pages/login/login.js'), 'utf8')
+const loginMarkup = fs.readFileSync(path.join(__dirname, '../pages/login/login.wxml'), 'utf8')
+const homeMarkup = fs.readFileSync(path.join(__dirname, '../pages/home/home.wxml'), 'utf8')
+const homeSource = fs.readFileSync(path.join(__dirname, '../pages/home/home.js'), 'utf8')
 
 function fixture(resumeOverride, options = {}) {
   let definition, completeCount = 0, resolveCount = 0, finish
   let pendingTarget, targetReady = false
-  const timers = new Map(), navigations = [], requests = [], sessions = []
+  const timers = new Map(), navigations = [], wechatLogins = []
   const values = { token: 't', user: { id: 1 }, ...options.values }
   const resume = resumeOverride || {
     resolve: () => {
@@ -20,23 +23,22 @@ function fixture(resumeOverride, options = {}) {
   }
   const mocks = {
     '../../utils/auth': { isLoggedIn: () => Boolean(values.token),
-      getUser: () => values.user,
-      syncCurrentUser: async () => values.user,
-      loginDirect(token, user, expiresAt, refreshToken) {
-        sessions.push({ token, user, expiresAt, refreshToken })
-        values.token = token
-        values.user = user
+      async wechatLogin({ shouldCommit }) {
+        wechatLogins.push({ shouldCommit: shouldCommit() })
+        if (!shouldCommit()) return
+        values.token = 'wechat-session'
+        values.user = { id: 1 }
       },
       checkAndRefreshToken: options.refresh || (async () => true) },
     '../../utils/api': { normalizeExpiresAt: value => value, now: () => Date.now(),
       resetRedirecting() {},
-      async post(url, data, requestOptions) {
-        requests.push({ url, data, options: requestOptions })
-        return options.post(url, data, requestOptions)
-      } },
+    },
     '../../utils/storage': { KEYS: { TOKEN: 'token', TOKEN_EXPIRES_AT: 'expires', USER: 'user' },
       get: key => values[key] },
-    '../../utils/privacy': { hasAcceptedCurrentPrivacy: () => options.agreed !== false },
+    '../../utils/privacy': {
+      hasAcceptedCurrentPrivacy: () => options.agreed !== false,
+      savePrivacyAcceptance() {},
+    },
     '../../config': {},
     '../../utils/navigation': { getNavigationMetrics: () => ({}) },
     '../../utils/launch-resume': { createLoginResume: () => resume },
@@ -47,22 +49,20 @@ function fixture(resumeOverride, options = {}) {
   vm.runInNewContext(source, {
     Page: value => { definition = value },
     require: name => { assert.ok(Object.hasOwn(mocks, name), name); return mocks[name] },
-    wx: { login: async () => ({ code: 'wechat-code' }), showToast() {}, reLaunch: navigation => {
+    wx: { showToast() {}, reLaunch: navigation => {
       navigations.push(navigation.url)
       if (options.navigationFails) navigation.fail()
       else if (navigation.success) navigation.success()
     } },
     setTimeout: callback => { const id = timers.size + 1; timers.set(id, callback); return id },
     clearTimeout: id => timers.delete(id),
-    setInterval: () => 1,
-    clearInterval() {},
     console, Date,
   })
   const page = { ...definition, data: structuredClone(definition.data),
     setData(patch) { Object.assign(this.data, patch) } }
   page.onLoad(options.query)
   return {
-    page, values, navigations, requests, sessions,
+    page, values, navigations, wechatLogins,
     runTimer: () => { const [id, callback] = [...timers][0]; timers.delete(id); return callback() },
     finish: target => {
       pendingTarget = target
@@ -85,71 +85,28 @@ test('login redirects directly to resolved target only after auth and consent su
   assert.equal(harness.completeCount, 1)
 })
 
-test('account entry displays linked identities without starting login or redirecting', async () => {
-  const harness = fixture(undefined, { query: { mode: 'account' }, values: {
-    user: { id: 1, email: 'reader@example.com', identities: [{ provider: 'email' }] },
-  } })
-  await Promise.resolve()
-  assert.equal(harness.page.data.accountMode, true)
-  assert.equal(harness.page.data.accountEmail, 'reader@example.com')
-  assert.equal(harness.page.data.loginMethod, 'wechat')
+test('mini-program account binding and email login entry points are removed', () => {
+  assert.doesNotMatch(homeMarkup, /account-security-entry|账号与登录|openAccountSecurity/)
+  assert.doesNotMatch(homeSource, /account-navigation|openAccountSecurity/)
+  assert.equal(fs.existsSync(path.join(__dirname, '../pages/home/utils/account-navigation.js')), false)
+  assert.doesNotMatch(loginMarkup, /accountMode|loginMethod|login-method-tab|email-|邮箱验证码登录|绑定邮箱|绑定微信/)
+  assert.match(loginMarkup, /微信一键登录/)
+  assert.match(source, /auth\.wechatLogin/)
+  assert.doesNotMatch(source,
+    /accountMode|onEmail|_startEmail|emailChallenge|identities\/[^']*\/bind|\/auth\/email/)
+})
+
+test('wechat one-click login still authenticates and follows the normal redirect path', async () => {
+  const harness = fixture(undefined, { values: { token: '' } })
   assert.equal(harness.page.data.entryPending, false)
-  assert.deepEqual(harness.requests, [])
-  assert.deepEqual(harness.navigations, [])
-})
-
-test('email binding reuses OTP fields and replaces the session for the same owner', async () => {
-  const harness = fixture(undefined, { query: { mode: 'account' }, post: async url =>
-    url.endsWith('/start') ? { challenge_id: 'challenge', resend_after: 60 }
-      : { access_token: 'new', refresh_token: 'refresh', expires_at: 100, user: { id: 1 } },
-  })
-  harness.page.setData({ email: 'reader@example.com' })
-  await harness.page.onEmailSubmit()
-  harness.page.setData({ emailCode: '123456' })
-  await harness.page.onEmailSubmit()
-  assert.deepEqual(harness.requests.map(request => request.url), [
-    '/users/me/identities/email/bind/start', '/users/me/identities/email/bind/verify',
-  ])
-  assert.equal(harness.requests[1].data.client, 'miniprogram')
-  assert.equal(harness.sessions.length, 1)
-  assert.equal(harness.sessions[0].user.id, 1)
-  assert.equal(harness.sessions[0].refreshToken, 'refresh')
-})
-
-test('wechat binding only calls the authenticated bind route and keeps the user id', async () => {
-  const harness = fixture(undefined, { query: { mode: 'account' }, post: async () => ({
-    access_token: 'new', refresh_token: 'refresh', expires_at: 100, user: { id: 1 },
-  }) })
   await harness.page.onWechatLogin()
-  assert.deepEqual(harness.requests.map(request => request.url), ['/users/me/identities/wechat/bind'])
-  assert.equal(harness.requests[0].data.code, 'wechat-code')
-  assert.equal(harness.sessions[0].user.id, 1)
-})
-
-test('an occupied wechat identity reports the conflict without replacing the session', async () => {
-  const harness = fixture(undefined, { query: { mode: 'account' }, post: async () => {
-    throw new Error('该微信已绑定到其他账号')
-  } })
-  await harness.page.onWechatLogin()
-  assert.equal(harness.page.data.error, '该微信已绑定到其他账号')
-  assert.equal(harness.sessions.length, 0)
-  assert.equal(harness.values.token, 't')
-})
-
-test('switching accounts during binding cannot restore the previous owner session', async () => {
-  let finish, markStarted
-  const started = new Promise(resolve => { markStarted = resolve })
-  const harness = fixture(undefined, { query: { mode: 'account' }, post: () =>
-    new Promise(resolve => { finish = resolve; markStarted() }),
-  })
-  const running = harness.page.onWechatLogin()
-  await started
-  harness.values.user = { id: 2 }
-  finish({ access_token: 'old-owner', user: { id: 1 } })
+  assert.equal(harness.wechatLogins.length, 1)
+  assert.equal(harness.wechatLogins[0].shouldCommit, true)
+  assert.equal(harness.page.data.error, '')
+  const running = harness.runTimer()
+  harness.finish('/pages/home/home')
   await running
-  assert.equal(harness.sessions.length, 0)
-  assert.equal(harness.values.user.id, 2)
-  assert.match(harness.page.data.error, /账号已切换/)
+  assert.deepEqual(harness.navigations, ['/pages/home/home'])
 })
 
 test('first-time entry reveals consent and login instead of a stuck startup screen', async () => {

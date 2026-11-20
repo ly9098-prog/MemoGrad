@@ -3276,6 +3276,3 @@ page { background: #FAFCFB; }
   max-height: calc(90vh - 28px);
   border-radius: 0; box-shadow: none; transform: none; animation: none;
 }
-
-.account-security-entry { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 24rpx; border: 1rpx solid #D8E7DE; border-radius: 16rpx; background: #FFFFFF; color: #315D49; font-size: 26rpx; font-weight: 500; }
-.account-security-entry::after { border: 0; }

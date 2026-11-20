@@ -278,8 +278,6 @@
     </view>
   </view>
 
-  <button wx:if="{{!guestMode}}" class="account-security-entry" bindtap="openAccountSecurity" hover-class="tool-pressed">账号与登录</button>
-
   <view class="safe-bottom"></view>
 
   <motion-sheet show="{{showProfileSheet}}" label="设置头像和昵称" background="#FBFCF8" layer="{{999}}" safe-area="{{false}}" dismissible="{{!profileSaving}}" bind:close="closeProfileSheet">

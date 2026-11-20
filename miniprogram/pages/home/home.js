@@ -6,12 +6,10 @@ const {
 } = require('./utils/growth-page-controller')
 const { homeCanvasMethods } = require('./utils/home-canvas')
 const { guestLoginGuideMethods } = require('./utils/guest-login-guide')
-const { accountNavigationMethods } = require('./utils/account-navigation')
 Page({
   ...growthPageMethods,
   ...homeCanvasMethods,
   ...guestLoginGuideMethods,
-  ...accountNavigationMethods,
   _growthApi: null,
   data: {
     guestMode: true,
