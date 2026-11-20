@@ -293,16 +293,9 @@ const sandbox = {
     }
     if (request === '../../utils/api') return api
     if (request === '../../config') return {}
-    if (request === '../../utils/route-params') return { safeDecodeURIComponent: v => v }
     if (request === './utils/route-params') return { safeDecodeURIComponent: v => v }
     if (request === './utils/subject-scope') return { filter408SubjectTree: value => value }
-    if (request === './utils/subject-cache') {
-      return {
-        readSubjectCache: () => null,
-        writeSubjectCache: () => true,
-      }
-    }
-    if (request === '../../utils/pomodoro-theme' || request === './utils/pomodoro-theme') {
+    if (request === './utils/pomodoro-theme') {
       return {
         getTheme: () => 'light',
         normalizeTheme: v => v || 'light',

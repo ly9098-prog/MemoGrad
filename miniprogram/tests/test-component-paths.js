@@ -19,7 +19,6 @@ const skipDirNames = new Set([
   'miniprogram_npm',
   'tests',
   'scripts',
-  '__mocks__',
   '.pytest_cache',
   '.ruff_cache',
   '.claude',

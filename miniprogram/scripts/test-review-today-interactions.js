@@ -42,7 +42,7 @@ var apiMockPath = path.resolve(__dirname, '../utils/api.js')
 var stemRenderPath = path.resolve(__dirname, '../subpackages/study/utils/stem-render.js')
 var adapterPath = path.resolve(__dirname, '../subpackages/study/utils/question-runner-adapter.js')
 var answerPath = path.resolve(__dirname, '../subpackages/study/utils/answer.js')
-var subjectMetaPath = path.resolve(__dirname, '../utils/subject-meta.js')
+var subjectMetaPath = path.resolve(__dirname, '../subpackages/study/utils/subject-meta.js')
 var configPath = path.resolve(__dirname, '../config.js')
 var debugPath = path.resolve(__dirname, '../utils/debug.js')
 

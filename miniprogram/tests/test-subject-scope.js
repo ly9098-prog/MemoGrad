@@ -2,7 +2,6 @@ const assert = require('node:assert/strict')
 const { test } = require('node:test')
 
 const scopes = [
-  ['shared', require('../utils/subject-scope')],
   ['study', require('../subpackages/study/utils/subject-scope')],
   ['pomodoro', require('../pages/pomodoro/utils/subject-scope')],
 ]

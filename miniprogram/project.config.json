@@ -4,10 +4,6 @@
     "ignore": [
       {
         "type": "folder",
-        "value": "__mocks__"
-      },
-      {
-        "type": "folder",
         "value": "tests"
       },
       {
@@ -69,26 +65,6 @@
       {
         "type": "folder",
         "value": "miniprogram_npm"
-      },
-      {
-        "type": "glob",
-        "value": "utils/pomodoro-theme.js"
-      },
-      {
-        "type": "glob",
-        "value": "utils/route-params.js"
-      },
-      {
-        "type": "glob",
-        "value": "utils/subject-scope.js"
-      },
-      {
-        "type": "glob",
-        "value": "utils/error-diagnosis.js"
-      },
-      {
-        "type": "glob",
-        "value": "utils/subject-meta.js"
       },
       {
         "type": "glob",
