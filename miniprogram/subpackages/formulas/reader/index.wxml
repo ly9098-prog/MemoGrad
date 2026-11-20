@@ -50,16 +50,11 @@
     <view class="fr-card-wrap">
       <view class="fr-transition-stage {{transitionClass}}">
         <view class="fr-reader-meta">
-          <view class="fr-mode-switch" aria-role="group" aria-label="阅读模式">
-            <button class="fr-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{!recitationMode}}" disabled="{{loadingNext}}">浏览</button>
-            <button class="fr-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fr-mode-pressed" aria-pressed="{{recitationMode}}" disabled="{{loadingNext}}">背诵</button>
+          <view class="fr-reading-context">
+            <text class="fr-mode-label">{{recitationMode ? '背诵' : '浏览'}}</text>
+            <text class="fr-random-context" wx:if="{{isRandom}}">随机顺序</text>
           </view>
           <view class="fr-reader-actions">
-            <text class="fr-random-context" wx:if="{{isRandom}}">随机</text>
-            <view class="fr-index-pill" wx:if="{{isRandom || sequenceIds.length > 1}}">
-              <text>{{isRandom ? currentIndex + 1 : sequenceIndex + 1}}</text>
-              <text class="fr-index-unit">{{isRandom ? '/ ' + displayCards.length : '/ ' + sequenceIds.length}}</text>
-            </view>
             <view wx:if="{{!guestMode}}"
               class="fr-card-favorite {{currentCard.isFavorited ? 'active' : ''}} {{favoriteBusy ? 'disabled' : ''}}"
               data-id="{{currentCard.id}}"
@@ -89,14 +84,7 @@
           bind:formulaend="onFormulaGestureEnd"
         />
 
-        <view class="fr-swipe-note" wx:if="{{isRandom || sequenceIds.length > 1}}">
-          <view class="fr-swipe-line"></view>
-          <view class="fr-swipe-copy">
-            <text>页面左右滑动切换速记卡</text>
-            <text class="fr-swipe-sub">公式区域可独立横向滑动</text>
-          </view>
-          <view class="fr-swipe-line"></view>
-        </view>
+        <text class="fr-swipe-note" wx:if="{{isRandom || canGoPrev || canGoNext}}">左右滑动切卡 · 公式可独立横滑</text>
       </view>
       <view class="fr-bottom-space"></view>
     </view>

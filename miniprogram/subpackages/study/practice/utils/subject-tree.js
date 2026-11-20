@@ -7,7 +7,8 @@ function readSubjectName(node) {
 }
 
 function readSubjectCode(node) {
-  return node.subject_code != null ? node.subject_code : (node.code != null ? node.code : '')
+  return node.product_code != null ? node.product_code
+    : (node.subject_code != null ? node.subject_code : (node.code != null ? node.code : ''))
 }
 
 function bySortOrder(a, b) {

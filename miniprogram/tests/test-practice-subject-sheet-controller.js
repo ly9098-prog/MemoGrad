@@ -133,3 +133,214 @@ test('option tap ignores hidden, closing and invalid targets', () => {
   controller.handleOptionTap(0, 'parent')
   assert.equal(state.lastTap, null)
 })
+
+function sheetHarness() {
+  const tree = require('../subpackages/study/practice/utils/subject-tree')
+  const state = {
+    subjectTree: tree.normalizeSubjectTree([
+      { subject_id: 10, subject_code: 'math', display_name: '数学', children: [
+        { subject_id: 11, display_name: '高等数学' },
+      ] },
+      { subject_id: 70, subject_code: 'exam408', display_name: '计算机综合', children: [
+        { subject_id: 71, display_name: '数据结构', children: [{ subject_id: 72, display_name: '线性表' }] },
+        { subject_id: 73, display_name: '操作系统' },
+      ] },
+    ]),
+    data: {}, writes: [], selections: [], timers: [],
+  }
+  let controller
+  controller = createSubjectSheetController({
+    getSubjectTree: () => state.subjectTree,
+    getSelectedSubjectId: () => 72,
+    getSheetPages: () => state.data.subjectSheetPages,
+    getCurrentIndex: () => state.data.subjectSheetCurrent,
+    getDraft: () => state.data.subjectSheetDraft,
+    getCloseTimer: () => null, setCloseTimer() {}, clearTimeout() {},
+    setData(patch, callback) { state.writes.push(patch); Object.assign(state.data, patch); if (callback) callback() },
+    isVisible: () => state.data.subjectSheetVisible,
+    isClosing: () => state.data.subjectSheetClosing,
+    isPageAlive: () => true,
+    setTimeout(callback, delay) { state.timers.push({ callback, delay }); return 1 },
+    selectSubject: (...args) => state.selections.push(args),
+  })
+  controller.open()
+  return { state, controller }
+}
+
+test('native swipe only changes the visible discipline and ignores programmatic/stale change events', () => {
+  const { state, controller } = sheetHarness()
+  assert.equal(state.data.subjectSheetPages[1].node_id, 71, 'opening restores the selected descendant path')
+  const before = state.writes.length
+  controller.change({ detail: { current: 0, source: '' } })
+  assert.equal(state.writes.length, before)
+  controller.change({ detail: { current: 0, source: 'touch' } })
+  assert.equal(state.data.subjectSheetCurrent, 0)
+  const after = state.writes.length
+  controller.change({ detail: { current: 0, source: 'touch' } })
+  controller.change({ detail: { current: 9, source: 'touch' } })
+  assert.equal(state.writes.length, after)
+  assert.deepEqual(state.selections, [])
+  controller.change({ detail: { current: 1, source: 'touch' } })
+  assert.equal(state.data.subjectSheetCurrent, 1, 'native circular wrap can report either valid edge index')
+})
+
+test('browsing a subject never selects all; only explicit scope staging plus confirmation commits', () => {
+  const { state, controller } = sheetHarness()
+  controller.browse(70)
+  controller.chooseCard(71)
+  assert.equal(state.data.subjectSheetPages[1].node_id, 71)
+  assert.equal(state.data.subjectSheetDraft.subject_id, 72)
+  assert.deepEqual(state.selections, [])
+  controller.stage(71)
+  assert.equal(state.data.subjectSheetDraft.display_name, '数据结构（全部）')
+  assert.deepEqual(state.selections, [])
+  controller.confirm()
+  assert.deepEqual(state.selections, [[71, '数据结构（全部）', 70, true]])
+  assert.equal(state.data.subjectSheetClosing, true)
+  controller.confirm()
+  assert.equal(state.selections.length, 1)
+})
+
+test('cancel discards a draft; foreign or disabled subjects cannot be confirmed', () => {
+  const { state, controller } = sheetHarness()
+  controller.browse(70)
+  controller.chooseCard(73)
+  assert.equal(state.data.subjectSheetDraft.subject_id, 73)
+  controller.hide()
+  state.timers.at(-1).callback()
+  controller.open()
+  assert.equal(state.data.subjectSheetDraft.subject_id, 72)
+  controller.chooseCard(11)
+  assert.equal(state.data.subjectSheetDraft.subject_id, 72)
+  state.subjectTree = []
+  controller.confirm()
+  assert.deepEqual(state.selections, [])
+})
+
+function practicePageHarness(guestMode) {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
+  const { subjectCatalogFixture } = require('./helpers/practice-page-fixture')
+  const filename = path.resolve(__dirname, '../subpackages/study/practice/practice.js')
+  const requests = [], timers = []
+  let definition
+  const catalog = subjectCatalogFixture()
+  const platform = { getStorageSync: () => [], setStorageSync() {}, showToast() {} }
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
+    Page: value => { definition = value }, wx: platform, console,
+    setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length },
+    clearTimeout() {},
+    require(name) {
+      if (name === '../../../utils/api') return {
+        createTraceId: () => 'subject-sheet-test',
+        get: async (...args) => { requests.push(args); return guestMode ? { items: catalog } : catalog },
+      }
+      return require(path.resolve(path.dirname(filename), name))
+    },
+  }, { filename })
+  const page = { ...definition, _pageAlive: true, _subjectsRequestSeq: 0,
+    data: { ...JSON.parse(JSON.stringify(definition.data)), guestMode, count: 20, selectedMode: 'random' },
+    setData(patch, callback) { Object.assign(this.data, patch); if (callback) callback() },
+  }
+  return { page, requests, timers }
+}
+
+for (const guestMode of [false, true]) {
+  test(`${guestMode ? 'guest' : 'signed-in'}: real page confirms IDs and scope, retains count/mode, and loads only on start`, async () => {
+    const { page, requests, timers } = practicePageHarness(guestMode)
+    await page.loadPracticeSubjects({ skipAutostart: true })
+    assert.equal(requests[0][0], guestMode ? '/guest/practice/subjects' : '/practice/subjects')
+    if (guestMode) assert.equal(requests[0][2].auth, 'none')
+    assert.equal(page.data.selectedSubjectId, 70)
+    page._launchKnowledgePointId = 999
+    page.openSubjectSheet()
+    page.toggleParentExpansion({ detail: { current: 1, source: '' } })
+    assert.equal(page.data.subjectSheetCurrent, 0, 'programmatic events cannot undo the 408 default')
+    page.chooseChildSubject({ currentTarget: { dataset: { subjectId: 71 } } })
+    assert.equal(page.data.selectedSubjectId, 70, 'a card tap only previews')
+    assert.equal(page._launchKnowledgePointId, 999)
+    page.chooseChildSubject({ currentTarget: { dataset: { action: 'confirm' } } })
+    assert.equal(page.data.selectedSubjectId, 71)
+    assert.equal(page.data.selectedSubjectHasChildren, false)
+    assert.equal(page._launchKnowledgePointId, null, 'changing the confirmed scope clears old launch constraints')
+    assert.equal(page.data.count, 20)
+    assert.equal(page.data.selectedMode, 'random')
+    assert.equal(requests.length, 1, 'confirmation never prematurely loads a question batch')
+    const params = page._buildQuestionRequestParams()
+    assert.equal(params.subject_id, 71)
+    assert.equal(params.include_children, false)
+    assert.equal(params.count, 20)
+    assert.deepEqual(Array.from(page._getPracticeSubjectScopeIds(71, false)), [71])
+    timers.at(-1).callback()
+    page.openSubjectSheet()
+    assert.equal(page.data.subjectSheetDraft.subject_id, 71)
+    page.chooseParentSubject({ currentTarget: { dataset: { subjectId: 70 } } })
+    page.chooseChildSubject({ currentTarget: { dataset: { action: 'confirm' } } })
+    assert.equal(page._buildQuestionRequestParams().include_children, true)
+    assert.deepEqual(Array.from(page._getPracticeSubjectScopeIds(70, true)).sort(), [70, 71, 72, 73, 74])
+    page._readPendingSubmission = () => null
+    page._setPracticeUnloadGuard = () => {}
+    let loads = 0
+    page._loadQuestions = async () => { loads += 1 }
+    const controller = page._startPracticeController()
+    await controller.start()
+    assert.equal(loads, 1)
+  })
+}
+
+test('sheet markup keeps one native discipline per swipe and leaf cards contain no repeated action captions', () => {
+  const fs = require('node:fs'), path = require('node:path')
+  const root = path.resolve(__dirname, '../subpackages/study/practice')
+  const wxml = fs.readFileSync(path.join(root, 'practice.wxml'), 'utf8')
+  const css = fs.readFileSync(path.join(root, 'practice.wxss'), 'utf8')
+  assert.match(wxml, /<swiper[^>]*circular="\{\{subjectSheetPages\.length > 1\}\}"[^>]*autoplay="\{\{false\}\}"[^>]*display-multiple-items="1"/)
+  assert.match(wxml, /bindchange="toggleParentExpansion"/)
+  assert.match(wxml, /data-action="confirm">确定选择/)
+  const gridMarkup = wxml.slice(wxml.indexOf('<view class="subject-options-grid"'), wxml.indexOf('</swiper>'))
+  assert.ok(!/subject-option-action|>选择科目<\/text>|>已预选<\/text>/.test(gridMarkup),
+    'subject cards have no repeated visual action captions')
+  assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
+  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:76vh/)
+  assert.match(css, /\.subject-sheet \.subject-discipline-scroll\{[^}]*height:100%;width:100%/)
+  assert.match(css, /\.subject-sheet \.sheet-close\{[^}]*width:44px;height:44px/)
+  for (const selector of ['subject-discipline-hint', 'subject-sheet-selection', 'subject-empty-hint']) {
+    assert.ok(new RegExp(`\\.${selector}\\{[^}]*font-size:max\\(24rpx,12px\\)`).test(css),
+      `${selector} remains at least 12px on narrow devices`)
+  }
+  for (const selector of ['subject-option-name', 'subject-sheet-confirm']) {
+    assert.ok(new RegExp(`\\.${selector}\\{[^}]*font-size:max\\(28rpx,14px\\)`).test(css),
+      `${selector} remains at least 14px on narrow devices`)
+  }
+})
+
+test('compiled sheet retains circular/one-page behavior, enabled grids, draft confirmation and empty states', {
+  skip: !process.env.PRACTICE_SUBJECT_WXML && 'set PRACTICE_SUBJECT_WXML to the native WXML compiler output',
+}, () => {
+  const fs = require('node:fs'), vm = require('node:vm')
+  const { subjectCatalogFixture } = require('./helpers/practice-page-fixture')
+  const tree = require('../subpackages/study/practice/utils/subject-tree')
+  const { buildSubjectSheetView } = require('../subpackages/study/practice/utils/subject-sheet-view')
+  const context = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
+  vm.runInContext(fs.readFileSync(process.env.PRACTICE_SUBJECT_WXML, 'utf8'), context)
+  const render = context.$gwx('subpackages/study/practice/practice.wxml')
+  assert.equal(typeof render, 'function')
+  const all = node => [node, ...(node.children || []).flatMap(child => child && typeof child === 'object' ? all(child) : [])]
+  const byClass = (node, name) => all(node).filter(item => String((item.attr || {}).class || '').split(/\s+/).includes(name))
+  const base = { entryResolved: true, started: false, subjectSheetVisible: true }
+  const catalog = tree.normalizeSubjectTree(subjectCatalogFixture())
+  const many = render({ ...base, ...buildSubjectSheetView(catalog, 71) })
+  const swiper = byClass(many, 'subject-discipline-swiper')[0]
+  assert.equal(swiper.attr.circular, true)
+  assert.equal(swiper.attr.autoplay, false)
+  assert.equal(Number(swiper.attr.displayMultipleItems), 1)
+  assert.equal(byClass(many, 'subject-discipline-item').length, 4)
+  assert.equal(byClass(byClass(many, 'subject-discipline-item')[0], 'subject-option').length, 4)
+  assert.equal(byClass(many, 'subject-option-check').length, 1)
+  assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.disabled, false)
+  const single = render({ ...base, ...buildSubjectSheetView(catalog.slice(0, 1), 70) })
+  assert.equal(byClass(single, 'subject-discipline-swiper')[0].attr.circular, false)
+  assert.equal(byClass(single, 'subject-discipline-hint').length, 0)
+  const empty = render({ ...base, ...buildSubjectSheetView([]) })
+  assert.equal(byClass(empty, 'subject-discipline-swiper').length, 0)
+  assert.equal(byClass(empty, 'subject-empty').length, 1)
+  assert.equal(byClass(empty, 'subject-sheet-confirm')[0].attr.disabled, true)
+})

@@ -19,6 +19,12 @@ function _subjectSheetController(page, dependencies) {
 const { createSubjectSheetController, getClearTimeout, getDate, getSetTimeout } = dependencies
 return page._subjectSheetControllerInstance || (
 page._subjectSheetControllerInstance = createSubjectSheetController({
+getSubjectTree: () => page.data.subjectTree,
+getSelectedSubjectId: () => page.data.selectedSubjectId,
+getSheetPages: () => page.data.subjectSheetPages,
+getCurrentIndex: () => page.data.subjectSheetCurrent,
+getDraft: () => page.data.subjectSheetDraft,
+selectSubject: (...args) => page._selectSubject(...args),
 getCloseTimer: () => page._subjectSheetCloseTimer,
 setCloseTimer: timer => { page._subjectSheetCloseTimer = timer },
 clearTimeout: timer => getClearTimeout()(timer),
@@ -39,6 +45,12 @@ function _subjectSelectionController(page, dependencies) {
 const { createSubjectSelectionController } = dependencies
 return page._subjectSelectionControllerInstance || (
 page._subjectSelectionControllerInstance = createSubjectSelectionController({
+isSheetVisible: () => page.data.subjectSheetVisible,
+stageSheetSubject: id => page._subjectSheetController().stage(id),
+chooseSheetCard: id => page._subjectSheetController().chooseCard(id),
+browseSheetSubject: id => page._subjectSheetController().browse(id),
+changeSheetDiscipline: event => page._subjectSheetController().change(event),
+confirmSheetSubject: () => page._subjectSheetController().confirm(),
 getSelectedSubjectId: () => page.data.selectedSubjectId,
 getSelectedMode: () => page.data.selectedMode,
 isGuest: () => page.data.guestMode,

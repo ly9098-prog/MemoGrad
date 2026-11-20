@@ -1,4 +1,5 @@
 const RECENT_SUBJECTS_STORAGE_KEY = 'practice_recent_subjects_v1'
+const { preferredSubjectRoot } = require('./subject-sheet-view')
 
 function selectDefaultSubject(options) {
   const availableSubjects = options.flattenSelectableSubjects(options.subjectTree)
@@ -7,7 +8,9 @@ function selectDefaultSubject(options) {
   const validStored = options.storedSubjects
     .map(item => availableMap[Number(item.subject_id)])
     .filter(Boolean)
-  const fallback = availableSubjects[0]
+  const preferred = preferredSubjectRoot(options.subjectTree)
+  const fallback = preferred && String(preferred.subject_code || '').toLowerCase() === 'exam408'
+    ? availableSubjects.find(item => item.subject_id === preferred.subject_id) : availableSubjects[0]
   const selected = validStored[0] || fallback
   if (!selected) return null
   const recentBase = validStored.length > 0 ? validStored : [selected]

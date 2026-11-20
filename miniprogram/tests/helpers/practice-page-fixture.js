@@ -80,4 +80,28 @@ function fixture(sourcePath = process.env.PRACTICE_PAGE_SOURCE) {
   return { page, methods: definition, calls, instances, stubs, api, config, context, platform }
 }
 
-module.exports = { fixture, FACTORIES }
+// Public catalog response shape. IDs are deliberately synthetic: exam408 is a
+// product code, never a numeric-ID contract. Mirrors the enabled API fields.
+function subjectCatalogFixture() {
+  const leaf = (id, code, name, parentId, order) => ({
+    subject_id: id, subject_code: code, product_code: code,
+    display_name: name, subject_name: name, parent_id: parentId,
+    level: parentId == null ? 1 : 2, sort_order: order, children: [],
+  })
+  return [
+    { ...leaf(70, 'exam408', '计算机综合', null, 0), children: [
+      leaf(71, 'data_structure', '数据结构', 70, 10),
+      leaf(72, 'computer_organization', '计算机组成原理', 70, 20),
+      leaf(73, 'operating_system', '操作系统', 70, 30),
+      leaf(74, 'computer_network', '计算机网络', 70, 40),
+    ] },
+    { ...leaf(80, 'math', '数学', null, 50), children: [
+      leaf(81, 'advanced_math', '高等数学', 80, 10),
+      leaf(82, 'linear_algebra', '线性代数', 80, 20),
+    ] },
+    leaf(90, 'english', '英语', null, 60),
+    leaf(100, 'politics', '政治', null, 70),
+  ]
+}
+
+module.exports = { fixture, FACTORIES, subjectCatalogFixture }

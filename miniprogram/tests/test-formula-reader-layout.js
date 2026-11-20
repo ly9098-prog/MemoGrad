@@ -211,13 +211,24 @@ assert.match(componentSource, /patch\.isFlipped = false/)
 assert.doesNotMatch(template, /fc-detail-body|toggleSection/, 'browse and recitation share one complete content surface')
 assert.doesNotMatch(read('subpackages/formulas/reader/index.wxml'), /fr-card-surface/, 'reader does not wrap the card in another card')
 const readerStyles = read('subpackages/formulas/reader/index.wxss')
+const libraryStyles = read('subpackages/formulas/library/index.wxss')
 assert.match(readerStyles.slice(readerStyles.lastIndexOf('@media (prefers-reduced-motion: reduce)')),
   /\.fr-transition-stage,[\s\S]*transition: none !important/, 'reduced motion wins after the reader transition rules')
-for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [readerStyles, 'fr-mode-tab'],
+for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-expand-button'], [libraryStyles, 'fl-mode-tab'],
+  [libraryStyles, 'fl-settings-button'], [libraryStyles, 'fl-search-clear'],
   [readerStyles, 'fr-card-favorite'], [readerStyles, 'fr-nav-hit']]) {
   assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
     control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
 }
+for (const control of ['fc-flip-front-scroll', 'fc-flip-back-scroll']) {
+  const tag = template.match(new RegExp('<scroll-view[^>]*class="' + control + '"[^>]*>'))[0]
+  assert.doesNotMatch(tag, /(?:bind|catch)touch(?:start|end|cancel)/,
+    'card vertical reading must let page swipe events bubble: ' + control)
+}
+assert.match(template, /class="fc-formula-line-scroll"[\s\S]*?bindtouchstart="onFormulaTouchStart"/,
+  'actual horizontal formula scroll views still isolate card switching')
+assert.match(readerStyles, /\.fr-transition-stage\s*\{[^}]*transform:\s*none\s*!important;/,
+  'card changes stay opacity-only to avoid rich-text ghosts')
 const opening = componentSource.slice(componentSource.indexOf('    openFormulaReading('), componentSource.indexOf('    closeFormulaReading('))
 assert.doesNotMatch(opening, /renderFormulaNodes|setTimeout/, 'click path never parses math or waits for animation')
 
@@ -246,6 +257,7 @@ if (process.argv[2]) {
   }
   const renderCard = nativeRenderer('subpackages/formulas/components/formula-card/index.wxml')
   const renderReader = nativeRenderer('subpackages/formulas/reader/index.wxml')
+  const renderLibrary = nativeRenderer('subpackages/formulas/library/index.wxml')
   const textNodes = text => [{ type: 'text', text }]
   const fixtureData = {
     ...structuredClone(definition.data),
@@ -315,7 +327,11 @@ if (process.argv[2]) {
     const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode })
     const card = nodes(readerTree).find(node => node.attr && node.attr.id === 'readerFormulaCard')
     assert.equal(card.attr.recitationMode, recitationMode, 'reader passes its chosen mode to the card')
-    const tabs = byClass(readerTree, 'fr-mode-tab')
+    assert.equal(byClass(readerTree, 'fr-mode-tab').length, 0, 'mode settings live in the library')
+    assert.equal(byClass(readerTree, 'fr-mode-label').length, 1)
+    const libraryTree = renderLibrary({ initialLoading: false, activeLibraryType: 'formula',
+      activeTags: [], formulas: [], recitationMode, showMoreSheet: true })
+    const tabs = byClass(libraryTree, 'fl-mode-tab')
     assert.equal(tabs.length, 2)
     assert.equal(tabs[0].attr.ariaPressed, !recitationMode)
     assert.equal(tabs[1].attr.ariaPressed, recitationMode)

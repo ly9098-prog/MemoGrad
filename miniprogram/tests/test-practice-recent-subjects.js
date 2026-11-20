@@ -87,3 +87,19 @@ test('promotes, deduplicates, trims and persists recent subjects', () => {
     { subject_id: 1, display_name: '数据结构', parent_subject_id: 408 },
   ])
 })
+
+test('a fresh session defaults to the canonical 408 root while valid recent selections retain precedence', () => {
+  const tree = require('../subpackages/study/practice/utils/subject-tree')
+  const catalog = require('./helpers/practice-page-fixture').subjectCatalogFixture()
+  const subjectTree = tree.normalizeSubjectTree(catalog.reverse())
+  const options = { subjectTree, storedSubjects: [],
+    flattenSelectableSubjects: tree.flattenSelectableSubjects,
+    decorateRecentSubjects: values => values,
+  }
+  const fresh = selectDefaultSubject(options).view
+  assert.equal(fresh.selectedSubjectId, 70)
+  assert.equal(fresh.selectedSubjectName, '计算机综合（全部）')
+  assert.equal(fresh.selectedSubjectHasChildren, true)
+  assert.equal(selectDefaultSubject({ ...options, storedSubjects: [{ subject_id: 82 }] }).view.selectedSubjectId, 82)
+  assert.equal(selectDefaultSubject({ ...options, storedSubjects: [{ subject_id: 999 }] }).view.selectedSubjectId, 70)
+})

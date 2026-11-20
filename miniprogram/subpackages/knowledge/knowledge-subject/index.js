@@ -369,6 +369,7 @@ if (!this._unloaded && this._pageVisible !== false) this._refreshMapAfterPractic
 onPageScroll(event) { this._scrollTop = Number(event.scrollTop) || 0 },
 onHide() {
 this._pageVisible = false
+this._cancelSelectionTransition(true)
 this._forceDirty = Boolean(this._forceTimer)
 clearTimeout(this._forceTimer)
 this._forceTimer = null
@@ -389,8 +390,6 @@ clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
 clearTimeout(this._labelSwitchTimer)
-clearTimeout(this._selectionSwitchTimer)
-clearTimeout(this._selectionSettleTimer)
 clearTimeout(this._returnRefreshTimer)
 clearTimeout(this._returnSyncRetryTimer)
 this._returnSyncRetryTimer = null
@@ -401,6 +400,7 @@ this._practiceLaunchFeedbackTimer = null
 onResize() { this.measureViewport(true) },
 onUnload() {
 this._pageVisible = false
+this._cancelSelectionTransition(false)
 clearTimeout(this._forceTimer)
 this._forceTimer = null
 this._layoutCache = null
@@ -422,8 +422,6 @@ clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
 clearTimeout(this._labelSwitchTimer)
-clearTimeout(this._selectionSwitchTimer)
-clearTimeout(this._selectionSettleTimer)
 clearTimeout(this._returnRefreshTimer)
 clearTimeout(this._returnSyncRetryTimer)
 this._returnSyncRetryTimer = null
@@ -935,7 +933,8 @@ _buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroup
 },
 
 _commitView(payload, animateScene, callback) {
-  const commit = () => this.setData(payload, () => {
+  this._cancelSelectionTransition(false)
+  const commit = () => this.setData({ ...payload, selectionSwitching: false, selectionSwitchPhase: '' }, () => {
     const next = () => { if (!this._unloaded && this._pageVisible !== false) this.measureViewport(false) }
     if (wx.nextTick) wx.nextTick(next)
     else next()
@@ -955,8 +954,7 @@ transitionLabelView(dataChanges = {}, callback) {
 clearTimeout(this._labelSwitchTimer)
 clearTimeout(this._themeTransitionTimer)
 clearTimeout(this._sceneAnimationTimer)
-clearTimeout(this._selectionSwitchTimer)
-clearTimeout(this._selectionSettleTimer)
+this._cancelSelectionTransition(false)
 const startPayload = { ...dataChanges, sceneAnimating: false, themeSwitching: true, themeSwitchPhase: 'leaving', selectionSwitching: false, selectionSwitchPhase: '' }
 this.setData(startPayload, () => {
 this._labelSwitchTimer = setTimeout(() => {
@@ -1489,12 +1487,52 @@ this.selectGraphPoint(Number(id))
 },
 selectGraphPoint(id) {
 const nextId = Number(id)
-if (!nextId || !this._nodeById || !this._nodeById.has(nextId) || nextId === Number(this._selectedId)) return
-clearTimeout(this._selectionSwitchTimer)
-clearTimeout(this._selectionSettleTimer)
+if (this._unloaded || this._pageVisible === false || !nextId || !this._nodeById || !this._nodeById.has(nextId) || nextId === Number(this._selectedId)) return
+const currentScene = this.data.scene
+if (!currentScene || !currentScene.nodes.some(node => node.kind === 'point' && Number(node.pointId) === nextId)) return
+this._cancelSelectionTransition(false)
 this._selectedId = nextId
 this._cancelIndexDetailReveal(true)
-this.applyView(false, false)
+const scene = highlightScene({ ...currentScene, nodes: currentScene.nodes.map(node => ({ ...node })), edges: currentScene.edges.map(edge => ({ ...edge })) }, { selectedId: nextId, activeGroupKey: this.data.activeGroupKey })
+const visible = (this._visibleNodes || []).find(node => Number(node.knowledge_point_id) === nextId)
+this._pendingSelectedPoint = { ...this._nodeById.get(nextId), matchedAlias: visible && visible.matchedAlias || '' }
+const indexNodes = (this.data.indexNodes || []).map(row => {
+const indexSelected = Number(row.knowledge_point_id) === nextId
+if (indexSelected === Boolean(row.indexSelected)) return row
+return { ...row, indexSelected,
+indexActionText: this._buildIndexActionText(row, row.indexExpandable, row.indexForcedOpen, row.indexExpanded, indexSelected),
+indexAriaAction: this._buildIndexAriaAction(row, row.indexExpandable, row.indexForcedOpen, row.indexExpanded, indexSelected, normalizeSearchText(this.data.indexQuery)) }
+})
+const labels = this._frame && this._camera ? labelDisplay(this._camera, this._frame, scene.nodes) : {}
+this._cameraLabelCache = null
+const revision = this._selectionRevision
+this.setData({ scene, indexNodes, ...labels, selectionSwitching: true, selectionSwitchPhase: 'leaving' }, () => {
+if (revision !== this._selectionRevision || this._unloaded || this._pageVisible === false) return
+this._selectionSwitchTimer = setTimeout(() => {
+this._selectionSwitchTimer = null
+if (revision !== this._selectionRevision || this._unloaded || this._pageVisible === false) return
+const selectedPoint = this._pendingSelectedPoint
+this._pendingSelectedPoint = null
+this.setData({ selectedPoint, selectionSwitchPhase: 'entering' }, () => {
+if (revision !== this._selectionRevision || this._unloaded || this._pageVisible === false) return
+this._selectionSettleTimer = setTimeout(() => {
+this._selectionSettleTimer = null
+if (revision === this._selectionRevision && !this._unloaded && this._pageVisible !== false) this.setData({ selectionSwitching: false, selectionSwitchPhase: '' })
+}, SELECTION_SWITCH_IN_MS)
+})
+}, this.data.selectedPoint ? SELECTION_SWITCH_OUT_MS : 0)
+})
+},
+_cancelSelectionTransition(publish) {
+this._selectionRevision = (this._selectionRevision || 0) + 1
+clearTimeout(this._selectionSwitchTimer)
+clearTimeout(this._selectionSettleTimer)
+this._selectionSwitchTimer = null
+this._selectionSettleTimer = null
+if (publish && !this._unloaded && (this._pendingSelectedPoint || this.data.selectionSwitching)) {
+this.setData({ ...(this._pendingSelectedPoint ? { selectedPoint: this._pendingSelectedPoint } : {}), selectionSwitching: false, selectionSwitchPhase: '' })
+}
+this._pendingSelectedPoint = null
 },
 _measureIndexDetailTarget(callback) {
 if (typeof callback !== 'function') return

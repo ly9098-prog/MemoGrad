@@ -1,6 +1,7 @@
 const api = require('../../../utils/api')
 const auth = require('../../../utils/auth')
 const storage = require('../../../utils/storage')
+const readerState = require('../utils/formula-reader-state')
 const formulaContent = require('../utils/formula-content')
 const Parser = require('../utils/mp-html-parser')
 const LatexPlugin = require('../utils/katex/index')
@@ -41,7 +42,6 @@ function renderFormulaTitleNodes(title) {
   }
 }
 
-const READER_SEQUENCE_KEY = 'reader_sequence'
 const SEARCH_DEBOUNCE_MS = 500
 const LIBRARY_TYPE_FORMULA = 'formula'
 const LIBRARY_TYPE_FUNCTION_GRAPH = 'function_graph'
@@ -190,6 +190,7 @@ Page({
     showTagPicker: false,
     showSubjectPicker: false,
     showMoreSheet: false,
+    recitationMode: false,
 
     // Loading states
     initialLoading: true,
@@ -212,7 +213,9 @@ Page({
     this._pageAlive = true
     this._visible = true
     this._favoriteBusyIds = new Set()
+    this._librarySession = readerState.sessionIdentity()
     this.setData({ guestMode: !auth.isLoggedIn() })
+    this.syncReaderMode(options.mode)
     this.measureNavigation()
     const onlyFavorites = auth.isLoggedIn() && options.favorites === '1'
     if (onlyFavorites) this.setData({ onlyFavorites: true })
@@ -224,6 +227,22 @@ Page({
 
   onShow() {
     this._visible = true
+    this.syncReaderMode()
+    if (!this.librarySessionValid()) {
+      this._librarySession = readerState.sessionIdentity()
+      this._catalogRequestVersion++
+      this._favoriteRequestVersion++
+      this._replaceRequestVersion++
+      this._favoriteBusyIds = new Set()
+      this.setData({ guestMode: !auth.isLoggedIn(), onlyFavorites: false, favoriteIds: [],
+        formulas: [], catalog: [], chapters: [], activeChapterId: null, page: 1, total: 0,
+        hasMore: true, initialLoading: true, loadingMore: false, loadError: false })
+      this.loadCatalog()
+      this.loadFavoriteIds()
+      this.loadFormulas(true)
+      this._hasShownOnce = true
+      return
+    }
     // onLoad already performs the initial request. Refresh favorites every time
     // the page becomes visible again so a toggle made in the reader is reflected
     // immediately when the user navigates back to the library.
@@ -232,6 +251,10 @@ Page({
       return
     }
     this.loadFavoriteIds()
+  },
+
+  librarySessionValid() {
+    return !this._librarySession || readerState.sameSession(this._librarySession)
   },
 
 
@@ -263,7 +286,8 @@ Page({
   // ── Catalog ──
 
   async loadCatalog() {
-    if (!this._pageAlive) return
+    if (!this._pageAlive || !this.librarySessionValid()) return
+    const session = readerState.sessionIdentity()
     const requestVersion = ++this._catalogRequestVersion
     try {
       var params = {}
@@ -286,7 +310,7 @@ Page({
         url += '?' + Object.keys(params).map(function(k) { return k + '=' + encodeURIComponent(params[k]) }).join('&')
       }
       const data = await api.request('GET', url, {}, { auth: 'optional' })
-      if (!this._pageAlive || requestVersion !== this._catalogRequestVersion) return
+      if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== this._catalogRequestVersion) return
       const catalog = this.normalizeCatalog(data?.items || [])
       const currentCode = this.data.activeSubject || DEFAULT_FORMULA_SUBJECT
       const allCodes = BASE_FORMULA_SUBJECTS.map(function (subject) { return subject.code })
@@ -307,7 +331,7 @@ Page({
         if (subjectChanged) this.loadFormulas(true)
       })
     } catch (e) {
-      if (!this._pageAlive || requestVersion !== this._catalogRequestVersion) return
+      if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== this._catalogRequestVersion) return
       console.error('Failed to load formula catalog', e)
     }
   },
@@ -663,7 +687,8 @@ Page({
   // ── Load Formulas ──
 
   async loadFormulas(replace = false) {
-    if (!this._pageAlive) return
+    if (!this._pageAlive || !this.librarySessionValid()) return
+    const session = readerState.sessionIdentity()
     if (replace) this._replaceRequestVersion = (this._replaceRequestVersion || 0) + 1
     var requestVersion = this._replaceRequestVersion || 0
     var d = this.data
@@ -673,9 +698,10 @@ Page({
     try {
       var baseParams = this._buildFormulaParams(d)
       var fetchResult = await this._fetchFormulaPages(baseParams, d.pageSize, d.activeLibraryType)
-      if (!this._pageAlive || requestVersion !== (this._replaceRequestVersion || 0)) return
+      if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== (this._replaceRequestVersion || 0)) return
       this.setData(this._buildFormulaResultPatch(fetchResult, d, replace, requestVersion))
     } catch (e) {
+      if (!readerState.sameSession(session)) return
       this._handleFormulaLoadError(e, replace, requestVersion)
     }
   },
@@ -785,7 +811,8 @@ Page({
   },
 
   async loadFavoriteIds() {
-    if (!this._pageAlive || !auth.isLoggedIn()) return
+    if (!this._pageAlive || !auth.isLoggedIn() || !this.librarySessionValid()) return
+    const session = readerState.sessionIdentity()
     const requestVersion = ++this._favoriteRequestVersion
     try {
       const favoriteIds = []
@@ -798,7 +825,7 @@ Page({
           page,
           page_size: FAVORITE_PAGE_SIZE,
         })
-        if (!this._pageAlive || requestVersion !== this._favoriteRequestVersion) return
+        if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== this._favoriteRequestVersion) return
 
         const items = data?.items || []
         items.forEach((item) => {
@@ -816,7 +843,7 @@ Page({
         page += 1
       }
 
-      if (!this._pageAlive || requestVersion !== this._favoriteRequestVersion) return
+      if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== this._favoriteRequestVersion) return
       const favoriteSet = new Set(favoriteIds)
       const formulas = (this.data.formulas || []).map((item) => {
         const isFavorited = favoriteSet.has(Number(item.id))
@@ -828,13 +855,14 @@ Page({
       }).filter((item) => !this.data.onlyFavorites || item.isFavorited)
       this.setData({ favoriteIds, formulas })
     } catch (e) {
-      if (!this._pageAlive || requestVersion !== this._favoriteRequestVersion) return
+      if (!this._pageAlive || !readerState.sameSession(session) || requestVersion !== this._favoriteRequestVersion) return
       console.warn('Failed to load formula favorites', e)
     }
   },
 
   async toggleFormulaFavorite(e) {
-    if (!auth.isLoggedIn()) return
+    if (!auth.isLoggedIn() || !this.librarySessionValid()) return
+    const session = readerState.sessionIdentity()
 
     const formulaId = Number(e.currentTarget.dataset.id)
     if (!formulaId || !this._pageAlive) return
@@ -852,7 +880,7 @@ Page({
       } else {
         await api.request('PUT', `/formulas/${formulaId}/favorite`)
       }
-      if (!this._pageAlive) return
+      if (!this._pageAlive || !readerState.sameSession(session)) return
 
       // Invalidate a favorite-list GET that may have started before this write;
       // an older response must not undo the user's latest toggle.
@@ -873,7 +901,7 @@ Page({
       this.setData({ formulas, favoriteIds })
       wx.showToast({ title: current ? '已取消收藏' : '已收藏', icon: 'none' })
     } catch (err) {
-      if (!this._pageAlive) return
+      if (!this._pageAlive || !readerState.sameSession(session)) return
       console.error('Toggle formula favorite failed', err)
       wx.showToast({ title: '操作失败，请重试', icon: 'none' })
     } finally {
@@ -900,7 +928,20 @@ Page({
 
   noop() {},
 
+  syncReaderMode(explicitMode) {
+    if (explicitMode === 'browse' || explicitMode === 'recite') readerState.writeMode(explicitMode)
+    this.setData({ recitationMode: readerState.readMode(explicitMode) === 'recite' })
+  },
+
+  setReaderMode(event) {
+    const mode = event.currentTarget.dataset.mode
+    if (mode !== 'browse' && mode !== 'recite') return
+    readerState.writeMode(mode)
+    this.syncReaderMode()
+  },
+
   goToReader(e) {
+    if (!this.librarySessionValid()) return
     const formulaId = e.currentTarget.dataset.id
     if (formulaId === undefined || formulaId === null || formulaId === '') return
 
@@ -909,33 +950,38 @@ Page({
       .filter((id) => id !== undefined && id !== null && id !== '')
     const sequenceIndex = Math.max(0, sequenceIds.findIndex((id) => String(id) === String(formulaId)))
 
-    try {
-      wx.setStorageSync(READER_SEQUENCE_KEY, {
-        ids: sequenceIds,
-        index: sequenceIndex,
-        savedAt: formulaNowMs(),
-        owner: storage.ownerFingerprint(),
-        sessionGeneration: storage.currentSessionGeneration(),
-        subjectCode: this.data.activeSubject,
-        chapterId: this.data.activeChapterId,
-        searchValue: this.data.searchValue,
-        libraryType: this.data.activeLibraryType,
-        studyCardType: this.data.activeStudyCardType,
-      })
-    } catch (_) {}
+    this.syncReaderMode()
+    const params = readerState.sequenceFilters(this._buildFormulaParams(this.data))
+    readerState.writeSequence({
+      ids: sequenceIds,
+      index: sequenceIndex,
+      params,
+      pageSize: this.data.pageSize,
+      firstPage: 1,
+      nextPage: this.data.page,
+      hasMore: this.data.hasMore,
+    }, formulaNowMs())
 
     wx.navigateTo({
-      url: `/subpackages/formulas/reader/index?id=${encodeURIComponent(formulaId)}&index=${sequenceIndex}&source=library`,
+      url: '/subpackages/formulas/reader/index?' + readerState.queryString({
+        ...params, id: formulaId, index: sequenceIndex, source: 'library',
+        mode: this.data.recitationMode ? 'recite' : 'browse',
+        sequence_page: Math.floor(sequenceIndex / this.data.pageSize) + 1,
+        page_size: this.data.pageSize,
+      }),
     })
   },
 
   goToFavorites() {
+    if (!auth.isLoggedIn() || !this.librarySessionValid()) return
+    this.syncReaderMode()
     wx.navigateTo({
-      url: `/subpackages/formulas/library/index?favorites=1`,
+      url: '/subpackages/formulas/library/index?' + readerState.queryString({ favorites: 1, mode: this.data.recitationMode ? 'recite' : 'browse' }),
     })
   },
 
   goToRandom() {
+    if (!this.librarySessionValid()) return
     const { activeSubject, activeChapterId, activeTags, activeLibraryType, activeStudyCardType } = this.data
     const params = {
       subject_code: activeSubject,
@@ -950,11 +996,11 @@ Page({
         .map(t => t.code)
         .join(',')
     }
+    this.syncReaderMode()
     wx.navigateTo({
-      url: `/subpackages/formulas/reader/index?random=1&` + Object.entries(params)
-        // Avoid destructured callback params for the same SWC runtime-helper issue.
-        .map(entry => `${entry[0]}=${entry[1]}`)
-        .join('&'),
+      url: '/subpackages/formulas/reader/index?' + readerState.queryString({
+        ...params, random: 1, mode: this.data.recitationMode ? 'recite' : 'browse',
+      }),
     })
   },
 })

@@ -82,18 +82,18 @@
     <view class="fc-flip-stage {{recitationMode ? 'is-recite' : 'is-browse'}} {{recitationMode && isFlipped ? 'is-flipped' : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}"
-          bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
-          <template is="card-heading" data="{{card: card, content: content}}" />
+        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}">
+          <view class="fc-recall-question {{card.title.length > 48 ? 'is-long-question' : ''}}">
+            <template is="card-heading" data="{{card: card, content: content}}" />
+          </view>
         </scroll-view>
-        <text class="fc-recall-prompt">先回想核心内容与适用条件，再翻面核对</text>
+        <text class="fc-recall-prompt">回想要点与适用条件</text>
         <button class="fc-flip-action" bindtap="toggleCardFlip" hover-class="fc-control-pressed" aria-label="显示答案" aria-expanded="{{isFlipped}}" disabled="{{isFlipped}}">显示答案</button>
       </view>
       <view class="fc-flip-face {{recitationMode ? 'fc-flip-back' : 'fc-browse-face'}}" aria-hidden="{{recitationMode && !isFlipped}}">
         <block wx:if="{{recitationMode}}">
           <view class="fc-answer-heading"><text class="fc-face-label">答案</text><text class="fc-scroll-note">卡内上下滑动</text></view>
-          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}" catchtap="containFormulaReading"
-            catchtouchstart="onFormulaTouchStart" catchtouchend="onFormulaTouchEnd" catchtouchcancel="onFormulaTouchEnd">
+          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}" catchtap="containFormulaReading">
             <template is="card-heading" data="{{card: card, content: content}}" />
             <template is="card-content" data="{{card: card, content: content, formulaBlocks: formulaBlocks, graphImageUrl: graphImageUrl, displayGraphUrl: displayGraphUrl, graphViewportRatio: graphViewportRatio, graphLoadError: graphLoadError}}" />
           </scroll-view>

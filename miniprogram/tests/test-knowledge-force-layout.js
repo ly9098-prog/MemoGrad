@@ -329,3 +329,86 @@ test('direct and search index navigation preserve selection across chapter page 
     }
   }
 })
+
+function selectionPage() {
+  const group = groupWithLeaves(8)
+  const scene = buildScene([group], subject, { groupKey: 'tree', focusNodeId: 1, selectedId: 2 })
+  const frame = { width: 365, height: 343 }
+  const writes = []
+  return {
+    ...pageDefinition, writes,
+    data: { ...structuredClone(pageDefinition.data), subject, scene, activeGroupKey: 'tree',
+      selectedPoint: group.nodes[1], indexNodes: group.nodes.map(node => ({ ...node, indexSelected: node.knowledge_point_id === 2 })) },
+    _nodeById: new Map(group.nodes.map(node => [node.knowledge_point_id, node])),
+    _visibleNodes: group.nodes, _selectedId: 2, _pageVisible: true,
+    _frame: frame, _camera: fitCamera(frame),
+    setData(patch, callback) { writes.push(patch); Object.assign(this.data, patch); if (callback) callback() },
+    applyView() { assert.fail('selection must not rebuild the scene, filters or index tree') },
+    cancelGraphMotion() {}, measureViewport() {},
+  }
+}
+
+test('point selection preserves geometry and camera while detail waits for its exit frame', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const page = selectionPage()
+  const positions = page.data.scene.nodes.map(node => [node.cx, node.cy])
+  const camera = { ...page._camera }
+  page.selectGraphPoint(3)
+  assert.equal(page._selectedId, 3)
+  assert.equal(page.data.scene.nodes.find(node => node.pointId === 3).selected, true)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 2, 'old detail remains during its exit')
+  assert.equal(page.data.selectionSwitchPhase, 'leaving')
+  t.mock.timers.tick(82)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 3)
+  assert.equal(page.data.selectionSwitchPhase, 'entering')
+  assert.equal(page.data.indexNodes.find(node => node.knowledge_point_id === 3).indexActionText, '已定位')
+  assert.deepEqual(page.data.scene.nodes.map(node => [node.cx, node.cy]), positions)
+  assert.deepEqual(page._camera, camera)
+  assert.ok(page.writes.every(patch => !('graphMotionState' in patch) && !('stageStyle' in patch)), 'selection cannot reset an active WXS camera')
+  t.mock.timers.tick(220)
+  assert.equal(page.data.selectionSwitching, false)
+  assert.equal(page.data.selectionSwitchPhase, '')
+})
+
+test('rapid point taps publish only the latest detail and cannot replay an earlier selection', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const page = selectionPage()
+  page.selectGraphPoint(3)
+  t.mock.timers.tick(40)
+  page.selectGraphPoint(4)
+  t.mock.timers.tick(42)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 2)
+  t.mock.timers.tick(40)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 4)
+  t.mock.timers.tick(500)
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 4)
+  assert.equal(page.data.scene.nodes.filter(node => node.selected).length, 1)
+  assert.ok(!page.writes.some(patch => patch.selectedPoint && patch.selectedPoint.knowledge_point_id === 3))
+})
+
+test('hiding flushes the latest selected detail and cancels all later visual work', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const page = selectionPage()
+  page.selectGraphPoint(3)
+  page.onHide()
+  assert.equal(page.data.selectedPoint.knowledge_point_id, 3)
+  assert.equal(page.data.selectionSwitching, false)
+  const count = page.writes.length
+  t.mock.timers.tick(1000)
+  page.selectGraphPoint(4)
+  assert.equal(page.writes.length, count)
+})
+
+test('a full view update supersedes pending selected details', t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const originalWx = Object.getOwnPropertyDescriptor(global, 'wx')
+  global.wx = { nextTick: callback => callback() }
+  t.after(() => originalWx ? Object.defineProperty(global, 'wx', originalWx) : delete global.wx)
+  const page = selectionPage()
+  page.selectGraphPoint(3)
+  page._commitView({ selectedPoint: null, scene: { nodes: [], edges: [] } }, false)
+  t.mock.timers.tick(1000)
+  assert.equal(page.data.selectedPoint, null)
+  assert.equal(page.data.selectionSwitching, false)
+  assert.equal(page.data.selectionSwitchPhase, '')
+})

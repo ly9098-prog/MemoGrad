@@ -10,6 +10,10 @@ const {
   subjectHasChildren,
   getPracticeSubjectScopeIds,
 } = require('../subpackages/study/practice/utils/subject-tree')
+const {
+  buildSubjectSheetView,
+  buildSubjectSheetPage,
+} = require('../subpackages/study/practice/utils/subject-sheet-view')
 
 const rawTree = [
   {
@@ -124,4 +128,32 @@ test('resolves direct and descendant practice scopes', () => {
   assert.deepEqual(getPracticeSubjectScopeIds(408, true, tree), [408, 2, 1])
   assert.deepEqual(getPracticeSubjectScopeIds(99, true, tree), [])
   assert.deepEqual(getPracticeSubjectScopeIds(0, true, tree), [])
+})
+
+test('sheet defaults to the exam408 code, never a hard-coded subject id, and shows only direct children', () => {
+  const tree = normalizeSubjectTree([
+    { subject_id: 408, subject_code: 'math', display_name: '数学', sort_order: 0 },
+    { subject_id: 71, subject_code: 'exam408', display_name: '计算机综合', sort_order: 1, children: [
+      { subject_id: 72, display_name: '数据结构', subject_code: 'data_structure', children: [
+        { subject_id: 73, display_name: '线性表' },
+      ] },
+      { subject_id: 74, display_name: '计算机组成原理' },
+      { subject_id: 75, display_name: '操作系统' },
+      { subject_id: 76, display_name: '计算机网络' },
+      { subject_id: 77, display_name: '已停用', is_active: false },
+    ] },
+  ])
+  const view = buildSubjectSheetView(tree)
+  assert.equal(view.subjectSheetCurrent, 1)
+  assert.match(view.subjectSheetPages[1].root_name, /408/)
+  assert.deepEqual(view.subjectSheetPages[1].options.map(item => item.subject_id), [72, 74, 75, 76])
+  const nested = buildSubjectSheetPage(tree[1], 72)
+  assert.equal(nested.node_id, 72)
+  assert.equal(nested.back_id, 71)
+  assert.deepEqual(nested.options.map(item => item.subject_id), [73])
+  assert.equal(nested.has_children, true)
+  const restored = buildSubjectSheetView(tree, 73)
+  assert.equal(restored.subjectSheetCurrent, 1)
+  assert.equal(restored.subjectSheetPages[1].node_id, 72)
+  assert.equal(restored.subjectSheetDraft.subject_id, 73)
 })

@@ -13,10 +13,6 @@
           <text class="fl-compact-total-number">{{total || formulas.length || 0}}</text>
           <text class="fl-compact-total-unit">{{activeLibraryType === 'function_graph' ? '张' : '条'}}</text>
         </view>
-        <view class="fl-more-button" hover-class="fl-pressed" bindtap="toggleMoreSheet" aria-label="更多功能">
-          <view class="fl-more-dots"><view class="fl-dot"></view><view class="fl-dot"></view><view class="fl-dot"></view></view>
-          <view class="fl-more-active-dot" wx:if="{{activeTags.length}}"></view>
-        </view>
       </view>
     </view>
 
@@ -46,20 +42,27 @@
       </view>
     </view>
 
-    <view class="fl-search-box">
-      <view class="fl-search-icon"></view>
-      <input
-        class="fl-search-input"
-        placeholder="{{activeLibraryType === 'function_graph' ? '搜索函数图像名称或关键词' : '搜索速记卡名称或关键词'}}"
-        placeholder-class="fl-search-placeholder"
-        value="{{searchValue}}"
-        bindinput="onSearchInput"
-        confirm-type="search"
-        bindconfirm="onSearchConfirm"
-      />
-      <view class="fl-search-clear" wx:if="{{searchValue}}" hover-class="fl-pressed" bindtap="onSearchClear">
-        <text class="line-icon icon-close"></text>
+    <view class="fl-search-tools">
+      <view class="fl-search-box">
+        <view class="fl-search-icon"></view>
+        <input
+          class="fl-search-input"
+          placeholder="{{activeLibraryType === 'function_graph' ? '搜索函数图像' : '搜索名称或关键词'}}"
+          placeholder-class="fl-search-placeholder"
+          aria-label="{{activeLibraryType === 'function_graph' ? '搜索函数图像名称或关键词' : '搜索速记卡名称或关键词'}}"
+          value="{{searchValue}}"
+          bindinput="onSearchInput"
+          confirm-type="search"
+          bindconfirm="onSearchConfirm"
+        />
+        <view class="fl-search-clear" wx:if="{{searchValue}}" hover-class="fl-pressed" bindtap="onSearchClear" role="button" aria-label="清除搜索">
+          <text class="line-icon icon-close"></text>
+        </view>
       </view>
+      <button class="fl-settings-button" hover-class="fl-pressed" bindtap="toggleMoreSheet" aria-label="阅读与筛选设置，当前{{recitationMode ? '背诵' : '浏览'}}模式" aria-expanded="{{showMoreSheet}}">
+        <text class="fl-settings-label">设置</text>
+        <text class="fl-settings-mode">{{recitationMode ? '背诵' : '浏览'}}<text wx:if="{{activeTags.length}}"> · {{activeTags.length}} 标签</text></text>
+      </button>
     </view>
 
     <view class="fl-quick-row">
@@ -79,7 +82,7 @@
 
       <view class="fl-quick-action fl-random-action" hover-class="fl-pressed" bindtap="goToRandom">
         <view class="fl-quick-icon"><text class="line-icon icon-review"></text></view>
-        <text class="fl-quick-title">随机背诵</text>
+        <text class="fl-quick-title">{{recitationMode ? '随机背诵' : '随机浏览'}}</text>
         <text class="line-icon icon-chevron-right fl-quick-arrow"></text>
       </view>
     </view>
@@ -104,7 +107,6 @@
     <view class="fl-section-head">
       <view>
         <text class="fl-section-title">章节筛选</text>
-        <text class="fl-section-kicker">CHAPTERS</text>
       </view>
       <text class="fl-section-filter-note" wx:if="{{activeTags.length}}">已选 {{activeTags.length}} 个标签</text>
     </view>
@@ -294,12 +296,19 @@
       <view class="fl-sheet-handle"></view>
       <view class="fl-sheet-head">
         <view>
-          <text class="fl-sheet-title">更多功能</text>
-          <text class="fl-sheet-subtitle">管理标签和当前筛选条件</text>
+          <text class="fl-sheet-title">阅读与筛选设置</text>
         </view>
-        <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed">
+        <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed" role="button" aria-label="关闭设置">
           <text class="line-icon icon-close"></text>
         </view>
+      </view>
+      <view class="fl-reading-settings">
+        <text class="fl-mode-label">打开卡片时</text>
+        <view class="fl-mode-switch" aria-role="group" aria-label="阅读模式">
+          <button class="fl-mode-tab {{recitationMode ? '' : 'is-active'}}" data-mode="browse" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{!recitationMode}}">浏览</button>
+          <button class="fl-mode-tab {{recitationMode ? 'is-active' : ''}}" data-mode="recite" bindtap="setReaderMode" hover-class="fl-pressed" aria-pressed="{{recitationMode}}">背诵</button>
+        </view>
+        <text class="fl-mode-description">{{recitationMode ? '先看题面，回想后翻面核对答案' : '直接阅读公式、适用条件与例题'}}</text>
       </view>
       <view class="fl-more-list">
         <view class="fl-more-item" hover-class="fl-pressed" bindtap="openTagPickerFromMore">

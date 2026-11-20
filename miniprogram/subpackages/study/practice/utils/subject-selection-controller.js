@@ -48,6 +48,7 @@ function chooseRecent(options, event) {
 
 function chooseParent(options, event) {
   const ds = dataset(event)
+  if (options.isSheetVisible && options.isSheetVisible()) return options.stageSheetSubject(ds.subjectId)
   const subjectId = Number(ds.subjectId)
   const subjectName = ds.subjectName
   const hasChildren = ds.hasChildren === true || ds.hasChildren === 'true'
@@ -58,6 +59,11 @@ function chooseParent(options, event) {
 }
 
 function toggleExpansion(options, event) {
+  if (options.isSheetVisible && options.isSheetVisible()) {
+    return event && event.detail && event.detail.current != null
+      ? options.changeSheetDiscipline(event)
+      : options.browseSheetSubject(dataset(event).subjectId)
+  }
   const subjectId = Number(dataset(event).subjectId)
   if (!subjectId) return
   const next = options.getExpandedSubjectId() === subjectId ? null : subjectId
@@ -66,6 +72,9 @@ function toggleExpansion(options, event) {
 
 function chooseChild(options, event) {
   const ds = dataset(event)
+  if (options.isSheetVisible && options.isSheetVisible()) {
+    return ds.action === 'confirm' ? options.confirmSheetSubject() : options.chooseSheetCard(ds.subjectId)
+  }
   const subjectId = Number(ds.subjectId)
   const subjectName = ds.subjectName
   const hasChildren = ds.hasChildren === true || ds.hasChildren === 'true'

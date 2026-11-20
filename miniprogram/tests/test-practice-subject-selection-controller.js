@@ -148,3 +148,24 @@ test('manual mode and count changes clear overrides and update computed fields',
   state.callbacks[2]()
   assert.equal(state.computedUpdates, 2)
 })
+
+test('registered selection entries route sheet browsing and staging without committing practice configuration', () => {
+  const routed = []
+  const { controller, state } = createHarness({
+    isSheetVisible: () => true,
+    stageSheetSubject: id => routed.push(['stage', id]),
+    chooseSheetCard: id => routed.push(['card', id]),
+    browseSheetSubject: id => routed.push(['browse', id]),
+    changeSheetDiscipline: e => routed.push(['swipe', e.detail.current]),
+    confirmSheetSubject: () => routed.push(['confirm']),
+  })
+  controller.chooseParent(event({ subjectId: 70 }))
+  controller.chooseChild(event({ subjectId: 71 }))
+  controller.toggleExpansion(event({ subjectId: 70 }))
+  controller.toggleExpansion({ detail: { current: 1, source: 'touch' } })
+  controller.chooseChild(event({ action: 'confirm' }))
+  assert.deepEqual(routed, [['stage', 70], ['card', 71], ['browse', 70], ['swipe', 1], ['confirm']])
+  assert.deepEqual(state.patches, [])
+  assert.equal(state.overridesCleared, 0)
+  assert.deepEqual(state.remembered, [])
+})

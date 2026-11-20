@@ -6,6 +6,10 @@ const KEYS = {
   LAST_AUTH_OWNER: 'last_auth_owner',
 }
 
+// Request fences follow identity boundaries, not access-token rotation. Pages
+// do not outlive this runtime; explicit/expired-session cleanup advances it.
+let authSessionRevision = 0
+
 /** 业务缓存键列表 — 会话切换或注销时需清除 */
 const BUSINESS_CACHE_KEYS = [
   'lastPracticeResult',
@@ -92,6 +96,7 @@ function removeDebugSnapshots() {
 }
 
 function clearSession(options) {
+  authSessionRevision += 1
   var opts = options || {}
   var preservePrivacy = opts.preservePrivacyAcceptance === true
   var previousOwner = ownerFingerprint()
@@ -142,8 +147,7 @@ function ownerFingerprint() {
 }
 
 function currentSessionGeneration() {
-  const token = get(KEYS.TOKEN)
-  return token ? String(token).slice(-24) : ''
+  return get(KEYS.TOKEN) ? `${ownerFingerprint()}:${authSessionRevision}` : ''
 }
 
 module.exports = {
@@ -156,5 +160,6 @@ module.exports = {
   setStrict,
   remove,
   clearSession,
+  currentSessionGeneration,
   ownerFingerprint,
 }
