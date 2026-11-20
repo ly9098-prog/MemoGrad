@@ -13,7 +13,6 @@ const INDEX_TREE_BASE_X = 24
 const INDEX_TREE_STEP_X = 28
 const INDEX_CONTENT_BASE_INDENT = 32
 const QUICK_THEME_LIMIT = 5
-const RECENT_THEME_LIMIT = 5
 const SEARCH_DEBOUNCE_MS = 300
 const INDEX_SEARCH_LEAVE_MS = 72
 const INDEX_SEARCH_ENTER_MS = 210
@@ -26,7 +25,6 @@ const INDEX_SEARCH_RETENTION_EPSILON = 1
 const THEME_SHEET_SELECT_DELAY_MS = 96
 const THEME_SHEET_CLOSE_MS = 236
 const THEME_TRANSITION_MS = 180
-const LABEL_SWITCH_OUT_MS = 72
 const SELECTION_SWITCH_OUT_MS = 82
 const SELECTION_SWITCH_IN_MS = 220
 const RETURN_REFRESH_DELAY_MS = 260
@@ -56,15 +54,15 @@ const alias = aliases.find(value => textSearchMatch(value, rawQuery, compactQuer
 return { matched: Boolean(alias), alias: String(alias || '') }
 }
 const THEME_ICON_ASSETS = {
-overview: '/assets/icons/knowledge-subject/overview.png',
+overview: '/assets/icons/mobile-controls/layers.svg',
 tree: '/assets/icons/knowledge-subject/tree.png',
 nodes: '/assets/icons/knowledge-subject/nodes.png',
 relation: '/assets/icons/knowledge-subject/relation.png',
-move: '/assets/icons/knowledge-subject/move.png',
-chip: '/assets/icons/knowledge-subject/chip.png',
-queue: '/assets/icons/knowledge-subject/queue.png',
-layers: '/assets/icons/knowledge-subject/layers.png',
-code: '/assets/icons/knowledge-subject/code.png',
+move: '/assets/icons/mobile-controls/expand.svg',
+chip: '/assets/icons/mobile-controls/cpu.svg',
+queue: '/assets/icons/mobile-controls/list-ordered.svg',
+layers: '/assets/icons/mobile-controls/layers.svg',
+code: '/assets/icons/mobile-controls/code-xml.svg',
 }
 const themeIconSrc = kind => THEME_ICON_ASSETS[kind] || THEME_ICON_ASSETS.nodes
 const INDEX_ICON_ASSETS = {
@@ -217,28 +215,9 @@ const compact = compactSearchText(raw)
 return raw.includes(rawQuery) || (compactQuery && compact.includes(compactQuery))
 })
 }
-const buildQuickGroupChips = (chips, activeKey, recentKeys = []) => {
-const source = Array.isArray(chips) ? chips : []
-const recentRank = new Map((Array.isArray(recentKeys) ? recentKeys : []).map((key, index) => [String(key), index]))
-const ranked = source.slice().sort((a, b) => {
-const aRecent = recentRank.has(String(a.key)) ? recentRank.get(String(a.key)) : Number.MAX_SAFE_INTEGER
-const bRecent = recentRank.has(String(b.key)) ? recentRank.get(String(b.key)) : Number.MAX_SAFE_INTEGER
-if (aRecent !== bRecent && (aRecent !== Number.MAX_SAFE_INTEGER || bRecent !== Number.MAX_SAFE_INTEGER)) return aRecent - bRecent
-const aStructured = Number(a.descendantCount) > 0 ? 1 : 0
-const bStructured = Number(b.descendantCount) > 0 ? 1 : 0
-if (aStructured !== bStructured) return bStructured - aStructured
-if (aStructured && Number(a.descendantCount) !== Number(b.descendantCount)) return Number(b.descendantCount) - Number(a.descendantCount)
-return Number(a.orderIndex || 0) - Number(b.orderIndex || 0)
-})
-const result = ranked.slice(0, QUICK_THEME_LIMIT)
-const normalizedActive = String(activeKey || '')
-if (!normalizedActive || result.some(item => String(item.key) === normalizedActive)) return result
-const activeItem = source.find(item => String(item.key) === normalizedActive)
-if (!activeItem) return result
-if (result.length < QUICK_THEME_LIMIT) result.push(activeItem)
-else if (result.length) result[result.length - 1] = activeItem
-return result
-}
+// Reading a theme must not move the next tap target. The full chooser retains
+// every theme; these shortcuts follow the same stable syllabus order.
+const buildQuickGroupChips = chips => (Array.isArray(chips) ? chips : []).slice(0, QUICK_THEME_LIMIT)
 const percent = value => value == null || !Number.isFinite(Number(value)) ? null : Math.max(0, Math.min(100, Math.round(Number(value))))
 const accuracyPercent = (value) => {
 const number = Number(value)
@@ -255,7 +234,7 @@ filters: FILTERS.map(item => ({ id: item.id, label: item.label, count: 0 })),
 filter: 'all', query: '', searchDraft: '', searchFocused: false, searchPending: false, searchResultCount: 0, activeGroupKey: '', activeGroupName: '', indexScopeGroupKey: '',
 groupChips: [], quickGroupChips: [], themeGroupCount: 0, themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '', themeSheetGroups: [],
 scene: { nodes: [], edges: [], page: 0, pageCount: 1, focused: false },
-pageEntered: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null,
+pageEntered: false, themeSwitching: false, themeSwitchPhase: '', selectionSwitching: false, selectionSwitchPhase: '', graphMotionState: null, graphSettlementToken: 0,
 stageStyle: '', zoomText: '100%', zoomInDisabled: false, zoomOutDisabled: true, selectedPoint: null,
 graphLabelMode: 'overview', graphLabelSize: 32, graphLabelVisibility: {}, graphLabelLayouts: {},
 indexDetailRevealPhase: '', indexDetailRevealStyle: '',
@@ -298,11 +277,6 @@ if (!Number.isInteger(this.subjectId) || this.subjectId <= 0) {
 this.setData({ loading: false, error: '科目参数无效' })
 return
 }
-this._recentGroupStorageKey = `knowledgeSubjectRecentGroups:${this.subjectId}`
-try {
-const stored = wx.getStorageSync(this._recentGroupStorageKey)
-this._recentGroupKeys = Array.isArray(stored) ? stored.map(item => String(item || '')).filter(Boolean).slice(0, RECENT_THEME_LIMIT) : []
-} catch (error) { this._recentGroupKeys = [] }
 const persistedState = String((options && options.restore_state) || '') === '1'
 ? this._readViewState(true)
 : null
@@ -361,6 +335,10 @@ if (!this._unloaded && this._pageVisible !== false) this._refreshMapAfterPractic
 onPageScroll(event) { this._scrollTop = Number(event.scrollTop) || 0 },
 onHide() {
 this._pageVisible = false
+this._cancelGraphSettlements()
+if (this.data.themeSheetOpen || this.data.themeSheetClosing || this.data.themeSwitching) {
+this.setData({ themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '', themeSwitching: false, themeSwitchPhase: '' })
+}
 this._cancelSelectionTransition(true)
 this._requestId = (this._requestId || 0) + 1
 this.cancelGraphMotion()
@@ -377,7 +355,6 @@ clearTimeout(this._entryTimer)
 clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
-clearTimeout(this._labelSwitchTimer)
 clearTimeout(this._returnRefreshTimer)
 clearTimeout(this._returnSyncRetryTimer)
 this._returnSyncRetryTimer = null
@@ -388,6 +365,7 @@ this._practiceLaunchFeedbackTimer = null
 onResize() { this.measureViewport(true) },
 onUnload() {
 this._pageVisible = false
+this._cancelGraphSettlements()
 this._cancelSelectionTransition(false)
 this._layoutCache = null
 this.cancelGraphMotion()
@@ -406,7 +384,6 @@ clearTimeout(this._entryTimer)
 clearTimeout(this._themeSheetCloseTimer)
 clearTimeout(this._themeSheetSelectTimer)
 clearTimeout(this._themeTransitionTimer)
-clearTimeout(this._labelSwitchTimer)
 clearTimeout(this._returnRefreshTimer)
 clearTimeout(this._returnSyncRetryTimer)
 this._returnSyncRetryTimer = null
@@ -518,33 +495,37 @@ async loadMap(showLoading = true, options = {}) {
     const data = await api.get(`/knowledge-map/subjects/${this.subjectId}`)
     if (this._unloaded || this._pageVisible === false || requestId !== this._requestId) return
     if (!data || !data.subject) throw new Error('知识图谱暂不可用')
-    this._nodes = this._buildMapNodes(data)
-    this._groups = buildKnowledgeGroups(this._nodes, data.subject)
-    const graduation = summarizeGroups(this._groups)
-    this._groups = graduation.items
-    this._expandInitialGroups(options)
-    this._buildNodeById()
-    const validNodeIds = new Set(this._nodeById.keys())
-    this._expandedNodeIds = new Set(Array.from(this._expandedNodeIds || []).filter(id => validNodeIds.has(Number(id))))
-    const stats = this._buildMapStats(data)
-    const filters = FILTERS.map(item => ({ id: item.id, label: item.label, count: item.statuses ? this._nodes.filter(node => item.statuses.includes(node.status)).length : this._nodes.length }))
-    const firstLoad = !this._loadedOnce
-    const preserveViewState = options && options.preserveViewState
-    if (preserveViewState) this._applyPreservedViewState(preserveViewState, validNodeIds)
-    this._loadedOnce = true
-    wx.setNavigationBarTitle({ title: `${data.subject.subject_name} · 知识图谱` })
-    this.setData({
-      loading: false, error: '', refreshError: '', subject: data.subject, filters,
-      syllabusText: this._buildSyllabusText(data.syllabus_version),
-      stats,
-      chapterGraduation: graduation.summary,
-      ...(preserveViewState ? this._viewStateDataPatch(preserveViewState) : {}),
-      ...(preserveViewState ? this.cameraPayload(true) : {}),
-    }, () => this.applyView(firstLoad && !preserveViewState, () => {
-      if (firstLoad) this.enterPage()
-      if (preserveViewState) this._restoreScrollPosition(preserveViewState)
-      this._pendingInitialViewState = null
-    }))
+    await this._afterGraphSettled(() => {
+      if (this._unloaded || this._pageVisible === false || requestId !== this._requestId) return
+      // Refresh the view the reader is using now. A request-start snapshot may
+      // predate a drag, a zoom or another theme visit made while the API waited.
+      const firstLoad = !this._loadedOnce
+      const preserveViewState = (!firstLoad && this._captureViewState()) || options.preserveViewState
+      this._nodes = this._buildMapNodes(data)
+      this._groups = buildKnowledgeGroups(this._nodes, data.subject)
+      const graduation = summarizeGroups(this._groups)
+      this._groups = graduation.items
+      this._expandInitialGroups(options)
+      this._buildNodeById()
+      const validNodeIds = new Set(this._nodeById.keys())
+      this._expandedNodeIds = new Set(Array.from(this._expandedNodeIds || []).filter(id => validNodeIds.has(Number(id))))
+      const stats = this._buildMapStats(data)
+      const filters = FILTERS.map(item => ({ id: item.id, label: item.label, count: item.statuses ? this._nodes.filter(node => item.statuses.includes(node.status)).length : this._nodes.length }))
+      if (preserveViewState) this._applyPreservedViewState(preserveViewState, validNodeIds)
+      this._loadedOnce = true
+      wx.setNavigationBarTitle({ title: `${data.subject.subject_name} · 知识图谱` })
+      this.setData({
+        loading: false, error: '', refreshError: '', subject: data.subject, filters,
+        syllabusText: this._buildSyllabusText(data.syllabus_version),
+        stats,
+        chapterGraduation: graduation.summary,
+        ...(firstLoad && preserveViewState ? this._viewStateDataPatch(preserveViewState) : {}),
+      }, () => this.applyView(firstLoad && !preserveViewState, () => {
+        if (firstLoad) this.enterPage()
+        if (preserveViewState) this._restoreScrollPosition(preserveViewState)
+        this._pendingInitialViewState = null
+      }))
+    })
   } catch (error) {
     if (this._unloaded || this._pageVisible === false || requestId !== this._requestId) return
     const message = api.getErrorMessage(error)
@@ -664,7 +645,7 @@ if (wx.nextTick) wx.nextTick(reveal)
 else reveal()
 },
 _buildIndexPayload(options = {}) {
-  const config = FILTERS.find(item => item.id === this.data.filter) || FILTERS[0]
+  const config = FILTERS.find(item => item.id === (options.filter || this.data.filter)) || FILTERS[0]
   const query = normalizeSearchText(options.query != null ? options.query : (this.data.indexQuery || this.data.query))
   const dedicatedQuery = normalizeSearchText(options.dedicatedQuery != null ? options.dedicatedQuery : this.data.indexQuery)
   const indexScopeGroupKey = String(options.indexScopeGroupKey != null ? options.indexScopeGroupKey : (this.data.indexScopeGroupKey || ''))
@@ -784,33 +765,32 @@ const effectiveQuery = dedicatedQuery || normalizeSearchText(this.data.query)
 const payload = this._buildIndexPayload({ query: effectiveQuery, dedicatedQuery, indexScopeGroupKey: this.data.indexScopeGroupKey })
 this.setData(payload, () => { if (typeof callback === 'function') callback() })
 },
-applyView(resetCamera = false, callback) {
+applyView(resetCamera = false, callback, dataChanges = {}) {
   if (!this.data.subject) return
-  const config = FILTERS.find(item => item.id === this.data.filter) || FILTERS[0]
-  const query = normalizeSearchText(this.data.query)
+  const viewData = { ...this.data, ...dataChanges }
+  const config = FILTERS.find(item => item.id === viewData.filter) || FILTERS[0]
+  const query = normalizeSearchText(viewData.query)
   this._filteredGroups = buildFilteredKnowledgeGroups(this._groups, config, query)
   const availableGroups = this._filteredGroups.filter(group => group.matchCount > 0 && group.nodes.length)
-  const { activeGroupKey, activeFilteredGroup, focusNodeId } = this._resolveActiveGroup(availableGroups)
+  const { activeGroupKey, activeFilteredGroup, focusNodeId } = this._resolveActiveGroup(availableGroups, viewData)
   const scopedGroups = activeFilteredGroup ? [activeFilteredGroup] : availableGroups
   this._visibleNodes = scopedGroups.reduce((result, group) => result.concat(group.nodes), [])
   const sceneState = this._buildSceneState(availableGroups, activeGroupKey, focusNodeId)
   this._focusNodeId = sceneState.focusNodeId
   this._selectedId = sceneState.selectedId
   this._graphPage = sceneState.scene.page
-  const indexScopeGroupKey = this._resolveIndexScopeGroupKey(availableGroups)
+  const indexScopeGroupKey = this._resolveIndexScopeGroupKey(availableGroups, viewData)
   const groupChips = this._buildGroupChips()
-  const payload = this._buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, sceneState.scene, query)
+  const payload = { ...dataChanges, ...this._buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, sceneState.scene, query, viewData) }
   if (resetCamera && this._frame) {
     this._camera = fitCamera(this._frame)
   }
-  if (this._camera && this._frame) Object.assign(payload, this.cameraPayload(true, {}, sceneState.scene))
+  if (this._camera && this._frame) Object.assign(payload, this.cameraPayload(true, {}, sceneState.scene, true, !resetCamera))
   this._commitView(payload, callback)
 },
 
-_resolveActiveGroup(availableGroups) {
-  let indexScopeGroupKey = String(this.data.indexScopeGroupKey || '')
-  if (indexScopeGroupKey && !availableGroups.some(group => String(group.key) === indexScopeGroupKey)) indexScopeGroupKey = ''
-  let activeGroupKey = availableGroups.some(group => String(group.key) === String(this.data.activeGroupKey)) ? String(this.data.activeGroupKey) : ''
+_resolveActiveGroup(availableGroups, viewData = this.data) {
+  let activeGroupKey = availableGroups.some(group => String(group.key) === String(viewData.activeGroupKey)) ? String(viewData.activeGroupKey) : ''
   let activeFilteredGroup = activeGroupKey ? availableGroups.find(group => String(group.key) === activeGroupKey) : null
   let focusNodeId = 0
   if (activeFilteredGroup) {
@@ -857,8 +837,8 @@ _buildSceneState(availableGroups, activeGroupKey, focusNodeId) {
   return { scene, focusNodeId: focusNodeIdResolved, selectedId }
 },
 
-_resolveIndexScopeGroupKey(availableGroups) {
-  let indexScopeGroupKey = String(this.data.indexScopeGroupKey || '')
+_resolveIndexScopeGroupKey(availableGroups, viewData = this.data) {
+  let indexScopeGroupKey = String(viewData.indexScopeGroupKey || '')
   if (indexScopeGroupKey && !availableGroups.some(group => String(group.key) === indexScopeGroupKey)) indexScopeGroupKey = ''
   return indexScopeGroupKey
 },
@@ -888,16 +868,16 @@ _buildGroupChips() {
   })
 },
 
-_buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, scene, query) {
+_buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroups, scene, query, viewData = this.data) {
   const visibleById = new Map(this._visibleNodes.map(node => [Number(node.knowledge_point_id), node]))
   const selectedVisible = visibleById.get(Number(this._selectedId)) || null
   const selectedBase = this._nodeById && this._nodeById.get(Number(this._selectedId))
-  const quickGroupChips = buildQuickGroupChips(groupChips, activeGroupKey, this._recentGroupKeys)
-  const themeSheetGroups = groupChips.filter(group => themeSearchMatch(group, this.data.themeQuery))
+  const quickGroupChips = buildQuickGroupChips(groupChips)
+  const themeSheetGroups = groupChips.filter(group => themeSearchMatch(group, viewData.themeQuery))
   const activeGroup = groupChips.find(group => group.key === activeGroupKey)
   const searchResultCount = availableGroups.reduce((count, group) => count + Number(group.matchCount || 0), 0)
-  const effectiveIndexQuery = normalizeSearchText(this.data.indexQuery) || query
-  const indexPayload = this._buildIndexPayload({ query: effectiveIndexQuery, dedicatedQuery: normalizeSearchText(this.data.indexQuery), indexScopeGroupKey })
+  const effectiveIndexQuery = normalizeSearchText(viewData.indexQuery) || query
+  const indexPayload = this._buildIndexPayload({ query: effectiveIndexQuery, dedicatedQuery: normalizeSearchText(viewData.indexQuery), indexScopeGroupKey, filter: viewData.filter })
   const payload = {
     activeGroupKey,
     activeGroupName: activeGroup ? activeGroup.name : '',
@@ -907,7 +887,7 @@ _buildViewPayload(activeGroupKey, indexScopeGroupKey, groupChips, availableGroup
     quickGroupChips,
     themeGroupCount: groupChips.length,
     themeSheetGroups,
-    searchPending: normalizeSearchText(this.data.searchDraft) !== query,
+    searchPending: normalizeSearchText(viewData.searchDraft) !== query,
     searchResultCount,
     selectedPoint: selectedBase && selectedVisible ? { ...selectedBase, matchedAlias: selectedVisible.matchedAlias || '' } : null,
     ...indexPayload,
@@ -925,26 +905,17 @@ _commitView(payload, callback) {
   })
 },
 transitionLabelView(dataChanges = {}, callback) {
-clearTimeout(this._labelSwitchTimer)
 clearTimeout(this._themeTransitionTimer)
 this._cancelSelectionTransition(false)
-const startPayload = { ...dataChanges, themeSwitching: true, themeSwitchPhase: 'leaving', selectionSwitching: false, selectionSwitchPhase: '' }
-this.setData(startPayload, () => {
-this._labelSwitchTimer = setTimeout(() => {
-this._labelSwitchTimer = null
-if (this._unloaded || this._pageVisible === false) return
+// Commit scope and scene in one render. A delayed scope-first patch exposed an
+// old scene under the new selected theme and could swallow a quick return tap.
 this.applyView(false, () => {
-if (this._unloaded || this._pageVisible === false) return
-this.setData({ themeSwitchPhase: 'entering' }, () => {
 if (typeof callback === 'function') callback()
 this._themeTransitionTimer = setTimeout(() => {
 this._themeTransitionTimer = null
 if (!this._unloaded && this._pageVisible !== false) this.setData({ themeSwitching: false, themeSwitchPhase: '' })
 }, THEME_TRANSITION_MS)
-})
-})
-}, LABEL_SWITCH_OUT_MS)
-})
+}, { ...dataChanges, themeSwitching: true, themeSwitchPhase: 'entering' })
 },
 setFilter(event) {
 const filter = String(event.currentTarget.dataset.filter || 'all')
@@ -1281,10 +1252,11 @@ _scheduleSearchCommit(anchor, token, nextQuery, normalizedNext, oldHeight, oldFo
 },
 
 _commitSearchResult(anchor, token, nextQuery, normalizedNext, oldHeight, oldFootprint, options) {
+return this._afterGraphSettled(() => {
   if (this._unloaded || token !== this._indexSearchTransitionToken) return
   this._graphPage = 0
   this._indexLimit = INITIAL_INDEX_LIMIT
-  this.setData({
+  this.applyView(false, () => this._finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options), {
     query: nextQuery,
     activeGroupKey: '',
     indexScopeGroupKey: '',
@@ -1292,7 +1264,8 @@ _commitSearchResult(anchor, token, nextQuery, normalizedNext, oldHeight, oldFoot
     themeSheetClosing: false,
     themeSheetPendingKey: '__idle__',
     themeQuery: '',
-  }, () => this.applyView(false, () => this._finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options)))
+  })
+})
 },
 
 _finalizeSearchResult(anchor, token, normalizedNext, oldHeight, oldFootprint, options) {
@@ -1338,15 +1311,6 @@ this._graphPage = 0; this._indexLimit = INITIAL_INDEX_LIMIT; this._selectedId = 
 this.setData({ filter: 'all', query: '', searchDraft: '', searchPending: false, activeGroupKey: '', indexScopeGroupKey: '', themeSheetOpen: false, themeSheetClosing: false, themeSheetPendingKey: '__idle__', themeQuery: '' }, () => this.applyView(true))
 },
 chooseGroup(event) { this.openGroup(String(event.currentTarget.dataset.key || '')) },
-rememberGroup(key) {
-const normalized = String(key || '')
-if (!normalized) return
-const next = [normalized].concat(Array.isArray(this._recentGroupKeys) ? this._recentGroupKeys : [])
-.filter((item, index, list) => item && list.indexOf(item) === index)
-.slice(0, RECENT_THEME_LIMIT)
-this._recentGroupKeys = next
-try { if (this._recentGroupStorageKey) wx.setStorageSync(this._recentGroupStorageKey, next) } catch (error) { }
-},
 openGroup(key, callback) {
 const normalized = String(key || '')
 const targetGroup = normalized
@@ -1362,9 +1326,7 @@ if (normalized === this.data.activeGroupKey && Number(this._focusNodeId) === tar
 this._graphPage = 0; this._indexLimit = INITIAL_INDEX_LIMIT; this._selectedId = 0
 this._focusNodeId = targetFocusId
 if (targetFocusId) this._expandedNodeIds.add(targetFocusId)
-if (normalized) this.rememberGroup(normalized)
-const quickGroupChips = buildQuickGroupChips(this.data.groupChips, normalized, this._recentGroupKeys)
-this.transitionLabelView({ activeGroupKey: normalized, indexScopeGroupKey: normalized, quickGroupChips }, callback)
+this.transitionLabelView({ activeGroupKey: normalized, indexScopeGroupKey: normalized }, callback)
 },
 showOverview(callback) {
 this._focusNodeId = 0
@@ -1435,8 +1397,7 @@ this._selectedId = 0
 this._focusNodeId = nextFocusId
 const base = this._nodeById && this._nodeById.get(nextFocusId)
 ;(base && Array.isArray(base.pathIds) ? base.pathIds : [nextFocusId]).forEach(id => this._expandedNodeIds.add(Number(id)))
-const quickGroupChips = buildQuickGroupChips(this.data.groupChips, normalizedGroupKey, this._recentGroupKeys)
-this.transitionLabelView({ activeGroupKey: normalizedGroupKey, indexScopeGroupKey: normalizedGroupKey, quickGroupChips }, callback)
+this.transitionLabelView({ activeGroupKey: normalizedGroupKey, indexScopeGroupKey: normalizedGroupKey }, callback)
 },
 onGraphBreadcrumbTap(event) {
 const focusNodeId = Number(event.currentTarget.dataset.id) || 0
@@ -1915,13 +1876,17 @@ return
 }
 this._lastGraphTap = now
 },
-graphMotionModel(scene) {
+graphMotionModel(scene, preserveMotion = false) {
 const limits = cameraLimits(this._frame)
 const nodes = (scene && scene.nodes) || []
 const byId = new Map(nodes.map((node, index) => [node.id, index]))
 this._graphMotionSequence = 0
+const revision = this._graphMotionRevision = (this._graphMotionRevision || 0) + 1
+if (!preserveMotion || !this._graphMotionFloor) this._graphMotionFloor = revision
 return {
-revision: this._graphMotionRevision = (this._graphMotionRevision || 0) + 1,
+revision,
+gestureEpoch: this._graphGestureEpoch || 0,
+preserveMotion,
 active: !this._unloaded && this._pageVisible !== false,
 camera: { ...this._camera }, width: this._frame.width, height: this._frame.height,
 min: limits.min, max: limits.max,
@@ -1929,17 +1894,51 @@ nodes: nodes.map(node => ({ id: node.id, cx: node.cx, cy: node.cy, r: node.r }))
 edges: ((scene && scene.edges) || []).map(edge => ({ from: byId.get(edge.from), to: byId.get(edge.to) })),
 }
 },
+_afterGraphSettled(callback) {
+if (this._unloaded || this._pageVisible === false) return
+const model = this.data.graphMotionState
+if (!model || !model.active || !Array.isArray(model.nodes) || !model.nodes.length) return callback()
+return new Promise((resolve, reject) => {
+const pending = this._pendingGraphSettlements || (this._pendingGraphSettlements = [])
+pending.push({ callback, resolve, reject })
+const token = this._graphSettlementToken = (this._graphSettlementToken || 0) + 1
+this.setData({ graphSettlementToken: token })
+})
+},
+completeGraphSettlement(result) {
+if (!result || result.token !== this._graphSettlementToken || this._unloaded || this._pageVisible === false) return
+const pending = this._pendingGraphSettlements || []
+this._pendingGraphSettlements = []
+pending.forEach(task => {
+try { task.resolve(task.callback()) } catch (error) { task.reject(error) }
+})
+},
+_cancelGraphSettlements() {
+this._graphSettlementToken = (this._graphSettlementToken || 0) + 1
+const pending = this._pendingGraphSettlements || []
+this._pendingGraphSettlements = []
+pending.forEach(task => task.resolve())
+},
 cancelGraphMotion() {
 const model = this.data.graphMotionState
 this._graphMotionRevision = (this._graphMotionRevision || 0) + 1
+this._graphMotionFloor = this._graphMotionRevision
 if (model && !this._unloaded) this.setData({ graphMotionState: { ...model, active: false, revision: this._graphMotionRevision } })
 },
 commitGraphMotion(result) {
-if (this._unloaded || this._pageVisible === false || !result || result.revision !== this._graphMotionRevision) return
-if (!Number.isInteger(result.sequence) || result.sequence <= (this._graphMotionSequence || 0)) return
+if (this._unloaded || this._pageVisible === false || !result) return
+const currentRevision = result.revision === this._graphMotionRevision
+const epoch = Number.isInteger(result.gestureEpoch) ? result.gestureEpoch : 0
+// Preserving scene updates may overtake a queued gesture commit. Camera actions
+// advance the floor, so old scene commits can never undo a zoom, reset or resize.
+const newerCompatibleMotion = result.revision >= (this._graphMotionFloor || this._graphMotionRevision) &&
+result.revision < this._graphMotionRevision && epoch > (this._graphGestureEpoch || 0)
+if ((!currentRevision && !newerCompatibleMotion) || epoch < (this._graphGestureEpoch || 0)) return
+if (!Number.isInteger(result.sequence) || result.sequence < 1 || (currentRevision && result.sequence <= (this._graphMotionSequence || 0))) return
 const camera = result.camera
 if (!this._frame || !camera || ![camera.x, camera.y, camera.scale].every(Number.isFinite)) return
-this._graphMotionSequence = result.sequence
+if (currentRevision) this._graphMotionSequence = result.sequence
+this._graphGestureEpoch = epoch
 this._camera = clampCamera(camera, this._frame)
 const patch = {}
 const moved = result.node
@@ -1975,14 +1974,14 @@ this._frame = { left: rect.left, top: rect.top + (this._scrollTop || 0), width: 
 if (reset || changed) this.resetView()
 }).exec()
 },
-cameraPayload(includeMetrics = true, extra = {}, scene = this.data.scene, syncMotion = true) {
+cameraPayload(includeMetrics = true, extra = {}, scene = this.data.scene, syncMotion = true, preserveMotion = false) {
 if (!this._frame || !this._camera) return extra
 const nodes = (scene || {}).nodes
 const cache = this._cameraLabelCache
 const changed = !cache || cache.nodes !== nodes || cache.frame !== this._frame || cache.scale !== this._camera.scale
 const labels = changed ? labelDisplay(this._camera, this._frame, nodes) : cache.labels
 if (changed) this._cameraLabelCache = { nodes, frame: this._frame, scale: this._camera.scale, labels }
-const payload = { ...extra, ...(syncMotion ? { graphMotionState: this.graphMotionModel(scene) } : {}), graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
+const payload = { ...extra, ...(syncMotion ? { graphMotionState: this.graphMotionModel(scene, preserveMotion) } : {}), graphLabelMode: labels.graphLabelMode, graphLabelSize: labels.graphLabelSize,
 ...(changed ? { graphLabelVisibility: labels.graphLabelVisibility, graphLabelLayouts: labels.graphLabelLayouts } : {}), stageStyle: cameraStyle(this._camera) }
 if (!includeMetrics) return payload
 const fit = fitCamera(this._frame)

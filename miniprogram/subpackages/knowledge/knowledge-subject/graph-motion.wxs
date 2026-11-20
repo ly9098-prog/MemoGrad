@@ -93,6 +93,7 @@ function publish(owner, state) {
   owner.callMethod('commitGraphMotion', {
     revision: state.revision,
     sequence: state.sequence = (state.sequence || 0) + 1,
+    gestureEpoch: state.gestureEpoch || 0,
     camera: copyCamera(state.camera),
     node: state.changedNode ? {
       id: state.changedNode.id,
@@ -108,30 +109,56 @@ function settle(owner, state) {
 function sync(value, oldValue, owner) {
   if (!value) return;
   var state = owner.getState();
+  // A scene can cross the bridge while another drag has already started.
+  // Its acknowledged epoch cannot replace that newer view-layer interaction.
+  var keepMotion = value.preserveMotion && value.active && state.model && state.model.active &&
+    (state.gestureEpoch || 0) > (value.gestureEpoch || 0);
+  var gesture = keepMotion ? state.gesture : null;
+  var dragged = gesture && gesture.nodeIndex >= 0 ? state.nodes[gesture.nodeIndex] : null;
+  var changedNode = keepMotion ? state.changedNode : null;
   state.revision = value.revision;
   state.sequence = 0;
-  state.run = (state.run || 0) + 1;
+  if (!keepMotion) state.run = (state.run || 0) + 1;
+  state.gestureEpoch = math.max(state.gestureEpoch || 0, value.gestureEpoch || 0);
   state.model = value;
-  state.camera = copyCamera(value.camera);
-  state.gesture = null;
+  if (!keepMotion) state.camera = copyCamera(value.camera);
+  state.gesture = gesture;
   state.nodeIndex = -1;
   state.changedNode = null;
-  state.dirty = false;
+  if (!keepMotion) state.dirty = false;
   state.paintPending = false;
   state.geometryDirty = true;
   state.refreshComponents = true;
   state.nodes = [];
   for (var i = 0; i < value.nodes.length; i++) {
     var node = value.nodes[i];
-    state.nodes.push({
+    var nextNode = {
       id: node.id,
-      cx: node.cx,
-      cy: node.cy,
+      cx: changedNode && changedNode.id === node.id ? changedNode.cx : node.cx,
+      cy: changedNode && changedNode.id === node.id ? changedNode.cy : node.cy,
       r: node.r
-    });
+    };
+    state.nodes.push(nextNode);
+    if (changedNode && changedNode.id === node.id) state.changedNode = nextNode;
+    if (dragged && dragged.id === node.id) {
+      state.nodeIndex = i;
+      gesture.nodeIndex = i;
+    }
+  }
+  if (dragged && state.nodeIndex < 0) {
+    // Filtering may remove the dragged node; keep the camera, stop that drag.
+    state.gesture = null;
+    state.run = (state.run || 0) + 1;
   }
   components(owner, state);
-  if (state.viewport) state.viewport.removeClass('graph-interacting');
+  if (state.viewport) {
+    if (state.gesture) state.viewport.addClass('graph-interacting');
+    else state.viewport.removeClass('graph-interacting');
+  }
+  if (keepMotion) {
+    paint(state);
+    state.geometryDirty = true;
+  }
   if (value.active) queuePaint(owner, state);
 }
 function nodeStart(event, owner) {
@@ -158,6 +185,7 @@ function begin(event, owner, state) {
   var camera = copyCamera(state.camera);
   var node = state.nodeIndex >= 0 ? state.nodes[state.nodeIndex] : null;
   state.run = (state.run || 0) + 1;
+  state.gestureEpoch = (state.gestureEpoch || 0) + 1;
   state.gesture = {
     rect: rect,
     first: first,
@@ -296,6 +324,39 @@ function control(event, owner) {
   if (data.step) owner.callMethod('zoomGraph', { currentTarget: { dataset: data } });
   else owner.callMethod('resetView', {});
 }
+// Controls outside the canvas must also flush its view-layer camera before
+// replacing a scene. Otherwise an unfinished fling rewinds to the last JS ACK.
+function action(event, owner) {
+  var data = event.currentTarget.dataset;
+  var allowed = {
+    chooseGroup: true, showOverview: true, setFilter: true, resetFilters: true,
+    openThemeSheet: true, onGraphNodeTap: true, changeGraphPage: true,
+    handleIndexRowTap: true, handleIndexActionTap: true,
+    focusSearch: true, focusIndexSearch: true
+  };
+  if (!allowed[data.graphAction]) return;
+  var state = owner.getState();
+  if (state.model && state.model.active) {
+    state.run = (state.run || 0) + 1;
+    state.gesture = null;
+    state.nodeIndex = -1;
+    paint(state);
+    settle(owner, state);
+  }
+  owner.callMethod(data.graphAction, { currentTarget: { dataset: data } });
+}
+function flush(token, oldToken, owner) {
+  if (!token || token === oldToken) return;
+  var state = owner.getState();
+  if (state.model && state.model.active) {
+    state.run = (state.run || 0) + 1;
+    state.gesture = null;
+    state.nodeIndex = -1;
+    paint(state);
+    settle(owner, state);
+  }
+  owner.callMethod('completeGraphSettlement', { token: token });
+}
 module.exports = {
   sync: sync,
   nodeStart: nodeStart,
@@ -303,5 +364,7 @@ module.exports = {
   move: move,
   end: end,
   tap: tap,
-  control: control
+  control: control,
+  action: action,
+  flush: flush
 };

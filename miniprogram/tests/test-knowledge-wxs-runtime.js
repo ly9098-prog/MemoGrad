@@ -75,7 +75,7 @@ test('native-compiled graph WXS loads and pans without invented runtime globals'
   motion.nv_end(event(null, null, 'touchcancel'), owner)
   assert.deepEqual(calls, [{
     name: 'commitGraphMotion',
-    args: { revision: 1, sequence: 1, camera: { x: -75, y: -115, scale: 0.8 }, node: null },
+    args: { revision: 1, sequence: 1, gestureEpoch: 1, camera: { x: -75, y: -115, scale: 0.8 }, node: null },
   }])
   assert.match(styles.at(-1).transform, /translate3d\(-75px,-115px,0\)/)
 })

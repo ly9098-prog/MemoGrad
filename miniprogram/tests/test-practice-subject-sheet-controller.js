@@ -144,6 +144,8 @@ function sheetHarness() {
       { subject_id: 70, subject_code: 'exam408', display_name: '计算机综合', children: [
         { subject_id: 71, display_name: '数据结构', children: [{ subject_id: 72, display_name: '线性表' }] },
         { subject_id: 73, display_name: '操作系统' },
+        { subject_id: 74, display_name: '计算机组成原理' },
+        { subject_id: 75, display_name: '计算机网络' },
       ] },
     ]),
     data: {}, writes: [], selections: [], timers: [],
@@ -213,12 +215,15 @@ test('cross-discipline swipe prevents confirmation until a subject on the curren
 test('browsing a subject never selects all; only explicit scope staging plus confirmation commits', () => {
   const { state, controller } = sheetHarness()
   controller.browse(70)
+  assert.equal(state.data.subjectSheetPages[1].grid_rows, 2, 'four subjects use the compact two-row height')
   controller.chooseCard(71)
   assert.equal(state.data.subjectSheetPages[1].node_id, 71)
+  assert.equal(state.data.subjectSheetPages[1].grid_rows, 1, 'a nested page shrinks to its direct child rows')
   assert.equal(state.data.subjectSheetDraft.subject_id, 72)
   assert.deepEqual(state.selections, [])
   controller.browse(state.data.subjectSheetPages[1].back_id)
   assert.equal(state.data.subjectSheetPages[1].node_id, 70)
+  assert.equal(state.data.subjectSheetPages[1].grid_rows, 2)
   assert.equal(state.data.subjectSheetDraft.subject_id, 72, 'returning preserves the draft')
   controller.chooseCard(71)
   controller.stage(71)
@@ -328,7 +333,7 @@ for (const guestMode of [false, true]) {
   })
 }
 
-test('sheet keeps native swiping, a compact title action and square text options without repeated copy', () => {
+test('sheet keeps native swiping, compact text options and image controls without repeated copy', () => {
   const fs = require('node:fs'), path = require('node:path')
   const root = path.resolve(__dirname, '../subpackages/study/practice')
   const wxml = fs.readFileSync(path.join(root, 'practice.wxml'), 'utf8')
@@ -343,16 +348,68 @@ test('sheet keeps native swiping, a compact title action and square text options
   assert.ok(!/subject-discipline-hint|subject-sheet-selection|左右滑动切换学科/.test(sheetMarkup))
   assert.match(sheetMarkup, /class="subject-discipline-dots" wx:if="\{\{subjectSheetPages.length > 1\}\}"/)
   assert.match(sheetMarkup, /subject-sheet-rows-\{\{subjectSheetPages\[subjectSheetCurrent\].grid_rows/)
+  assert.ok(!/line-icon|icon-chevron|icon-close/.test(sheetMarkup), 'sheet controls use the shared SVG images')
   assert.match(css, /\.subject-options-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
-  assert.match(css, /\.subject-option\{[^}]*min-height:288rpx/)
-  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:calc\([^}]*max-height:82vh/)
+  assert.match(css, /\.subject-option\{[^}]*min-height:64px[^}]*background:transparent/)
+  assert.match(css, /\.subject-sheet-layer \.subject-sheet\{[^}]*width:100%;height:auto;max-height:74vh/)
   assert.match(css, /\.subject-sheet \.subject-discipline-scroll\{[^}]*height:100%;width:100%/)
   assert.match(css, /\.subject-sheet \.sheet-close\{[^}]*width:44px;height:44px/)
+  assert.match(css, /\.subject-discipline-heading\{[^}]*min-height:44px/)
+  assert.match(css, /\.subject-sheet-confirm\{[^}]*width:auto;min-width:144px;max-width:100%;min-height:44px/)
   assert.match(css, /\.subject-scope-option\{[^}]*display:inline-flex[^}]*min-width:44px;min-height:44px[^}]*background:transparent/)
   assert.match(css, /\.subject-empty-hint\{[^}]*font-size:max\(24rpx,12px\)/)
   for (const selector of ['subject-option-name', 'subject-sheet-confirm']) {
     assert.ok(new RegExp(`\\.${selector}\\{[^}]*font-size:max\\(28rpx,14px\\)`).test(css),
       `${selector} remains at least 14px on narrow devices`)
+  }
+})
+
+test('two-row sheet stays within the compact height budget including safe area and readable 408 labels', () => {
+  const fs = require('node:fs'), path = require('node:path')
+  const css = fs.readFileSync(path.resolve(__dirname, '../subpackages/study/practice/practice.wxss'), 'utf8')
+  const rule = selector => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = css.match(new RegExp(escaped + '\\{([^}]*)\\}'))
+    assert.ok(match, selector)
+    return Object.fromEntries(match[1].split(';').filter(Boolean).map(declaration => declaration.split(':')))
+  }
+  const px = value => {
+    assert.match(value, /^\d+(?:\.\d+)?px$/)
+    return parseFloat(value)
+  }
+  const surface = rule('.subject-sheet-layer .subject-sheet')
+  const padding = surface.padding.match(/^(\d+)px (\d+)px max\((\d+)px,env\(safe-area-inset-bottom\)\)$/)
+  assert.ok(padding, 'bottom padding uses the larger of ordinary spacing and the safe area, never their sum')
+  assert.equal(surface.height, 'auto', 'the Drawer has no reserved empty height')
+  assert.equal(surface['box-shadow'], 'none')
+  assert.equal(rule('.subject-sheet .sheet-handle').position, 'absolute', 'handle shares top padding instead of adding a separate row')
+  const header = px(rule('.subject-sheet .sheet-header')['min-height'])
+  const twoRows = px(rule('.subject-sheet.subject-sheet-rows-2 .subject-discipline-swiper').height)
+  const oneRow = px(rule('.subject-sheet.subject-sheet-rows-1 .subject-discipline-swiper').height)
+  const item = rule('.subject-option')
+  const gap = px(rule('.subject-options-grid').gap)
+  const heading = rule('.subject-discipline-heading')
+  assert.equal(twoRows, px(heading['min-height']) + px(heading['margin-bottom']) + 2 * px(item['min-height']) + gap,
+    'native viewport fits the heading and two option rows without extra whitespace')
+  assert.equal(twoRows - oneRow, px(item['min-height']) + gap, 'one-row branches release the unused option row')
+  const dots = rule('.subject-discipline-dots')
+  const footer = rule('.subject-sheet-footer')
+  const confirm = rule('.subject-sheet-confirm')
+  assert.ok(header >= 44 && px(heading['min-height']) >= 44 && px(confirm['min-height']) >= 44)
+  for (const safeArea of [0, 34]) {
+    const height = Number(padding[1]) + header + twoRows + px(dots['min-height']) + px(dots['margin-top']) +
+      px(footer['padding-top']) + px(confirm['min-height']) + parseFloat(surface['border-top']) + Math.max(Number(padding[3]), safeArea)
+    assert.ok(height >= 300 && height <= 330, `sheet including ${safeArea}px safe area: ${height}px`)
+    assert.ok(height <= 568 * .74, 'short screens retain the footer outside the scroll viewport')
+  }
+  const itemPadding = item.padding.split(' ').map(px)
+  for (const width of [320, 390, 430]) {
+    const tileWidth = (width - 2 * Number(padding[2]) - gap) / 2
+    const textWidth = tileWidth - 2 * itemPadding[1] - 2 * parseFloat(item.border)
+    const fontSize = Math.max(28 * width / 750, 14)
+    const lines = Math.ceil(Array.from('计算机组成原理').length * fontSize / textWidth)
+    assert.ok(lines * fontSize * 1.5 + 2 * itemPadding[0] + 2 * parseFloat(item.border) <= px(item['min-height']),
+      `longest 408 label fits a compact option at ${width}px without shrinking the text`)
   }
 })
 
@@ -380,6 +437,11 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   assert.equal(byClass(many, 'subject-discipline-item').length, 4)
   const computer = byClass(many, 'subject-discipline-item')[0]
   assert.equal(byClass(computer, 'subject-option').length, 4)
+  assert.equal(byClass(computer, 'subject-option').filter(option => option.attr.ariaPressed).length, 1,
+    'single-selection toggles expose only the staged option as pressed')
+  assert.ok(byClass(computer, 'subject-option').every(option => option.attr.ariaRole === 'button'))
+  assert.ok(byClass(many, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-2'))
+  assert.equal(byClass(many, 'sheet-close-icon')[0].attr.src, '/assets/icons/mobile-controls/x.svg')
   assert.equal(byClass(computer, 'subject-option-icon').length, 0)
   assert.equal(byClass(byClass(computer, 'subject-discipline-heading')[0], 'subject-scope-option').length, 1)
   assert.equal(text(byClass(computer, 'subject-scope-option')[0]), '选整科')
@@ -388,6 +450,7 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   assert.equal(text(byClass(many, 'subject-sheet-footer')[0]), '确定选择')
   assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.ariaLabel, '确认选择数据结构')
   assert.equal(byClass(many, 'subject-option-check').length, 1)
+  assert.equal(byClass(many, 'subject-option-check')[0].attr.src, '/assets/icons/practice-subject/check.svg')
   assert.equal(byClass(many, 'subject-sheet-confirm')[0].attr.disabled, false)
   const swiped = render({ ...base, ...buildSubjectSheetView(catalog, 71), subjectSheetCurrent: 1, subjectSheetDraft: null })
   assert.equal(byClass(swiped, 'subject-sheet-confirm')[0].attr.disabled, true,
@@ -395,20 +458,77 @@ test('compiled sheet retains circular/one-page behavior, enabled grids, draft co
   const single = render({ ...base, ...buildSubjectSheetView(catalog.slice(0, 1), 70) })
   assert.equal(byClass(single, 'subject-discipline-swiper')[0].attr.circular, false)
   assert.equal(byClass(single, 'subject-discipline-dots').length, 0)
+  assert.equal(byClass(single, 'subject-scope-check')[0].attr.src, '/assets/icons/practice-subject/check.svg')
+  assert.equal(byClass(single, 'subject-option').filter(option => option.attr.ariaPressed).length, 0,
+    'selecting the whole discipline never marks an individual option')
+  const fresh = render({ ...base, ...buildSubjectSheetView(catalog) })
+  assert.equal(byClass(fresh, 'subject-discipline-swiper')[0].attr.current, 0, 'fresh selection still opens the canonical 408 discipline')
+  assert.equal(byClass(fresh, 'subject-option').filter(option => option.attr.ariaPressed).length, 0)
+  assert.equal(byClass(fresh, 'subject-sheet-confirm')[0].attr.disabled, true, 'browsing the default discipline does not stage it')
   const rawBranch = subjectCatalogFixture()
   rawBranch[1].children[0].children = [{ subject_id: 83, display_name: '微积分', children: [] }]
-  const branchView = buildSubjectSheetView(tree.normalizeSubjectTree(rawBranch), 83)
+  const branchCatalog = tree.normalizeSubjectTree(rawBranch)
+  const parent = render({ ...base, ...buildSubjectSheetView(branchCatalog, 80) })
+  assert.equal(byClass(parent, 'subject-option-arrow')[0].attr.src, '/assets/icons/mobile-controls/chevron-right.svg')
+  const branchView = buildSubjectSheetView(branchCatalog, 83)
   const branch = render({ ...base, ...branchView })
   const math = byClass(branch, 'subject-discipline-item')[branchView.subjectSheetCurrent]
+  assert.ok(byClass(branch, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-1'))
   assert.equal(text(byClass(math, 'subject-discipline-title')[0]), '高等数学')
   assert.equal(byClass(math, 'subject-branch-back')[0].attr['data-subject-id'], 80)
+  assert.equal(byClass(math, 'subject-branch-icon')[0].attr.src, '/assets/icons/mobile-controls/chevron-left.svg')
   assert.equal(text(byClass(math, 'subject-scope-option')[0]), '选全部')
   assert.equal(text(byClass(math, 'subject-option-name')[0]), '微积分')
+  const longName = '计算机系统与网络综合专项练习科目'
+  const rawLong = [{ subject_id: 70, subject_code: 'exam408', display_name: '计算机综合', children: [
+    { subject_id: 7000, display_name: '已停用科目', is_active: false },
+    ...Array.from({ length: 9 }, (_, i) => ({ subject_id: 7001 + i, display_name: `${longName}${i}` })),
+  ] }]
+  const long = render({ ...base, ...buildSubjectSheetView(tree.normalizeSubjectTree(rawLong), 7009) })
+  assert.ok(byClass(long, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-2'))
+  assert.equal(byClass(long, 'subject-discipline-scroll')[0].attr.scrollY, true)
+  assert.equal(byClass(long, 'subject-option').length, 9, 'compact height never truncates the subject tree')
+  assert.equal(byClass(long, 'subject-option').at(-1).attr['data-subject-id'], 7009)
+  assert.equal(text(byClass(long, 'subject-option-name').at(-1)), `${longName}8`)
+  assert.ok(!text(long).includes('已停用科目'))
   const leaf = render({ ...base, ...buildSubjectSheetView(catalog.slice(2, 3), 90) })
   assert.equal(text(byClass(leaf, 'subject-scope-option')[0]), '选择')
   assert.equal(byClass(leaf, 'subject-options-grid').length, 0)
   const empty = render({ ...base, ...buildSubjectSheetView([]) })
+  assert.ok(byClass(empty, 'subject-sheet')[0].attr.class.includes('subject-sheet-rows-0'))
   assert.equal(byClass(empty, 'subject-discipline-swiper').length, 0)
   assert.equal(byClass(empty, 'subject-empty').length, 1)
   assert.equal(byClass(empty, 'subject-sheet-confirm')[0].attr.disabled, true)
+
+  for (const selectedMode of ['random', 'sequential', 'smart']) {
+    for (const count of [5, 10, 20, 30]) {
+      const settings = render({ ...base, subjectSheetVisible: false, settingsExpanded: true, selectedMode, count })
+      const marks = byClass(settings, 'setting-check-icon')
+      assert.equal(marks.length, 2, 'only the selected mode and count receive a check')
+      assert.ok(marks.every(mark => mark.attr.src === '/assets/icons/mobile-controls/check.svg'))
+      const activeMode = byClass(settings, 'mode-card').find(card => card.attr.class.split(/\s+/).includes('active'))
+      const activeCount = byClass(settings, 'count-btn').find(card => card.attr.class.split(/\s+/).includes('active'))
+      assert.equal(activeMode.attr['data-mode'], selectedMode)
+      assert.equal(Number(activeCount.attr['data-count']), count)
+      assert.equal(byClass(activeMode, 'setting-check-icon').length, 1)
+      assert.equal(byClass(activeCount, 'setting-check-icon').length, 1)
+      assert.equal(activeMode.attr.bindtap, 'chooseMode')
+      assert.equal(activeCount.attr.bindtap, 'setCount')
+      assert.equal(byClass(settings, 'hero-chevron-image').length, 2)
+      assert.ok(byClass(settings, 'hero-chevron-image').every(icon => icon.attr.src === '/assets/icons/mobile-controls/chevron-right.svg'))
+      assert.equal(byClass(settings, 'config-chevron')[0].attr.src, '/assets/icons/mobile-controls/chevron-down.svg')
+      assert.ok(byClass(settings, 'config-chevron')[0].attr.class.includes('up'))
+      assert.ok(byClass(settings, 'panel-collapse-arrow')[0].attr.class.includes('up'))
+    }
+  }
+  const guest = render({ ...base, subjectSheetVisible: false, settingsExpanded: true, guestMode: true, selectedMode: 'random', count: 5 })
+  assert.equal(byClass(guest, 'mode-card-locked').length, 2)
+  assert.ok(byClass(guest, 'mode-card-locked').every(card => !card.attr.bindtap))
+  assert.ok(byClass(guest, 'mode-lock').every(icon => icon.attr.src === '/assets/icons/lock.svg'), 'existing guest lock images remain')
+  const collapsed = render({ ...base, subjectSheetVisible: false, settingsExpanded: false })
+  assert.equal(byClass(collapsed, 'panel-collapse-arrow').length, 0)
+  assert.ok(!byClass(collapsed, 'config-chevron')[0].attr.class.includes('up'))
+  const error = render({ ...base, subjectSheetVisible: false, errorText: '科目加载失败' })
+  assert.equal(byClass(error, 'setup-error-icon')[0].attr.src, '/assets/icons/mobile-controls/circle-exclamation-point.svg')
+  assert.equal(byClass(error, 'setup-error-retry')[0].attr.bindtap, 'startPractice')
 })

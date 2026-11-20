@@ -409,7 +409,8 @@ jobs:
             miniprogram/tests/test-knowledge-map-request-contract.js \
             miniprogram/tests/test-knowledge-view-motion.js \
             miniprogram/tests/test-knowledge-wxs-runtime.js \
-            miniprogram/tests/test-formula-flip.js
+            miniprogram/tests/test-formula-flip.js \
+            miniprogram/tests/test-formula-library-switch.js
           node miniprogram/tests/test-formula-reader-layout.js
           node --test miniprogram/tests/test-home-login-guide.js
           node --test \

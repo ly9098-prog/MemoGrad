@@ -63,7 +63,7 @@ async function withPage(kind, run) {
         _detailRequests: Object.create(null), _switchToken: 0,
       })
     }
-    await run({ page, api, sync, calls, timers })
+    await run({ page, definition, api, sync, calls, timers })
   } finally {
     if (originals) {
       ;[api.get, api.getErrorMessage, sync.getForSubject, sync.resolveReceipt, sync.remove] = originals
@@ -152,6 +152,29 @@ test('subject pending receipts clear only when the direct counter resolves them'
   })
 })
 
+test('background map refresh preserves the pending search draft and its debounce', async () => {
+  await withPage('subject', async ({ page, api, timers }) => {
+    page._loadedOnce = true
+    page.data.subject = mapPayload('current').subject
+    const response = deferred()
+    api.get = () => response.promise
+    const loading = page.loadMap()
+    page.focusSearch()
+    page.searchPoints({ detail: { value: 'A' } })
+    response.resolve(mapPayload('updated'))
+    await loading
+    assert.equal(page.data.searchDraft, 'A')
+    assert.equal(page.data.searchFocused, true)
+    assert.equal(page.data.searchPending, true)
+    const [id, task] = [...timers].find(([, task]) => task.delay === 300)
+    let appliedQuery
+    page._commitSearchQuery = value => { appliedQuery = value }
+    timers.delete(id)
+    task.callback()
+    assert.equal(appliedQuery, 'A', 'the typed query still reaches the existing debounce')
+  })
+})
+
 test('subject hide and unload cancel a pending branch transition', async () => {
   await withPage('subject', async ({ page, timers }) => {
     page.data.subject = { subject_id: 10, subject_name: '操作系统' }
@@ -167,6 +190,70 @@ test('subject hide and unload cancel a pending branch transition', async () => {
     assert.ok(unloadTimer)
     page.onUnload()
     assert.equal(timers.has(unloadTimer), false)
+  })
+})
+
+test('hiding during theme-sheet closing releases its mask and permits reopening', async () => {
+  await withPage('subject', async ({ page, timers }) => {
+    page.openThemeSheet()
+    page.chooseThemeFromSheet({ currentTarget: { dataset: { key: 'chapter-2' } } })
+    const [id, task] = [...timers].find(([, task]) => task.delay === 96)
+    timers.delete(id); task.callback()
+    assert.equal(page.data.themeSheetClosing, true)
+    page.onHide()
+    page._pageVisible = true
+    assert.equal(page.data.themeSheetOpen, false)
+    assert.equal(page.data.themeSheetClosing, false)
+    assert.equal(page.data.themeSheetPendingKey, '__idle__')
+    page.openThemeSheet()
+    page.closeThemeSheet()
+    assert.equal(page.data.themeSheetClosing, true)
+    assert.ok([...timers.values()].some(task => task.delay === 236))
+  })
+})
+
+function installSubjectView(page, definition) {
+  page.applyView = definition.applyView
+  page.data.subject = { subject_id: 10, subject_name: '计算机组成原理' }
+  page._groups = ['计算机系统概述', '数据的表示和运算', '存储系统', '指令系统', '中央处理器', '总线'].map((name, index) => {
+    const id = index * 100 + 1
+    const root = { knowledge_point_id: id, name, parentId: 0, hasChildren: true, status: 'good', pathIds: [id] }
+    const leaf = { knowledge_point_id: id + 1, name: `${name}考点`, parentId: id, hasChildren: false, status: 'good', pathIds: [id, id + 1] }
+    return { key: `chapter-${index}`, rootId: id, name, nodes: [root, leaf], rootNode: root, descendantCount: 1 }
+  })
+  page._buildNodeById()
+  page.applyView(false)
+}
+
+test('visiting themes keeps quick theme positions in syllabus order', async () => {
+  await withPage('subject', async ({ page, definition, timers }) => {
+    installSubjectView(page, definition)
+    const order = page.data.quickGroupChips.map(chip => chip.key)
+    assert.deepEqual(order, page._groups.slice(0, 5).map(group => group.key))
+    for (const key of ['chapter-4', 'chapter-2', 'chapter-5', '']) {
+      page.openGroup(key)
+      for (const [id, task] of [...timers]) { timers.delete(id); task.callback() }
+      assert.deepEqual(page.data.quickGroupChips.map(chip => chip.key), order, `theme visit ${key} must not move tap targets`)
+    }
+  })
+})
+
+test('rapid theme changes publish scope, title, nodes and index together', async () => {
+  await withPage('subject', async ({ page, definition, calls, timers }) => {
+    installSubjectView(page, definition)
+    calls.patches.length = 0
+    page.openGroup('chapter-2')
+    page.openGroup('chapter-4')
+    page.showOverview()
+    for (const [id, task] of [...timers]) { timers.delete(id); task.callback() }
+    for (const patch of calls.patches.filter(patch => 'activeGroupKey' in patch)) {
+      assert.ok(patch.scene, 'a scope must never appear with the previous scene')
+      assert.equal(patch.scene.groupKey || '', patch.activeGroupKey)
+      assert.equal(patch.indexScopeGroupKey, patch.activeGroupKey)
+      assert.equal(patch.activeGroupName, patch.activeGroupKey ? page._groups.find(group => group.key === patch.activeGroupKey).name : '')
+    }
+    assert.equal(page.data.activeGroupKey, '')
+    assert.equal(page.data.scene.focused, false)
   })
 })
 

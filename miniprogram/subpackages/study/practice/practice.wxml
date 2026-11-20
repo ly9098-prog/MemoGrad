@@ -23,7 +23,7 @@
 <premium-nav title="刷题" variant="mint" fixed="{{false}}" bind:back="goBack" />
 <scroll-view class="setup-scroll" scroll-y enhanced show-scrollbar="{{true}}" bounces="{{false}}">
 <view class="setup-error-card" wx:if="{{errorText}}">
-<text class="setup-error-icon line-icon icon-exclamation" aria-hidden="true"></text>
+<image class="setup-error-icon" src="/assets/icons/mobile-controls/circle-exclamation-point.svg" mode="aspectFit" aria-hidden="true" />
 <text class="setup-error-text">{{errorText}}</text>
 <button class="setup-error-retry" bindtap="startPractice">{{guestMode ? '重新加载科目' : '重试'}}</button>
 </view>
@@ -33,7 +33,7 @@
 <view class="hero-head">
 <view class="hero-subject-action" hover-class="soft-pressed" bindtap="openSubjectSheet">
 <text class="hero-subject">{{selectedSubjectName || '选择科目'}}</text>
-<text class="hero-subject-arrow line-icon icon-chevron-right" aria-hidden="true"></text>
+<view class="hero-subject-arrow"><image class="hero-chevron-image" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="hero-mode"><image src="/assets/icons/practice/{{selectedMode === 'sequential' ? 'list-ordered' : (selectedMode === 'smart' ? 'target' : 'shuffle')}}.svg" mode="aspectFit" aria-hidden="true" /><text>{{selectedModeLabel}}</text></view>
 </view>
@@ -61,13 +61,13 @@
           bindtap="startPractice"
         >
 <text>{{selectedSubjectId ? '开始本组练习' : '请先选择科目'}}</text>
-<view class="hero-start-arrow"><text class="line-icon icon-chevron-right" aria-hidden="true"></text></view>
+<view class="hero-start-arrow"><image class="hero-chevron-image" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></view>
 </button>
 <view class="hero-config" hover-class="soft-pressed" bindtap="toggleSettings">
 <text class="hero-config-text">练习设置</text>
 <view class="hero-config-edit">
 <text>{{settingsExpanded ? '收起' : '调整'}}</text>
-<text class="config-chevron line-icon icon-chevron-down {{settingsExpanded ? 'up' : ''}}" aria-hidden="true"></text>
+<image class="config-chevron {{settingsExpanded ? 'up' : ''}}" src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 </view>
 </view>
@@ -77,7 +77,7 @@
 <text class="panel-title">练习设置</text>
 </view>
 <view class="panel-collapse" hover-class="soft-pressed" bindtap="toggleSettings">
-<text>收起</text><text class="panel-collapse-arrow line-icon icon-chevron-down up" aria-hidden="true"></text>
+<text>收起</text><image class="panel-collapse-arrow up" src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 </view>
 <view class="setting-block">
@@ -90,21 +90,21 @@
 <image class="mode-icon-image" src="/assets/icons/practice/shuffle.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">随机挑战</text>
 <text class="mode-desc">综合查漏</text>
-<view class="option-check" wx:if="{{selectedMode==='random'}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check" wx:if="{{selectedMode==='random'}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="mode-card {{guestMode ? 'mode-card-locked' : (selectedMode==='sequential' ? 'active' : '')}}" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="sequential" aria-disabled="{{guestMode}}">
 <image class="mode-icon-image" src="/assets/icons/practice/list-ordered.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">顺序推进</text>
 <text class="mode-desc">按题库顺序续刷</text>
 <image class="mode-lock" wx:if="{{guestMode}}" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
-<view class="option-check" wx:if="{{!guestMode && selectedMode==='sequential'}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check" wx:if="{{!guestMode && selectedMode==='sequential'}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="mode-card {{guestMode ? 'mode-card-locked' : (selectedMode==='smart' ? 'active' : '')}}" hover-class="{{guestMode ? '' : 'option-pressed'}}" bindtap="{{guestMode ? '' : 'chooseMode'}}" data-mode="smart" aria-disabled="{{guestMode}}">
 <image class="mode-icon-image" src="/assets/icons/practice/target.svg" mode="aspectFit" aria-hidden="true"></image>
 <text class="mode-title">智能推荐</text>
 <text class="mode-desc">薄弱优先</text>
 <image class="mode-lock" wx:if="{{guestMode}}" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
-<view class="option-check" wx:if="{{!guestMode && selectedMode==='smart'}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check" wx:if="{{!guestMode && selectedMode==='smart'}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 </view>
 <text class="guest-mode-note" wx:if="{{guestMode}}">顺序推进和智能推荐依赖个人练习数据，登录后可用。</text>
@@ -117,19 +117,19 @@
 <view class="count-row">
 <view class="count-btn {{count===5 ? 'active' : ''}}" hover-class="option-pressed" bindtap="setCount" data-count="5">
 <text class="count-main">5题</text><text class="count-time">约10分钟</text>
-<view class="option-check count-check" wx:if="{{count===5}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check count-check" wx:if="{{count===5}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="count-btn {{count===10 ? 'active' : ''}}" hover-class="option-pressed" bindtap="setCount" data-count="10">
 <text class="count-main">10题</text><text class="count-time">约20分钟</text>
-<view class="option-check count-check" wx:if="{{count===10}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check count-check" wx:if="{{count===10}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="count-btn {{count===20 ? 'active' : ''}}" hover-class="option-pressed" bindtap="setCount" data-count="20">
 <text class="count-main">20题</text><text class="count-time">约40分钟</text>
-<view class="option-check count-check" wx:if="{{count===20}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check count-check" wx:if="{{count===20}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="count-btn {{count===30 ? 'active' : ''}}" hover-class="option-pressed" bindtap="setCount" data-count="30">
 <text class="count-main">30题</text><text class="count-time">约60分钟</text>
-<view class="option-check count-check" wx:if="{{count===30}}"><text class="setting-check-icon line-icon icon-check" aria-hidden="true"></text></view>
+<view class="option-check count-check" wx:if="{{count===30}}"><image class="setting-check-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 </view>
 </view>
@@ -140,7 +140,7 @@
 <text class="surface-title">最近使用科目</text>
 </view>
 <view class="surface-action" hover-class="soft-pressed" bindtap="openSubjectSheet">
-<text>科目</text><text class="line-icon icon-chevron-right surface-action-arrow" aria-hidden="true"></text>
+<text>科目</text><image class="surface-action-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 </view>
 <scroll-view scroll-x enhanced enable-flex bounces="{{false}}" show-scrollbar="{{false}}" class="recent-scroll">
@@ -179,12 +179,12 @@
 <view class="subject-sheet-layer {{subjectSheetClosing ? 'closing' : ''}}" wx:if="{{subjectSheetVisible}}">
 <view class="subject-sheet-backdrop" catchtap="closeSubjectSheet" catchtouchmove="noop"></view>
 <view class="subject-sheet subject-sheet-rows-{{subjectSheetPages[subjectSheetCurrent].grid_rows || 0}}" catchtap="noop">
-<view class="sheet-handle"></view>
+<view class="sheet-handle" aria-hidden="true"></view>
 <view class="sheet-header">
 <view>
 <text class="sheet-title">选择科目</text>
 </view>
-<view class="sheet-close" aria-role="button" aria-label="取消选科" hover-class="soft-pressed" catchtap="closeSubjectSheet"><text class="line-icon icon-close" aria-hidden="true"></text></view>
+<view class="sheet-close" aria-role="button" aria-label="取消选科" hover-class="soft-pressed" catchtap="closeSubjectSheet"><image class="sheet-close-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="subject-empty" wx:if="{{!subjectSheetPages || subjectSheetPages.length === 0}}">
 <text class="subject-empty-text">暂无可练习科目</text>
@@ -196,7 +196,7 @@
 <view class="subject-discipline-page">
 <view class="subject-discipline-heading">
 <view wx:if="{{!discipline.is_root}}" class="subject-branch-back" aria-role="button" aria-label="返回上级科目" hover-class="soft-pressed" catchtap="toggleParentExpansion" data-subject-id="{{discipline.back_id}}">
-<text class="line-icon icon-chevron-right" aria-hidden="true"></text>
+<image class="subject-branch-icon" src="/assets/icons/mobile-controls/chevron-left.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 <text class="subject-discipline-title">{{discipline.is_root ? discipline.root_name : discipline.node_name}}</text>
 <view class="subject-scope-option {{subjectSheetDraft.subject_id === discipline.node_id ? 'active' : ''}}" aria-role="button" aria-label="{{discipline.has_children ? '选择' + discipline.node_name + '全部科目' : '选择' + discipline.node_name}}" aria-pressed="{{subjectSheetDraft.subject_id === discipline.node_id}}" hover-class="subject-scope-pressed" catchtap="chooseParentSubject" data-subject-id="{{discipline.node_id}}">
@@ -207,7 +207,7 @@
 <view class="subject-options-grid" wx:if="{{discipline.options.length}}">
 <view wx:for="{{discipline.options}}" wx:for-item="subject" wx:key="subject_id" class="subject-option {{subjectSheetDraft.subject_id === subject.subject_id ? 'active' : ''}}" aria-role="button" aria-label="{{subject.display_name}}，{{subject.has_children ? '查看下级科目' : '选择科目'}}" aria-pressed="{{subjectSheetDraft.subject_id === subject.subject_id}}" hover-class="subject-option-pressed" catchtap="chooseChildSubject" data-subject-id="{{subject.subject_id}}">
 <text class="subject-option-name">{{subject.display_name}}</text>
-<text wx:if="{{subject.has_children}}" class="subject-option-arrow line-icon icon-chevron-right" aria-hidden="true"></text>
+<image wx:if="{{subject.has_children}}" class="subject-option-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
 <image wx:elif="{{subjectSheetDraft.subject_id === subject.subject_id}}" class="subject-option-check" src="/assets/icons/practice-subject/check.svg" mode="aspectFit" aria-hidden="true" />
 </view>
 </view>

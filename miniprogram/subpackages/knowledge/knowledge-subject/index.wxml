@@ -22,7 +22,7 @@
 <text class="loading-note">正在整理知识层级</text>
 </view>
 <view class="page-state error-state" wx:elif="{{error}}">
-<view class="error-orbit" aria-hidden="true"><view class="error-core">!</view></view>
+<image class="atlas-state-icon" src="/assets/icons/mobile-controls/circle-exclamation-point.svg" mode="aspectFit" aria-hidden="true" />
 <text class="state-title">知识图谱未能加载</text>
 <text class="state-note">{{error}}</text>
 <button class="state-action" bindtap="retry" hover-class="atlas-pressed">重新加载</button>
@@ -31,9 +31,9 @@
 <view class="refresh-notice" wx:if="{{refreshError}}"><text>更新失败，当前仍显示上次数据</text><button bindtap="retry">重试</button></view>
 <view class="atlas-tools page-reveal reveal-tools">
 <view class="atlas-search {{searchFocused ? 'search-focused' : ''}} {{searchDraft ? 'search-has-value' : ''}}">
-<view class="search-symbol" aria-hidden="true"></view>
-<input class="search-input" placeholder="搜索知识点名称" placeholder-class="search-placeholder" value="{{searchDraft}}" bindinput="searchPoints" bindconfirm="submitSearch" focus="{{searchFocused}}" bindfocus="focusSearch" bindblur="blurSearch" maxlength="80" confirm-type="search" cursor-spacing="18" aria-label="搜索知识点名称" />
-<view class="search-clear" wx:if="{{searchDraft}}" bindtap="clearSearch" hover-class="search-clear-pressed" aria-role="button" aria-label="清空搜索"><view class="clear-symbol" aria-hidden="true"></view></view>
+<image class="search-symbol" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" />
+<input class="search-input" placeholder="搜索知识点名称" placeholder-class="search-placeholder" value="{{searchDraft}}" bindinput="searchPoints" bindconfirm="submitSearch" focus="{{searchFocused}}" data-graph-action="focusSearch" bindfocus="{{graphMotion.action}}" bindblur="blurSearch" maxlength="80" confirm-type="search" cursor-spacing="18" aria-label="搜索知识点名称" />
+<view class="search-clear" wx:if="{{searchDraft}}" bindtap="clearSearch" hover-class="search-clear-pressed" aria-role="button" aria-label="清空搜索"><image class="clear-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></view>
 </view>
 <view class="filter-theme-card">
 <view class="filter-card-glow" aria-hidden="true"></view>
@@ -43,45 +43,45 @@
 <text wx:else>共 {{searchResultCount}} 个匹配知识点</text>
 </view>
 <view class="filter-grid">
-<button wx:for="{{filters}}" wx:key="id" class="atlas-filter {{filter === item.id ? 'filter-active' : ''}}" data-filter="{{item.id}}" bindtap="setFilter" hover-class="atlas-pressed" aria-label="{{item.label}}，{{item.count}}个知识点{{filter === item.id ? '，已选中' : ''}}"><view class="filter-dot filter-dot-{{item.id}}" aria-hidden="true"></view><text class="filter-label">{{item.label}}</text><text class="filter-count">{{item.count}}</text></button>
+<button wx:for="{{filters}}" wx:key="id" class="atlas-filter {{filter === item.id ? 'filter-active' : ''}}" data-filter="{{item.id}}" data-graph-action="setFilter" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="{{item.label}}，{{item.count}}个知识点{{filter === item.id ? '，已选中' : ''}}"><view class="filter-dot filter-dot-{{item.id}}" aria-hidden="true"></view><text class="filter-label">{{item.label}}</text><text class="filter-count">{{item.count}}</text></button>
 </view>
 <view class="theme-section" wx:if="{{groupChips.length}}">
 <view class="theme-section-head">
 <view class="theme-section-title"><view class="theme-rail" aria-hidden="true"></view><view><text>主题范围</text></view></view>
-<button class="theme-more" bindtap="openThemeSheet" hover-class="atlas-pressed" aria-label="查看全部{{themeGroupCount}}个主题"><text>更多主题</text><text class="theme-more-arrow" aria-hidden="true">›</text></button>
+<button class="theme-more" data-graph-action="openThemeSheet" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="查看全部{{themeGroupCount}}个主题"><text>更多主题</text><image class="theme-more-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></button>
 </view>
 <view class="theme-quick-grid">
-<button class="theme-quick-chip theme-quick-overview {{!activeGroupKey ? 'theme-active' : ''}}" data-key="" bindtap="chooseGroup" hover-class="atlas-pressed" aria-label="全部主题，{{searchResultCount}}个知识点{{!activeGroupKey ? '，已选中' : ''}}">
-<view class="theme-card-icon" aria-hidden="true"><image class="theme-icon-image" src="/assets/icons/knowledge-subject/overview.png" mode="aspectFit" /></view>
+<button class="theme-quick-chip theme-quick-overview {{!activeGroupKey ? 'theme-active' : ''}}" data-key="" data-graph-action="chooseGroup" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="全部主题，{{searchResultCount}}个知识点{{!activeGroupKey ? '，已选中' : ''}}">
+<view class="theme-card-icon" aria-hidden="true"><image class="theme-icon-image" src="/assets/icons/mobile-controls/layers.svg" mode="aspectFit" /></view>
 <view class="theme-card-copy"><text class="theme-quick-name">全部主题</text><text class="theme-card-count">{{searchResultCount}} 个知识点</text></view>
-<view class="theme-card-mark {{!activeGroupKey ? 'is-active' : ''}}" aria-hidden="true"></view>
+<image class="theme-card-mark" src="/assets/icons/mobile-controls/{{!activeGroupKey ? 'check' : 'plus'}}.svg" mode="aspectFit" aria-hidden="true" />
 </button>
-<button wx:for="{{quickGroupChips}}" wx:key="key" class="theme-quick-chip {{activeGroupKey === item.key ? 'theme-active' : ''}} {{!item.count ? 'theme-disabled' : ''}}" disabled="{{!item.count}}" data-key="{{item.key}}" bindtap="chooseGroup" hover-class="atlas-pressed" aria-label="{{item.name}}，{{item.count}}个知识点{{activeGroupKey === item.key ? '，已选中' : ''}}">
+<button wx:for="{{quickGroupChips}}" wx:key="key" class="theme-quick-chip {{activeGroupKey === item.key ? 'theme-active' : ''}} {{!item.count ? 'theme-disabled' : ''}}" disabled="{{!item.count}}" data-key="{{item.key}}" data-graph-action="chooseGroup" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed" aria-label="{{item.name}}，{{item.count}}个知识点{{activeGroupKey === item.key ? '，已选中' : ''}}">
 <view class="theme-card-icon" aria-hidden="true"><image class="theme-icon-image" src="{{item.iconSrc}}" mode="aspectFit" /></view>
 <view class="theme-card-copy"><text class="theme-quick-name">{{item.name}}</text><text class="theme-card-count">{{item.count}} 个知识点</text></view>
-<view class="theme-card-mark {{activeGroupKey === item.key ? 'is-active' : ''}}" aria-hidden="true"></view>
+<image class="theme-card-mark" src="/assets/icons/mobile-controls/{{activeGroupKey === item.key ? 'check' : 'plus'}}.svg" mode="aspectFit" aria-hidden="true" />
 <view class="theme-graduation-badge theme-graduation-{{item.graduationState}}" wx:if="{{item.graduationState === 'graduated' || item.graduationState === 'ready'}}">
 <text>{{item.graduationLabel}}</text>
 </view>
 </button>
 </view>
-<view class="theme-active-summary theme-switch-{{themeSwitchPhase}}" wx:if="{{activeGroupKey}}">
-<view class="theme-active-copy"><view class="current-scope-icon" aria-hidden="true"><view></view></view><text class="theme-active-name">{{activeGroupName}}</text></view>
+<view class="theme-active-summary">
+<view class="theme-active-copy"><image class="current-scope-icon" src="/assets/icons/mobile-controls/locate-fixed.svg" mode="aspectFit" aria-hidden="true" /><text class="theme-active-name">{{activeGroupName || '全部主题'}}</text></view>
 <view class="theme-graduation-summary" wx:if="{{chapterGraduation && chapterGraduation.total}}"><text>{{chapterGraduation.text}}</text></view>
-<button class="theme-clear {{!activeGroupKey ? 'theme-clear-disabled' : ''}}" disabled="{{!activeGroupKey}}" bindtap="showOverview" hover-class="atlas-pressed">清除</button>
+<button class="theme-clear {{!activeGroupKey ? 'theme-clear-disabled' : ''}}" disabled="{{!activeGroupKey}}" data-graph-action="showOverview" bindtap="{{graphMotion.action}}" hover-class="atlas-pressed">清除</button>
 </view>
 </view>
 </view>
 </view>
 <view id="atlas-shell" class="atlas-shell graph-card page-reveal reveal-graph {{themeSwitching ? 'theme-content-switching' : ''}} theme-switch-{{themeSwitchPhase}}">
 <view class="graph-card-head">
-<button wx:if="{{scene.focused}}" class="graph-back" data-kind="core" data-key="{{scene.groupKey}}" data-id="{{scene.focusNodeId}}" catchtap="onGraphNodeTap" aria-label="返回上一级"><view class="graph-back-chevron" aria-hidden="true"></view></button>
+<button disabled="{{!scene.focused}}" class="graph-back {{scene.focused ? '' : 'graph-back-hidden'}}" data-kind="core" data-key="{{scene.groupKey}}" data-id="{{scene.focusNodeId}}" data-graph-action="onGraphNodeTap" catchtap="{{graphMotion.action}}" aria-label="返回上一级"><image class="graph-back-chevron" src="/assets/icons/mobile-controls/chevron-left.svg" mode="aspectFit" aria-hidden="true" /></button>
 <view class="graph-card-copy">
-<text class="graph-card-title">{{scene.title}}</text>
+<text class="graph-card-title" aria-label="{{scene.title}}">{{scene.title}}</text>
 <text class="graph-count">{{scene.countText}}</text>
 </view>
 </view>
-<view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}}" motion="{{graphMotionState}}" change:motion="{{graphMotion.sync}}" bindtouchstart="{{graphMotion.start}}" catchtouchmove="{{graphMotion.move}}" bindtouchend="{{graphMotion.end}}" bindtouchcancel="{{graphMotion.end}}" bindtap="{{graphMotion.tap}}">
+<view id="atlas-viewport" class="atlas-viewport graph-canvas graph-label-{{graphLabelMode || 'overview'}}" motion="{{graphMotionState}}" change:motion="{{graphMotion.sync}}" settlement="{{graphSettlementToken}}" change:settlement="{{graphMotion.flush}}" bindtouchstart="{{graphMotion.start}}" catchtouchmove="{{graphMotion.move}}" bindtouchend="{{graphMotion.end}}" bindtouchcancel="{{graphMotion.end}}" bindtap="{{graphMotion.tap}}">
 <view class="atlas-stage" style="{{stageStyle}}font-size:{{graphLabelSize || 32}}px;" wx:if="{{scene.nodes.length}}">
 <view wx:for="{{scene.edges}}" wx:key="id" class="atlas-edge force-edge edge-{{item.kind}} {{item.active ? 'edge-active' : ''}} {{item.dimmed ? 'edge-dimmed' : ''}}" style="{{item.style}}" aria-hidden="true"></view>
 <view wx:for="{{scene.nodes}}" wx:key="id" class="atlas-node force-node force-{{item.kind}} tone-{{item.tone}} {{item.pathActive ? 'node-path' : ''}} {{item.selected ? 'node-selected' : ''}} {{item.neighbor ? 'node-neighbor' : ''}} {{graphLabelVisibility[item.id] ? 'node-label-visible' : ''}} {{item.dimmed ? 'node-dimmed' : ''}}" style="{{item.style}}" data-kind="{{item.kind}}" data-key="{{item.groupKey}}" data-id="{{item.pointId}}" data-node-id="{{item.id}}" bindtouchstart="{{graphMotion.nodeStart}}" catchtap="{{graphMotion.tap}}" hover-class="graph-node-pressed" hover-start-time="18" hover-stay-time="72" hover-stop-propagation="true" aria-role="button" aria-label="{{item.label}}">
@@ -92,24 +92,24 @@
 </view>
 </view>
 <view class="atlas-empty graph-empty" wx:else>
-<view class="empty-orbit" aria-hidden="true"></view>
+<image class="atlas-state-icon" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" />
 <text class="atlas-empty-title">{{filters[0].count ? '没有匹配的知识点' : '本科目暂无知识点'}}</text>
 <text class="atlas-empty-note">{{filters[0].count ? '更换关键词、主题或掌握状态后再试' : '知识点就绪后会在这里建立关系'}}</text>
-<button wx:if="{{filters[0].count}}" class="empty-reset" bindtap="resetFilters">查看全部知识点</button>
+<button wx:if="{{filters[0].count}}" class="empty-reset" data-graph-action="resetFilters" bindtap="{{graphMotion.action}}">查看全部知识点</button>
 </view>
 </view>
 <view class="graph-toolbar" wx:if="{{scene.nodes.length}}">
 <view class="graph-toolbar-copy"><text class="graph-zoom-text">{{zoomText}}</text><text class="graph-scope-hint">拖动 · 双指缩放</text></view>
 <view class="graph-controls">
-<button class="graph-control" data-step="1" catchtap="{{graphMotion.control}}" disabled="{{zoomInDisabled}}" aria-label="放大图谱">+</button>
-<button class="graph-control graph-control-out" data-step="-1" catchtap="{{graphMotion.control}}" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱">−</button>
-<button class="graph-control graph-control-reset" catchtap="{{graphMotion.control}}" aria-label="复位图谱"><view aria-hidden="true"></view></button>
+<button class="graph-control" data-step="1" catchtap="{{graphMotion.control}}" disabled="{{zoomInDisabled}}" aria-label="放大图谱"><image class="graph-control-icon" src="/assets/icons/mobile-controls/plus.svg" mode="aspectFit" aria-hidden="true" /></button>
+<button class="graph-control graph-control-out" data-step="-1" catchtap="{{graphMotion.control}}" disabled="{{zoomOutDisabled}}" aria-label="缩小图谱"><image class="graph-control-icon" src="/assets/icons/mobile-controls/minus.svg" mode="aspectFit" aria-hidden="true" /></button>
+<button class="graph-control graph-control-reset" catchtap="{{graphMotion.control}}" aria-label="复位图谱"><image class="graph-control-icon" src="/assets/icons/mobile-controls/locate-fixed.svg" mode="aspectFit" aria-hidden="true" /></button>
 </view>
 </view>
 <view class="graph-page-navigation" wx:if="{{scene.pageCount > 1}}">
-<button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" bindtap="changeGraphPage" aria-label="上一页知识节点">上一页</button>
+<button class="graph-page-turn" disabled="{{scene.page === 0}}" data-step="-1" data-graph-action="changeGraphPage" bindtap="{{graphMotion.action}}" aria-label="上一页知识节点">上一页</button>
 <text class="graph-page-status" aria-label="第 {{scene.page + 1}} 页，共 {{scene.pageCount}} 页">{{scene.page + 1}} / {{scene.pageCount}}</text>
-<button class="graph-page-turn" disabled="{{scene.page + 1 >= scene.pageCount}}" data-step="1" bindtap="changeGraphPage" aria-label="下一页知识节点">下一页</button>
+<button class="graph-page-turn" disabled="{{scene.page + 1 >= scene.pageCount}}" data-step="1" data-graph-action="changeGraphPage" bindtap="{{graphMotion.action}}" aria-label="下一页知识节点">下一页</button>
 </view>
 </view>
 <view class="point-card-reveal-shell point-card-reveal-{{indexDetailRevealPhase || 'stable'}}" style="{{indexDetailRevealStyle}}" wx:if="{{selectedPoint}}"><view id="knowledge-point-detail-card" class="point-card point-card-index-target {{themeSwitching ? 'theme-content-switching' : ''}} theme-switch-{{themeSwitchPhase}} {{selectionSwitching ? 'selection-switching' : ''}} selection-{{selectionSwitchPhase}}">
@@ -134,7 +134,7 @@
 <view class="index-toolbar-side">
 <button class="index-search-trigger {{indexSearchOpen ? 'index-search-open' : ''}} {{indexSearchDraft ? 'index-search-has-query' : ''}}" bindtap="toggleIndexSearch" hover-class="index-search-pressed" hover-start-time="12" hover-stay-time="55" aria-label="{{indexSearchOpen ? '收起知识索引搜索' : '在知识索引中搜索'}}">
 <image wx:if="{{!indexSearchOpen}}" src="/assets/icons/knowledge-index/search.svg" mode="aspectFit" aria-hidden="true" />
-<view wx:else class="index-search-close-symbol" aria-hidden="true"></view>
+<image wx:else class="index-search-close-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
 <view class="index-search-query-dot" wx:if="{{indexSearchDraft && !indexSearchOpen}}" aria-hidden="true"></view>
 </button>
 </view>
@@ -148,8 +148,8 @@
 <view class="index-inline-search-leading" aria-hidden="true">
 <image class="index-inline-search-icon" src="/assets/icons/knowledge-index/search.svg" mode="aspectFit" />
 </view>
-<input class="index-inline-search-input" placeholder="搜索知识点名称或英文别名" placeholder-class="index-inline-search-placeholder" value="{{indexSearchDraft}}" bindinput="indexSearchPoints" bindconfirm="submitIndexSearch" focus="{{indexSearchFocused}}" bindfocus="focusIndexSearch" bindblur="blurIndexSearch" maxlength="80" confirm-type="search" cursor-spacing="18" aria-label="搜索知识点名称或英文别名" />
-<button class="index-inline-clear" wx:if="{{indexSearchDraft}}" catchtap="clearIndexSearch" hover-class="index-inline-control-pressed" aria-label="清空搜索"><view class="index-inline-clear-symbol" aria-hidden="true"></view></button>
+<input class="index-inline-search-input" placeholder="搜索知识点名称或英文别名" placeholder-class="index-inline-search-placeholder" value="{{indexSearchDraft}}" bindinput="indexSearchPoints" bindconfirm="submitIndexSearch" focus="{{indexSearchFocused}}" data-graph-action="focusIndexSearch" bindfocus="{{graphMotion.action}}" bindblur="blurIndexSearch" maxlength="80" confirm-type="search" cursor-spacing="18" aria-label="搜索知识点名称或英文别名" />
+<button class="index-inline-clear" wx:if="{{indexSearchDraft}}" catchtap="clearIndexSearch" hover-class="index-inline-control-pressed" aria-label="清空搜索"><image class="index-inline-clear-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></button>
 <view class="index-inline-divider" wx:if="{{indexSearchDraft}}" aria-hidden="true"></view>
 <view class="index-inline-search-meta {{indexSearchPending ? 'index-inline-search-meta-pending' : ''}}" wx:if="{{indexSearchDraft}}">
 <view class="search-pending-dot" wx:if="{{indexSearchPending}}" aria-hidden="true"></view>
@@ -161,7 +161,7 @@
 <view id="knowledge-index-results-shell" class="index-results-shell {{indexResultsTransitioning ? 'index-results-transitioning' : ''}} {{indexSearchPending ? 'index-results-pending' : ''}} {{(indexQuery || query) && !indexCount ? 'index-results-empty-state' : ''}}" style="{{indexResultsHeightStyle}}" aria-busy="{{indexSearchPending ? 'true' : 'false'}}">
 <view id="knowledge-index-results-content" class="index-results-content index-results-{{indexResultsPhase}} {{(indexQuery || query) && !indexCount ? 'index-results-content-empty' : ''}}">
 <view class="index-list" wx:if="{{indexNodes.length}}">
-<view wx:for="{{indexNodes}}" wx:key="knowledge_point_id" id="knowledge-index-node-{{item.knowledge_point_id}}" class="index-row depth-{{item.depth}} {{item.hasChildren ? 'index-row-branch' : 'index-row-leaf'}} {{item.indexSelected ? 'index-row-selected' : ''}} {{item.contextOnly ? 'index-row-context' : ''}} {{item.indexSearchTarget ? 'index-row-search-target' : ''}} {{indexNavigatingId === item.knowledge_point_id ? 'index-row-navigating' : ''}} {{item.indexIsLastVisible ? 'index-row-last-visible' : ''}}" data-id="{{item.knowledge_point_id}}" bindtap="handleIndexRowTap" hover-class="index-pressed" hover-start-time="12" hover-stay-time="55" hover-stop-propagation="true" aria-role="button" aria-label="{{item.indexAriaAction}}{{item.name}}">
+<view wx:for="{{indexNodes}}" wx:key="knowledge_point_id" id="knowledge-index-node-{{item.knowledge_point_id}}" class="index-row depth-{{item.depth}} {{item.hasChildren ? 'index-row-branch' : 'index-row-leaf'}} {{item.indexSelected ? 'index-row-selected' : ''}} {{item.contextOnly ? 'index-row-context' : ''}} {{item.indexSearchTarget ? 'index-row-search-target' : ''}} {{indexNavigatingId === item.knowledge_point_id ? 'index-row-navigating' : ''}} {{item.indexIsLastVisible ? 'index-row-last-visible' : ''}}" data-id="{{item.knowledge_point_id}}" data-graph-action="handleIndexRowTap" bindtap="{{graphMotion.action}}" hover-class="index-pressed" hover-start-time="12" hover-stay-time="55" hover-stop-propagation="true" aria-role="button" aria-label="{{item.indexAriaAction}}{{item.name}}">
 <view class="index-tree-layer" aria-hidden="true">
 <view wx:for="{{item.indexAncestorGuides}}" wx:for-item="guide" wx:key="left" class="index-ancestor-guide" style="left: {{guide.left}}rpx;"></view>
 <view wx:if="{{item.depth}}" class="index-joint {{item.indexHasNextSibling ? 'index-joint-continues' : ''}}" style="left: {{item.indexJointLeft}}rpx;">
@@ -182,18 +182,16 @@
 </view>
 </view>
 </view>
-<button class="index-action {{item.indexExpandable ? 'index-action-expand' : 'index-action-locate'}} {{item.indexSelected && !item.hasChildren ? 'index-action-selected' : ''}} {{indexQuery && !item.matched ? 'index-action-path' : ''}} {{indexNavigatingId === item.knowledge_point_id ? 'index-action-navigating' : ''}}" disabled="{{indexQuery && !item.matched}}" data-id="{{item.knowledge_point_id}}" catchtap="handleIndexActionTap" hover-class="index-action-pressed" hover-start-time="12" hover-stay-time="55" hover-stop-propagation="true" aria-label="{{item.indexAriaAction}}{{item.name}}">
+<button class="index-action {{item.indexExpandable ? 'index-action-expand' : 'index-action-locate'}} {{item.indexSelected && !item.hasChildren ? 'index-action-selected' : ''}} {{indexQuery && !item.matched ? 'index-action-path' : ''}} {{indexNavigatingId === item.knowledge_point_id ? 'index-action-navigating' : ''}}" disabled="{{indexQuery && !item.matched}}" data-id="{{item.knowledge_point_id}}" data-graph-action="handleIndexActionTap" catchtap="{{graphMotion.action}}" hover-class="index-action-pressed" hover-start-time="12" hover-stay-time="55" hover-stop-propagation="true" aria-label="{{item.indexAriaAction}}{{item.name}}">
 <view wx:if="{{indexNavigatingId === item.knowledge_point_id}}" class="index-navigation-spinner" aria-hidden="true"></view>
 <image wx:elif="{{!item.hasChildren}}" class="index-locate-icon" src="/assets/icons/knowledge-index/locate.svg" mode="aspectFit" aria-hidden="true" />
 <text>{{indexNavigatingId === item.knowledge_point_id ? '定位中' : item.indexActionText}}</text>
-<view wx:if="{{item.indexExpandable && !indexQuery}}" class="index-action-caret {{item.indexExpanded ? 'index-action-caret-open' : ''}}" aria-hidden="true"></view>
+<image wx:if="{{item.indexExpandable && !indexQuery}}" class="index-action-caret {{item.indexExpanded ? 'index-action-caret-open' : ''}}" src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
 </button>
 </view>
 </view>
 <view class="index-search-empty" wx:if="{{(indexQuery || query) && !indexCount}}">
 <view class="index-search-empty-art" aria-hidden="true">
-<view class="index-search-empty-spark index-search-empty-spark-left"></view>
-<view class="index-search-empty-spark index-search-empty-spark-right"></view>
 <image class="index-search-empty-planet" src="/assets/images/knowledge-index/search-empty-planet.png" mode="aspectFit" />
 </view>
 <text class="index-search-empty-title">没有找到匹配的知识点</text>
@@ -217,25 +215,25 @@
 <view class="theme-sheet-head">
 <view class="theme-sheet-title-wrap">
 <view class="theme-sheet-title-row">
-<view class="theme-sheet-brand-icon" aria-hidden="true"><image class="theme-icon-image theme-brand-image" src="/assets/icons/knowledge-subject/layers.png" mode="aspectFit" /></view>
+<view class="theme-sheet-brand-icon" aria-hidden="true"><image class="theme-icon-image theme-brand-image" src="/assets/icons/mobile-controls/layers.svg" mode="aspectFit" /></view>
 <text class="theme-sheet-title">选择主题</text>
 </view>
 <text class="theme-sheet-caption">{{themeGroupCount}} 个可用主题 · 选择后返回图谱</text>
 </view>
-<view class="theme-sheet-close" bindtap="closeThemeSheet" hover-class="search-clear-pressed" aria-role="button" aria-label="关闭主题选择"><view class="clear-symbol"></view></view>
+<view class="theme-sheet-close" bindtap="closeThemeSheet" hover-class="search-clear-pressed" aria-role="button" aria-label="关闭主题选择"><image class="clear-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" /></view>
 </view>
 <view class="theme-sheet-search">
-<view class="search-symbol" aria-hidden="true"></view>
+<image class="search-symbol" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" />
 <input value="{{themeQuery}}" placeholder="搜索主题名称" placeholder-class="search-placeholder" bindinput="searchThemes" confirm-type="search" cursor-spacing="18" aria-label="搜索主题名称" />
-<view class="theme-search-clear" wx:if="{{themeQuery}}" bindtap="clearThemeSearch" hover-class="search-clear-pressed" aria-role="button" aria-label="清空主题搜索"><view class="clear-symbol"></view></view>
+<view class="theme-search-clear" wx:if="{{themeQuery}}" bindtap="clearThemeSearch" hover-class="search-clear-pressed" aria-role="button" aria-label="清空主题搜索"><image class="clear-symbol" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" /></view>
 </view>
 <scroll-view class="theme-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
 <view class="theme-sheet-list">
 <button class="theme-sheet-featured {{themeSheetPendingKey === '' || (themeSheetPendingKey === '__idle__' && !activeGroupKey) ? 'theme-sheet-active' : ''}}" data-key="" bindtap="chooseThemeFromSheet" hover-class="atlas-pressed">
-<view class="theme-sheet-featured-icon" aria-hidden="true"><image class="theme-icon-image" src="/assets/icons/knowledge-subject/overview.png" mode="aspectFit" /></view>
+<view class="theme-sheet-featured-icon" aria-hidden="true"><image class="theme-icon-image" src="/assets/icons/mobile-controls/layers.svg" mode="aspectFit" /></view>
 <view class="theme-sheet-featured-copy"><text class="theme-sheet-featured-name">全部主题</text><text class="theme-sheet-featured-note">查看当前筛选下全部知识点</text></view>
 <text class="theme-sheet-chip-count">{{searchResultCount}}</text>
-<view class="theme-sheet-item-arrow" aria-hidden="true"></view>
+<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
 </button>
 <view class="theme-sheet-rows" wx:if="{{themeSheetGroups.length}}">
 <block wx:for="{{themeSheetGroups}}" wx:key="key">
@@ -245,12 +243,12 @@
 <view class="theme-sheet-item-icon" aria-hidden="true"><image class="theme-icon-image" src="{{item.iconSrc}}" mode="aspectFit" /></view>
 <view class="theme-sheet-item-copy"><text class="theme-sheet-item-name">{{item.name}}</text><text class="theme-sheet-item-note">主题 {{item.orderText}}</text></view>
 <text class="theme-sheet-chip-count">{{item.count}}</text>
-<view class="theme-sheet-item-arrow" aria-hidden="true"></view>
+<image class="theme-sheet-item-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
 </button>
 </view>
 </block>
 </view>
-<view class="theme-sheet-empty" wx:if="{{themeQuery && !themeSheetGroups.length}}"><view class="theme-empty-icon" aria-hidden="true"></view><text>没有匹配的主题</text><text>换个关键词试试</text></view>
+<view class="theme-sheet-empty" wx:if="{{themeQuery && !themeSheetGroups.length}}"><image class="theme-empty-icon" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" /><text>没有匹配的主题</text><text>换个关键词试试</text></view>
 <view class="theme-sheet-safe"></view>
 </view>
 </scroll-view>

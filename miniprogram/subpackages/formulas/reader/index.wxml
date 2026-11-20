@@ -1,13 +1,9 @@
 <app-dialog id="appDialog" theme="mint"></app-dialog>
-<view class="fr-page">
+<view class="fr-page" bindtap="onReaderActivity" bindtouchstart="onNavigationTouchStart" bindtouchend="onNavigationTouchEnd" bindtouchcancel="onNavigationTouchCancel">
   <premium-nav title="速记" variant="mint" bind:back="goBack" />
 
   <view class="fr-loading" wx:if="{{loading}}">
-    <view class="fr-loading-mark">
-      <view class="fr-loading-line line-one"></view>
-      <view class="fr-loading-line line-two"></view>
-      <view class="fr-loading-line line-three"></view>
-    </view>
+    <image class="fr-loading-mark" src="/assets/icons/mobile-controls/book-open.svg" mode="aspectFit" aria-hidden="true" />
     <text class="fr-state-title">正在整理速记内容</text>
     <text class="fr-state-desc">核心记忆、边界与易错点正在加载</text>
     <view class="fr-skeleton-card">
@@ -19,7 +15,7 @@
   </view>
 
   <view class="fr-error" wx:elif="{{loadError}}">
-    <view class="fr-error-mark">!</view>
+    <image class="fr-error-mark" src="/assets/icons/mobile-controls/circle-exclamation-point.svg" mode="aspectFit" aria-hidden="true" />
     <text class="fr-state-title">暂时无法打开这张速记卡</text>
     <text class="fr-state-desc">{{errorText || '请检查网络后重新加载'}}</text>
     <button class="fr-retry" hover-class="fr-control-pressed" bindtap="retryLoad">重新加载</button>
@@ -28,7 +24,7 @@
 
   <!-- 非加载、非错误但没有有效卡片 -->
   <view class="fr-error" wx:elif="{{!currentCard}}">
-    <view class="fr-error-mark">?</view>
+    <image class="fr-error-mark" src="/assets/icons/mobile-controls/book-open.svg" mode="aspectFit" aria-hidden="true" />
     <text class="fr-state-title">速记内容暂不可用</text>
     <text class="fr-state-desc">该速记卡可能存在格式问题或已被移除</text>
     <button class="fr-retry" hover-class="fr-control-pressed" bindtap="retryLoad">重新加载</button>
@@ -42,12 +38,13 @@
     enhanced
     show-scrollbar="{{false}}"
     scroll-top="{{readerScrollTop}}"
+    bindscroll="onReaderScroll"
     bindtouchstart="onReaderTouchStart"
     bindtouchmove="onReaderTouchMove"
     bindtouchend="onReaderTouchEnd"
     bindtouchcancel="onReaderTouchCancel"
   >
-    <view class="fr-card-wrap">
+    <view class="fr-card-wrap {{recitationMode ? 'is-recite' : ''}}">
       <view class="fr-transition-stage {{transitionClass}}">
         <view class="fr-reader-meta">
           <view class="fr-reading-context">
@@ -65,10 +62,10 @@
               aria-pressed="{{currentCard.isFavorited}}"
               aria-disabled="{{favoriteBusy}}"
             >
-              <view class="fr-bookmark-icon"></view>
+              <image class="fr-bookmark-icon" src="/assets/icons/mobile-controls/{{currentCard.isFavorited ? 'bookmark-check' : 'bookmark'}}.svg" mode="aspectFit" aria-hidden="true" />
             </view>
             <view wx:else class="fr-card-favorite is-locked" aria-disabled="true">
-              <view class="fr-bookmark-icon"></view><image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
+              <image class="fr-bookmark-icon" src="/assets/icons/mobile-controls/lock.svg" mode="aspectFit" aria-hidden="true" />
             </view>
           </view>
         </view>
@@ -83,27 +80,26 @@
           bind:readingchange="onFormulaReadingChange"
           bind:formulastart="onFormulaGestureStart"
           bind:formulaend="onFormulaGestureEnd"
+          bind:readeractivity="onCardActivity"
         />
-
-        <text class="fr-swipe-note" wx:if="{{isRandom || canGoPrev || canGoNext}}">左右滑动切卡 · 公式可独立横滑</text>
       </view>
-      <view class="fr-bottom-space"></view>
+      <view class="fr-bottom-space" wx:if="{{!recitationMode}}"></view>
     </view>
   </scroll-view>
 
-  <view class="fr-nav-capsule" wx:if="{{!loading && !loadError && currentCard && !formulaReadingExpanded}}">
+  <view class="fr-nav-capsule {{navigationVisible ? '' : 'is-hidden'}}" wx:if="{{!loading && !loadError && currentCard && !formulaReadingExpanded}}" aria-hidden="{{!navigationVisible}}">
     <view
       class="fr-nav-hit {{!canGoPrev || loadingNext ? 'disabled' : ''}}"
       hover-class="fr-nav-pressed"
       bindtap="goPrev"
       role="button"
       aria-label="上一张速记卡"
-      aria-disabled="{{!canGoPrev || loadingNext}}"
+      aria-disabled="{{!navigationVisible || !canGoPrev || loadingNext}}"
     >
-      <text class="fr-arrow fr-arrow-left"></text>
+      <image class="fr-arrow" src="/assets/icons/mobile-controls/chevron-left.svg" mode="aspectFit" aria-hidden="true" />
     </view>
     <view class="fr-nav-status">
-      <view class="fr-nav-loader" wx:if="{{loadingNext}}"></view>
+      <image class="fr-nav-loader" wx:if="{{loadingNext}}" src="/assets/icons/mobile-controls/loader-circle.svg" mode="aspectFit" aria-hidden="true" />
       <text wx:else>{{isRandom ? currentIndex + 1 : sequenceIndex + 1}} / {{isRandom ? displayCards.length : sequenceIds.length || 1}}</text>
     </view>
     <view
@@ -112,9 +108,9 @@
       bindtap="goNext"
       role="button"
       aria-label="下一张速记卡"
-      aria-disabled="{{!canGoNext || loadingNext}}"
+      aria-disabled="{{!navigationVisible || !canGoNext || loadingNext}}"
     >
-      <text class="fr-arrow fr-arrow-right"></text>
+      <image class="fr-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
     </view>
   </view>
 </view>

@@ -131,13 +131,162 @@ test('zoom and reset controls settle the current view before dispatch and cancel
   }
 })
 
-test('hiding, resizing or changing scenes cancels old frames and releases the touch identity', () => {
+test('theme and index controls flush the visible fling camera before changing the scene', () => {
+  for (const action of ['chooseGroup', 'showOverview', 'setFilter', 'openThemeSheet', 'onGraphNodeTap', 'changeGraphPage', 'handleIndexRowTap', 'handleIndexActionTap', 'focusSearch', 'focusIndexSearch']) {
+    const h = motionFixture()
+    h.motion.start(h.event([h.touch(160, 150)], 'touchstart'), h.owner)
+    h.advance(16)
+    h.motion.move(h.event([h.touch(110, 115)]), h.owner)
+    h.motion.end(h.event([], 'touchend'), h.owner)
+    h.tick(); h.tick()
+    const visibleCamera = JSON.parse(JSON.stringify(h.state.camera))
+    assert.notDeepEqual(visibleCamera, h.model.camera, 'the visible camera is newer than its last JS acknowledgement')
+    h.motion.action({ currentTarget: { dataset: { graphAction: action, key: 'chapter-2' } } }, h.owner)
+    assert.deepEqual(h.calls.map(row => row.name), ['commitGraphMotion', action])
+    assert.deepEqual(h.calls[0].args.camera, visibleCamera)
+    assert.equal(h.classes.has('graph-interacting'), false)
+    for (let index = 0; h.frames.length && index < 10; index++) h.tick()
+    assert.deepEqual(JSON.parse(JSON.stringify(h.state.camera)), visibleCamera, 'the cancelled fling cannot resume after navigation')
+  }
+})
+
+test('an asynchronous scene update waits for the current WXS camera and cancels on hide', async () => {
+  let definition
+  const originalPage = global.Page
+  global.Page = value => { definition = value }
+  const file = require.resolve('../subpackages/knowledge/knowledge-subject/index')
+  delete require.cache[file]
+  try { require(file) } finally { global.Page = originalPage }
+  const h = motionFixture()
+  const page = { ...definition, data: { ...definition.data, graphMotionState: h.model, scene: { nodes: h.model.nodes.map(node => ({ ...node, label: node.id, kind: node.id === 'core' ? 'core' : 'point' })), edges: [] } },
+    _frame: h.rect, _camera: { ...h.model.camera }, _graphMotionRevision: 1, _pageVisible: true,
+    setData(patch) { Object.assign(this.data, patch) } }
+  h.motion.start(h.event([h.touch(160, 150)], 'touchstart'), h.owner)
+  h.advance(16)
+  h.motion.move(h.event([h.touch(110, 115)]), h.owner)
+  h.motion.end(h.event([], 'touchend'), h.owner)
+  h.tick(); h.tick()
+  const visible = JSON.parse(JSON.stringify(h.state.camera))
+  let published = null
+  const pending = page._afterGraphSettled(() => { published = { ...page._camera } })
+  assert.equal(published, null, 'an API or debounce result waits instead of rebuilding from a stale camera')
+  h.motion.flush(page.data.graphSettlementToken, 0, h.owner)
+  assert.deepEqual(h.calls.map(call => call.name), ['commitGraphMotion', 'completeGraphSettlement'])
+  h.calls.forEach(call => page[call.name](call.args))
+  await pending
+  assert.deepEqual(published, visible)
+  const cancelled = page._afterGraphSettled(() => assert.fail('hidden page cannot apply its queued scene'))
+  page._pageVisible = false
+  page._cancelGraphSettlements()
+  page.completeGraphSettlement({ token: page.data.graphSettlementToken })
+  await cancelled
+  assert.equal(page._pendingGraphSettlements.length, 0)
+})
+
+for (const phase of ['dragging', 'coasting', 'cancelled', 'released']) {
+  test(`a scene acknowledgement preserves a newer ${phase} gesture across the bridge`, async () => {
+    let definition
+    const originalPage = global.Page
+    global.Page = value => { definition = value }
+    const file = require.resolve('../subpackages/knowledge/knowledge-subject/index')
+    delete require.cache[file]
+    try { require(file) } finally { global.Page = originalPage }
+    const h = motionFixture()
+    const page = {
+      ...definition,
+      data: { ...definition.data, graphMotionState: h.model, scene: {
+        nodes: h.model.nodes.map(node => ({ ...node, label: node.id, kind: node.id === 'core' ? 'core' : 'point' })), edges: [],
+      } },
+      _frame: h.rect, _camera: { ...h.model.camera }, _graphMotionRevision: 1, _graphMotionFloor: 1, _pageVisible: true,
+      setData(patch) {
+        Object.assign(this.data, patch)
+        if (patch.graphMotionState) h.sync(patch.graphMotionState)
+      },
+    }
+    h.motion.start(h.event([h.touch(160, 150)], 'touchstart'), h.owner)
+    h.motion.move(h.event([h.touch(110, 115)]), h.owner)
+    const pending = page._afterGraphSettled(() => page.setData(page.cameraPayload(true, {}, page.data.scene, true, true)))
+    h.motion.flush(page.data.graphSettlementToken, 0, h.owner)
+    const messages = h.calls.splice(0)
+    page.commitGraphMotion(messages[0].args)
+
+    // The next touch begins before JS receives the settlement confirmation.
+    h.motion.start(h.event([h.touch(100, 100)], 'touchstart'), h.owner)
+    h.advance(16)
+    h.motion.move(h.event([h.touch(130, 125)]), h.owner)
+    if (phase === 'coasting') {
+      h.motion.end(h.event([], 'touchend'), h.owner)
+      h.tick()
+    }
+    if (phase === 'cancelled') h.motion.end(h.event([], 'touchcancel'), h.owner)
+    if (phase === 'released') {
+      h.advance(100)
+      h.motion.end(h.event([], 'touchend'), h.owner)
+      h.tick()
+    }
+    const latestCamera = JSON.parse(JSON.stringify(h.state.camera))
+    const currentRun = h.state.run
+    page.completeGraphSettlement(messages[1].args)
+    await pending
+    assert.deepEqual(JSON.parse(JSON.stringify(h.state.camera)), latestCamera)
+    assert.equal(h.state.run, currentRun, 'a scene acknowledgement cannot cancel a newer gesture or its inertia')
+    assert.ok(h.stage.style.transform.startsWith(`translate3d(${latestCamera.x}px,${latestCamera.y}px`))
+
+    if (phase === 'dragging') {
+      assert.ok(h.state.gesture)
+      h.motion.move(h.event([h.touch(145, 140)]), h.owner)
+      h.motion.end(h.event([], 'touchcancel'), h.owner)
+    } else if (phase === 'coasting') {
+      for (let index = 0; h.frames.length && index < 200; index++) h.tick()
+    }
+    const result = h.calls.filter(row => row.name === 'commitGraphMotion').at(-1).args
+    const drain = () => { while (h.calls.length) { const call = h.calls.shift(); page[call.name](call.args) } }
+    drain()
+    assert.deepEqual(page._camera, JSON.parse(JSON.stringify(h.state.camera)))
+    assert.equal(page._graphGestureEpoch, result.gestureEpoch)
+
+    const expectedZoom = zoomCamera(page._camera, 1.25, { x: h.rect.width / 2, y: h.rect.height / 2 }, h.rect)
+    h.motion.control({ currentTarget: { dataset: { step: 1 } } }, h.owner)
+    drain()
+    assert.deepEqual(JSON.parse(JSON.stringify(h.state.camera)), expectedZoom, 'the next zoom uses the newly acknowledged camera')
+    page.commitGraphMotion({ ...result, gestureEpoch: result.gestureEpoch + 1 })
+    assert.deepEqual(page._camera, expectedZoom, 'an explicit camera action closes the old scene compatibility interval')
+  })
+}
+
+test('scene changes remap a newer node drag by id and stop it if its node disappears', () => {
+  for (const removed of [false, true]) {
+    const h = motionFixture()
+    const initial = h.state.nodes[1]
+    const x = h.state.camera.x + initial.cx * h.state.camera.scale
+    const y = h.state.camera.y + initial.cy * h.state.camera.scale
+    const start = h.event([h.touch(x, y)], 'touchstart', initial.id)
+    h.motion.nodeStart(start, h.owner)
+    h.motion.start(start, h.owner)
+    h.motion.move(h.event([h.touch(x + 20, y + 10)]), h.owner)
+    const moved = JSON.parse(JSON.stringify(h.state.changedNode))
+    const camera = JSON.parse(JSON.stringify(h.state.camera))
+    const nodes = removed ? [h.model.nodes[0]] : h.model.nodes.slice().reverse()
+    h.sync({ revision: 2, gestureEpoch: 0, preserveMotion: true, nodes, edges: [] })
+    assert.deepEqual(JSON.parse(JSON.stringify(h.state.camera)), camera)
+    if (removed) assert.equal(h.state.gesture, null)
+    else {
+      assert.equal(h.state.gesture.nodeIndex, 0)
+      assert.deepEqual(JSON.parse(JSON.stringify(h.state.nodes[0])), moved)
+      h.motion.move(h.event([h.touch(x + 40, y + 20)]), h.owner)
+      h.motion.end(h.event([], 'touchcancel'), h.owner)
+      assert.deepEqual(h.calls.at(-1).args.node, { id: initial.id, cx: 350, cy: 325 })
+    }
+  }
+})
+
+test('hiding or an acknowledged scene reset cancels old frames and releases the touch identity', () => {
   for (const hidden of [true, false]) {
     const h = motionFixture()
     h.motion.start(h.event([h.touch(120, 120)], 'touchstart'), h.owner)
     h.motion.move(h.event([h.touch(90, 90)]), h.owner)
     h.motion.end(h.event([], 'touchend'), h.owner)
-    h.sync({ revision: 2, active: !hidden, camera: { x: 1, y: 2, scale: 0.8 } })
+    h.sync({ revision: 2, gestureEpoch: h.state.gestureEpoch, active: !hidden, camera: { x: 1, y: 2, scale: 0.8 } })
     for (let index = 0; h.frames.length && index < 20; index++) h.tick()
     assert.equal(h.calls.length, 0)
     assert.equal(h.state.gesture, null)

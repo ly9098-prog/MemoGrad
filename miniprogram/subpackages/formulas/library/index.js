@@ -194,6 +194,8 @@ Page({
 
     // Loading states
     initialLoading: true,
+    contentReady: false,
+    resultsMinHeight: 0,
     guestMode: false,
     loadingMore: false,
     loadError: false,
@@ -513,26 +515,60 @@ Page({
 
   onLibraryTypeChange(e) {
     const type = e.currentTarget.dataset.type
-    if (!type || type === this.data.activeLibraryType) return
-    const libraryTabs = (this.data.libraryTabs || []).map((tab) => ({
-      ...tab,
-      active: tab.key === type,
-    }))
-    this.setData({
-      libraryTabs,
-      activeLibraryType: type,
-      page: 1,
-      formulas: [],
-      total: 0,
-      hasMore: true,
-      loadError: false,
-      showChapterPicker: false,
-      showTagPicker: false,
-      showSubjectPicker: false,
-      showMoreSheet: false,
+    if (![LIBRARY_TYPE_FORMULA, LIBRARY_TYPE_FUNCTION_GRAPH].includes(type)) return
+    if (type === this.data.activeLibraryType) {
+      if (this._pendingLibraryType) {
+        this._typeSwitchVersion = (this._typeSwitchVersion || 0) + 1
+        this._pendingLibraryType = ''
+      }
+      return
+    }
+    if (this._pendingLibraryType === type) return
+    this._pendingLibraryType = type
+    const switchVersion = this._typeSwitchVersion = (this._typeSwitchVersion || 0) + 1
+    this._captureResultsFootprint((resultsMinHeight, documentTop, windowHeight) => {
+      if (!this._pageAlive || !this._visible || switchVersion !== this._typeSwitchVersion) return
+      this._pendingLibraryType = ''
+      this._resultsDocumentTop = documentTop
+      this._resultsWindowHeight = windowHeight
+      this.setData({
+        libraryTabs: this.data.libraryTabs.map(tab => ({ ...tab, active: tab.key === type })),
+        activeLibraryType: type,
+        page: 1,
+        formulas: [],
+        resultsMinHeight,
+        total: 0,
+        hasMore: true,
+        loadError: false,
+        showChapterPicker: false,
+        showTagPicker: false,
+        showSubjectPicker: false,
+        showMoreSheet: false,
+      }, () => {
+        this.loadCatalog()
+        this.loadFormulas(true)
+      })
     })
-    this.loadCatalog()
-    this.loadFormulas(true)
+  },
+
+  _captureResultsFootprint(callback) {
+    let windowHeight = 0
+    try { windowHeight = Number(wx.getWindowInfo().windowHeight) || 0 } catch (_) {}
+    if (!wx.createSelectorQuery) { callback(0, null, windowHeight); return }
+    try {
+      wx.createSelectorQuery().in(this).select('#formula-library-results').boundingClientRect().exec(result => {
+        const rect = result && result[0]
+        callback(rect ? Math.max(0, Math.ceil(windowHeight - Number(rect.top))) : 0,
+          rect ? Number(rect.top) + (this._scrollTop || 0) : null, windowHeight)
+      })
+    } catch (_) { callback(0, null, windowHeight) }
+  },
+
+  onPageScroll(event) {
+    this._scrollTop = Math.max(0, Number(event.scrollTop) || 0)
+    if (!this.data.resultsMinHeight || this._resultsDocumentTop == null) return
+    const height = Math.max(0, Math.ceil(this._scrollTop + this._resultsWindowHeight - this._resultsDocumentTop))
+    if (height + 80 < this.data.resultsMinHeight || !this._scrollTop) this.setData({ resultsMinHeight: height })
   },
 
   // ── Study Card Type ──
@@ -656,6 +692,8 @@ Page({
 
   onHide() {
     this._visible = false
+    this._typeSwitchVersion = (this._typeSwitchVersion || 0) + 1
+    this._pendingLibraryType = ''
   },
 
   onUnload() {
@@ -665,6 +703,7 @@ Page({
     this._tagsRequestVersion++
     this._favoriteRequestVersion++
     this._replaceRequestVersion++
+    this._typeSwitchVersion = (this._typeSwitchVersion || 0) + 1
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = null
     if (this._favoriteBusyIds) this._favoriteBusyIds.clear()
@@ -692,9 +731,9 @@ Page({
     if (replace) this._replaceRequestVersion = (this._replaceRequestVersion || 0) + 1
     var requestVersion = this._replaceRequestVersion || 0
     var d = this.data
-    if (d.loading || d.loadingMore || (d.initialLoading && !replace) || !d.hasMore) return
+    if (!replace && (d.loading || d.loadingMore || d.initialLoading || !d.hasMore)) return
     var loadingFlag = replace ? "initialLoading" : "loadingMore"
-    this.setData({ [loadingFlag]: true, loadError: false })
+    this.setData({ [loadingFlag]: true, ...(replace ? { loadingMore: false } : {}), loadError: false })
     try {
       var baseParams = this._buildFormulaParams(d)
       var fetchResult = await this._fetchFormulaPages(baseParams, d.pageSize, d.activeLibraryType)
@@ -752,7 +791,7 @@ Page({
     return {
       formulas: mergedFormulas, total: totalItems, page: fetchResult.requestPage,
       hasMore: hasKnownTotal ? fetchedThroughPage * fetchResult.pageSize < totalItems : hasMoreByResponse,
-      initialLoading: false, loadingMore: false,
+      initialLoading: false, loadingMore: false, contentReady: true,
     }
   },
 
@@ -760,7 +799,7 @@ Page({
     if (!this._pageAlive || requestVersion !== (this._replaceRequestVersion || 0)) return
     console.error("Failed to load formulas", e)
     var shouldReplaceWithError = replace || !(this.data.formulas || []).length
-    this.setData({ initialLoading: false, loadingMore: false, loadError: shouldReplaceWithError, loadErrorMessage: shouldReplaceWithError ? (e.message || "加载失败") : "" })
+    this.setData({ initialLoading: false, loadingMore: false, contentReady: true, loadError: shouldReplaceWithError, loadErrorMessage: shouldReplaceWithError ? (e.message || "加载失败") : "" })
     if (!shouldReplaceWithError) wx.showToast({ title: "加载更多失败，请重试", icon: "none" })
   },
 

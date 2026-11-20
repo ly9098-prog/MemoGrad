@@ -22,6 +22,7 @@ const MAX_RANDOM_HISTORY = 24
 const MAX_SEQUENCE_SEARCH_PAGES = 10
 const TRANSITION_OUT_MS = 150
 const TRANSITION_IN_DELAY_MS = 36
+const NAVIGATION_IDLE_MS = 5000
 
 const STUDY_CARD_TYPE_LABEL = {
   formula: '公式',
@@ -82,6 +83,7 @@ Page({
     recitationHeight: 0,
     recitationNeedsScroll: false,
     transitionClass: '',
+    navigationVisible: true,
 
     isRandom: false,
     randomParams: {},
@@ -89,6 +91,8 @@ Page({
 
   onLoad(options = {}) {
     this._readerAlive = true
+    this._readerVisible = true
+    this._navigationTouchActive = false
     this._navigatingBack = false
     this._readerSession = readerState.sessionIdentity()
     this.setData({ guestMode: !auth.isLoggedIn(), recitationMode: readerState.readMode(options.mode) === 'recite' })
@@ -141,10 +145,70 @@ Page({
   },
 
   onShow() {
-    if (this.readerSessionValid()) return
+    if (this.readerSessionValid()) {
+      this._readerVisible = true
+      this.onReaderActivity()
+      return
+    }
     this.onUnload()
     this.setData({ currentCard: null, displayCards: [], sequenceIds: [], loading: false, loadingNext: false,
       canGoPrev: false, canGoNext: false, loadError: true, errorText: '登录状态已更新，请返回速记卡库重新选择' })
+  },
+
+  onHide() {
+    this._readerVisible = false
+    this.clearNavigationTimer()
+    clearTimeout(this._formulaGestureTimer)
+    this._navigationTouchActive = false
+    this._formulaGestureActive = false
+    this._readerGesture = null
+  },
+
+  clearNavigationTimer() {
+    clearTimeout(this._navigationTimer)
+    this._navigationTimer = null
+    this._navigationTimerToken = (this._navigationTimerToken || 0) + 1
+  },
+
+  onReaderActivity() {
+    if (!this._readerAlive || this._readerVisible === false) return
+    this.clearNavigationTimer()
+    if (!this.data.currentCard || this.data.formulaReadingExpanded) return
+    if (!this.data.navigationVisible) this.setData({ navigationVisible: true })
+    if (this._navigationTouchActive || this._formulaGestureActive || this.data.loading || this.data.loadingNext) return
+    const token = this._navigationTimerToken
+    this._navigationTimer = setTimeout(() => {
+      if (token !== this._navigationTimerToken || !this._readerAlive || this._readerVisible === false) return
+      this._navigationTimer = null
+      if (this._navigationTouchActive || this._formulaGestureActive || this.data.formulaReadingExpanded || this.data.loadingNext) return
+      this.setData({ navigationVisible: false })
+    }, NAVIGATION_IDLE_MS)
+  },
+
+  onCardActivity(event = {}) {
+    if (!this._readerAlive || this._readerVisible === false) return
+    const phase = event.detail && event.detail.phase
+    if (phase === 'start') this._navigationTouchActive = true
+    if (phase === 'end') this._navigationTouchActive = Boolean(event.detail.touching)
+    this.onReaderActivity()
+  },
+
+  onNavigationTouchStart() {
+    if (!this._readerAlive || this._readerVisible === false) return
+    this._navigationTouchActive = true
+    this.onReaderActivity()
+  },
+
+  onNavigationTouchEnd(event = {}) {
+    if (!this._readerAlive || this._readerVisible === false) return
+    this._navigationTouchActive = Boolean(event.touches && event.touches.length)
+    this.onReaderActivity()
+  },
+
+  onNavigationTouchCancel() {
+    if (!this._readerAlive || this._readerVisible === false) return
+    this._navigationTouchActive = false
+    this.onReaderActivity()
   },
 
   readerSessionValid() {
@@ -170,8 +234,9 @@ Page({
     const status = Number(info.statusBarHeight || 20)
     const navHeight = status + Number(menu && menu.height || 32) + Math.max(4, Number(menu && menu.top || status + 6) - status) * 2
     const bottomInset = Math.max(0, Number(info.screenHeight || height) - Number(info.safeArea && info.safeArea.bottom || info.screenHeight || height))
-    // Reserve the 44px navigation targets, their spacing and one line of help.
-    const footerHeight = 64 + bottomInset + 20 * rpx + Math.max(24 * rpx, 12) * 1.6
+    // Navigation floats over the footer; only the safe area and outer gap
+    // reduce the stable stage. Its visibility never changes card geometry.
+    const footerHeight = bottomInset + 12
     this._readerLayout = { height, footerHeight }
     this._readerLayoutMeasured = false
     this._readerLayoutToken = (this._readerLayoutToken || 0) + 1
@@ -184,7 +249,7 @@ Page({
     const token = this._readerLayoutToken
     this.createSelectorQuery().select('.fr-reader-meta').boundingClientRect().exec(rects => {
       if (!this._readerAlive || token !== this._readerLayoutToken || !rects || !rects[0]) return
-      const available = this._readerLayout.height - rects[0].bottom - this._readerLayout.footerHeight
+      const available = this._readerLayout.height - rects[0].bottom - (this._readerScrollOffset || 0) - this._readerLayout.footerHeight
       if (!Number.isFinite(available)) return
       this._readerLayoutMeasured = true
       this.setData({ recitationHeight: Math.max(240, Math.floor(available)), recitationNeedsScroll: available < 240 })
@@ -193,6 +258,9 @@ Page({
 
   onUnload() {
     this._readerAlive = false
+    this._readerVisible = false
+    this._navigationTouchActive = false
+    this.clearNavigationTimer()
     clearTimeout(this._transitionTimer)
     clearTimeout(this._transitionInTimer)
     clearTimeout(this._formulaGestureTimer)
@@ -306,6 +374,7 @@ Page({
     console.error("Failed to load formula", err)
     if (transition) {
       this.setData({ loadingNext: false, transitionClass: "" })
+      this.onReaderActivity()
       wx.showToast({ title: "切换失败，请重试", icon: "none" })
     } else {
       this.setData({ loading: false, loadError: true, errorText: err && err.message ? err.message : "公式加载失败，请稍后重试" })
@@ -381,11 +450,13 @@ Page({
       const currentIndex = ids.findIndex(id => sameId(id, currentId))
       this.setData({ sequenceIds: ids, sequenceIndex: currentIndex, loadingNext: false,
         sequenceHasPrev: context.firstPage > 1, sequenceHasNext: context.hasMore }, () => this.syncNavigationState())
+      this.onReaderActivity()
       const nextIndex = currentIndex + (direction === 'prev' ? -1 : 1)
       if (ids[nextIndex] != null) await this.loadCard(ids[nextIndex], { transition: true, sequenceIndex: nextIndex, direction })
     } catch (_) {
       if (!this._readerAlive || !this.readerSessionValid() || requestToken !== this._sequenceRequestToken) return
       this.setData({ loadingNext: false })
+      this.onReaderActivity()
       wx.showToast({ title: '切换失败，请重试', icon: 'none' })
     }
   },
@@ -436,6 +507,7 @@ Page({
     console.error("Failed to load random formula", err)
     if (append) {
       this.setData({ loadingNext: false, transitionClass: "" })
+      this.onReaderActivity()
       wx.showToast({ title: "没有更多公式", icon: "none" })
     } else {
       this.setData({ loading: false, loadError: true, errorText: err && err.message ? err.message : "暂时没有可背诵的公式" })
@@ -477,6 +549,8 @@ Page({
 
   resetReaderScroll() {
     if (!this._readerAlive) return
+    this.onReaderActivity()
+    this._readerScrollOffset = 0
     this.refineReaderViewport()
     this.setData({ readerScrollTop: 1 }, () => {
       if (this._readerAlive) this.setData({ readerScrollTop: 0 })
@@ -485,22 +559,29 @@ Page({
 
   onFormulaReadingChange(event) {
     this.setData({ formulaReadingExpanded: Boolean(event.detail && event.detail.expanded) })
+    this.onReaderActivity()
   },
 
   onFormulaGestureStart() {
+    if (this._readerAlive === false || this._readerVisible === false) return
     clearTimeout(this._formulaGestureTimer)
     this._formulaGestureActive = true
     this._readerGesture = null
+    this.onReaderActivity()
   },
 
   onFormulaGestureEnd() {
+    if (this._readerAlive === false || this._readerVisible === false) return
     clearTimeout(this._formulaGestureTimer)
     this._formulaGestureTimer = setTimeout(() => {
+      if (this._readerAlive === false || this._readerVisible === false) return
       this._formulaGestureActive = false
+      this.onReaderActivity()
     }, 70)
   },
 
   onReaderTouchStart(e = {}) {
+    this.onNavigationTouchStart()
     this._readerGesture = null
     if (this.data.loadingNext || this.data.formulaReadingExpanded || this._formulaGestureActive) return
     if (!e.touches || e.touches.length !== 1) return
@@ -525,6 +606,7 @@ Page({
   },
 
   onReaderTouchEnd(e = {}) {
+    this.onNavigationTouchEnd(e)
     const gesture = this._readerGesture
     this._readerGesture = null
     if (this._formulaGestureActive || !gesture || gesture.axis === 'y' || this.data.loadingNext || this.data.formulaReadingExpanded) return
@@ -544,6 +626,12 @@ Page({
 
   onReaderTouchCancel() {
     this._readerGesture = null
+    this.onNavigationTouchCancel()
+  },
+
+  onReaderScroll(event = {}) {
+    this._readerScrollOffset = Math.max(0, Number(event.detail && event.detail.scrollTop) || 0)
+    this.onReaderActivity()
   },
 
   switchRandomCard(nextIndex, direction) {
@@ -555,6 +643,7 @@ Page({
   },
 
   goPrev() {
+    this.onReaderActivity()
     if (this.data.loadingNext || this.data.formulaReadingExpanded || !this.readerSessionValid() || !this.data.canGoPrev) return
     if (this.data.isRandom) {
       this.switchRandomCard(this.data.currentIndex - 1, 'prev')
@@ -570,6 +659,7 @@ Page({
   },
 
   goNext() {
+    this.onReaderActivity()
     if (this.data.loadingNext || this.data.formulaReadingExpanded || !this.readerSessionValid() || !this.data.canGoNext) return
     if (!this.data.isRandom) {
       const ids = Array.isArray(this.data.sequenceIds) ? this.data.sequenceIds : []
@@ -591,6 +681,7 @@ Page({
   },
 
   async toggleFavorite(e) {
+    this.onReaderActivity()
     if (!auth.isLoggedIn() || !this.readerSessionValid()) return
 
     const cardId = normalizeId(e.currentTarget.dataset.id)

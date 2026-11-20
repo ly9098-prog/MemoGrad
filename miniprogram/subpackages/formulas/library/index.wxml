@@ -2,12 +2,12 @@
 <view class="fl-page">
   <premium-nav title="速记卡" variant="mint" bind:back="goBack" />
 
-  <view class="fl-content {{!initialLoading ? 'route-enter-page' : ''}}">
+  <view class="fl-content {{contentReady ? 'route-enter-page' : ''}}">
     <view class="fl-sticky-tools" style="top: {{navHeight}}px;">
       <view class="fl-filter-row">
         <view class="fl-subject-select" hover-class="fl-pressed" bindtap="toggleSubjectPicker" role="button" aria-label="选择学科，当前{{activeSubjectName}}" aria-expanded="{{showSubjectPicker}}">
           <text class="fl-subject-select-name">{{activeSubjectName}}</text>
-          <text class="line-icon icon-chevron-down fl-control-chevron"></text>
+          <image class="fl-ui-icon fl-control-chevron" src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
         </view>
 
         <view class="fl-library-switch">
@@ -27,7 +27,7 @@
     </view>
 
     <view class="fl-search-box">
-      <view class="fl-search-icon"></view>
+      <image class="fl-search-icon" src="/assets/icons/mobile-controls/search.svg" mode="aspectFit" aria-hidden="true" />
       <input
         class="fl-search-input"
         placeholder="{{activeLibraryType === 'function_graph' ? '搜索函数图像' : '搜索名称或关键词'}}"
@@ -39,7 +39,7 @@
         bindconfirm="onSearchConfirm"
       />
       <view class="fl-search-clear" wx:if="{{searchValue}}" hover-class="fl-pressed" bindtap="onSearchClear" role="button" aria-label="清除搜索">
-        <text class="line-icon icon-close"></text>
+        <image class="fl-ui-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
 
@@ -51,19 +51,19 @@
       <button class="fl-filter-button" hover-class="fl-pressed" bindtap="toggleMoreSheet" aria-label="筛选卡片{{activeChapterId || activeTags.length || onlyFavorites || activeStudyCardType ? '，已应用筛选' : ''}}" aria-expanded="{{showMoreSheet}}">
         <text>筛选</text>
         <view class="fl-filter-dot" wx:if="{{activeChapterId || activeTags.length || onlyFavorites || activeStudyCardType}}"></view>
-        <text class="line-icon icon-chevron-down fl-control-chevron"></text>
+        <image class="fl-ui-icon fl-control-chevron" src="/assets/icons/mobile-controls/chevron-down.svg" mode="aspectFit" aria-hidden="true" />
       </button>
     </view>
 
     <view class="fl-active-tags" wx:if="{{activeChapterId || activeStudyCardType || onlyFavorites || _shownActiveTags.length}}">
       <view class="fl-active-tag" wx:for="{{chapters}}" wx:for-item="chapter" wx:key="id" wx:if="{{chapter.active}}" data-id="0" bindtap="onChapterSelect" role="button" aria-label="移除章节筛选{{chapter.name}}">
-        <text>{{chapter.name}}</text><text class="fl-active-tag-close">×</text>
+        <text>{{chapter.name}}</text><image class="fl-active-tag-close" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </view>
       <view class="fl-active-tag" wx:for="{{studyTypeTabs}}" wx:for-item="type" wx:key="key" wx:if="{{type.active && type.key}}" data-type="" bindtap="onStudyCardTypeChange" role="button" aria-label="移除内容类型筛选{{type.name}}">
-        <text>{{type.name}}</text><text class="fl-active-tag-close">×</text>
+        <text>{{type.name}}</text><image class="fl-active-tag-close" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </view>
       <view class="fl-active-tag" wx:if="{{onlyFavorites}}" bindtap="toggleFavoritesOnly" role="button" aria-label="移除收藏筛选">
-        <text>收藏</text><text class="fl-active-tag-close">×</text>
+        <text>收藏</text><image class="fl-active-tag-close" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </view>
       <view
         class="fl-active-tag"
@@ -75,10 +75,11 @@
         aria-label="移除标签筛选{{item.name}}"
       >
         <text>{{item.name}}</text>
-        <text class="fl-active-tag-close">×</text>
+        <image class="fl-active-tag-close" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
 
+    <view id="formula-library-results" class="fl-results" style="{{resultsMinHeight ? 'min-height:' + resultsMinHeight + 'px;' : ''}}" aria-busy="{{initialLoading}}">
     <view class="fl-list-head" wx:if="{{!initialLoading && !loadError}}">
       <view class="fl-list-caption">
         <text class="fl-list-title">{{activeLibraryType === 'function_graph' ? '函数图像' : '速记卡'}}</text>
@@ -94,13 +95,13 @@
     </view>
 
     <view class="fl-empty" wx:if="{{!initialLoading && loadError}}">
-      <view class="fl-state-icon fl-state-error"><text class="line-icon icon-exclamation"></text></view>
+      <view class="fl-state-icon fl-state-error"><image class="fl-ui-icon" src="/assets/icons/mobile-controls/circle-exclamation-point.svg" mode="aspectFit" aria-hidden="true" /></view>
       <text class="fl-state-title">{{activeLibraryType === 'function_graph' ? '函数图像加载失败' : '速记卡加载失败'}}</text>
       <text class="fl-state-desc">{{loadErrorMessage || '请检查网络后重试'}}</text>
       <view class="fl-reload-btn" hover-class="fl-pressed" bindtap="reload">重新加载</view>
     </view>
 
-    <view class="fl-list {{activeLibraryType === 'function_graph' ? 'fl-graph-list' : ''}}" wx:if="{{!loadError && formulas.length > 0}}">
+    <view class="fl-list {{activeLibraryType === 'function_graph' ? 'fl-graph-list' : ''}}" wx:if="{{!initialLoading && !loadError && formulas.length > 0}}">
       <view
         class="fl-card {{activeLibraryType === 'function_graph' ? 'fl-card-graph' : ''}}"
         wx:for="{{formulas}}"
@@ -140,7 +141,7 @@
             aria-role="button"
             aria-label="{{item.isFavorited || item.is_favorited ? '取消收藏' : '收藏公式'}}"
           >
-            <view class="fl-bookmark-icon"></view>
+            <image class="fl-bookmark-icon" src="/assets/icons/mobile-controls/bookmark.svg" mode="aspectFit" aria-hidden="true" />
           </view>
           <view wx:else class="fl-favorite-btn is-locked" aria-disabled="true" aria-label="登录后可收藏公式">
             <image class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
@@ -158,11 +159,7 @@
             binderror="onGraphImageError"
           />
           <view class="fl-graph-placeholder" wx:else>
-            <view class="fl-graph-placeholder-icon">
-              <view class="fl-graph-axis-x"></view>
-              <view class="fl-graph-axis-y"></view>
-              <text class="fl-graph-curve">⌁</text>
-            </view>
+            <image class="fl-graph-placeholder-icon" src="/assets/icons/mobile-controls/chart-no-axes-combined.svg" mode="aspectFit" aria-hidden="true" />
             <text class="fl-graph-placeholder-title">图像暂未上传</text>
             <text class="fl-graph-placeholder-desc">该条目已标记为函数图像</text>
           </view>
@@ -181,7 +178,7 @@
 
         <view class="fl-card-foot">
           <text class="fl-card-hint">{{activeLibraryType === 'function_graph' ? '查看大图、适用条件与完整解析' : '查看核心记忆、易混点与考试陷阱'}}</text>
-          <text class="line-icon icon-chevron-right fl-card-arrow"></text>
+          <image class="fl-ui-icon fl-card-arrow" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
 
@@ -192,9 +189,10 @@
     </view>
 
     <view class="fl-empty" wx:if="{{!initialLoading && !loadError && formulas.length === 0}}">
-      <view class="fl-state-icon"><text class="line-icon {{activeLibraryType === 'function_graph' ? 'icon-review' : 'icon-book'}}"></text></view>
+      <view class="fl-state-icon"><image class="fl-ui-icon" src="/assets/icons/mobile-controls/{{activeLibraryType === 'function_graph' ? 'chart-no-axes-combined' : 'book-open'}}.svg" mode="aspectFit" aria-hidden="true" /></view>
       <text class="fl-state-title">{{searchValue ? (activeLibraryType === 'function_graph' ? '没有匹配的函数图像' : '没有匹配的速记卡') : (activeLibraryType === 'function_graph' ? '暂无函数图像' : '暂无速记卡数据')}}</text>
       <text class="fl-state-desc">{{searchValue ? '换一个关键词或清除筛选试试' : (activeLibraryType === 'function_graph' ? '当前筛选下尚未录入函数图像' : '当前科目尚未录入对应速记卡')}}</text>
+    </view>
     </view>
   </view>
 
@@ -207,7 +205,7 @@
           <text class="fl-sheet-subtitle">切换后将重新加载章节与内容</text>
         </view>
         <view class="fl-sheet-close" bindtap="toggleSubjectPicker" hover-class="fl-pressed">
-          <text class="line-icon icon-close"></text>
+          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
       <view class="fl-subject-options">
@@ -222,7 +220,7 @@
         >
           <view class="fl-subject-option-mark"><view class="fl-subject-option-dot"></view></view>
           <text class="fl-subject-option-name">{{s.name}}</text>
-          <text class="line-icon icon-check" wx:if="{{s.active}}"></text>
+          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" wx:if="{{s.active}}" />
         </view>
       </view>
     </view>
@@ -234,10 +232,10 @@
       <view class="fl-sheet-head">
         <text class="fl-sheet-title">筛选</text>
         <view class="fl-sheet-close" bindtap="toggleMoreSheet" hover-class="fl-pressed" role="button" aria-label="关闭筛选">
-          <text class="line-icon icon-close"></text>
+          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
-      <scroll-view class="fl-filter-body" scroll-y enhanced show-scrollbar="{{true}}">
+      <scroll-view class="fl-filter-body" scroll-y enhanced show-scrollbar="{{false}}">
         <view class="fl-filter-section" wx:if="{{activeSubject === 'exam408' && activeLibraryType !== 'function_graph'}}">
           <text class="fl-filter-heading">内容类型</text>
           <view class="fl-study-type-row">
@@ -274,13 +272,13 @@
           <button class="fl-filter-option {{onlyFavorites ? 'is-active' : ''}}" hover-class="fl-pressed" bindtap="toggleFavoritesOnly" disabled="{{guestMode}}" aria-pressed="{{onlyFavorites}}" aria-label="{{guestMode ? '登录后可筛选收藏' : '只看收藏'}}">
             <text>只看收藏</text>
             <image wx:if="{{guestMode}}" class="ui-lock" src="/assets/icons/lock.svg" mode="aspectFit" aria-hidden="true" />
-            <text wx:elif="{{onlyFavorites}}" class="line-icon icon-check"></text>
+            <image wx:elif="{{onlyFavorites}}" class="fl-ui-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" />
           </button>
           <view class="fl-filter-option" hover-class="fl-pressed" bindtap="openTagPickerFromMore" role="button">
             <text>标签</text>
             <view class="fl-filter-option-end">
               <text class="fl-filter-value">{{activeTags.length ? '已选 ' + activeTags.length + ' 个' : '全部'}}</text>
-              <text class="line-icon icon-chevron-right"></text>
+              <image class="fl-ui-icon" src="/assets/icons/mobile-controls/chevron-right.svg" mode="aspectFit" aria-hidden="true" />
             </view>
           </view>
         </view>
@@ -301,7 +299,7 @@
           <text class="fl-sheet-subtitle">可同时选择多个标签</text>
         </view>
         <view class="fl-sheet-close" bindtap="toggleTagPicker" hover-class="fl-pressed">
-          <text class="line-icon icon-close"></text>
+          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" />
         </view>
       </view>
       <view class="fl-tag-grid">
@@ -315,7 +313,7 @@
           bindtap="onTagSelect"
         >
           <text>{{t.name}}</text>
-          <text class="line-icon icon-check" wx:if="{{t._active}}"></text>
+          <image class="fl-ui-icon" src="/assets/icons/mobile-controls/check.svg" mode="aspectFit" aria-hidden="true" wx:if="{{t._active}}" />
         </view>
       </view>
       <view class="fl-sheet-done" hover-class="fl-pressed" bindtap="toggleTagPicker">完成筛选</view>

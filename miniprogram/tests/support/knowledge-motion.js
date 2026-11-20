@@ -33,7 +33,7 @@ function motionFixture(options = {}) {
   const fit = layout.fitCamera(frame)
   const limits = layout.cameraLimits(frame)
   let model = {
-    revision: 1, active: true, width: frame.width, height: frame.height, ...limits,
+    revision: 1, gestureEpoch: 0, preserveMotion: false, active: true, width: frame.width, height: frame.height, ...limits,
     camera: { ...fit, scale: 0.8, ...options.camera },
     nodes: [{ id: 'core', cx: 400, cy: 460, r: 40 }, { id: 'point:2', cx: 300, cy: 300, r: 24 }],
     edges: [{ from: 0, to: 1 }],

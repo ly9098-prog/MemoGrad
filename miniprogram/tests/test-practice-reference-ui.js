@@ -52,11 +52,16 @@ assert.ok(/\.runner-reference \.runner-bottom-inner > \.runner-next,[\s\S]*?back
 assert.ok(!/(?:color|background(?:-color)?):[^;]*!important/.test(theme), 'palette overrides are scoped without forced colors')
 assert.ok(hasCss(setupCss, '.mode-card.active .mode-title, .count-btn.active .count-main { color: #23483C; }'))
 assert.ok(hasCss(setupCss, '.mode-card.active .mode-desc, .count-btn.active .count-time { color: #507568; }'))
-assert.ok(hasCss(setupCss, '.parent-arrow.up { transform: rotate(90deg); }'), 'expanded subject chevron points down')
-assert.ok(setup.includes('panel-collapse-arrow line-icon icon-chevron-down up'), 'collapse chevron points up')
-assert.ok(!/>(?:›|⌄|⌃|↝|≡|◎|✓)<\//.test(setup), 'setup controls use drawn icons rather than font glyphs')
-for (const css of [theme, setupCss]) {
-  assert.ok(hasCss(css, 'left: 50%; top: 50%; width: 12rpx; height: 12rpx;'), 'chevron is centred in the actual box')
+assert.ok(hasCss(setupCss, '.config-chevron.up,.panel-collapse-arrow.up { transform: rotate(180deg); }'), 'expanded settings rotate the official chevron up')
+assert.ok(setup.includes('<image class="panel-collapse-arrow up" src="/assets/icons/mobile-controls/chevron-down.svg"'), 'collapse uses the official chevron image')
+assert.ok(!setup.includes('line-icon'), 'practice page no longer uses CSS icon primitives')
+assert.ok(!/>(?:›|⌄|⌃|↝|≡|◎|✓)<\//.test(setup), 'setup controls do not substitute font glyphs for icons')
+assert.strictEqual((setup.match(/<image class="setting-check-icon" src="\/assets\/icons\/mobile-controls\/check.svg"/g) || []).length, 7,
+  'all three mode and four count marks use the official check image')
+assert.ok(hasCss(setupCss, '.hero-chevron-image { display: block; width: 16px; height: 16px; }'), 'hero image has explicit dimensions')
+assert.ok(hasCss(theme, 'left: 50%; top: 50%; width: 12rpx; height: 12rpx;'), 'runner component retains its existing chevron layout')
+for (const name of ['chevron-left', 'chevron-right', 'chevron-down', 'x', 'check', 'circle-exclamation-point']) {
+  assert.ok(fs.existsSync(path.join(root, 'assets/icons/mobile-controls/' + name + '.svg')), 'official resource exists: ' + name)
 }
 
 let definition

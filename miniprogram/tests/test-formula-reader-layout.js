@@ -226,7 +226,17 @@ for (const control of ['fc-flip-front-scroll', 'fc-flip-back-scroll']) {
   const tag = template.match(new RegExp('<scroll-view[^>]*class="' + control + '"[^>]*>'))[0]
   assert.doesNotMatch(tag, /(?:bind|catch)touch(?:start|end|cancel)/,
     'card vertical reading must let page swipe events bubble: ' + control)
+  assert.match(tag, /scroll-y/, 'long content stays scrollable: ' + control)
+  assert.match(tag, /show-scrollbar="\{\{false\}\}"/, 'reading scrollbars are hidden without clipping content: ' + control)
+  assert.match(tag, /bindscroll="onContentScroll"/, 'inertial card scrolling wakes navigation: ' + control)
 }
+const navigationTag = read('subpackages/formulas/reader/index.wxml').match(/<view[^>]*class="fr-nav-capsule[^>]*>/)[0]
+assert.doesNotMatch(navigationTag, /wx:if="\{\{navigationVisible/,
+  'idle navigation keeps its node so it can fade without changing content geometry')
+assert.match(navigationTag, /aria-hidden="\{\{!navigationVisible\}\}"/,
+  'idle navigation leaves the accessibility tree immediately')
+assert.match(readerStyles, /\.fr-nav-capsule\.is-hidden\s*\{[^}]*opacity:\s*0;[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/,
+  'idle navigation cannot intercept a touch while its opacity fades')
 assert.match(template, /class="fc-formula-line-scroll"[\s\S]*?bindtouchstart="onFormulaTouchStart"/,
   'actual horizontal formula scroll views still isolate card switching')
 assert.match(readerStyles, /\.fr-transition-stage\s*\{[^}]*transform:\s*none\s*!important;/,
@@ -328,6 +338,32 @@ if (process.argv[2]) {
   assert.equal(byClass(renderCard(graph), 'fc-content-empty').length, 0)
   assert.equal(byClass(renderCard({ ...graph, graphLoadError: true }), 'fc-graph-fallback').length, 1)
   assert.equal(byClass(renderCard({ ...graph, graphImageUrl: '', displayGraphUrl: '' }), 'fc-graph-fallback').length, 1)
+  for (const graphLoadError of [false, true]) {
+    const graphTree = renderCard({ ...graph, graphLoadError, graphViewportRatio: 75 })
+    assert.equal(byClass(graphTree, 'fc-graph-viewport')[0].attr.style, 'padding-bottom:75%;',
+      'image loading and failure retain exactly the same reserved viewport')
+  }
+  for (const navigationVisible of [false, true]) {
+    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card,
+      navigationVisible, canGoPrev: true, canGoNext: true })
+    const capsule = byClass(readerTree, 'fr-nav-capsule')
+    assert.equal(capsule.length, 1, 'idle visibility does not recreate the floating controls')
+    assert.equal(capsule[0].attr.ariaHidden, !navigationVisible)
+    assert.equal(byClass(readerTree, 'is-hidden').length, navigationVisible ? 0 : 1,
+      'hidden floating controls receive the non-interactive fading state')
+    for (const hit of byClass(capsule[0], 'fr-nav-hit')) {
+      assert.equal(hit.attr.ariaDisabled, !navigationVisible, 'available controls become inaccessible while idle-hidden')
+    }
+  }
+  function visibleText(node) {
+    return typeof node === 'string' || typeof node === 'number' ? String(node) : (node && node.children || []).map(visibleText).join('')
+  }
+  for (const total of [120, 12345]) {
+    const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card,
+      sequenceIds: Array.from({ length: total }, (_, index) => index + 1), sequenceIndex: total - 1 })
+    assert.equal(visibleText(byClass(readerTree, 'fr-nav-status')[0]).trim(), total + ' / ' + total,
+      'long navigation counts keep every digit')
+  }
 
   for (const recitationMode of [false, true]) {
     const readerTree = renderReader({ ...readerDefinition.data, loading: false, currentCard: fixtureData.card, recitationMode, recitationHeight: 600 })

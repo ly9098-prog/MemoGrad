@@ -20,6 +20,7 @@
         <view class="fc-formula-row" wx:for="{{block.readingRows}}" wx:for-item="row" wx:key="_key">
           <scroll-view class="fc-formula-line-scroll" wx:for="{{row.lineItems}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="_key"
             scroll-x enhanced show-scrollbar="{{false}}" bounces="{{false}}"
+            bindscroll="onContentScroll"
             bindtouchstart="onFormulaTouchStart" bindtouchend="onFormulaTouchEnd" bindtouchcancel="onFormulaTouchEnd">
             <view class="fc-reading-line {{row.isScrollable ? 'is-long' : ''}} {{lineIndex > 0 ? 'is-continuation' : ''}}">
               <rich-text class="fc-formula-rich" nodes="{{line.mathNodes}}" user-select="{{true}}" />
@@ -32,16 +33,13 @@
     </view>
   </view>
 
-  <view class="fc-graph-section" wx:if="{{(card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph) && (displayGraphUrl || graphImageUrl) && !graphLoadError}}">
-    <view class="fc-section-heading"><text class="fc-section-title">函数图像</text><text class="fc-preview-hint">点击查看大图</text></view>
-    <view class="fc-graph-viewport" style="padding-bottom:{{graphViewportRatio}}%;" bindtap="previewGraph">
-      <image class="fc-graph-image" src="{{displayGraphUrl || graphImageUrl}}" mode="aspectFit" lazy-load bindload="onGraphLoad" binderror="onGraphError" />
-      <image class="fc-graph-preload" wx:if="{{graphImageUrl && displayGraphUrl !== graphImageUrl}}" src="{{graphImageUrl}}" bindload="onFullGraphLoad" binderror="onFullGraphError" />
+  <view class="fc-graph-section" wx:if="{{card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph}}">
+    <view class="fc-section-heading"><text class="fc-section-title">函数图像</text><text class="fc-preview-hint" wx:if="{{(displayGraphUrl || graphImageUrl) && !graphLoadError}}">点击查看大图</text></view>
+    <view class="fc-graph-viewport" style="padding-bottom:{{graphViewportRatio}}%;">
+      <image class="fc-graph-image" wx:if="{{(displayGraphUrl || graphImageUrl) && !graphLoadError}}" src="{{displayGraphUrl || graphImageUrl}}" data-card-id="{{card.id}}" data-src="{{displayGraphUrl || graphImageUrl}}" mode="aspectFit" lazy-load bindtap="previewGraph" bindload="onGraphLoad" binderror="onGraphError" />
+      <view class="fc-graph-fallback" wx:else><text class="fc-graph-fallback-title">函数图像暂时无法加载</text><text class="fc-graph-fallback-desc">仍可继续查看公式与函数性质</text></view>
+      <image class="fc-graph-preload" wx:if="{{graphImageUrl && displayGraphUrl !== graphImageUrl && !graphLoadError}}" src="{{graphImageUrl}}" data-card-id="{{card.id}}" data-src="{{graphImageUrl}}" bindload="onFullGraphLoad" binderror="onFullGraphError" />
     </view>
-  </view>
-  <view class="fc-graph-section" wx:elif="{{(card.card_type === 'function_graph' || card.is_function_graph || card.isFunctionGraph) && (graphLoadError || (!displayGraphUrl && !graphImageUrl))}}">
-    <text class="fc-section-title">函数图像</text>
-    <view class="fc-graph-fallback"><text class="fc-graph-fallback-title">函数图像暂时无法加载</text><text class="fc-graph-fallback-desc">仍可继续查看公式与函数性质</text></view>
   </view>
 
   <view class="fc-reading-section" wx:if="{{content.summaryNodes.length}}">
@@ -83,7 +81,7 @@
       style="{{recitationMode && readingHeight > 0 ? 'height:' + readingHeight + 'px;' : ''}}"
       bindtouchstart="onCardTouchStart" bindtouchmove="onCardTouchMove" bindtouchend="onCardTouchEnd" bindtouchcancel="onCardTouchCancel">
       <view wx:if="{{recitationMode}}" class="fc-flip-face fc-flip-front" aria-hidden="{{isFlipped}}">
-        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}">
+        <scroll-view class="fc-flip-front-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}" bindscroll="onContentScroll">
           <view class="fc-recall-question {{card.title.length > 48 ? 'is-long-question' : ''}}">
             <template is="card-heading" data="{{card: card, content: content}}" />
           </view>
@@ -94,7 +92,7 @@
       <view class="fc-flip-face {{recitationMode ? 'fc-flip-back' : 'fc-browse-face'}}" aria-hidden="{{recitationMode && !isFlipped}}">
         <block wx:if="{{recitationMode}}">
           <view class="fc-answer-heading"><text class="fc-face-label">答案</text><text class="fc-scroll-note">卡内上下滑动</text></view>
-          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{true}}" scroll-top="{{recitationScrollTop}}" catchtap="containFormulaReading">
+          <scroll-view class="fc-flip-back-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-top="{{recitationScrollTop}}" bindscroll="onContentScroll" catchtap="containFormulaReading">
             <template is="card-heading" data="{{card: card, content: content}}" />
             <template is="card-content" data="{{card: card, content: content, formulaBlocks: formulaBlocks, graphImageUrl: graphImageUrl, displayGraphUrl: displayGraphUrl, graphViewportRatio: graphViewportRatio, graphLoadError: graphLoadError}}" />
           </scroll-view>
@@ -123,7 +121,7 @@
         <text class="fc-expanded-title" wx:else>公式阅读</text>
         <text class="fc-expanded-subtitle" wx:if="{{expandedBlock.hasWideRows}}">保留完整公式，超宽部分可左右滑动</text>
       </view>
-      <view class="fc-reading-close" bindtap="closeFormulaReading" hover-class="fc-control-pressed" role="button" aria-label="关闭公式阅读"><view class="fc-close-icon" aria-hidden="true"></view></view>
+      <view class="fc-reading-close" bindtap="closeFormulaReading" hover-class="fc-control-pressed" role="button" aria-label="关闭公式阅读"><image class="fc-close-icon" src="/assets/icons/mobile-controls/x.svg" mode="aspectFit" aria-hidden="true" /></view>
     </view>
     <scroll-view class="fc-expanded-scroll" style="height:{{expandedScrollHeight}}px;" scroll-y enhanced show-scrollbar="{{false}}">
       <view class="fc-expanded-content">

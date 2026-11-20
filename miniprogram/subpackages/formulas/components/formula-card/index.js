@@ -586,12 +586,14 @@ Component({
       if (!this.data.recitationMode || this.data.expandedBlock || this._readingOpening ||
           Date.now() < (this._flipTapSuppressedUntil || 0)) return
       this.setData({ isFlipped: !this.data.isFlipped })
+      this.onContentScroll()
     },
     onCardTouchStart(event) {
       var touches = event && event.touches || []
       var touch = touches[0]
       this._flipGesture = touch ? { x: touch.clientX, y: touch.clientY } : null
       if (touches.length > 1) this._flipTapSuppressedUntil = Date.now() + 500
+      this.triggerEvent('readeractivity', { phase: 'start' })
     },
     onCardTouchMove(event) {
       var touches = event && event.touches || []
@@ -605,10 +607,12 @@ Component({
     onCardTouchEnd(event) {
       this.onCardTouchMove({ touches: event && event.changedTouches || [] })
       this._flipGesture = null
+      this.triggerEvent('readeractivity', { phase: 'end', touching: Boolean(event && event.touches && event.touches.length) })
     },
     onCardTouchCancel() {
       this._flipGesture = null
       this._flipTapSuppressedUntil = Date.now() + 500
+      this.triggerEvent('readeractivity', { phase: 'end' })
     },
     openFormulaReading(event) {
       var index = Number(event.currentTarget.dataset.index)
@@ -657,7 +661,13 @@ Component({
       this.onFormulaTouchEnd()
     },
 
-    containFormulaReading() {},
+    containFormulaReading() {
+      this.onContentScroll()
+    },
+
+    onContentScroll() {
+      this.triggerEvent('readeractivity', { phase: 'activity' })
+    },
 
     // Keep the viewport ratio in sync with the card currently mounted. Called
     // from the card observer so switching cards (reader swipes between cards
@@ -682,6 +692,13 @@ Component({
     // thumbnail shows immediately; a hidden off-screen <image> preloads the
     // master image and swaps in when its load event fires.
     _refreshDisplayGraph() {
+      const sourceKey = [this.data.card && this.data.card.id, this.data.graphImageUrl, this.data.graphThumbnailUrl].join('|')
+      if (sourceKey !== this._graphSourceKey) {
+        this._graphSourceKey = sourceKey
+        this.setData({ graphLoaded: false, graphLoadError: false,
+          displayGraphUrl: computeDisplayGraphUrl(this.data.graphImageUrl, this.data.graphThumbnailUrl, false) })
+        return
+      }
       const next = computeDisplayGraphUrl(
         this.data.graphImageUrl,
         this.data.graphThumbnailUrl,
@@ -692,23 +709,33 @@ Component({
       }
     },
 
-    onGraphLoad() {
-      // Load event of whichever src is currently displayed (thumbnail or
-      // master). The master is marked ready only by its own preloader.
-      this.setData({ graphLoadError: false })
+    isCurrentGraphEvent(event, fullImage = false) {
+      if (!event || !event.currentTarget) return true
+      const dataset = event.currentTarget.dataset || {}
+      const src = fullImage ? this.data.graphImageUrl : this.data.displayGraphUrl || this.data.graphImageUrl
+      return String(dataset.cardId) === String(this.data.card && this.data.card.id) && dataset.src === src
     },
 
-    onFullGraphLoad() {
+    onGraphLoad(event) {
+      // Load event of whichever src is currently displayed (thumbnail or
+      // master). The master is marked ready only by its own preloader.
+      if (this.isCurrentGraphEvent(event)) this.setData({ graphLoadError: false })
+    },
+
+    onFullGraphLoad(event) {
+      if (!this.isCurrentGraphEvent(event, true)) return
       this.setData({ graphLoadError: false, graphLoaded: true })
       this._refreshDisplayGraph()
     },
 
-    onFullGraphError() {
+    onFullGraphError(event) {
+      if (!this.isCurrentGraphEvent(event, true)) return
       // Master image failed to download — keep the thumbnail visible.
       this.setData({ graphLoaded: false })
     },
 
-    onGraphError() {
+    onGraphError(event) {
+      if (!this.isCurrentGraphEvent(event)) return
       // The actively displayed image failed (usually the thumbnail itself).
       // If we have not fallen back anywhere else, surface the error state.
       this.setData({ graphLoadError: true, graphLoaded: false })

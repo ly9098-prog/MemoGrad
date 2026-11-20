@@ -269,6 +269,173 @@ function navigationRuntime() {
 }
 const settleNavigation = () => new Promise(resolve => setImmediate(resolve))
 
+function floatingReaderRuntime() {
+  let clock = 0, nextId = 0, definition
+  const timers = new Map()
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../subpackages/formulas/reader/index.js'), 'utf8'), {
+    require: () => ({}), Page: value => { definition = value }, console,
+    setTimeout(callback, delay) { const id = ++nextId; timers.set(id, { callback, at: clock + delay }); return id },
+    clearTimeout(id) { timers.delete(id) },
+  })
+  const reader = { ...definition, _readerAlive: true, _readerVisible: true,
+    data: { ...structuredClone(definition.data), loading: false, currentCard: { id: 201 }, recitationMode: true },
+    readerSessionValid: () => true,
+    writes: [], setData(patch, callback) { this.writes.push(patch); Object.assign(this.data, patch); if (callback) callback() },
+  }
+  return { reader, timers,
+    advance(ms) {
+      const end = clock + ms
+      let next
+      while ((next = Array.from(timers).filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0])) {
+        timers.delete(next[0]); clock = next[1].at; next[1].callback()
+      }
+      clock = end
+    },
+  }
+}
+
+test('floating navigation hides after five idle seconds and activity restarts one deadline without resizing content', () => {
+  const { reader, advance, timers } = floatingReaderRuntime()
+  reader.data.recitationHeight = 600
+  reader.resetReaderScroll()
+  assert.equal(reader.data.navigationVisible, true)
+  advance(4999)
+  assert.equal(reader.data.navigationVisible, true)
+  advance(1)
+  assert.equal(reader.data.navigationVisible, false)
+  reader.onReaderActivity()
+  assert.equal(reader.data.navigationVisible, true)
+  advance(3000)
+  reader.onReaderActivity()
+  assert.equal(timers.size, 1, 'repeated scrolling replaces the deadline instead of adding timers')
+  advance(4999)
+  assert.equal(reader.data.navigationVisible, true)
+  advance(1)
+  assert.equal(reader.data.navigationVisible, false)
+  assert.equal(reader.data.recitationHeight, 600, 'showing controls never changes either face height')
+})
+
+test('floating navigation stays awake through long multi-touch and formula gestures then restarts after release', () => {
+  const { reader, advance } = floatingReaderRuntime()
+  reader.resetReaderScroll()
+  advance(4900)
+  reader.onReaderTouchStart({ touches: [{ clientX: 100, clientY: 100 }] })
+  advance(6000)
+  assert.equal(reader.data.navigationVisible, true, 'a held touch must not lose its controls')
+  reader.onReaderTouchEnd({ touches: [{ clientX: 100, clientY: 100 }], changedTouches: [{ clientX: 120, clientY: 100 }] })
+  advance(6000)
+  assert.equal(reader.data.navigationVisible, true, 'another finger is still down')
+  reader.onReaderTouchCancel()
+  advance(5000)
+  assert.equal(reader.data.navigationVisible, false)
+  reader.onFormulaGestureStart()
+  advance(10000)
+  assert.equal(reader.data.navigationVisible, true)
+  reader.onFormulaGestureEnd()
+  advance(70 + 4999)
+  assert.equal(reader.data.navigationVisible, true)
+  advance(1)
+  assert.equal(reader.data.navigationVisible, false)
+})
+
+test('prompt, answer, caught taps and inertial scroll wake the floating navigation through the card boundary', () => {
+  const { reader, advance } = floatingReaderRuntime()
+  const card = cardInstance(true)
+  card.triggerEvent = (name, detail) => {
+    if (name === 'readeractivity') reader.onCardActivity({ detail })
+  }
+  reader.resetReaderScroll()
+  advance(5000)
+  card.onCardTouchStart({ touches: [{ clientX: 100, clientY: 100 }] })
+  assert.equal(reader.data.navigationVisible, true)
+  advance(6000)
+  assert.equal(reader.data.navigationVisible, true)
+  card.onCardTouchEnd({ touches: [], changedTouches: [{ clientX: 100, clientY: 100 }] })
+  advance(5000)
+  assert.equal(reader.data.navigationVisible, false)
+  for (const action of ['onContentScroll', 'toggleCardFlip', 'containFormulaReading']) {
+    card[action]()
+    assert.equal(reader.data.navigationVisible, true, action)
+    advance(5000)
+    assert.equal(reader.data.navigationVisible, false, action)
+  }
+})
+
+test('page hide pauses navigation timers, return restarts them and late unload callbacks cannot write', () => {
+  const { reader, advance, timers } = floatingReaderRuntime()
+  reader.resetReaderScroll()
+  const oldCallback = Array.from(timers.values())[0].callback
+  reader.onHide()
+  reader.onNavigationTouchEnd({ touches: [{ clientX: 120, clientY: 100 }] })
+  const writes = reader.writes.length
+  oldCallback()
+  advance(10000)
+  assert.equal(timers.size, 0)
+  assert.equal(reader.writes.length, writes, 'background pages perform no idle update')
+  reader.onShow()
+  assert.equal(reader.data.navigationVisible, true)
+  advance(5000)
+  assert.equal(reader.data.navigationVisible, false)
+  reader.onShow()
+  const pending = Array.from(timers.values())[0].callback
+  reader.onUnload()
+  const afterUnload = reader.writes.length
+  pending()
+  reader.onReaderActivity()
+  advance(10000)
+  assert.equal(reader.writes.length, afterUnload)
+  assert.equal(timers.size, 0)
+})
+
+test('native expanded reading owns navigation until it closes without resetting the current content', () => {
+  const { reader, advance, timers } = floatingReaderRuntime()
+  reader.resetReaderScroll()
+  const card = reader.data.currentCard
+  reader.data.readerScrollTop = 420
+  reader.onFormulaGestureStart()
+  reader.onFormulaReadingChange({ detail: { expanded: true } })
+  advance(10000)
+  assert.equal(timers.size, 0)
+  reader.onFormulaReadingChange({ detail: { expanded: false } })
+  reader.onFormulaGestureEnd()
+  advance(70 + 4999)
+  assert.equal(reader.data.navigationVisible, true)
+  advance(1)
+  assert.equal(reader.data.navigationVisible, false)
+  assert.equal(reader.data.currentCard, card)
+  assert.equal(reader.data.readerScrollTop, 420)
+})
+
+test('switching graph cards ignores old load and error events while preserving the reserved image ratio', () => {
+  const card = cardInstance(true)
+  card.data.graphImageUrl = '/fixture-first.svg'
+  card.data.graphThumbnailUrl = '/fixture-first-thumb.svg'
+  changeCard(card, { id: 1, title: '函数图一', card_type: 'function_graph', graph_asset: { width: 400, height: 300 } })
+  const event = (cardId, src) => ({ currentTarget: { dataset: { cardId, src } }, detail: { width: 100, height: 500 } })
+  const staleFull = event(1, card.data.graphImageUrl)
+  const staleThumbnail = event(1, card.data.graphThumbnailUrl)
+  card.data.graphImageUrl = '/fixture-second.svg'
+  card.data.graphThumbnailUrl = '/fixture-second-thumb.svg'
+  changeCard(card, { id: 2, title: '函数图二', card_type: 'function_graph', graph_asset: { width: 500, height: 300 } })
+  card._refreshDisplayGraph()
+  const ratio = card.data.graphViewportRatio
+  const formulas = card.data.formulaBlocks
+  const writes = card.writes.length
+  card.onGraphError(staleThumbnail)
+  card.onFullGraphLoad(staleFull)
+  card.onFullGraphError(staleFull)
+  card.onGraphLoad(staleThumbnail)
+  assert.equal(card.writes.length, writes, 'old image callbacks must not alter the new card')
+  card.onFullGraphLoad(event(2, card.data.graphImageUrl))
+  assert.equal(card.data.graphLoaded, true)
+  card.data.recitationScrollTop = 420
+  card.onGraphError(event(2, card.data.graphImageUrl))
+  assert.equal(card.data.graphLoadError, true)
+  assert.equal(card.data.graphViewportRatio, ratio, 'network dimensions do not resize the image viewport')
+  assert.equal(card.data.formulaBlocks, formulas)
+  assert.equal(card.data.recitationScrollTop, 420, 'image state never resets the scroll position')
+})
+
 test('real library entry enables both capsule and swipe navigation with real session storage', async () => {
   const runtime = navigationRuntime()
   const library = runtime.loadPage('library')
@@ -507,6 +674,9 @@ test('recitation uses the available phone height and keeps safe-area navigation 
     assert.ok(cardHeight > width * 760 / 750, 'a tall phone is not limited to the old width-based stage: ' + width)
     assert.equal(reader.data.recitationNeedsScroll, false)
     assert.ok(cardHeight + status + 46 + 44 + bottomInset < height, 'card leaves space for navigation and safe area')
+    const top = status + 46 + width * 22 / 750 + 44 + width * 28 / 750
+    assert.ok(height - bottomInset - top - cardHeight <= 13,
+      'floating controls do not reserve a permanent bottom navigation row')
     runtime.wx.getWindowInfo = () => ({ windowWidth: width, windowHeight: height, screenHeight: height,
       statusBarHeight: status, safeArea: { bottom: height } })
     reader.onResize({ size: { windowWidth: width, windowHeight: height } })
@@ -531,6 +701,11 @@ test('native reader measurements refine height and stale resize/unload measureme
   const initialHeight = reader.data.recitationHeight
   pending.shift()([{ bottom: 220 }])
   assert.ok(reader.data.recitationHeight < initialHeight, 'a taller measured header reduces the stage before the footer')
+  const topHeight = reader.data.recitationHeight
+  reader.onReaderScroll({ detail: { scrollTop: 100 } })
+  reader.onResize({ size: { windowWidth: 390, windowHeight: 844 } })
+  pending.shift()([{ bottom: 120 }])
+  assert.equal(reader.data.recitationHeight, topHeight, 'resizing after an outer scroll uses document geometry rather than inflating the stage')
   reader.onResize({ size: { windowWidth: 390, windowHeight: 700 } })
   const oldResize = pending.shift()
   reader.onResize({ size: { windowWidth: 390, windowHeight: 800 } })
