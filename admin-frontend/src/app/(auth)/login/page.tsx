@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   type FormEvent,
   type PointerEvent,
-  Suspense,
   useEffect,
   useState,
 } from "react";
@@ -24,6 +23,7 @@ import {
 import { AdminFooter } from "@/components/layout/admin-footer";
 import { SliderCaptcha } from "@/components/security/slider-captcha";
 import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 import { apiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import type { LoginResponse } from "@/lib/api/types";
@@ -119,7 +119,6 @@ function postLoginTarget(response: LoginResponse, next: string | null) {
 
 function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const login = useAuthStore((state) => state.login);
 
   // Keep the credential form's state order stable for interaction tests.
@@ -140,7 +139,7 @@ function LoginForm() {
   const emailCodeSent = Boolean(challengeId);
 
   function selectMode(nextMode: LoginMode) {
-    if (loading || captchaOpen) return;
+    if (loading) return;
     setMode(nextMode);
     setError("");
     setChallengeId("");
@@ -156,9 +155,10 @@ function LoginForm() {
     setLoading(true);
     try {
       const response = await login(username, password);
+      const next = new URLSearchParams(window.location.search).get("next");
       const target = response?.user?.must_change_password
-        ? `/change-password?next=${encodeURIComponent(safeInternalRedirect(searchParams.get("next")))}`
-        : safeInternalRedirect(searchParams.get("next"));
+        ? `/change-password?next=${encodeURIComponent(safeInternalRedirect(next))}`
+        : safeInternalRedirect(next);
       router.replace(target);
     } catch (submitError) {
       setError(loginErrorMessage(submitError));
@@ -221,7 +221,12 @@ function LoginForm() {
         body: JSON.stringify({ challenge_id: challengeId, code }),
       });
       useAuthStore.getState().acceptLogin(response);
-      router.replace(postLoginTarget(response, searchParams.get("next")));
+      router.replace(
+        postLoginTarget(
+          response,
+          new URLSearchParams(window.location.search).get("next"),
+        ),
+      );
     } catch (submitError) {
       setError(loginErrorMessage(submitError, "email"));
     } finally {
@@ -264,7 +269,7 @@ function LoginForm() {
                   type="button"
                   aria-pressed={mode === "password"}
                   data-active={mode === "password" || undefined}
-                  disabled={loading || captchaOpen}
+                  disabled={loading}
                   onClick={() => selectMode("password")}
                 >
                   密码登录
@@ -273,7 +278,7 @@ function LoginForm() {
                   type="button"
                   aria-pressed={mode === "email"}
                   data-active={mode === "email" || undefined}
-                  disabled={loading || captchaOpen}
+                  disabled={loading}
                   onClick={() => selectMode("email")}
                 >
                   邮箱验证码
@@ -331,10 +336,6 @@ function LoginForm() {
                 </form>
                 <form onSubmit={handleEmailStart} className={styles.form} aria-busy={loading}
                   inert={mode !== "email" || emailCodeSent} aria-hidden={mode !== "email" || emailCodeSent}>
-                  <div className={styles.emailIntro}>
-                    <Mail aria-hidden="true" />
-                    <p>验证码仅发送给已登录并主动验证过的管理员邮箱，不会创建新账号。</p>
-                  </div>
                   <div className={styles.field}>
                     <label htmlFor="admin-email">管理员邮箱</label>
                     <div className={styles.inputShell} data-invalid={hasError || undefined}>
@@ -384,30 +385,20 @@ function LoginForm() {
                   </div>
                   <div className={styles.field}>
                     <label htmlFor="email-code">6 位验证码</label>
-                    <div className={styles.inputShell} data-invalid={hasError || undefined}>
-                      <ShieldCheck className={styles.fieldIcon} aria-hidden="true" strokeWidth={1.7} />
-                      <Input
-                        disabled={loading}
-                        id="email-code"
-                        name="code"
-                        type="text"
-                        variant="ghost"
-                        className={`${styles.input} ${styles.codeInput}`}
-                        value={code}
-                        onChange={(event) => {
-                          setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-                          if (error) setError("");
-                        }}
-                        placeholder="000000"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        pattern="\d{6}"
-                        maxLength={6}
-                        aria-invalid={hasError || undefined}
-                        aria-describedby={hasError ? "login-error" : undefined}
-                        required
-                      />
-                    </div>
+                    <OtpInput
+                      id="email-code"
+                      name="code"
+                      value={code}
+                      onChange={(value) => {
+                        setCode(value);
+                        if (error) setError("");
+                      }}
+                      disabled={loading}
+                      invalid={hasError}
+                      describedBy={hasError ? "login-error" : undefined}
+                      ariaLabel="6 位邮箱验证码"
+                      required
+                    />
                   </div>
                   {captchaOpen && emailCodeSent && (
                     <SliderCaptcha
@@ -464,5 +455,5 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-  return <Suspense fallback={null}><LoginForm /></Suspense>;
+  return <LoginForm />;
 }

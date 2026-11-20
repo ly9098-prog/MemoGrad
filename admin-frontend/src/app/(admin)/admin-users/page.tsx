@@ -31,6 +31,7 @@ import {
   MetricStrip,
 } from "@/components/admin/management-ui";
 import { StatusBadge } from "@/components/status-badge";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -309,6 +310,11 @@ export default function AdminUsersPage() {
   const currentItems = displayedUsers?.items ?? [];
   const totalPages = Math.max(displayedUsers?.total_pages ?? 1, 1);
   const pagination = useMemo(() => buildPagination(page, totalPages), [page, totalPages]);
+  const usersEntranceRef = useStaggeredEntrance<HTMLTableSectionElement>({
+    ready: currentItems.length > 0,
+    itemCount: currentItems.length,
+    animationKey: `${page}-${pageSize}-${keyword}-${roleFilter}-${statusFilter}-${createdFrom}-${createdTo}`,
+  });
   const selectedOnPage = currentItems.filter((user) => selectedIds.has(user.id));
   const allPageSelected = currentItems.length > 0 && selectedOnPage.length === currentItems.length;
   const somePageSelected = selectedOnPage.length > 0 && !allPageSelected;
@@ -642,7 +648,7 @@ export default function AdminUsersPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={usersEntranceRef}>
                 {users.isLoading && !hasDisplayedUsers ? (
                   Array.from({ length: Math.min(pageSize, 7) }, (_, index) => (
                     <tr key={index} className="border-b border-border last:border-0">

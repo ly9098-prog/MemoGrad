@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -120,17 +120,7 @@ function ProfileForm({ user }: { user: AuthUser }) {
 export default function ProfilePage() {
   const storedUser = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
-  const [activeSection, setActiveSection] = useState<"details" | "security">("details");
   const user = storedUser && ("id" in storedUser ? storedUser : storedUser.user);
-
-  useEffect(() => {
-    const updateActiveSection = () => {
-      setActiveSection(window.location.hash === "#security" ? "security" : "details");
-    };
-    updateActiveSection();
-    window.addEventListener("hashchange", updateActiveSection);
-    return () => window.removeEventListener("hashchange", updateActiveSection);
-  }, []);
 
   if (!user) return null;
 
@@ -171,29 +161,6 @@ export default function ProfilePage() {
           <span>最近登录 {lastLogin}</span>
         </div>
       </header>
-
-      <nav aria-label="个人信息分区" className={styles.tabs}>
-        <a
-          href="#details"
-          className={`${styles.tab} ${
-            activeSection === "details" ? styles.tabActive : ""
-          }`}
-          aria-current={activeSection === "details" ? "location" : undefined}
-          onClick={() => setActiveSection("details")}
-        >
-          基本资料
-        </a>
-        <a
-          href="#security"
-          className={`${styles.tab} ${
-            activeSection === "security" ? styles.tabActive : ""
-          }`}
-          aria-current={activeSection === "security" ? "location" : undefined}
-          onClick={() => setActiveSection("security")}
-        >
-          登录与安全
-        </a>
-      </nav>
 
       <section className={styles.workspace} aria-label="管理员账户">
         <aside className={styles.identityRail}>

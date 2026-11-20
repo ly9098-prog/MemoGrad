@@ -37,6 +37,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body:has([data-user-auth-shell]) {
+  background: #090f16;
+}
+
+:root:has([data-user-auth-shell]) {
+  background: #090f16;
+}
+
 button,
 input {
   font: inherit;
@@ -215,6 +223,11 @@ input:focus-visible {
   background: var(--paper);
   color: var(--muted);
   font-size: 12px;
+}
+
+.boot-screen[data-user-auth-shell] {
+  background: #090f16;
+  color: #a9bdcc;
 }
 
 .account-page {

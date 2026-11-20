@@ -1,9 +1,15 @@
 "use client";
 
-import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import SliderCaptchaBase, {
+  type ActionType,
+  CurrentTargetType,
+  type VerifyParam,
+} from "rc-slider-captcha";
+import { RotateCw, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { buildSliderVerification } from "./slider-captcha-geometry";
 import styles from "./slider-captcha.module.css";
 
 type SliderChallenge = {
@@ -22,27 +28,16 @@ type SliderTicket = {
   expires_in: number;
 };
 
-type TrajectoryPoint = {
-  x: number;
-  y: number;
-  t: number;
-};
-
-type DragState = {
-  pointerId: number | null;
-  pointerX: number;
-  startedAt: number;
-  trajectory: TrajectoryPoint[];
-};
-
 type SliderCaptchaProps = {
   onVerified: (ticket: string) => void;
   onCancel: () => void;
 };
 
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(maximum, Math.max(minimum, value));
-}
+const RENDER_WIDTH = 280;
+const RENDER_HEIGHT = 140;
+const RENDER_PIECE_SIZE = 42;
+const RENDER_PIECE_LEFT = 12;
+const RENDER_MAX_OFFSET = RENDER_WIDTH - RENDER_PIECE_SIZE - RENDER_PIECE_LEFT;
 
 function messageFor(error: unknown) {
   if (error instanceof ApiError) return error.message;
@@ -50,273 +45,295 @@ function messageFor(error: unknown) {
 }
 
 export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<DragState | null>(null);
-  const latestOffsetRef = useRef(0);
-  const mountedRef = useRef(true);
-  const requestSeqRef = useRef(0);
-  const verifyingRef = useRef(false);
-  const [challenge, setChallenge] = useState<SliderChallenge | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [verifying, setVerifying] = useState(false);
+  const keyboardInputId = useId();
+  const challengeRef = useRef<SliderChallenge | null>(null);
+  const actionRef = useRef<ActionType | undefined>(undefined);
+  const mountedRef = useRef(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const verifyControllerRef = useRef<AbortController | null>(null);
+  const interactionCancelledRef = useRef(false);
+  const [pieceTop, setPieceTop] = useState(0);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-
-  const fetchChallenge = useCallback(
-    () => apiRequest<SliderChallenge>("/auth/captcha/slider/start", {
-      method: "POST",
-      skipRefresh: true,
-      exposeErrorDetail: true,
-    }),
-    [],
-  );
-
-  const loadChallenge = useCallback(async () => {
-    const seq = ++requestSeqRef.current;
-    verifyingRef.current = false;
-    setLoading(true);
-    setVerifying(false);
-    setDragging(false);
-    setChallenge(null);
-    setOffset(0);
-    latestOffsetRef.current = 0;
-    dragRef.current = null;
-    setError("");
-    try {
-      const response = await fetchChallenge();
-      if (mountedRef.current && seq === requestSeqRef.current) setChallenge(response);
-    } catch (loadError) {
-      if (mountedRef.current && seq === requestSeqRef.current) setError(messageFor(loadError));
-    } finally {
-      if (mountedRef.current && seq === requestSeqRef.current) setLoading(false);
-    }
-  }, [fetchChallenge]);
 
   useEffect(() => {
     mountedRef.current = true;
-    const seq = ++requestSeqRef.current;
-    void fetchChallenge()
-      .then((response) => {
-        if (mountedRef.current && seq === requestSeqRef.current) setChallenge(response);
-      })
-      .catch((loadError: unknown) => {
-        if (mountedRef.current && seq === requestSeqRef.current) setError(messageFor(loadError));
-      })
-      .finally(() => {
-        if (mountedRef.current && seq === requestSeqRef.current) setLoading(false);
-      });
+    // rc-slider-captcha's mount effect runs twice in React 19 Strict Mode and
+    // leaves the final status at Loading. Deferring one request also lets the
+    // replay cleanup cancel its first timer before it can consume a challenge.
+    const timer = window.setTimeout(() => actionRef.current?.refresh(), 0);
     return () => {
+      window.clearTimeout(timer);
       mountedRef.current = false;
-      requestSeqRef.current += 1;
+      requestControllerRef.current?.abort();
+      verifyControllerRef.current?.abort();
     };
-  }, [fetchChallenge]);
+  }, []);
 
-  function retainPoint(trajectory: TrajectoryPoint[], point: TrajectoryPoint) {
-    // Downsample intermediate points while preserving the initial position.
-    if (trajectory.length >= 64) {
-      const retained = trajectory.filter((_, index) => index === 0 || index % 2 === 1);
-      trajectory.splice(0, trajectory.length, ...retained);
+  const request = useCallback(async () => {
+    if (!mountedRef.current) {
+      throw new DOMException("Captcha request cancelled", "AbortError");
     }
-    trajectory.push(point);
-  }
-
-  function appendPoint(clientY: number, drag: DragState) {
-    const bounds = trackRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    const point = {
-      x: Math.round(latestOffsetRef.current),
-      y: Math.round(clientY - bounds.top),
-      t: Math.round(performance.now() - drag.startedAt),
-    };
-    const previous = drag.trajectory.at(-1);
-    if (!previous || Math.abs(previous.x - point.x) >= 2 || point.t - previous.t >= 80) {
-      retainPoint(drag.trajectory, point);
-    }
-  }
-
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!challenge || loading || verifyingRef.current || !event.isPrimary || event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = {
-      pointerId: event.pointerId,
-      pointerX: event.clientX,
-      startedAt: performance.now(),
-      trajectory: [{ x: 0, y: Math.round(event.clientY - event.currentTarget.getBoundingClientRect().top), t: 0 }],
-    };
-    latestOffsetRef.current = 0;
-    setOffset(0);
-    setDragging(true);
-    setError("");
-  }
-
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    const drag = dragRef.current;
-    const bounds = trackRef.current?.getBoundingClientRect();
-    if (!drag || drag.pointerId !== event.pointerId || !challenge || !bounds || bounds.width <= 0) return;
-    const scale = challenge.width / bounds.width;
-    const maximum = challenge.width - challenge.piece_size;
-    const nextOffset = Math.round(clamp((event.clientX - drag.pointerX) * scale, 0, maximum));
-    latestOffsetRef.current = nextOffset;
-    setOffset(nextOffset);
-    appendPoint(event.clientY, drag);
-  }
-
-  function cancelDrag() {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    latestOffsetRef.current = 0;
-    setDragging(false);
-    setOffset(0);
-  }
-
-  function cancelChallenge() {
-    requestSeqRef.current += 1;
-    mountedRef.current = false;
-    onCancel();
-  }
-
-  async function verifyCurrentOffset() {
-    const drag = dragRef.current;
-    if (!challenge || !drag || verifyingRef.current) return;
-    dragRef.current = null;
-    setDragging(false);
-    const trajectory = [...drag.trajectory];
-    const finalPoint = {
-      x: Math.round(latestOffsetRef.current),
-      y: trajectory.at(-1)?.y ?? 0,
-      t: Math.round(performance.now() - drag.startedAt),
-    };
-    retainPoint(trajectory, finalPoint);
-    if (latestOffsetRef.current < 8 || finalPoint.t < 180) {
-      latestOffsetRef.current = 0;
-      setOffset(0);
-      setError("请慢慢拖动滑块对齐缺口");
-      return;
-    }
-    const seq = requestSeqRef.current;
-    verifyingRef.current = true;
-    setVerifying(true);
+    const controller = new AbortController();
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = controller;
+    setReady(false);
     setError("");
     try {
-      const response = await apiRequest<SliderTicket>("/auth/captcha/slider/verify", {
-        method: "POST",
-        skipRefresh: true,
-        exposeErrorDetail: true,
-        body: JSON.stringify({
-          captcha_id: challenge.captcha_id,
-          offset: Math.round(latestOffsetRef.current),
-          trajectory,
-        }),
+      const challenge = await apiRequest<SliderChallenge>(
+        "/auth/captcha/slider/start",
+        {
+          method: "POST",
+          skipRefresh: true,
+          exposeErrorDetail: true,
+          signal: controller.signal,
+        },
+      );
+      if (controller.signal.aborted || !mountedRef.current) {
+        throw new DOMException("Captcha request cancelled", "AbortError");
+      }
+      challengeRef.current = challenge;
+      setReady(true);
+      setPieceTop(
+        Math.round(
+          (challenge.piece_y / challenge.height) * RENDER_HEIGHT,
+        ),
+      );
+      return {
+        bgUrl: challenge.background_image,
+        puzzleUrl: challenge.puzzle_image,
+      };
+    } catch (loadError) {
+      if (!controller.signal.aborted && mountedRef.current) {
+        setReady(false);
+        setError(messageFor(loadError));
+      }
+      throw loadError;
+    }
+  }, []);
+
+  const verify = useCallback(
+    async (data: VerifyParam) => {
+      if (!mountedRef.current) {
+        throw new DOMException("Captcha verification cancelled", "AbortError");
+      }
+      if (interactionCancelledRef.current) {
+        interactionCancelledRef.current = false;
+        const cancelled = new DOMException(
+          "Captcha gesture cancelled",
+          "AbortError",
+        );
+        setError("操作已取消，请重新拖动");
+        throw cancelled;
+      }
+      const challenge = challengeRef.current;
+      if (!challenge) {
+        const unavailable = new Error("安全验证已失效，请刷新后重试");
+        setError(unavailable.message);
+        throw unavailable;
+      }
+
+      const verification = buildSliderVerification(data, challenge, {
+        width: RENDER_WIDTH,
+        height: RENDER_HEIGHT,
+        pieceLeft: RENDER_PIECE_LEFT,
       });
-      if (mountedRef.current && seq === requestSeqRef.current) onVerified(response.ticket);
-    } catch (verifyError) {
-      if (!mountedRef.current || seq !== requestSeqRef.current) return;
-      setError(messageFor(verifyError));
-      setOffset(0);
-      latestOffsetRef.current = 0;
-    } finally {
-      if (mountedRef.current && seq === requestSeqRef.current) {
-        verifyingRef.current = false;
-        setVerifying(false);
-      }
-    }
-  }
+      const controller = new AbortController();
+      verifyControllerRef.current?.abort();
+      verifyControllerRef.current = controller;
 
-  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    appendPoint(event.clientY, drag);
-    void verifyCurrentOffset();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (!challenge || loading || verifyingRef.current) return;
-    const maximum = challenge.width - challenge.piece_size;
-    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      event.preventDefault();
-      if (!dragRef.current) {
-        dragRef.current = { pointerId: null, pointerX: 0, startedAt: performance.now(), trajectory: [{ x: 0, y: 0, t: 0 }] };
-      }
-      const step = event.shiftKey ? 12 : 4;
-      const direction = event.key === "ArrowRight" ? 1 : -1;
-      const nextOffset = clamp(latestOffsetRef.current + direction * step, 0, maximum);
-      latestOffsetRef.current = nextOffset;
-      retainPoint(dragRef.current.trajectory, { x: nextOffset, y: 0, t: Math.round(performance.now() - dragRef.current.startedAt) });
-      setOffset(nextOffset);
       setError("");
-      return;
-    }
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      void verifyCurrentOffset();
-    }
-  }
+      try {
+        const response = await apiRequest<SliderTicket>(
+          "/auth/captcha/slider/verify",
+          {
+            method: "POST",
+            skipRefresh: true,
+            exposeErrorDetail: true,
+            signal: controller.signal,
+            body: JSON.stringify({
+              captcha_id: challenge.captcha_id,
+              offset: verification.offset,
+              trajectory: verification.trajectory,
+            }),
+          },
+        );
+        if (controller.signal.aborted || !mountedRef.current) {
+          throw new DOMException("Captcha verification cancelled", "AbortError");
+        }
+        onVerified(response.ticket);
+      } catch (verifyError) {
+        if (!controller.signal.aborted && mountedRef.current) {
+          setError(messageFor(verifyError));
+        }
+        throw verifyError;
+      }
+    },
+    [onVerified],
+  );
 
-  const maximum = challenge ? challenge.width - challenge.piece_size : 1;
-  const progress = clamp(offset / maximum, 0, 1);
-  const disabled = loading || verifying;
+  const verifyWithKeyboard = useCallback(() => {
+    interactionCancelledRef.current = false;
+    const trail: VerifyParam["trail"] = keyboardOffset > 0
+      ? [[0, 0], [Math.round(keyboardOffset / 2), 0], [keyboardOffset, 0]]
+      : [[0, 0], [0, 0]];
+    void verify({
+      x: keyboardOffset,
+      y: 0,
+      sliderOffsetX: keyboardOffset,
+      duration: 600,
+      trail,
+      targetType: CurrentTargetType.Puzzle,
+      errorCount: 0,
+    }).catch(() => undefined);
+  }, [keyboardOffset, verify]);
+
+  const retryVerification = useCallback(() => {
+    if (!mountedRef.current) return;
+    interactionCancelledRef.current = false;
+    setError("");
+    actionRef.current?.refresh(true);
+  }, []);
 
   return (
-    <section className={styles.root} aria-labelledby="slider-captcha-title" aria-busy={disabled}>
+    <section
+      className={styles.root}
+      data-keyboard-mode={keyboardOpen || undefined}
+      aria-labelledby="admin-slider-captcha-title"
+      aria-busy={!ready}
+    >
       <div className={styles.heading}>
-        <span className={styles.title} id="slider-captcha-title"><ShieldCheck aria-hidden="true" />安全验证</span>
-        <button type="button" className={styles.refresh} onClick={() => void loadChallenge()} disabled={disabled} aria-label="刷新安全验证">
-          <RefreshCw aria-hidden="true" />
-        </button>
+        <span className={styles.title} id="admin-slider-captcha-title">
+          <ShieldCheck aria-hidden="true" />
+          安全验证
+        </span>
+        <span className={styles.headingActions}>
+          {!keyboardOpen ? (
+            <span className={styles.hint}>拖动拼图对齐缺口</span>
+          ) : null}
+          <button
+            type="button"
+            className={styles.keyboardToggle}
+            aria-expanded={keyboardOpen}
+            aria-controls={keyboardInputId}
+            onClick={() => setKeyboardOpen((open) => !open)}
+          >
+            {keyboardOpen ? "收起" : "键盘验证"}
+          </button>
+        </span>
       </div>
-      {loading ? (
-        <div className={styles.placeholder}><Loader2 aria-hidden="true" />正在生成验证图片</div>
-      ) : challenge ? (
-        <>
-          <div
-            className={styles.image}
-            style={{
-              aspectRatio: `${challenge.width} / ${challenge.height}`,
-              backgroundImage: `url("${challenge.background_image}")`,
+
+      <div
+        onPointerDownCapture={() => {
+          interactionCancelledRef.current = false;
+        }}
+        onPointerCancelCapture={() => {
+          interactionCancelledRef.current = true;
+        }}
+        onTouchStartCapture={() => {
+          interactionCancelledRef.current = false;
+        }}
+        onTouchCancelCapture={() => {
+          interactionCancelledRef.current = true;
+        }}
+      >
+        <SliderCaptchaBase
+          className={styles.captcha}
+          actionRef={actionRef}
+          autoRequest={false}
+          autoRefreshOnError={false}
+          request={request}
+          onVerify={verify}
+          bgSize={{ width: RENDER_WIDTH, height: RENDER_HEIGHT }}
+          puzzleSize={{
+            width: RENDER_PIECE_SIZE,
+            height: RENDER_PIECE_SIZE,
+            left: RENDER_PIECE_LEFT,
+            top: pieceTop,
+          }}
+          styles={{
+            puzzleImg: keyboardOpen
+              ? { transform: `translate3d(${keyboardOffset}px, 0, 0)` }
+              : undefined,
+          }}
+          tipText={{
+            default: "向右拖动滑块完成验证",
+            loading: "正在生成验证图片",
+            moving: "松开完成验证",
+            verifying: "正在验证",
+            success: "验证通过",
+            error: "验证失败，请重试",
+          }}
+          tipIcon={{
+            default: <ShieldCheck aria-hidden="true" />,
+            refresh: <RotateCw aria-hidden="true" />,
+          }}
+        />
+      </div>
+
+      {keyboardOpen ? (
+        <div className={styles.keyboardPanel}>
+          <label htmlFor={keyboardInputId}>拼图位置</label>
+          <input
+            id={keyboardInputId}
+            type="range"
+            min={0}
+            max={RENDER_MAX_OFFSET}
+            step={1}
+            value={keyboardOffset}
+            aria-label="拼图水平位置"
+            aria-describedby={`${keyboardInputId}-hint`}
+            onChange={(event) => {
+              setKeyboardOffset(Number(event.target.value));
+              setError("");
             }}
-            aria-hidden="true"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                verifyWithKeyboard();
+              }
+            }}
+          />
+          <span id={`${keyboardInputId}-hint`} className={styles.keyboardHint}>
+            方向键移动，Enter 确认
+          </span>
+          <button
+            type="button"
+            className={styles.keyboardConfirm}
+            disabled={!ready}
+            onClick={verifyWithKeyboard}
           >
-            <span
-              className={styles.piece}
-              style={{
-                left: `${(offset / challenge.width) * 100}%`,
-                top: `${(challenge.piece_y / challenge.height) * 100}%`,
-                width: `${(challenge.piece_size / challenge.width) * 100}%`,
-                height: `${(challenge.piece_size / challenge.height) * 100}%`,
-                backgroundImage: `url("${challenge.puzzle_image}")`,
-              }}
-            />
-          </div>
-          <div
-            ref={trackRef}
-            className={styles.track}
-            data-dragging={dragging || undefined}
-            role="slider"
-            tabIndex={disabled ? -1 : 0}
-            aria-label="拖动滑块对齐图片缺口"
-            aria-valuemin={0}
-            aria-valuemax={maximum}
-            aria-valuenow={Math.round(offset)}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={cancelDrag}
-            onLostPointerCapture={cancelDrag}
-            onKeyDown={handleKeyDown}
-          >
-            <span className={styles.fill} style={{ width: `${progress * 100}%` }} />
-            <span className={styles.handle} style={{ left: `calc(${progress * 100}% - ${progress * 28}px)` }}>
-              {verifying ? <Loader2 className={styles.spin} aria-hidden="true" /> : <span aria-hidden="true">→</span>}
-            </span>
-            <span className={styles.hint}>{verifying ? "正在验证" : dragging ? "松开完成验证" : "拖动滑块完成拼图"}</span>
-          </div>
-        </>
+            确认位置
+          </button>
+        </div>
       ) : null}
-      {error && <p className={styles.error} role="alert">{error}</p>}
-      <button type="button" className={styles.cancel} onClick={cancelChallenge}>取消</button>
+
+      {error ? (
+        <div className={styles.errorRow} role="alert">
+          <p className={styles.error}>{error}</p>
+          <button
+            type="button"
+            className={styles.retry}
+            onClick={retryVerification}
+          >
+            重新加载验证
+          </button>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className={styles.cancel}
+        onClick={() => {
+          interactionCancelledRef.current = true;
+          requestControllerRef.current?.abort();
+          verifyControllerRef.current?.abort();
+          onCancel();
+        }}
+      >
+        取消验证
+      </button>
     </section>
   );
 }

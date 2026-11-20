@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpen, Clock, Tag } from "lucide-react";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
 import { MathFormula } from "@/components/ui/math-formula";
 import type { AdminQuestion } from "@/lib/api/types";
@@ -180,6 +181,12 @@ export function QuestionListCard({
   onPageSizeChange,
   onSetPage,
 }: QuestionListCardProps) {
+  const listEntranceRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: !isLoading && items.length > 0,
+    itemCount: items.length,
+    animationKey: `${page}-${pageSize}-${filters.subject_id}-${filters.question_type}-${filters.is_active}-${filters.year}-${filters.difficulty}-${filters.keyword}-${filters.import_batch_id}-${filters.knowledge_point_id}`,
+  });
+
   return (
     <section className="admin-table-surface min-w-0 overflow-visible rounded-[18px]">
       <QuestionListToolbar
@@ -202,6 +209,7 @@ export function QuestionListCard({
         {isLoading ? <ListLoading /> : null}
 
         <div
+          ref={listEntranceRef}
           key={`${filters.subject_id}-${filters.question_type}-${filters.is_active}-${filters.year}-${filters.difficulty}-${filters.keyword}-${filters.import_batch_id}-${filters.knowledge_point_id}-${page}-${pageSize}`}
           className="divide-y divide-border"
         >

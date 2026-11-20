@@ -209,6 +209,50 @@ def test_real_redis_ticket_single_use_expiry_and_outage(owned_redis, monkeypatch
     asyncio.run(run())
 
 
+def test_miniprogram_otp_attempts_skip_the_cross_challenge_ip_lock(
+    owned_redis, monkeypatch
+):
+    async def run():
+        async with Redis.from_url(owned_redis.url) as client:
+            monkeypatch.setattr(cache, "_client", client)
+            address = "192.0.2.10"
+            issued = [
+                await otp.issue_otp(
+                    domain="user",
+                    purpose="login",
+                    email=f"mini{i}@example.com",
+                    client_ip=address,
+                    enforce_ip_lock=False,
+                )
+                for i in range(4)
+            ]
+
+            async def wrong(challenge):
+                return await otp.consume_otp(
+                    domain="user",
+                    purpose="login",
+                    client_ip=address,
+                    challenge_id=challenge.challenge_id,
+                    code="000000",
+                    enforce_ip_lock=False,
+                )
+
+            results = await asyncio.gather(
+                *(wrong(challenge) for challenge in issued),
+                return_exceptions=True,
+            )
+            assert all(isinstance(result, otp.OtpError) for result in results)
+            assert not any(isinstance(result, otp.OtpIpLockedError) for result in results)
+            assert await cache.get_strict(
+                otp._ip_failure_key("user", "login", address)
+            ) is None
+            assert await cache.get_strict(
+                otp._ip_lock_key("user", "login", address)
+            ) is None
+
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("kind", ["otp", "slider"])
 @pytest.mark.parametrize("correct", [False, True])
 @pytest.mark.parametrize("expired_lock", ["ip", "challenge"])

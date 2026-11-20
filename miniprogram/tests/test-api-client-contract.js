@@ -715,31 +715,6 @@ function loginPage() {
   }
 }
 
-function sliderComponent() {
-  const modulePath = require.resolve('../components/slider-captcha/index')
-  const originalComponent = global.Component
-  let definition
-  delete require.cache[modulePath]
-  global.Component = value => { definition = value }
-  try {
-    require(modulePath)
-  } finally {
-    if (originalComponent === undefined) delete global.Component
-    else global.Component = originalComponent
-  }
-  const events = []
-  return {
-    ...definition.methods,
-    _active: true,
-    _requestSeq: 0,
-    data: { ...definition.data },
-    events,
-    detach() { definition.lifetimes.detached.call(this) },
-    setData(values) { Object.assign(this.data, values) },
-    triggerEvent(name, detail) { events.push({ name, detail }) },
-  }
-}
-
 test('login page rolls authentication back when consent persistence fails', async () => {
   reset({}, { routes: { 'POST /auth/login': { statusCode: 200, data: {
     access_token: 'login-access', refresh_token: 'login-refresh',
@@ -792,22 +767,8 @@ test('late login completion commits consent before the destroyed page returns', 
   }
 })
 
-test('email login requires slider verification, sends its ticket and persists the miniprogram session', async () => {
+test('email login sends consent, verifies without bearer auth and persists the miniprogram session', async () => {
   reset({}, { routes: {
-    'POST /auth/captcha/slider/start': { statusCode: 200, data: {
-      captcha_id: 'slider-1',
-      background_image: 'data:image/png;base64,AA==',
-      puzzle_image: 'data:image/png;base64,AA==',
-      width: 320,
-      height: 160,
-      piece_size: 48,
-      piece_y: 42,
-      expires_in: 120,
-    }, header: {} },
-    'POST /auth/captcha/slider/verify': { statusCode: 200, data: {
-      ticket: 'captcha-ticket-0123456789abcdef',
-      expires_in: 120,
-    }, header: {} },
     'POST /auth/email/start': { statusCode: 200, data: {
       challenge_id: 'challenge-1',
       expires_in: 300,
@@ -823,36 +784,19 @@ test('email login requires slider verification, sends its ticket and persists th
 
   const page = loginPage()
   page.data.email = 'learner@example.com'
-  await page.onEmailSubmit()
-  assert.equal(page.data.emailCaptchaVisible, true)
-  assert.equal(calls.requests.length, 0, 'showing the challenge does not send an email')
-  const captcha = sliderComponent()
-  await captcha.loadChallenge()
-  assert.equal(captcha.data.challenge.captcha_id, 'slider-1')
-  assert.deepEqual(calls.requests[0].data, {})
-  assert.equal(calls.requests[0].header.Authorization, undefined)
-
-  captcha.onTouchStart()
-  captcha._startedAt = Date.now() - 240
-  await captcha.onChange({ detail: { value: 120 } })
-  assert.equal(captcha.events[0].name, 'verified')
-  await page.onEmailCaptchaVerified({ detail: captcha.events[0].detail })
+  await page._startEmailOtp()
   try {
-    assert.equal(calls.requests[1].data.captcha_id, 'slider-1')
-    assert.equal(calls.requests[1].data.offset, 120)
-    assert.ok(calls.requests[1].data.trajectory.length >= 2)
-    assert.deepEqual(calls.requests[2].data, {
+    assert.deepEqual(calls.requests[0].data, {
       email: 'learner@example.com',
+      wechat_code: 'wx-code',
       client: 'miniprogram',
       accepted_terms: true,
       agreement_version: '2026-11-20',
       privacy_version: '2026-11-20',
-      captcha_ticket: 'captcha-ticket-0123456789abcdef',
     })
-    assert.equal(calls.requests[2].header.Authorization, undefined)
+    assert.equal(calls.requests[0].header.Authorization, undefined)
     assert.equal(page.data.emailChallengeId, 'challenge-1')
     assert.equal(page.data.emailResendRemaining, 60)
-    assert.equal(page.data.emailCaptchaVisible, false)
   } finally {
     page._clearEmailCountdown()
   }
@@ -861,59 +805,17 @@ test('email login requires slider verification, sends its ticket and persists th
   page._scheduleHomeRedirect = () => { scheduled++ }
   page.data.emailCode = '123456'
   await page.onEmailSubmit()
-  assert.deepEqual(calls.requests[3].data, {
+  assert.deepEqual(calls.requests[1].data, {
     challenge_id: 'challenge-1',
     code: '123456',
     client: 'miniprogram',
   })
-  assert.equal(calls.requests[3].header.Authorization, undefined)
+  assert.equal(calls.requests[1].header.Authorization, undefined)
   assert.equal(memory.get('token'), 'email-access')
   assert.equal(memory.get('refresh_token'), 'email-refresh')
   assert.equal(memory.get('user').id, 23)
   assert.equal(memory.get('privacy_acceptance').privacy_version, '1.1')
   assert.equal(scheduled, 1)
-})
-
-test('slider preserves the starting point and bounds long adjustment trajectories', async () => {
-  reset({}, { routes: {
-    'POST /auth/captcha/slider/verify': { statusCode: 200, data: { ticket: 'ticket' }, header: {} },
-  } })
-  const captcha = sliderComponent()
-  captcha._resetMotion()
-  captcha.data.loading = false
-  captcha.data.challenge = { captcha_id: 'long-slider', width: 320 }
-  captcha._startedAt = Date.now() - 1000
-  for (let index = 0; index < 150; index++) captcha.onChanging({ detail: { value: index % 2 ? 120 : 115 } })
-  await captcha.onChange({ detail: { value: 120 } })
-  const points = calls.requests[0].data.trajectory
-  assert.ok(points.length >= 2 && points.length <= 64)
-  assert.equal(points[0].x, 0)
-  assert.equal(points[points.length - 1].x, 120)
-})
-
-test('cancelled or detached sliders never emit a late verification ticket', async () => {
-  for (const action of ['onCancel', 'detach']) {
-    reset()
-    const originalRequest = wx.request
-    let pending
-    wx.request = options => { pending = options }
-    try {
-      const captcha = sliderComponent()
-      captcha._resetMotion()
-      captcha.data.loading = false
-      captcha.data.challenge = { captcha_id: 'late-slider', width: 320 }
-      captcha._startedAt = Date.now() - 400
-      const result = captcha.onChange({ detail: { value: 120 } })
-      await new Promise(resolve => setImmediate(resolve))
-      assert.ok(pending)
-      captcha[action]()
-      pending.success({ statusCode: 200, data: { ticket: 'late-ticket' }, header: {} })
-      await result
-      assert.equal(captcha.events.some(event => event.name === 'verified'), false)
-    } finally {
-      wx.request = originalRequest
-    }
-  }
 })
 
 test('cancelling login before wx.login finishes does not create or persist a session', async () => {
@@ -931,6 +833,30 @@ test('cancelling login before wx.login finishes does not create or persist a ses
     assert.equal(memory.has('privacy_acceptance'), false)
     assert.equal(calls.requests.length, 0)
     assert.equal(page._homeRedirectTimer, null)
+  } finally {
+    wx.login = originalLogin
+  }
+})
+
+test('cancelling email login while wx.login is pending never requests an OTP', async () => {
+  reset()
+  const originalLogin = wx.login
+  let completeLogin
+  wx.login = () => new Promise(resolve => {
+    completeLogin = resolve
+  })
+  try {
+    const page = loginPage()
+    page.data.email = 'learner@example.com'
+    const completion = page._startEmailOtp()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.ok(completeLogin)
+    page.onGuestBrowse()
+    completeLogin({ code: 'late-wechat-code' })
+    await completion
+    assert.equal(calls.requests.length, 0)
+    assert.equal(memory.has('token'), false)
+    assert.equal(memory.has('privacy_acceptance'), false)
   } finally {
     wx.login = originalLogin
   }

@@ -3,8 +3,5 @@
   "backgroundColor": "#FAFCFB",
   "backgroundColorTop": "#FAFCFB",
   "backgroundColorBottom": "#FAFCFB",
-  "backgroundTextStyle": "dark",
-  "usingComponents": {
-    "slider-captcha": "/components/slider-captcha/index"
-  }
+  "backgroundTextStyle": "dark"
 }

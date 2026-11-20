@@ -23,7 +23,6 @@ Page({
     emailCodeSentTo: '',
     emailResendRemaining: 0,
     emailResendLabel: '',
-    emailCaptchaVisible: false,
     focusedField: '',
     entryPending: true,
     discMotionActive: false,
@@ -94,7 +93,6 @@ Page({
     this._safeSetData({ discMotionActive: false })
     this._clearHomeRedirectTimer()
     this._clearEmailCountdown()
-    this.onEmailCaptchaCancel()
   },
 
   onUnload() {
@@ -171,17 +169,6 @@ Page({
       emailResendRemaining: 0,
       emailResendLabel: '',
     })
-  },
-
-  onEmailCaptchaCancel() {
-    this._safeSetData({ emailCaptchaVisible: false })
-  },
-
-  onEmailCaptchaVerified(event) {
-    const ticket = event && event.detail && event.detail.ticket
-    if (!this.data.emailCaptchaVisible || typeof ticket !== 'string' || !ticket) return
-    this._safeSetData({ emailCaptchaVisible: false })
-    return this._startEmailOtp(ticket)
   },
 
   _scheduleHomeRedirect(delayMs = 0) {
@@ -358,7 +345,6 @@ Page({
   onGuestBrowse() {
     if (this._pageDestroyed) return
     this._loginCancelled = true
-    this.onEmailCaptchaCancel()
     this._pendingHomeRedirect = false
     this._clearHomeRedirectTimer()
     this._loginAttemptSeq += 1
@@ -374,7 +360,7 @@ Page({
   },
 
   onAgreementChange(e) {
-    if (this.data.loading || this.data.emailCaptchaVisible) return
+    if (this.data.loading) return
     const values = e && e.detail && Array.isArray(e.detail.value) ? e.detail.value : []
     const agreed = values.includes('agreed')
     this.setData({ agreed })
@@ -382,19 +368,17 @@ Page({
   },
 
   onLoginMethodChange(e) {
-    if (this.data.loading || this.data.emailCaptchaVisible) return
+    if (this.data.loading) return
     const method = e && e.currentTarget && e.currentTarget.dataset
       ? e.currentTarget.dataset.method
       : ''
     if (method !== 'wechat' && method !== 'email') return
-    this.onEmailCaptchaCancel()
     this._safeSetData({ loginMethod: method, error: '' })
   },
 
   onEmailInput(e) {
     if (this.data.loading) return
     const email = String((e && e.detail && e.detail.value) || '').slice(0, 254)
-    if (this.data.emailCaptchaVisible) this.onEmailCaptchaCancel()
     if (this.data.emailChallengeId && email.trim() !== this.data.emailCodeSentTo) {
       this._clearEmailChallenge()
     }
@@ -449,50 +433,67 @@ Page({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   },
 
-  _validateEmailOtpRequest() {
-    if (!this.ensureAgreementAccepted()) return ''
-    const email = this.data.email.trim()
-    if (!this._validEmail(email)) {
-      this._safeSetData({ error: '请输入有效的邮箱地址' })
-      return ''
-    }
-    if (email !== this.data.email) this._safeSetData({ email })
-    return email
+  _getWechatLoginCode() {
+    return new Promise((resolve, reject) => {
+      let settled = false
+      const finish = (error, result) => {
+        if (settled) return
+        settled = true
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve(result || {})
+      }
+      try {
+        const pending = wx.login({
+          success: result => finish(null, result),
+          fail: error => finish(error),
+        })
+        if (pending && typeof pending.then === 'function') {
+          pending.then(result => finish(null, result), error => finish(error))
+        }
+      } catch (error) {
+        finish(error)
+      }
+    })
   },
 
-  async _requestEmailCode() {
-    if (this._pageDestroyed || this.data.loading || this.data.emailCaptchaVisible ||
-      this.data.emailResendRemaining > 0 || !this._validateEmailOtpRequest()) return
-    if (this.data.accountMode) return this._startEmailOtp()
-    this._safeSetData({ emailCaptchaVisible: true, error: '' })
-  },
-
-  async _startEmailOtp(captchaTicket = '') {
+  async _startEmailOtp() {
     if (this._pageDestroyed || this.data.loading || this.data.emailResendRemaining > 0) {
       return
     }
-    const email = this._validateEmailOtpRequest()
-    if (!email) return
-    if (!this.data.accountMode && !captchaTicket) {
-      await this._requestEmailCode()
+    if (!this.ensureAgreementAccepted()) return
+    const email = this.data.email.trim()
+    if (!this._validEmail(email)) {
+      this._safeSetData({ error: '请输入有效的邮箱地址' })
       return
     }
 
+    const attemptSeq = ++this._loginAttemptSeq
+    this._loginCancelled = false
     this._safeSetData({ loading: true, error: '' })
     try {
       this._assertAccountOwner()
-      const payload = this.data.accountMode ? { email } : {
+      let wechatCode = ''
+      if (!this.data.accountMode) {
+        const loginResult = await this._getWechatLoginCode()
+        if (!this._isCurrentAttempt(attemptSeq) || this._loginCancelled) return
+        wechatCode = String(loginResult.code || '')
+        if (!wechatCode) throw new Error('微信客户端校验失败，请重试')
+      }
+      if (!this._isCurrentAttempt(attemptSeq) || this._loginCancelled) return
+      this._assertAccountOwner()
+      const response = await api.post(this.data.accountMode
+        ? '/users/me/identities/email/bind/start' : '/auth/email/start', this.data.accountMode ? { email } : {
         email,
+        wechat_code: wechatCode,
         client: 'miniprogram',
         accepted_terms: true,
         agreement_version: config.AGREEMENT_VERSION,
         privacy_version: config.PRIVACY_POLICY_VERSION,
-        captcha_ticket: captchaTicket,
-      }
-      const response = await api.post(this.data.accountMode
-        ? '/users/me/identities/email/bind/start' : '/auth/email/start',
-      payload, this.data.accountMode ? {} : { auth: 'none' })
-      if (this._pageDestroyed) return
+      }, this.data.accountMode ? {} : { auth: 'none' })
+      if (!this._isCurrentAttempt(attemptSeq) || this._loginCancelled) return
       this._assertAccountOwner()
       this._safeSetData({
         email,
@@ -515,7 +516,7 @@ Page({
   async onEmailSubmit() {
     if (this._pageDestroyed || this.data.loading) return
     if (!this.data.emailChallengeId) {
-      await this._requestEmailCode()
+      await this._startEmailOtp()
       return
     }
     if (!this.ensureAgreementAccepted()) return
@@ -558,7 +559,7 @@ Page({
 
   async onEmailResend() {
     if (this.data.loading || this.data.emailResendRemaining > 0) return
-    await this._requestEmailCode()
+    await this._startEmailOtp()
   },
 
   async onWechatLogin() {

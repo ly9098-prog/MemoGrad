@@ -172,6 +172,8 @@ async def get_user_response(db: AsyncSession, user: User) -> UserResponse:
             "masked_subject": (
                 f"{identity.subject[:2]}***@{identity.subject.split('@', 1)[1]}"
                 if identity.provider == "email" and "@" in identity.subject
+                else identity.subject
+                if identity.provider == "password"
                 else f"{identity.provider}:***"
             ),
             "verified": identity.verified_at is not None,

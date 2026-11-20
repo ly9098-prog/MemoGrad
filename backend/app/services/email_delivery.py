@@ -62,6 +62,7 @@ async def send_auth_email(*, to_email: str, subject: str, text: str) -> None:
 def build_otp_email(domain: str, purpose: str, code: str) -> tuple[str, str]:
     labels = {
         "login": "登录验证码",
+        "register": "注册验证码",
         "bind": "绑定邮箱验证码",
         "step_up": "安全验证验证码",
         "activate": "管理员邮箱验证码",

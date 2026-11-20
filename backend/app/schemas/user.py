@@ -66,7 +66,8 @@ class DeletionResponse(BaseModel):
 
 class EmailOtpStartRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
-    captcha_ticket: str = Field(min_length=32, max_length=64)
+    captcha_ticket: str | None = Field(default=None, min_length=32, max_length=64)
+    wechat_code: str | None = Field(default=None, min_length=1, max_length=256)
     client: str = Field(default="web", pattern="^(web|miniprogram)$")
     accepted_terms: bool = False
     agreement_version: str | None = Field(default=None, max_length=32)
@@ -77,6 +78,28 @@ class EmailOtpVerifyRequest(BaseModel):
     challenge_id: str = Field(min_length=32, max_length=64)
     code: str = Field(pattern=r"^\d{6}$")
     client: str = Field(default="web", pattern="^(web|miniprogram)$")
+
+
+class PasswordLoginRequest(BaseModel):
+    account: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+    client: str = Field(default="web", pattern="^web$")
+
+
+class PasswordRegisterStartRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=12, max_length=128)
+    captcha_ticket: str = Field(min_length=32, max_length=64)
+    accepted_terms: bool = False
+    agreement_version: str | None = Field(default=None, max_length=32)
+    privacy_version: str | None = Field(default=None, max_length=32)
+
+
+class PasswordRegisterVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=32, max_length=64)
+    code: str = Field(pattern=r"^\d{6}$")
+    client: str = Field(default="web", pattern="^web$")
 
 
 class OtpStartResponse(BaseModel):

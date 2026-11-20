@@ -169,6 +169,83 @@ def test_admin_email_login_consumes_slider_ticket_once(monkeypatch):
         app.dependency_overrides.pop(get_db, None)
 
 
+def test_admin_email_activation_requires_a_fresh_slider_ticket(monkeypatch):
+    import asyncio
+
+    from app.core.cache import cache
+    from app.services import (
+        admin_email_auth_service,
+        email_otp_service,
+        slider_captcha_service,
+    )
+
+    current_admin = AdminPrincipal(
+        _admin_user(password="old-password"),
+        {"jti": "token-id", "exp": 4102444800},
+    )
+
+    async def override_current_admin():
+        return current_admin
+
+    monkeypatch.setattr(cache, "_enabled", False)
+    delivery = AsyncMock()
+    monkeypatch.setattr(email_otp_service, "send_auth_email", delivery)
+    monkeypatch.setattr(
+        admin_email_auth_service,
+        "validate_admin_email_available",
+        AsyncMock(return_value="verified@example.com"),
+    )
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[admin_auth.get_current_admin] = override_current_admin
+    try:
+        missing_ticket = client.post(
+            "/api/admin/v1/auth/email/activate/start",
+            json={
+                "email": "verified@example.com",
+                "current_password": "old-password",
+            },
+        )
+        assert missing_ticket.status_code == 422
+
+        issued = client.post("/api/admin/v1/auth/captcha/slider/start")
+        assert issued.status_code == 200
+        challenge_id = issued.json()["captcha_id"]
+        challenge = asyncio.run(
+            cache.get_strict(slider_captcha_service._challenge_key(challenge_id))
+        )
+        target = challenge["target_x"]
+        verified = client.post(
+            "/api/admin/v1/auth/captcha/slider/verify",
+            json={
+                "captcha_id": challenge_id,
+                "offset": target,
+                "trajectory": [
+                    {"x": 0, "y": 0, "t": 0},
+                    {"x": target, "y": 0, "t": 400},
+                ],
+            },
+        )
+        assert verified.status_code == 200
+        payload = {
+            "email": "verified@example.com",
+            "current_password": "old-password",
+            "captcha_ticket": verified.json()["ticket"],
+        }
+        started = client.post(
+            "/api/admin/v1/auth/email/activate/start", json=payload
+        )
+        assert started.status_code == 200
+        assert delivery.await_count == 1
+
+        replay = client.post(
+            "/api/admin/v1/auth/email/activate/start", json=payload
+        )
+        assert replay.status_code == 400
+    finally:
+        app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
 def test_restricted_admin_token_is_only_accepted_by_all_scope_dependency():
     import asyncio
 

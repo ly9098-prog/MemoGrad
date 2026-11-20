@@ -16,7 +16,7 @@ from app.services.auth_attempt_guard import (
 from app.services.email_delivery import build_otp_email, send_auth_email
 
 DOMAINS = {"user", "admin"}
-PURPOSES = {"login", "bind", "step_up", "activate", "recover"}
+PURPOSES = {"login", "register", "bind", "step_up", "activate", "recover"}
 
 
 class OtpError(ValueError):
@@ -162,15 +162,17 @@ async def issue_otp(
     email: str,
     purpose: str,
     client_ip: str,
+    enforce_ip_lock: bool = True,
     user_id: int | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> IssuedOtp:
     if domain not in DOMAINS or purpose not in PURPOSES:
         raise OtpError("验证码用途无效")
-    try:
-        await _assert_ip_unlocked(domain, purpose, client_ip)
-    except CacheUnavailableError as exc:
-        raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
+    if enforce_ip_lock:
+        try:
+            await _assert_ip_unlocked(domain, purpose, client_ip)
+        except CacheUnavailableError as exc:
+            raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
     resend_key = _resend_key(domain, purpose, email)
     owner = uuid4().hex
     try:
@@ -215,6 +217,7 @@ async def _verify_code(
     purpose: str,
     client_ip: str,
     attempt: AuthAttempt,
+    enforce_ip_lock: bool,
 ) -> None:
     expected = str(challenge.get("code_digest") or "")
     actual = _digest(
@@ -227,6 +230,7 @@ async def _verify_code(
             ip_lock_key=_ip_lock_key(domain, purpose, client_ip),
             max_attempts=settings.OTP_MAX_ATTEMPTS,
             challenge_ttl=settings.OTP_EXPIRE_SEC,
+            enforce_ip_lock=enforce_ip_lock,
         ):
             raise OtpIpLockedError("验证码尝试次数过多，请稍后再试")
         raise OtpError("验证码错误或已失效")
@@ -239,6 +243,8 @@ async def consume_otp(
     domain: str,
     purpose: str,
     client_ip: str,
+    enforce_ip_lock: bool = True,
+    client: str | None = None,
 ) -> dict[str, Any]:
     try:
         async with serialize_ip_attempts(
@@ -251,6 +257,8 @@ async def consume_otp(
                 purpose=purpose,
                 client_ip=client_ip,
                 attempt=attempt,
+                enforce_ip_lock=enforce_ip_lock,
+                client=client,
             )
     except AuthAttemptBusyError as exc:
         raise OtpRateLimitError(str(exc)) from exc
@@ -266,6 +274,8 @@ async def _consume_otp(
     purpose: str,
     client_ip: str,
     attempt: AuthAttempt,
+    enforce_ip_lock: bool,
+    client: str | None,
 ) -> dict[str, Any]:
     key = _challenge_key(challenge_id)
     lock_key = f"{key}:lock"
@@ -278,7 +288,10 @@ async def _consume_otp(
         raise OtpRateLimitError("验证请求过于频繁，请稍后重试")
     attempt.locks.append((lock_key, owner))
     try:
-        if await attempt.read(_ip_lock_key(domain, purpose, client_ip)):
+        if (
+            enforce_ip_lock
+            and await attempt.read(_ip_lock_key(domain, purpose, client_ip))
+        ):
             raise OtpIpLockedError("验证码尝试次数过多，请稍后再试")
         challenge = await attempt.read(key)
         if not isinstance(challenge, dict):
@@ -289,6 +302,11 @@ async def _consume_otp(
             raise OtpError("验证码无效或已过期")
         if challenge.get("domain") != domain or challenge.get("purpose") != purpose:
             raise OtpError("验证码用途不匹配")
+        if (
+            client is not None
+            and challenge.get("metadata", {}).get("client") != client
+        ):
+            raise OtpError("验证码客户端不匹配")
         await _verify_code(
             challenge_id,
             challenge,
@@ -297,13 +315,12 @@ async def _consume_otp(
             purpose,
             client_ip,
             attempt,
+            enforce_ip_lock,
         )
-        await attempt.commit(
-            deletes=[
-                key, f"{key}:attempts", active_key,
-                _ip_failure_key(domain, purpose, client_ip),
-            ]
-        )
+        deletes = [key, f"{key}:attempts", active_key]
+        if enforce_ip_lock:
+            deletes.append(_ip_failure_key(domain, purpose, client_ip))
+        await attempt.commit(deletes=deletes)
         return challenge
     except CacheUnavailableError as exc:
         raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc

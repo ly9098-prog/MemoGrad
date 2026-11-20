@@ -11,9 +11,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import styles from "@/components/profile/profile.module.css";
+import { SliderCaptcha } from "@/components/security/slider-captcha";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 import { apiRequest } from "@/lib/api/client";
 import { isPasswordReady } from "@/lib/admin-user-utils";
 import type { LoginResponse } from "@/lib/api/types";
@@ -42,6 +44,7 @@ export function SecuritySettings() {
   const [code, setCode] = useState("");
   const [resendIn, setResendIn] = useState(0);
   const [activationLoading, setActivationLoading] = useState(false);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -57,9 +60,25 @@ export function SecuritySettings() {
     return () => window.clearInterval(timer);
   }, [resendIn]);
 
-  async function startActivation(event?: FormEvent<HTMLFormElement>) {
+  function openActivationCaptcha(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (activationLoading || captchaOpen) return;
+    if (!activationPassword) {
+      setError("请输入当前密码");
+      return;
+    }
+    if (!activationEmail.trim()) {
+      setError("请输入邮箱地址");
+      return;
+    }
+    setError("");
+    setMessage("");
+    setCaptchaOpen(true);
+  }
+
+  async function sendActivationCode(captchaTicket: string) {
     if (activationLoading) return;
+    setCaptchaOpen(false);
     setError("");
     setMessage("");
     setActivationLoading(true);
@@ -68,7 +87,9 @@ export function SecuritySettings() {
         method: "POST",
         exposeErrorDetail: true,
         body: JSON.stringify({
-          email: activationEmail.trim(), current_password: activationPassword,
+          email: activationEmail.trim(),
+          current_password: activationPassword,
+          captcha_ticket: captchaTicket,
         }),
       });
       setChallengeId(response.challenge_id);
@@ -84,7 +105,7 @@ export function SecuritySettings() {
 
   async function verifyActivation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (activationLoading || code.length !== 6) return;
+    if (activationLoading || captchaOpen || code.length !== 6) return;
     setError("");
     setMessage("");
     setActivationLoading(true);
@@ -97,6 +118,7 @@ export function SecuritySettings() {
       useAuthStore.getState().acceptLogin(response);
       setChallengeId("");
       setCode("");
+      setCaptchaOpen(false);
       setMessage("邮箱已验证，现在可以使用邮箱验证码登录。");
       setActivationPassword("");
     } catch (submitError) {
@@ -178,7 +200,7 @@ export function SecuritySettings() {
             </div>
           ) : null}
           {!challengeId ? (
-            <form onSubmit={startActivation} className={styles.securityForm}>
+            <form onSubmit={openActivationCaptcha} className={styles.securityForm}>
               <input
                 type="hidden"
                 autoComplete="username"
@@ -188,7 +210,7 @@ export function SecuritySettings() {
               <label>
                 当前密码
                 <Input
-                  disabled={activationLoading}
+                  disabled={activationLoading || captchaOpen}
                   type="password"
                   value={activationPassword}
                   onChange={(event) => setActivationPassword(event.target.value)}
@@ -200,7 +222,7 @@ export function SecuritySettings() {
               <label>
                 {emailVerified ? "新邮箱" : "邮箱地址"}
                 <Input
-                  disabled={activationLoading}
+                  disabled={activationLoading || captchaOpen}
                   type="email"
                   value={activationEmail}
                   onChange={(event) => setActivationEmail(event.target.value)}
@@ -212,7 +234,7 @@ export function SecuritySettings() {
               </label>
               <Button
                 type="submit"
-                disabled={activationLoading}
+                disabled={activationLoading || captchaOpen}
                 className={styles.actionButton}
               >
                 {activationLoading ? (
@@ -233,17 +255,15 @@ export function SecuritySettings() {
               />
               <label>
                 6 位验证码
-                <Input
-                  disabled={activationLoading}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
+                <OtpInput
+                  id="admin-activation-code"
+                  name="admin-activation-code"
+                  disabled={activationLoading || captchaOpen}
                   value={code}
-                  onChange={(event) =>
-                    setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  className={`${styles.textInput} ${styles.codeInput}`}
+                  onChange={setCode}
+                  invalid={Boolean(error)}
+                  theme="light"
+                  ariaLabel="6 位邮箱验证码"
                   required
                 />
               </label>
@@ -254,15 +274,18 @@ export function SecuritySettings() {
                 <button
                   type="button"
                   className={styles.textButton}
-                  disabled={activationLoading}
-                  onClick={() => setChallengeId("")}
+                  disabled={activationLoading || captchaOpen}
+                  onClick={() => {
+                    setCaptchaOpen(false);
+                    setChallengeId("");
+                  }}
                 >
                   修改邮箱
                 </button>
                 <button
                   type="button"
-                  disabled={activationLoading || resendIn > 0}
-                  onClick={() => void startActivation()}
+                  disabled={activationLoading || captchaOpen || resendIn > 0}
+                  onClick={() => openActivationCaptcha()}
                   className={styles.resendButton}
                 >
                   {resendIn > 0 ? `${resendIn} 秒后可重发` : "重新发送"}
@@ -270,7 +293,7 @@ export function SecuritySettings() {
               </div>
               <Button
                 type="submit"
-                disabled={activationLoading || code.length !== 6}
+                disabled={activationLoading || captchaOpen || code.length !== 6}
                 className={styles.actionButton}
               >
                 {activationLoading ? (
@@ -282,6 +305,12 @@ export function SecuritySettings() {
               </Button>
             </form>
           )}
+          {captchaOpen ? (
+            <SliderCaptcha
+              onVerified={(ticket) => void sendActivationCode(ticket)}
+              onCancel={() => setCaptchaOpen(false)}
+            />
+          ) : null}
         </section>
 
         <section

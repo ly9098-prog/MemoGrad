@@ -96,6 +96,7 @@ from app.models.user_auth import (  # noqa: F401
     UserConsentAcceptance,
     UserIdentityTombstone,
 )
+from app.models.user_password import UserPasswordCredential  # noqa: F401
 from app.models.user_adaptive_profile import UserAdaptiveProfile  # noqa: F401
 from app.models.user_knowledge_adaptive_state import (  # noqa: F401
     UserKnowledgeAdaptiveState,

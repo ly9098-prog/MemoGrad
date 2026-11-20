@@ -16,7 +16,7 @@ export default function HomePage() {
 
   if (!bootstrapped) {
     return (
-      <main className="boot-screen" role="status">
+      <main className="boot-screen" data-user-auth-shell role="status">
         <span>正在恢复 MemoGrad 账号</span>
       </main>
     );

@@ -1,8 +1,11 @@
+import hashlib
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth_otp_support import _ip, _raise_otp, _raise_slider_captcha
 from app.core.browser_origin import enforce_trusted_browser_origin
+from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.email_address import normalize_email
@@ -26,12 +29,37 @@ from app.services import (
     identity_service,
     slider_captcha_service,
     user_auth_service,
+    user_service,
 )
 
 router = APIRouter(prefix=API_V1_PREFIX)
 
 
 from app.api.v1 import auth_identity_bind, auth_identity_security
+
+
+async def _reserve_miniprogram_proof(request: Request) -> None:
+    digest = hashlib.sha256(_ip(request).encode("utf-8")).hexdigest()
+    try:
+        allowed = await cache.reserve_rate_limits_strict(
+            [
+                (
+                    f"auth:user:miniprogram-proof:{digest}",
+                    settings.OTP_IP_HOURLY_LIMIT,
+                    3600,
+                )
+            ]
+        )
+    except CacheUnavailableError as exc:
+        raise HTTPException(
+            status_code=503, detail="微信客户端校验服务暂时不可用，请稍后重试"
+        ) from exc
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="微信客户端校验过于频繁，请稍后再试",
+            headers={"Retry-After": "3600"},
+        )
 
 
 async def _email_identity_user(
@@ -112,20 +140,39 @@ async def start_email_login(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    wechat_subject: str | None = None
+    if data.client == "miniprogram":
+        if not data.wechat_code:
+            raise HTTPException(status_code=422, detail="请完成微信客户端校验")
+        await _reserve_miniprogram_proof(request)
+        try:
+            wechat_subject = await user_service.resolve_wechat_subject(
+                data.wechat_code
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     _identity, existing_user = await _email_identity_user(db, email)
     try:
-        await slider_captcha_service.consume_ticket(
-            ticket=data.captcha_ticket,
-            domain="user",
-            client_ip=_ip(request),
-        )
+        if data.client == "web" or request.headers.get("origin"):
+            if not data.captcha_ticket:
+                raise HTTPException(status_code=422, detail="请完成安全验证")
+            await slider_captcha_service.consume_ticket(
+                ticket=data.captcha_ticket,
+                domain="user",
+                client_ip=_ip(request),
+            )
         issued = await email_otp_service.issue_otp(
             domain="user",
             email=email,
             purpose="login",
             client_ip=_ip(request),
+            enforce_ip_lock=data.client != "miniprogram",
             user_id=existing_user.id if existing_user else None,
-            metadata={"consent": consent},
+            metadata={
+                "consent": consent,
+                "client": data.client,
+                "miniprogram_subject": wechat_subject,
+            },
         )
     except slider_captcha_service.SliderCaptchaError as exc:
         _raise_slider_captcha(exc)
@@ -153,6 +200,8 @@ async def verify_email_login(
             domain="user",
             purpose="login",
             client_ip=_ip(request),
+            enforce_ip_lock=data.client != "miniprogram",
+            client=data.client,
         )
     except email_otp_service.OtpError as exc:
         _raise_otp(exc)

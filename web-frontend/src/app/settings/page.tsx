@@ -21,7 +21,7 @@ export default function SettingsPage() {
 
   if (!bootstrapped) {
     return (
-      <main className="boot-screen" role="status">
+      <main className="boot-screen" data-user-auth-shell role="status">
         <span>正在恢复账号安全设置</span>
       </main>
     );

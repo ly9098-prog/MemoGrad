@@ -204,6 +204,14 @@ async def start_admin_email_activation(
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    try:
+        await slider_captcha_service.consume_ticket(
+            ticket=data.captcha_ticket,
+            domain="admin",
+            client_ip=_ip(request),
+        )
+    except slider_captcha_service.SliderCaptchaError as exc:
+        _raise_slider_captcha(exc)
     return await _issue_admin_start(
         email=normalized,
         purpose="activate",

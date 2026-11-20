@@ -36,15 +36,24 @@ class AuthAttempt:
         ip_lock_key: str,
         max_attempts: int,
         challenge_ttl: int,
+        enforce_ip_lock: bool = True,
     ) -> bool:
         attempt_key = f"{challenge_key}:attempts"
         attempts = int(await self.read(attempt_key) or 0) + 1
-        failures = int(await self.read(failure_key) or 0) + 1
+        failures = (
+            int(await self.read(failure_key) or 0) + 1
+            if enforce_ip_lock
+            else 0
+        )
         locked = failures >= settings.OTP_IP_LOCK_MAX_FAILURES
         await self.commit(
             increments=[
                 (attempt_key, challenge_ttl),
-                (failure_key, settings.OTP_IP_LOCK_SEC),
+                *(
+                    [(failure_key, settings.OTP_IP_LOCK_SEC)]
+                    if enforce_ip_lock
+                    else []
+                ),
             ],
             values=[(ip_lock_key, "1", settings.OTP_IP_LOCK_SEC)] if locked else [],
             deletes=[challenge_key, attempt_key] if attempts >= max_attempts else [],

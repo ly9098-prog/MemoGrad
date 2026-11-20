@@ -29,6 +29,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
+import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
@@ -400,6 +401,11 @@ export default function FormulasPage() {
   }, [searchDraft, filters.q]);
 
   const items = useMemo(() => formulas.data?.items ?? [], [formulas.data?.items]);
+  const formulaListRef = useStaggeredEntrance<HTMLDivElement>({
+    ready: items.length > 0,
+    itemCount: items.length,
+    animationKey: `${page}-${filters.category_id}-${filters.status}-${filters.q}`,
+  });
   const selectedCard = detail.data;
   const isBatchable = isBatchableStatus(currentFilterStatus);
 
@@ -831,7 +837,11 @@ export default function FormulasPage() {
             ) : (
               <div className={`transition-opacity duration-200 ${formulas.isFetching ? "opacity-70" : "opacity-100"}`}>
                 {items.length > 0 ? (
-                  <div className="stagger-enter divide-y divide-border border-y border-border" key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}>
+                  <div
+                    ref={formulaListRef}
+                    className="divide-y divide-border border-y border-border"
+                    key={`${filters.category_id}-${filters.status}-${filters.q}-${page}`}
+                  >
                   {items.map((card) => {
                   const isSelected = selectedId === card.id;
                   const tagNames = card.tags?.map((tag) => tag.name).join(" · ") || "";

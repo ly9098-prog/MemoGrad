@@ -155,8 +155,8 @@ def test_v24_migration_check_and_backup_restore(postgres):
         env=private_environment(),
     )
     _alembic(postgres, "upgrade", "head")
-    assert "v24_multi_identity_auth" in _alembic(postgres, "current")
-    assert "v24_multi_identity_auth" in _alembic(postgres, "heads")
+    assert "v25_user_password_auth" in _alembic(postgres, "current")
+    assert "v25_user_password_auth" in _alembic(postgres, "heads")
     assert "No new upgrade operations" in _alembic(postgres, "check")
     asyncio.run(_assert_history(postgres, migrated=True))
 
