@@ -100,20 +100,75 @@ button::after { border: 0; }
 .fl-list-meta { color: #507568; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .fl-random-action { min-height: 44px; flex-shrink: 0; padding: 0 12px; margin: 0; border: 0; border-radius: 10px; background: #D8EEE3; color: #23483C; font-size: 13px; line-height: 44px; font-weight: 500; }
 .fl-list { display:flex; flex-direction:column; gap:16rpx; }
-.fl-list-entry { opacity: 1; }
-.fl-list-entry-pending { opacity: .45; }
-.fl-list-entry-rise { animation: fl-list-entry-rise 420ms cubic-bezier(.16, 1, .3, 1) both; }
-.fl-list-entry-fade { animation: fl-list-entry-fade 420ms ease-out both; }
+.fl-list-entry { position:relative; opacity:1; transform-origin:50% 100%; }
+.fl-list-entry::before,
+.fl-list-entry::after {
+  content:'';
+  position:absolute;
+  z-index:0;
+  border:1rpx solid #D8EEE6;
+  border-radius:30rpx;
+  pointer-events:none;
+  box-sizing:border-box;
+  transform-origin:50% 100%;
+}
+.fl-list-entry::before {
+  left:10rpx;
+  right:10rpx;
+  top:12rpx;
+  bottom:-10rpx;
+  background:#E4F2EC;
+  opacity:.52;
+}
+.fl-list-entry::after {
+  z-index:1;
+  left:20rpx;
+  right:20rpx;
+  top:6rpx;
+  bottom:-5rpx;
+  background:#F4FBF7;
+  opacity:.78;
+}
+.fl-graph-list .fl-list-entry::before,
+.fl-graph-list .fl-list-entry::after { border-radius:32rpx; }
+.fl-list-entry-pending { opacity:.45; }
+.fl-list-entry-pending::before,
+.fl-list-entry-pending::after { opacity:0; }
+.fl-list-entry-rise { animation:fl-list-entry-rise 540ms cubic-bezier(.16, 1, .3, 1) both; will-change:transform, opacity; }
+.fl-list-entry-fade { animation:fl-list-entry-fade 540ms cubic-bezier(.16, 1, .3, 1) both; will-change:opacity; }
+.fl-list-entry-rise::before,
+.fl-list-entry-fade::before {
+  animation:fl-list-entry-stack-back 540ms cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay:inherit;
+  will-change:transform, opacity;
+}
+.fl-list-entry-rise::after,
+.fl-list-entry-fade::after {
+  animation:fl-list-entry-stack-front 540ms cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay:inherit;
+  will-change:transform, opacity;
+}
 @keyframes fl-list-entry-rise {
-  from { opacity: .45; transform: translate3d(0, 14px, 0); }
-  76% { opacity: 1; transform: translate3d(0, -1px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+  0%, 12% { opacity: .08; transform: translate3d(0, 30px, 0) scale(.95); }
+  62% { opacity: .96; transform: translate3d(0, 3px, 0) scale(.997); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes fl-list-entry-fade {
-  from { opacity: .45; }
+  0%, 12% { opacity: .22; }
+  62% { opacity: .92; }
   to { opacity: 1; }
 }
-.fl-card { padding:25rpx 24rpx 21rpx; border:1rpx solid #D8EEE6; border-radius:30rpx; background:#FFFFFF; box-shadow:0 10rpx 28rpx rgba(43,117,91,.045); transition:transform .15s ease, opacity .15s ease; }
+@keyframes fl-list-entry-stack-back {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) scaleX(.93); }
+  38% { opacity: .34; transform: translate3d(0, 6px, 0) scaleX(.982); }
+  to { opacity: .52; transform: translate3d(0, 0, 0) scaleX(1); }
+}
+@keyframes fl-list-entry-stack-front {
+  0%, 18% { opacity: 0; transform: translate3d(0, 12px, 0) scaleX(.965); }
+  58% { opacity: .58; transform: translate3d(0, 3px, 0) scaleX(.995); }
+  to { opacity: .78; transform: translate3d(0, 0, 0) scaleX(1); }
+}
+.fl-card { position:relative; z-index:2; padding:25rpx 24rpx 21rpx; border:1rpx solid #D8EEE6; border-radius:30rpx; background:#FFFFFF; box-shadow:0 10rpx 28rpx rgba(43,117,91,.045); transition:transform .15s ease, opacity .15s ease; }
 .fl-card-pressed { opacity:.78; transform:scale(.989); }
 .fl-card-head { display:flex; align-items:flex-start; gap:18rpx; }
 .fl-card-title-wrap { flex:1; min-width:0; }
@@ -229,6 +284,8 @@ button::after { border: 0; }
 
 @media (prefers-reduced-motion:reduce) {
   .fl-list-entry { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .fl-list-entry::before,
+  .fl-list-entry::after { animation: none !important; transform: none !important; will-change: auto !important; }
   .fl-subject-select, .fl-library-tab, .fl-card, .fl-bottom-sheet, .fl-tag-sheet, .fl-loading-ring, .fl-loading-dot { transition:none!important; animation:none!important; }
 }
 
