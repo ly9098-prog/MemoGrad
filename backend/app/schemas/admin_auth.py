@@ -38,6 +38,7 @@ class AdminUserResponse(BaseModel):
     role_id: int
     last_login_at: datetime | None = None
     last_login_ip: str | None = None
+    created_at: datetime | None = None
 
     @field_validator("must_change_password", mode="before")
     @classmethod

@@ -10,9 +10,9 @@ import {
   Mail,
   ShieldCheck,
 } from "lucide-react";
+import styles from "@/components/profile/profile.module.css";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import { isPasswordReady } from "@/lib/admin-user-utils";
@@ -29,7 +29,13 @@ export function SecuritySettings() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const email = user && "email" in user ? user.email ?? "" : "";
+  const username = user && "username" in user ? user.username : "";
   const emailVerified = Boolean(user && "email_verified" in user && user.email_verified);
+  const emailBadge = !email
+    ? { label: "未绑定", tone: "neutral" as const }
+    : emailVerified
+      ? { label: "已验证", tone: "success" as const }
+      : { label: "待验证", tone: "warning" as const };
   const [activationEmail, setActivationEmail] = useState(email);
   const [activationPassword, setActivationPassword] = useState("");
   const [challengeId, setChallengeId] = useState("");
@@ -133,162 +139,222 @@ export function SecuritySettings() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className={styles.securityContent}>
       {(error || message) ? (
         <div
           role={error ? "alert" : "status"}
-          className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
-            error
-              ? "border-destructive/20 bg-destructive-light text-destructive"
-              : "border-success/20 bg-success-light text-success"
+          className={`${styles.feedback} ${
+            error ? styles.feedbackError : styles.feedbackSuccess
           }`}
         >
-          {error ? <AlertCircle className="mt-0.5 h-4 w-4" /> : <CheckCircle2 className="mt-0.5 h-4 w-4" />}
+          {error ? <AlertCircle aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}
           <span>{error || message}</span>
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="rounded-2xl" id="email-settings">
-          <CardHeader>
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Mail className="h-5 w-5 text-primary" />
-              邮箱绑定
-              <StatusBadge tone={emailVerified ? "success" : "warning"}>
-                {emailVerified ? "已验证" : "未验证"}
-              </StatusBadge>
-            </h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-6 text-muted-foreground">
-              验证后可使用邮箱验证码登录和找回密码。更换邮箱需先验证当前密码。
-            </p>
-            {emailVerified ? (
-              <div className="rounded-xl border border-success/20 bg-success-light px-4 py-3 text-sm text-success">
-                当前邮箱 <strong className="break-all">{email}</strong> 已验证。
+      <div className={styles.securityGrid}>
+        <section
+          className={`${styles.securityPane} ${styles.emailPane}`}
+          id="email-settings"
+          aria-labelledby="email-settings-title"
+        >
+          <div className={styles.securityPaneHeader}>
+            <Mail aria-hidden="true" />
+            <h3 id="email-settings-title">邮箱绑定</h3>
+            <StatusBadge tone={emailBadge.tone}>
+              {emailBadge.label}
+            </StatusBadge>
+          </div>
+          <p className={styles.paneDescription}>
+            验证后可使用邮箱验证码登录和找回密码。更换邮箱需先验证当前密码。
+          </p>
+          {emailVerified ? (
+            <div className={styles.currentEmail}>
+              <CheckCircle2 aria-hidden="true" />
+              <div>
+                <span>当前邮箱</span>
+                <strong>{email}</strong>
               </div>
-            ) : null}
-            {!challengeId ? (
-              <form onSubmit={startActivation} className="grid gap-3">
-                <label className="grid gap-2 text-sm font-medium">
-                  当前密码
-                  <Input
-                    disabled={activationLoading}
-                    type="password" value={activationPassword}
-                    onChange={(event) => setActivationPassword(event.target.value)}
-                    autoComplete="current-password" required
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  {emailVerified ? "新邮箱" : "邮箱地址"}
-                  <Input
-                    disabled={activationLoading}
-                    type="email"
-                    value={activationEmail}
-                    onChange={(event) => setActivationEmail(event.target.value)}
-                    placeholder="name@example.com"
-                    autoComplete="email"
-                    required
-                  />
-                </label>
-                <Button type="submit" disabled={activationLoading} className="gap-2">
-                  {activationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                  发送验证码
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={verifyActivation} className="grid gap-3">
-                <label className="grid gap-2 text-sm font-medium">
-                  6 位验证码
-                  <Input
-                    disabled={activationLoading}
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={code}
-                    onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="font-mono text-lg tracking-[0.3em]"
-                    required
-                  />
-                </label>
-                <p className="break-all text-sm text-muted-foreground">验证码已发送至 {activationEmail}，5 分钟内有效。</p>
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <Button type="button" variant="ghost" size="sm" disabled={activationLoading} onClick={() => setChallengeId("")}>
-                    修改邮箱
-                  </Button>
-                  <button
-                    type="button"
-                    disabled={activationLoading || resendIn > 0}
-                    onClick={() => void startActivation()}
-                    className="text-primary disabled:text-muted-foreground"
-                  >
-                    {resendIn > 0 ? `${resendIn} 秒后可重发` : "重新发送"}
-                  </button>
-                </div>
-                <Button type="submit" disabled={activationLoading || code.length !== 6} className="gap-2">
-                  {activationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                  验证邮箱
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <KeyRound className="h-5 w-5 text-primary" />
-              修改登录密码
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={changePassword} className="grid gap-4">
-              <label className="grid gap-2 text-sm font-medium">
+            </div>
+          ) : null}
+          {!challengeId ? (
+            <form onSubmit={startActivation} className={styles.securityForm}>
+              <input
+                type="hidden"
+                autoComplete="username"
+                value={username}
+                readOnly
+              />
+              <label>
                 当前密码
                 <Input
-                  disabled={passwordLoading}
+                  disabled={activationLoading}
                   type="password"
-                  value={oldPassword}
-                  onChange={(event) => setOldPassword(event.target.value)}
+                  value={activationPassword}
+                  onChange={(event) => setActivationPassword(event.target.value)}
                   autoComplete="current-password"
+                  className={styles.textInput}
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-medium">
-                新密码
+              <label>
+                {emailVerified ? "新邮箱" : "邮箱地址"}
                 <Input
-                  disabled={passwordLoading}
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  autoComplete="new-password"
-                  minLength={12}
+                  disabled={activationLoading}
+                  type="email"
+                  value={activationEmail}
+                  onChange={(event) => setActivationEmail(event.target.value)}
+                  placeholder="name@example.com"
+                  autoComplete="email"
+                  className={styles.textInput}
                   required
                 />
               </label>
-              <label className="grid gap-2 text-sm font-medium">
-                再次输入新密码
-                <Input
-                  disabled={passwordLoading}
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  autoComplete="new-password"
-                  minLength={12}
-                  required
-                />
-              </label>
-              <p className="text-xs leading-6 text-muted-foreground">
-                至少 12 位，同时包含大写字母、小写字母和数字。修改后需要重新登录。
-              </p>
-              <Button type="submit" disabled={passwordLoading} className="gap-2">
-                {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                更新密码
+              <Button
+                type="submit"
+                disabled={activationLoading}
+                className={styles.actionButton}
+              >
+                {activationLoading ? (
+                  <Loader2 aria-hidden="true" className={styles.spinner} />
+                ) : (
+                  <Mail aria-hidden="true" className="h-4 w-4" />
+                )}
+                发送验证码
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          ) : (
+            <form onSubmit={verifyActivation} className={styles.securityForm}>
+              <input
+                type="hidden"
+                autoComplete="username"
+                value={username}
+                readOnly
+              />
+              <label>
+                6 位验证码
+                <Input
+                  disabled={activationLoading}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  className={`${styles.textInput} ${styles.codeInput}`}
+                  required
+                />
+              </label>
+              <p className={styles.otpMeta}>
+                验证码已发送至 {activationEmail}，5 分钟内有效。
+              </p>
+              <div className={styles.formUtilityRow}>
+                <button
+                  type="button"
+                  className={styles.textButton}
+                  disabled={activationLoading}
+                  onClick={() => setChallengeId("")}
+                >
+                  修改邮箱
+                </button>
+                <button
+                  type="button"
+                  disabled={activationLoading || resendIn > 0}
+                  onClick={() => void startActivation()}
+                  className={styles.resendButton}
+                >
+                  {resendIn > 0 ? `${resendIn} 秒后可重发` : "重新发送"}
+                </button>
+              </div>
+              <Button
+                type="submit"
+                disabled={activationLoading || code.length !== 6}
+                className={styles.actionButton}
+              >
+                {activationLoading ? (
+                  <Loader2 aria-hidden="true" className={styles.spinner} />
+                ) : (
+                  <ShieldCheck aria-hidden="true" className="h-4 w-4" />
+                )}
+                验证邮箱
+              </Button>
+            </form>
+          )}
+        </section>
+
+        <section
+          className={`${styles.securityPane} ${styles.passwordPane}`}
+          aria-labelledby="password-settings-title"
+        >
+          <div className={styles.securityPaneHeader}>
+            <KeyRound aria-hidden="true" />
+            <h3 id="password-settings-title">修改登录密码</h3>
+          </div>
+          <p className={styles.paneDescription}>
+            密码用于管理员登录。更新后所有会话立即失效。
+          </p>
+          <form onSubmit={changePassword} className={styles.securityForm}>
+            <input
+              type="hidden"
+              autoComplete="username"
+              value={username}
+              readOnly
+            />
+            <label>
+              当前密码
+              <Input
+                disabled={passwordLoading}
+                type="password"
+                value={oldPassword}
+                onChange={(event) => setOldPassword(event.target.value)}
+                autoComplete="current-password"
+                className={styles.textInput}
+                required
+              />
+            </label>
+            <label>
+              新密码
+              <Input
+                disabled={passwordLoading}
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={12}
+                className={styles.textInput}
+                required
+              />
+            </label>
+            <label>
+              再次输入新密码
+              <Input
+                disabled={passwordLoading}
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={12}
+                className={styles.textInput}
+                required
+              />
+            </label>
+            <small>至少 12 位，同时包含大写字母、小写字母和数字</small>
+            <Button
+              type="submit"
+              disabled={passwordLoading}
+              className={styles.actionButton}
+            >
+              {passwordLoading ? (
+                <Loader2 aria-hidden="true" className={styles.spinner} />
+              ) : (
+                <KeyRound aria-hidden="true" className="h-4 w-4" />
+              )}
+              更新密码
+            </Button>
+          </form>
+        </section>
       </div>
     </div>
   );

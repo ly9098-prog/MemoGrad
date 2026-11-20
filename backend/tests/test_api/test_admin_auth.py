@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -48,6 +49,7 @@ def _admin_user(password="old-password"):
         email="admin@example.com",
         is_active=True,
         role_id=1,
+        created_at=datetime(2024, 3, 12),
     )
 
 
@@ -71,6 +73,7 @@ def test_admin_login_success(monkeypatch):
     assert data["access_token"] == token
     assert data["token_type"] == "bearer"
     assert data["user"]["username"] == "admin"
+    assert data["user"]["created_at"] == "2024-03-12T00:00:00Z"
     assert data["role"]["name"] == "super_admin"
     assert data["permissions"] == permissions
     assert resp.cookies.get("admin_refresh_token") == refresh_token
@@ -133,7 +136,11 @@ def test_admin_email_login_consumes_slider_ticket_once(monkeypatch):
     import asyncio
 
     from app.core.cache import cache
-    from app.services import admin_email_auth_service, email_otp_service, slider_captcha_service
+    from app.services import (
+        admin_email_auth_service,
+        email_otp_service,
+        slider_captcha_service,
+    )
 
     monkeypatch.setattr(cache, "_enabled", False)
     delivery = AsyncMock()
