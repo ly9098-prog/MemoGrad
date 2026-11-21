@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginPage, { loginErrorMessage } from "./page";
+import { EmailOtpLoginForm } from "@/components/auth/email-otp-login-form";
 import { LoginCard } from "@/components/auth/login-card";
 import { ApiError } from "@/lib/api/errors";
 
@@ -9,6 +10,7 @@ type PointerHandler = (event: unknown) => void;
 
 vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
+  useCallback: (callback: unknown) => callback,
   useEffect: () => undefined,
   useRef: (current: unknown) => ({ current }),
   useState: (initial: unknown) => [initial, vi.fn()],
@@ -97,18 +99,22 @@ describe("login glass interaction", () => {
     expect(properties.size).toBe(0);
   });
 
-  it("renders the credential forms directly so refresh has no Suspense blank frame", () => {
+  it("renders the credential form and shared email panel directly", () => {
     const element = LoginPage() as ReactElement<Record<string, unknown>>;
     const forms: Element[] = [];
+    const emailPanels: Element[] = [];
     function visit(node: unknown) {
       if (Array.isArray(node)) { node.forEach(visit); return; }
       if (!isValidElement<Record<string, unknown>>(node)) return;
       if (node.type === "form") forms.push(node);
+      if (node.type === EmailOtpLoginForm) emailPanels.push(node);
       visit(node.props.children);
     }
     visit((element.type as (props: Record<string, unknown>) => unknown)(element.props));
-    expect(forms).toHaveLength(3);
-    expect(forms.map((form) => form.props.inert)).toEqual([false, true, true]);
-    expect(forms.map((form) => form.props["aria-hidden"])).toEqual([false, true, true]);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].props.inert).toBe(false);
+    expect(forms[0].props["aria-hidden"]).toBe(false);
+    expect(emailPanels).toHaveLength(1);
+    expect(emailPanels[0].props.active).toBe(false);
   });
 });

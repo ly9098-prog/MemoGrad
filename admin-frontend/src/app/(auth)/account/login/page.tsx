@@ -22,7 +22,9 @@ import {
 } from "lucide-react";
 import { SliderCaptcha } from "@/components/security/slider-captcha";
 import { AuthToast, type AuthToastState, type AuthToastTone } from "@/components/auth/auth-toast";
+import { EmailOtpLoginForm } from "@/components/auth/email-otp-login-form";
 import { LoginCard } from "@/components/auth/login-card";
+import { ResendCodeButton } from "@/components/auth/resend-code-button";
 import { GithubMark } from "@/components/icons/github-mark";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,7 +58,7 @@ const AUTH_ERRORS: Record<string, string> = {
 };
 
 type LoginMode = "password" | "email";
-type PendingAction = "password" | "register" | "email" | "github";
+type PendingAction = "password" | "register" | "github";
 
 function messageFor(error: unknown, mode: LoginMode = "password") {
   if (error instanceof ApiError) {
@@ -72,45 +74,11 @@ function messageFor(error: unknown, mode: LoginMode = "password") {
   return "操作未完成，请稍后重试";
 }
 
-function ResendButton({
-  seconds,
-  busy,
-  onResend,
-}: {
-  seconds: number;
-  busy: boolean;
-  onResend: () => void;
-}) {
-  const [remaining, setRemaining] = useState(seconds);
-
-  useEffect(() => {
-    setRemaining(seconds);
-    if (seconds <= 0) return;
-    const deadline = Date.now() + seconds * 1000;
-    const timer = window.setInterval(() => {
-      setRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [seconds]);
-
-  return (
-    <button
-      type="button"
-      className={styles.resendButton}
-      disabled={busy || remaining > 0}
-      onClick={onResend}
-    >
-      {remaining > 0 ? `${remaining} 秒后可重发` : "重新发送"}
-    </button>
-  );
-}
-
 export default function LearnerLoginPage() {
   const router = useRouter();
   const accessMode = useAuthStore((state) => state.accessMode);
   const acceptLearnerLogin = useAuthStore((state) => state.acceptLearnerLogin);
   const consentRef = useRef<HTMLInputElement>(null);
-  const autoSubmittedCodeRef = useRef("");
   const loginFinishingRef = useRef(false);
   useAuthBootstrap();
 
@@ -120,6 +88,7 @@ export default function LearnerLoginPage() {
   const [consentOpen, setConsentOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [toast, setToast] = useState<AuthToastState | null>(null);
   const pendingConsentRef = useRef<(() => void) | null>(null);
@@ -138,21 +107,14 @@ export default function LearnerLoginPage() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [email, setEmail] = useState("");
   const [sentEmail, setSentEmail] = useState("");
-  const [challengeId, setChallengeId] = useState("");
-  const [code, setCode] = useState("");
-  const [resendAfter, setResendAfter] = useState(0);
   const [registerChallengeId, setRegisterChallengeId] = useState("");
   const [registerCode, setRegisterCode] = useState("");
   const [registerResendAfter, setRegisterResendAfter] = useState(0);
+  const [emailBusy, setEmailBusy] = useState(false);
 
   const [captchaOpen, setCaptchaOpen] = useState(false);
-  const [captchaPurpose, setCaptchaPurpose] = useState<
-    "login-email" | "register"
-  >("login-email");
 
-  const emailCodeSent = Boolean(challengeId);
   const registrationCodeSent = Boolean(registerChallengeId);
 
   useEffect(() => {
@@ -194,6 +156,7 @@ export default function LearnerLoginPage() {
 
   function finishLogin(response: LearnerAuthResponse) {
     loginFinishingRef.current = true;
+    setFinishing(true);
     acceptLearnerLogin(response);
     showToast("登录成功，正在进入学习中心", "success");
     window.setTimeout(() => {
@@ -246,7 +209,6 @@ export default function LearnerLoginPage() {
     if (registerPassword.length < 12) return showToast("密码至少需要 12 位", "danger");
     if (registerPassword !== confirmPassword) return showToast("两次输入的密码不一致", "danger");
     if (!requireConsent()) return;
-    setCaptchaPurpose("register");
     setCaptchaOpen(true);
   }
 
@@ -313,86 +275,35 @@ export default function LearnerLoginPage() {
     }
   }
 
-  function requestEmailCode() {
-    if (busy || captchaOpen) return;
-    setCaptchaPurpose("login-email");
-    setCaptchaOpen(true);
+  function startEmailCode(input: { email: string; captchaTicket: string }) {
+    return apiRequest<LearnerOtpStartResponse>("/auth/email/start", {
+      method: "POST",
+      scope: "user",
+      skipRefresh: true,
+      exposeErrorDetail: true,
+      body: JSON.stringify({
+        email: input.email,
+        captcha_ticket: input.captchaTicket,
+        client: "web",
+        accepted_terms: true,
+        agreement_version: USER_AGREEMENT_VERSION,
+        privacy_version: PRIVACY_POLICY_VERSION,
+      }),
+    });
   }
 
-  function openEmailCaptcha(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || captchaOpen) return;
-    if (!email.trim()) return showToast("请输入邮箱地址", "danger");
-    if (!requireConsent(requestEmailCode)) return;
-    requestEmailCode();
-  }
-
-  function resetEmailChallenge() {
-    setChallengeId("");
-    setCode("");
-    autoSubmittedCodeRef.current = "";
-  }
-
-  async function sendEmailCode(ticket: string) {
-    setCaptchaOpen(false);
-    if (!requireConsent()) return;
-    begin("email");
-    try {
-      const response = await apiRequest<LearnerOtpStartResponse>(
-        "/auth/email/start",
-        {
-          method: "POST",
-          scope: "user",
-          skipRefresh: true,
-          exposeErrorDetail: true,
-          body: JSON.stringify({
-            email: email.trim(),
-            captcha_ticket: ticket,
-            client: "web",
-            accepted_terms: true,
-            agreement_version: USER_AGREEMENT_VERSION,
-            privacy_version: PRIVACY_POLICY_VERSION,
-          }),
-        },
-      );
-      setChallengeId(response.challenge_id);
-      setResendAfter(response.resend_after);
-      setCode("");
-      setSentEmail(email.trim());
-      showToast("验证码已发送，5 分钟内有效。请勿转发给他人。", "info");
-    } catch (submitError) {
-      showToast(messageFor(submitError, "email"), "danger");
-    } finally {
-      finish();
-    }
-  }
-
-  async function verifyEmail(
-    event?: FormEvent<HTMLFormElement>,
-    submittedCode = code,
-  ) {
-    event?.preventDefault();
-    if (busy || submittedCode.length !== 6) return;
-    begin("email");
-    try {
-      const response = await apiRequest<LearnerAuthResponse>("/auth/email/verify", {
-        method: "POST",
-        scope: "user",
-        skipRefresh: true,
-        exposeErrorDetail: true,
-        body: JSON.stringify({
-          challenge_id: challengeId,
-          code: submittedCode,
-          client: "web",
-        }),
-      });
-      finishLogin(response);
-    } catch (submitError) {
-      autoSubmittedCodeRef.current = "";
-      showToast(messageFor(submitError, "email"), "danger");
-    } finally {
-      finish();
-    }
+  function verifyEmailCode(input: { challengeId: string; code: string }) {
+    return apiRequest<LearnerAuthResponse>("/auth/email/verify", {
+      method: "POST",
+      scope: "user",
+      skipRefresh: true,
+      exposeErrorDetail: true,
+      body: JSON.stringify({
+        challenge_id: input.challengeId,
+        code: input.code,
+        client: "web",
+      }),
+    });
   }
 
   async function startGithub() {
@@ -420,7 +331,7 @@ export default function LearnerLoginPage() {
     }
   }
 
-  const disabled = busy || captchaOpen;
+  const disabled = busy || captchaOpen || emailBusy || finishing;
 
   return (
     <div className={styles.surface}>
@@ -694,7 +605,8 @@ export default function LearnerLoginPage() {
                   >
                     修改资料
                   </button>
-                  <ResendButton
+                  <ResendCodeButton
+                    key={registerChallengeId}
                     seconds={registerResendAfter}
                     busy={disabled}
                     onResend={() => {
@@ -719,96 +631,21 @@ export default function LearnerLoginPage() {
             ) : null}
 
             {!registering ? (
-              <form
-                className={`${styles.form} ${styles.emailForm}`}
-                onSubmit={emailCodeSent ? verifyEmail : openEmailCaptcha}
-                inert={mode !== "email"}
-                aria-hidden={mode !== "email"}
-              >
-                <div className={styles.field}>
-                  <label htmlFor="learner-email">邮箱地址</label>
-                  <div className={styles.inputShell}>
-                    <Mail className={styles.fieldIcon} aria-hidden="true" />
-                    <Input
-                      id="learner-email"
-                      variant="ghost"
-                      className={styles.input}
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      autoComplete="email"
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      placeholder="name@example.com"
-                      required
-                      disabled={disabled || emailCodeSent}
-                    />
-                  </div>
-                </div>
-                <div className={styles.field}>
-                  <div className={styles.fieldLabel}>
-                    <label htmlFor="learner-email-code">6 位邮箱验证码</label>
-                    {emailCodeSent ? (
-                      <span className={styles.fieldMeta} title={sentEmail}>
-                        {pending === "email" ? (
-                          <><Loader2 className={styles.spinner} aria-hidden="true" />正在验证</>
-                        ) : (
-                          <>已发送至 {sentEmail}</>
-                        )}
-                      </span>
-                    ) : null}
-                  </div>
-                  <OtpInput
-                    id="learner-email-code"
-                    name="learner-email-code"
-                    value={code}
-                    onChange={(value) => {
-                      setCode(value);
-                      if (!emailCodeSent || value.length !== 6) return;
-                      const submission = `${challengeId}:${value}`;
-                      if (autoSubmittedCodeRef.current === submission) return;
-                      autoSubmittedCodeRef.current = submission;
-                      void verifyEmail(undefined, value);
-                    }}
-                    disabled={disabled || !emailCodeSent}
-                    required
-                  />
-                </div>
-                {emailCodeSent ? (
-                  <div className={`${styles.otpActions} ${styles.otpActionsWithNote}`}>
-                    <button
-                      type="button"
-                      className={styles.backButton}
-                      disabled={disabled}
-                      onClick={resetEmailChallenge}
-                    >
-                      修改邮箱
-                    </button>
-                    <ResendButton
-                      seconds={resendAfter}
-                      busy={disabled}
-                      onResend={requestEmailCode}
-                    />
-                    <span className={styles.otpFootnote}>
-                      <ShieldCheck aria-hidden="true" />
-                      验证码仅用于本次登录，请勿转发给他人。
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    type="submit"
-                    className={styles.submit}
-                    disabled={disabled || !email.trim()}
-                    aria-busy={pending === "email"}
-                  >
-                    {pending === "email" ? (
-                      <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
-                    ) : (
-                      <><span>发送登录验证码</span><Mail aria-hidden="true" /></>
-                    )}
-                  </button>
-                )}
-              </form>
+              <EmailOtpLoginForm<LearnerAuthResponse>
+                idPrefix="learner"
+                emailLabel="邮箱地址"
+                scope="user"
+                active={mode === "email"}
+                disabled={busy || captchaOpen || finishing}
+                ensureConsent={requireConsent}
+                start={startEmailCode}
+                verify={verifyEmailCode}
+                onVerified={finishLogin}
+                formatError={(error) => messageFor(error, "email")}
+                onError={(message) => showToast(message, "danger")}
+                onInfo={(message) => showToast(message, "info")}
+                onBusyChange={setEmailBusy}
+              />
             ) : null}
 
             {registering ? null : (
@@ -906,18 +743,14 @@ export default function LearnerLoginPage() {
         >
           <DialogTitle className="sr-only">完成安全验证</DialogTitle>
           <DialogDescription className="sr-only">拖动滑块，将拼图移到图片缺口处。</DialogDescription>
-            <SliderCaptcha
-              scope="user"
-              onCancel={() => setCaptchaOpen(false)}
-              onVerified={(ticket) => {
-                setCaptchaOpen(false);
-                if (captchaPurpose === "register") {
-                  void sendRegisterCode(ticket);
-                } else {
-                  void sendEmailCode(ticket);
-                }
-              }}
-            />
+          <SliderCaptcha
+            scope="user"
+            onCancel={() => setCaptchaOpen(false)}
+            onVerified={(ticket) => {
+              setCaptchaOpen(false);
+              void sendRegisterCode(ticket);
+            }}
+          />
         </DialogContent>
       </Dialog>
       <AuthToast toast={toast} onClose={closeToast} />

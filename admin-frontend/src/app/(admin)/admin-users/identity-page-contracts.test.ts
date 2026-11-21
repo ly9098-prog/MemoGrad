@@ -80,6 +80,10 @@ function findElement(node: unknown, type: string): Element | undefined {
 function renderLogin() {
   vi.stubGlobal("window", {
     location: { search: `?next=${encodeURIComponent(h.next)}` },
+    setTimeout: (callback: () => void) => {
+      callback();
+      return 0;
+    },
   });
   const element = LoginPage() as ReactElement<Record<string, unknown>>;
   const form = findElement(
@@ -98,7 +102,10 @@ beforeEach(() => {
   vi.stubEnv("ADMIN_WEB_HOST", h.adminHost);
   h.request.mockReset().mockResolvedValue({ id: 12 });
   h.invalidate.mockReset().mockResolvedValue(undefined);
-  h.login.mockReset().mockResolvedValue(undefined);
+  h.login.mockReset().mockResolvedValue({
+    access_token: "fixture-token",
+    user: { must_change_password: false },
+  });
 });
 
 describe("login and shell ownership", () => {
@@ -116,18 +123,23 @@ describe("login and shell ownership", () => {
   it("waits for login before redirecting to a safe internal destination", async () => {
     h.states = ["operator", ["Unit", "Only", "12345!"].join(""), "", false];
     let release!: () => void;
-    h.login.mockReturnValue(new Promise<void>((resolve) => { release = resolve; }));
+    h.login.mockReturnValue(new Promise((resolve) => {
+      release = () => resolve({
+        access_token: "fixture-token",
+        user: { must_change_password: false },
+      });
+    }));
     const submit = renderLogin();
     const preventDefault = vi.fn();
     const pending = submit({ preventDefault });
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(h.login).toHaveBeenCalledWith(h.states[0], h.states[1]);
     expect(h.replace).not.toHaveBeenCalled();
-    expect(h.setters[3]).toHaveBeenCalledWith(true);
+    expect(h.setters[2]).toHaveBeenCalledWith(true);
     release();
     await pending;
     expect(h.replace).toHaveBeenCalledWith("/admin-users");
-    expect(h.setters[3]).toHaveBeenLastCalledWith(false);
+    expect(h.setters[2]).toHaveBeenLastCalledWith(false);
   });
 
   it("rejects external login destinations through the real redirect helper", async () => {
@@ -140,8 +152,12 @@ describe("login and shell ownership", () => {
     h.login.mockRejectedValue(new Error("private provider detail"));
     await renderLogin()({ preventDefault: vi.fn() });
     expect(h.replace).not.toHaveBeenCalled();
-    expect(h.setters[2]).toHaveBeenLastCalledWith("登录失败，请稍后重试");
-    expect(h.setters[3]).toHaveBeenLastCalledWith(false);
+    expect(h.setters[7]).toHaveBeenLastCalledWith({
+      id: expect.any(Number),
+      message: "登录失败，请稍后重试",
+      tone: "danger",
+    });
+    expect(h.setters[2]).toHaveBeenLastCalledWith(false);
   });
 
   it("waits for bootstrap before redirecting unauthenticated shell users", () => {
