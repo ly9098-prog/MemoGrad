@@ -21,6 +21,8 @@ CRITICAL_OPERATIONS = {
     ("/api/admin/v1/system/health", "get"): "SystemHealthResponse",
     ("/api/admin/v1/tasks/diagnostics", "get"): "TaskDiagnosticsResponse",
     ("/api/admin/v1/tasks/trace/{trace_id}", "get"): "TaskTraceResponse",
+    ("/api/admin/v1/app-users", "get"): "PaginatedResponse_AdminAppUserListItem_",
+    ("/api/admin/v1/app-users/{user_id}", "get"): "AdminAppUserDetail",
     ("/api/v1/auth/login", "post"): "TokenResponse",
     ("/api/v1/auth/refresh", "post"): "TokenResponse",
     ("/api/v1/practice/questions", "get"): "PracticeQuestionsResponse",
@@ -79,3 +81,24 @@ def test_ai_statistics_exposes_recorded_model_name_without_price_estimates():
     assert "model_name" in properties
     assert "estimated_cost" not in properties
     assert {"today_calls", "monthly_calls", "success_rate", "avg_latency_ms", "total_tokens", "daily_trends"} <= properties.keys()
+
+
+def test_admin_app_user_contract_exposes_client_boundary_fields():
+    schemas = app.openapi()["components"]["schemas"]
+    item = schemas["AdminAppUserListItem"]["properties"]
+    identity = schemas["AdminAppUserIdentitySummary"]["properties"]
+
+    assert {
+        "user_type",
+        "registration_source",
+        "last_active_client",
+        "last_active_at",
+        "identities",
+    } <= item.keys()
+    assert {"provider", "masked_subject", "verified", "created_at"} <= identity.keys()
+
+
+def test_browser_email_start_requires_a_scalar_captcha_ticket():
+    schema = app.openapi()["components"]["schemas"]["EmailOtpStartRequest"]
+
+    assert {"email", "captcha_ticket"} <= set(schema["required"])

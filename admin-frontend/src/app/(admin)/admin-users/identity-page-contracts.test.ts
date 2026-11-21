@@ -276,7 +276,7 @@ describe("Admin user request ownership", () => {
 
 describe("App user batch boundaries", () => {
   function setup() {
-    h.states[10] = " review ";
+    h.states[11] = " review ";
     AppUsersPage();
     return h.mutations[0];
   }

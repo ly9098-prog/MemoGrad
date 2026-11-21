@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_security import AdminPrincipal
@@ -18,6 +18,9 @@ from app.schemas.admin_app_users import (
 )
 from app.services.admin_audit_service import write_admin_audit
 
+USER_TYPES = ("web", "miniprogram", "both")
+WEB_IDENTITY_PROVIDERS = ("email", "github", "password")
+
 
 async def _ensure_super_admin(db: AsyncSession, operator: AdminPrincipal) -> None:
     role_name = await db.scalar(
@@ -26,7 +29,7 @@ async def _ensure_super_admin(db: AsyncSession, operator: AdminPrincipal) -> Non
         .where(AdminUser.id == operator.id)
     )
     if role_name != "super_admin":
-        raise PermissionError("仅 super_admin 可管理小程序管理员绑定")
+        raise PermissionError("仅 super_admin 可管理普通用户管理员绑定")
 
 
 async def list_app_users(
@@ -34,10 +37,12 @@ async def list_app_users(
     page: int,
     page_size: int,
     keyword: str | None = None,
+    user_type: str | None = None,
     is_banned: bool | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
 ) -> tuple[list[User], int]:
+    user_type = user_type if user_type in USER_TYPES else None
     conditions = []
     if keyword:
         pattern = f"%{keyword}%"
@@ -58,6 +63,15 @@ async def list_app_users(
         )
     if is_banned is not None:
         conditions.append(User.is_banned.is_(is_banned))
+    if user_type == "web":
+        conditions.append(_has_identity_condition(WEB_IDENTITY_PROVIDERS))
+        conditions.append(_without_wechat_condition())
+    elif user_type == "miniprogram":
+        conditions.append(_has_identity_condition(("wechat",)))
+        conditions.append(_without_web_identity_condition())
+    elif user_type == "both":
+        conditions.append(_has_identity_condition(("wechat",)))
+        conditions.append(_has_identity_condition(WEB_IDENTITY_PROVIDERS))
     if created_from:
         conditions.append(User.created_at >= normalize_to_naive_utc(created_from))
     if created_to:
@@ -76,6 +90,77 @@ async def list_app_users(
         .limit(page_size)
     )
     return list(result.scalars().all()), int(total or 0)
+
+
+def get_user_type(identities: list[UserAuthIdentity]) -> str:
+    if not identities:
+        return "unknown"
+    has_web = any(
+        identity.provider in WEB_IDENTITY_PROVIDERS for identity in identities
+    )
+    has_miniprogram = any(identity.provider == "wechat" for identity in identities)
+    if has_web and has_miniprogram:
+        return "both"
+    if has_web:
+        return "web"
+    if has_miniprogram:
+        return "miniprogram"
+    return "unknown"
+
+
+def _has_identity_condition(providers: tuple[str, ...]) -> ColumnElement[bool]:
+    return (
+        select(UserAuthIdentity.id)
+        .where(
+            UserAuthIdentity.user_id == User.id,
+            UserAuthIdentity.provider.in_(providers),
+        )
+        .exists()
+    )
+
+
+def _without_wechat_condition() -> ColumnElement[bool]:
+    return ~_has_identity_condition(("wechat",))
+
+
+def _without_web_identity_condition() -> ColumnElement[bool]:
+    return ~_has_identity_condition(WEB_IDENTITY_PROVIDERS)
+
+
+async def load_user_identities(db: AsyncSession, user_id: int) -> list[UserAuthIdentity]:
+    return list(
+        (
+            await db.execute(
+                select(UserAuthIdentity)
+                .where(UserAuthIdentity.user_id == user_id)
+                .order_by(UserAuthIdentity.created_at.asc())
+            )
+        ).scalars()
+    )
+
+
+async def load_user_identities_by_user(
+    db: AsyncSession, user_ids: list[int]
+) -> dict[int, list[UserAuthIdentity]]:
+    if not user_ids:
+        return {}
+    result = await db.execute(
+        select(UserAuthIdentity)
+        .where(UserAuthIdentity.user_id.in_(user_ids))
+        .order_by(UserAuthIdentity.created_at.asc(), UserAuthIdentity.id.asc())
+    )
+    grouped: dict[int, list[UserAuthIdentity]] = {user_id: [] for user_id in user_ids}
+    for identity in result.scalars():
+        grouped[identity.user_id].append(identity)
+    return grouped
+
+
+def mask_identity_subject(identity: UserAuthIdentity) -> str:
+    if identity.provider == "email" and "@" in identity.subject:
+        return f"{identity.subject[:2]}***@{identity.subject.split('@', 1)[1]}"
+    if identity.provider == "password":
+        return "password:***"
+    return f"{identity.provider}:***"
 
 
 async def get_app_user_detail(db: AsyncSession, user_id: int) -> dict:
@@ -99,15 +184,16 @@ async def get_app_user_detail(db: AsyncSession, user_id: int) -> dict:
         )
     )
 
-    identities = list(
-        (
-            await db.execute(
-                select(UserAuthIdentity)
-                .where(UserAuthIdentity.user_id == user.id)
-                .order_by(UserAuthIdentity.created_at.asc())
-            )
-        ).scalars()
-    )
+    identities = await load_user_identities(db, user.id)
+    identity_summaries = [
+        {
+            "provider": identity.provider,
+            "masked_subject": mask_identity_subject(identity),
+            "verified": identity.verified_at is not None,
+            "created_at": identity.created_at,
+        }
+        for identity in identities
+    ]
     return {
         "id": user.id,
         "openid": user.openid,
@@ -118,20 +204,14 @@ async def get_app_user_detail(db: AsyncSession, user_id: int) -> dict:
         "banned_at": user.banned_at,
         "banned_by": user.banned_by,
         "created_at": user.created_at,
+        "registration_source": user.registration_source,
+        "last_active_client": user.last_active_client,
+        "last_active_at": user.last_active_at,
+        "user_type": get_user_type(identities),
         "updated_at": user.updated_at,
         "lifecycle_status": user.lifecycle_status,
-        "login_identities": [
-            {
-                "provider": identity.provider,
-                "masked_subject": (
-                    f"{identity.subject[:2]}***@{identity.subject.split('@', 1)[1]}"
-                    if identity.provider == "email"
-                    else f"{identity.provider}:***"
-                ),
-                "verified": identity.verified_at is not None,
-            }
-            for identity in identities
-        ],
+        "identities": identity_summaries,
+        "login_identities": identity_summaries,
         "practice_count": int(practice_count or 0),
         "wrong_count": int(wrong_count or 0),
         "recent_active_at": recent_active_at,
@@ -268,14 +348,14 @@ async def bind_app_user_admin(
         select(AppUserAdminBinding).where(AppUserAdminBinding.user_id == user_id)
     )
     if existing_user_binding:
-        raise ValueError("该小程序用户已绑定管理员账号")
+        raise ValueError("该普通用户已绑定管理员账号")
     existing_admin_binding = await db.scalar(
         select(AppUserAdminBinding).where(
             AppUserAdminBinding.admin_user_id == admin_user_id
         )
     )
     if existing_admin_binding:
-        raise ValueError("该管理员账号已绑定小程序用户")
+        raise ValueError("该管理员账号已绑定普通用户")
 
     binding = AppUserAdminBinding(
         user_id=user_id, admin_user_id=admin_user_id, created_by=operator.id
@@ -309,7 +389,7 @@ async def unbind_app_user_admin(
         select(AppUserAdminBinding).where(AppUserAdminBinding.user_id == user_id)
     )
     if not binding:
-        raise ValueError("该小程序用户未绑定管理员账号")
+        raise ValueError("该普通用户未绑定管理员账号")
     detail = {"admin_user_id": binding.admin_user_id}
     await db.delete(binding)
     await write_admin_audit(

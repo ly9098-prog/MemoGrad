@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   Ban,
   CheckCircle2,
+  Eye,
   Download,
   RefreshCw,
   Search,
@@ -27,6 +28,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, toQuery } from "@/lib/api/client";
@@ -53,11 +55,32 @@ type ConfirmState = {
 } | null;
 type Notice = { tone: "success" | "error"; text: string } | null;
 
+type DetailState = { user: AppUser } | null;
+
 const STATUS_OPTIONS = [
   { value: "all", label: "全部状态" },
   { value: "active", label: "正常用户" },
   { value: "banned", label: "已封禁" },
 ];
+
+const USER_TYPE_OPTIONS = [
+  { value: "all", label: "全部类型" },
+  { value: "web", label: "Web 用户" },
+  { value: "miniprogram", label: "小程序用户" },
+  { value: "both", label: "Web + 小程序" },
+];
+
+const USER_TYPE_LABELS: Record<string, string> = {
+  web: "Web",
+  miniprogram: "小程序",
+  both: "Web + 小程序",
+  unknown: "未知",
+};
+
+const CLIENT_LABELS: Record<string, string> = {
+  web: "Web",
+  miniprogram: "小程序",
+};
 
 const PAGE_SIZE_OPTIONS = [
   { value: "10", label: "10 条/页" },
@@ -87,11 +110,33 @@ function UserAvatar({ user }: { user: AppUser }) {
   );
 }
 
+function TypeBadge({ user }: { user: AppUser }) {
+  const label = USER_TYPE_LABELS[user.user_type ?? "unknown"] ?? "未知";
+  const tone =
+    user.user_type === "both"
+      ? "border-primary/20 bg-primary-light text-primary"
+      : user.user_type === "web"
+        ? "border-border bg-secondary text-muted-foreground"
+        : "border-border bg-accent text-muted-foreground";
+
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", tone)}>
+      {label}
+    </span>
+  );
+}
+
+function ClientLabel({ value }: { value?: string | null }) {
+  if (!value) return <span className="text-muted-foreground/70">暂无记录</span>;
+  return <span>{CLIENT_LABELS[value] ?? value}</span>;
+}
+
 export default function AppUsersPage() {
   const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState<UserStatusFilter>("all");
+  const [userType, setUserType] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -101,6 +146,7 @@ export default function AppUsersPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [banReason, setBanReason] = useState("后台人工封禁");
   const [notice, setNotice] = useState<Notice>(null);
+  const [detailState, setDetailState] = useState<DetailState>(null);
   const [exporting, setExporting] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
 
@@ -110,13 +156,14 @@ export default function AppUsersPage() {
   const createdTo = dateTo ? endOfChinaDateUtcIso(dateTo) : undefined;
 
   const users = useQuery({
-    queryKey: ["app-users", page, pageSize, keyword, status, createdFrom, createdTo],
+    queryKey: ["app-users", page, pageSize, keyword, userType, status, createdFrom, createdTo],
     queryFn: () =>
       apiRequest<PaginatedResponse<AppUser>>(
         `/app-users${toQuery({
           page,
           page_size: pageSize,
           keyword: keyword || undefined,
+          user_type: userType === "all" ? undefined : userType,
           is_banned: isBanned,
           created_from: createdFrom,
           created_to: createdTo,
@@ -196,7 +243,7 @@ export default function AppUsersPage() {
   const usersEntranceRef = useStaggeredEntrance<HTMLTableSectionElement>({
     ready: currentItems.length > 0,
     itemCount: currentItems.length,
-    animationKey: `${page}-${pageSize}-${keyword}-${status}-${createdFrom}-${createdTo}`,
+    animationKey: `${page}-${pageSize}-${keyword}-${userType}-${status}-${createdFrom}-${createdTo}`,
   });
   const selectedOnPage = currentItems.filter((user) => selectedIds.has(user.id));
   const allPageSelected = currentItems.length > 0 && selectedOnPage.length === currentItems.length;
@@ -217,12 +264,13 @@ export default function AppUsersPage() {
   useEffect(() => {
     setSelectedIds(new Set());
     setBatchAction("");
-  }, [page, pageSize, keyword, status, createdFrom, createdTo]);
+  }, [page, pageSize, keyword, userType, status, createdFrom, createdTo]);
 
   const resetFilters = () => {
     setSearchInput("");
     setKeyword("");
     setStatus("all");
+    setUserType("all");
     setDateFrom("");
     setDateTo("");
     setPage(1);
@@ -252,7 +300,7 @@ export default function AppUsersPage() {
     setConfirmState({
       action: user.is_banned ? "unban" : "ban",
       userIds: [user.id],
-      label: user.nickname || user.openid,
+      label: user.nickname || user.openid || `用户 ${user.id}`,
     });
   };
 
@@ -282,6 +330,7 @@ export default function AppUsersPage() {
           page: 1,
           page_size: 100,
           keyword: keyword || undefined,
+          user_type: userType === "all" ? undefined : userType,
           is_banned: isBanned,
           created_from: createdFrom,
           created_to: createdTo,
@@ -294,6 +343,7 @@ export default function AppUsersPage() {
             page: currentPage,
             page_size: 100,
             keyword: keyword || undefined,
+            user_type: userType === "all" ? undefined : userType,
             is_banned: isBanned,
             created_from: createdFrom,
             created_to: createdTo,
@@ -339,9 +389,9 @@ export default function AppUsersPage() {
     <ManagementPage className="space-y-5 pb-6">
       <ManagementPageHeader
         icon={<UsersRound className="h-5 w-5" />}
-        title="小程序用户"
-        description="查询、筛选并管理小程序用户的账号状态与封禁记录。"
-        meta={<span>用户身份以微信 openid 为准；封禁只影响使用权限，不删除历史数据。</span>}
+        title="普通用户"
+        description="查询、筛选并管理 Web、小程序及双端普通用户的账号状态与封禁记录。"
+        meta={<span>用户类型按当前登录身份计算；封禁只影响使用权限，不删除历史数据。</span>}
       />
       {(manualRefreshing || (users.isLoading && !hasDisplayedUsers)) ? (
         <div
@@ -360,7 +410,7 @@ export default function AppUsersPage() {
         <MetricCard
           label="用户总数"
           value={totalUsers.data?.total ?? 0}
-          hint="全部小程序用户"
+          hint="全部普通用户"
           icon={<UsersRound className="h-4 w-4" />}
           loading={totalUsers.isLoading}
         />
@@ -411,7 +461,7 @@ export default function AppUsersPage() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
                 className="h-10 bg-card pl-9"
-                placeholder="搜索 OpenID / 昵称"
+                placeholder="搜索 OpenID / 昵称 / 邮箱 / 账号"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
               />
@@ -427,6 +477,17 @@ export default function AppUsersPage() {
                 options={STATUS_OPTIONS}
                 clearable={false}
                 className="w-full sm:min-w-32 xl:w-36"
+              />
+
+              <CustomSelect
+                value={userType}
+                onChange={(value) => {
+                  setUserType(value);
+                  setPage(1);
+                }}
+                options={USER_TYPE_OPTIONS}
+                clearable={false}
+                className="w-full sm:min-w-32 xl:w-44"
               />
 
               <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3">
@@ -508,9 +569,13 @@ export default function AppUsersPage() {
                   {[
                     ["ID", "w-20"],
                     ["用户信息", "min-w-72"],
+                    ["类型", "w-28"],
+                    ["注册来源", "w-24"],
+                    ["最近活跃", "w-36"],
                     ["封禁原因", "min-w-48"],
                     ["状态", "w-28"],
                     ["操作", "w-36"],
+                    ["详情", "w-24"],
                   ].map(([label, width]) => (
                     <th key={label} className={cn("px-4 py-3 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground", width)}>
                       {label}
@@ -525,14 +590,18 @@ export default function AppUsersPage() {
                       <td className="px-4 py-3 lg:px-5"><div className="h-[18px] w-[18px] animate-pulse rounded bg-border" /></td>
                       <td className="px-4 py-3"><div className="h-4 w-10 animate-pulse rounded bg-border" /></td>
                       <td className="px-4 py-3"><div className="h-10 w-56 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-6 w-20 animate-pulse rounded-full bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-16 animate-pulse rounded bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-24 animate-pulse rounded bg-border" /></td>
                       <td className="px-4 py-3"><div className="h-4 w-32 animate-pulse rounded bg-border" /></td>
                       <td className="px-4 py-3"><div className="h-6 w-14 animate-pulse rounded-full bg-border" /></td>
                       <td className="px-4 py-3"><div className="h-8 w-20 animate-pulse rounded-lg bg-border" /></td>
+                      <td className="px-4 py-3"><div className="h-8 w-16 animate-pulse rounded-lg bg-border" /></td>
                     </tr>
                   ))
                 ) : users.isError && !hasDisplayedUsers ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center text-sm text-destructive">用户列表加载失败，请点击刷新后重试。</td>
+                    <td colSpan={10} className="px-5 py-16 text-center text-sm text-destructive">用户列表加载失败，请点击刷新后重试。</td>
                   </tr>
                 ) : currentItems.length ? (
                   currentItems.map((user) => (
@@ -541,7 +610,7 @@ export default function AppUsersPage() {
                         <CustomCheckbox
                           checked={selectedIds.has(user.id)}
                           onCheckedChange={(checked) => toggleUserSelection(user.id, checked)}
-                          aria-label={`选择用户 ${user.nickname || user.openid}`}
+                          aria-label={`选择用户 ${user.nickname || user.openid || user.id}`}
                         />
                       </td>
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-muted-foreground tabular-nums">{user.id}</td>
@@ -550,8 +619,20 @@ export default function AppUsersPage() {
                           <UserAvatar user={user} />
                           <div className="min-w-0">
                             <div className="truncate font-semibold text-foreground">{user.nickname || "未设置昵称"}</div>
-                            <div className="mt-0.5 max-w-[320px] truncate font-mono text-[11px] text-muted-foreground/70">{user.openid}</div>
+                            <div className="mt-0.5 max-w-[320px] truncate font-mono text-[11px] text-muted-foreground/70">
+                              {user.openid || "无微信 openid（Web 账号）"}
+                            </div>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><TypeBadge user={user} /></td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground"><ClientLabel value={user.registration_source} /></td>
+                      <td className="px-4 py-3 text-xs">
+                        <div className="flex flex-col gap-1">
+                          <ClientLabel value={user.last_active_client} />
+                          <span className="text-muted-foreground/70">
+                            {user.last_active_at ? formatChinaDateTime(user.last_active_at) : "暂无时间"}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -579,14 +660,25 @@ export default function AppUsersPage() {
                           {user.is_banned ? "解封" : "封禁"}
                         </Button>
                       </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailState({ user })}
+                          className="h-8 min-w-20 rounded-lg px-2.5 text-xs shadow-none"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          详情
+                        </Button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-5 py-16 text-center">
+                    <td colSpan={10} className="px-5 py-16 text-center">
                       <UsersRound className="mx-auto h-8 w-8 text-muted-foreground/70" />
                       <p className="mt-3 text-sm font-medium text-muted-foreground">暂无符合条件的用户</p>
-                      <p className="mt-1 text-xs text-muted-foreground/70">可调整搜索词、状态或日期范围后重新查询。</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">可调整搜索词、类型、状态或日期范围后重新查询。</p>
                     </td>
                   </tr>
                 )}
@@ -686,6 +778,66 @@ export default function AppUsersPage() {
           </label>
         ) : null}
       </ConfirmDialog>
+
+      <Dialog open={detailState !== null} onOpenChange={(open) => !open && setDetailState(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>用户身份详情</DialogTitle>
+            <DialogDescription>
+              身份按当前账号绑定关系展示，仅包含安全摘要，不显示完整登录凭据。
+            </DialogDescription>
+          </DialogHeader>
+          {detailState ? (
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">当前类型</div>
+                  <div className="mt-1"><TypeBadge user={detailState.user} /></div>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">注册来源</div>
+                  <div className="mt-1 text-sm"><ClientLabel value={detailState.user.registration_source} /></div>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">最近活跃端</div>
+                  <div className="mt-1 text-sm"><ClientLabel value={detailState.user.last_active_client} /></div>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">最近活跃时间</div>
+                  <div className="mt-1 text-sm">
+                    {detailState.user.last_active_at ? formatChinaDateTime(detailState.user.last_active_at) : "暂无记录"}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground">登录身份</div>
+                {detailState.user.identities?.length ? (
+                  <ul className="space-y-2">
+                    {detailState.user.identities.map((identity, index) => (
+                      <li key={`${identity.provider}-${index}`} className="flex flex-col gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="font-medium">{identity.provider}</span>
+                          <span className="max-w-[220px] truncate font-mono text-xs text-muted-foreground">{identity.masked_subject}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3 text-xs">
+                          <span className="text-muted-foreground/70">
+                            {identity.created_at ? formatChinaDateTime(identity.created_at) : "绑定时间未知"}
+                          </span>
+                          <span className={identity.verified ? "text-success" : "text-muted-foreground/70"}>
+                            {identity.verified ? "已验证" : "未验证"}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-xl border border-border bg-secondary/30 px-3 py-2 text-sm text-muted-foreground">暂无身份记录。</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </ManagementPage>
   );
 }

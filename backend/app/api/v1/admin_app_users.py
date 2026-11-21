@@ -6,20 +6,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.admin_security import require_permissions, require_roles
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
+from app.models.user import User
+from app.models.user_auth import UserAuthIdentity
 from app.schemas.admin_app_users import (
     AdminAppUserBanRequest,
     AdminAppUserBindAdminRequest,
     AdminAppUserBindAdminResponse,
     AdminAppUserDetail,
+    AdminAppUserIdentitySummary,
     AdminAppUserListItem,
     AdminAppUserUpdateRequest,
 )
-from app.schemas.common import paginated_response
+from app.schemas.common import PaginatedResponse, paginated_response
 from app.services.admin_app_user_service import (
     ban_app_user,
     bind_app_user_admin,
     get_app_user_detail,
+    get_user_type,
     list_app_users,
+    load_user_identities,
+    load_user_identities_by_user,
+    mask_identity_subject,
     unban_app_user,
     unbind_app_user_admin,
     update_app_user,
@@ -28,11 +35,29 @@ from app.services.admin_app_user_service import (
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/app-users", tags=["admin-app-users"])
 
 
-@router.get("")
+def _build_app_user_item(
+    user: User, identities: list[UserAuthIdentity]
+) -> AdminAppUserListItem:
+    item = AdminAppUserListItem.model_validate(user)
+    item.identities = [
+        AdminAppUserIdentitySummary(
+            provider=identity.provider,
+            masked_subject=mask_identity_subject(identity),
+            verified=identity.verified_at is not None,
+            created_at=identity.created_at,
+        )
+        for identity in identities
+    ]
+    item.user_type = get_user_type(identities)
+    return item
+
+
+@router.get("", response_model=PaginatedResponse[AdminAppUserListItem])
 async def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     keyword: str | None = None,
+    user_type: str | None = Query(default=None, pattern="^(web|miniprogram|both)$"),
     is_banned: bool | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
@@ -40,14 +65,16 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
     users, total = await list_app_users(
-        db, page, page_size, keyword, is_banned, created_from, created_to
+        db, page, page_size, keyword, user_type, is_banned, created_from, created_to
     )
-    return paginated_response(
-        [AdminAppUserListItem.model_validate(user) for user in users],
-        total,
-        page,
-        page_size,
+    identities_by_user = await load_user_identities_by_user(
+        db, [user.id for user in users]
     )
+    items = []
+    for user in users:
+        identities = identities_by_user.get(user.id, [])
+        items.append(_build_app_user_item(user, identities))
+    return paginated_response(items, total, page, page_size)
 
 
 @router.get("/{user_id}", response_model=AdminAppUserDetail)
@@ -74,7 +101,7 @@ async def patch_user(
         user = await update_app_user(db, user_id, data, current_admin, request)
         await db.commit()
         await db.refresh(user)
-        return user
+        return _build_app_user_item(user, await load_user_identities(db, user.id))
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -134,7 +161,7 @@ async def ban_user(
         user = await ban_app_user(db, user_id, data, current_admin, request)
         await db.commit()
         await db.refresh(user)
-        return user
+        return _build_app_user_item(user, await load_user_identities(db, user.id))
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -151,7 +178,7 @@ async def unban_user(
         user = await unban_app_user(db, user_id, current_admin, request)
         await db.commit()
         await db.refresh(user)
-        return user
+        return _build_app_user_item(user, await load_user_identities(db, user.id))
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))

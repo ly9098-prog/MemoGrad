@@ -137,6 +137,7 @@ async def resolve_wechat_identity(
             namespace=namespace,
             subject=openid,
             allow_register=True,
+            registration_source="miniprogram",
         )
     except identity_service.IdentityUnavailableError as exc:
         raise ValueError(str(exc)) from exc

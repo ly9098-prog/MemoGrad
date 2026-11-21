@@ -104,8 +104,8 @@ const dashboardRoute: AdminRoute = {
 
 const appUsersRoute: AdminRoute = {
   href: "/app-users",
-  label: "小程序用户",
-  description: "封禁与资料",
+  label: "普通用户",
+  description: "身份与账号状态",
   permission: "app-user:read",
   icon: Users,
 };
@@ -313,7 +313,7 @@ export const adminRoutes: AdminRoute[] = [
  *
  * Group routes by the administrator's primary workflow so the top-level sidebar
  * stays compact while preserving every existing URL and permission check:
- * - 角色管理: 小程序用户 + 管理员 + 角色权限
+ * - 角色管理: 普通用户 + 管理员 + 角色权限
  * - 题目管理: 题库 + 导入 + 知识图谱
  * - 系统管理: AI 解析设置 + 审计日志 + 任务诊断
  * - 公式管理: 公式库 + 分类

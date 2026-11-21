@@ -54,6 +54,7 @@ async def resolve_github_identity(
             namespace="github.com",
             subject=subject,
             allow_register=True,
+            registration_source="web",
             display_name=str(profile.get("name") or profile.get("login") or "")[:64]
             or None,
         )

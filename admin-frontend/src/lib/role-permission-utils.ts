@@ -9,7 +9,7 @@ import type { Permission } from "@/lib/api/types";
 export const CATEGORY_META: Record<string, { label: string; description: string }> = {
   dashboard: { label: "仪表盘", description: "统计概览与运营数据" },
   admin_user: { label: "管理员管理", description: "后台管理员账号与安全操作" },
-  app_user: { label: "用户管理", description: "小程序用户查看与状态管理" },
+  app_user: { label: "用户管理", description: "普通用户查看与状态管理" },
   question: { label: "题库管理", description: "题目查看、编辑、审核与删除" },
   subject: { label: "科目管理", description: "科目与题库分类维护" },
   knowledge: { label: "知识图谱", description: "知识点与知识图谱能力" },
@@ -73,7 +73,7 @@ export const ACTION_ORDER = [
 export const RESOURCE_LABELS: Record<string, string> = {
   dashboard: "仪表盘",
   "admin-user": "后台管理员",
-  "app-user": "小程序用户",
+  "app-user": "普通用户",
   question: "题目",
   subject: "科目",
   knowledge: "知识图谱",

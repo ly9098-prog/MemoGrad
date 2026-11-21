@@ -41,8 +41,9 @@ describe("csvEscape", () => {
 });
 
 describe("buildUserCsvHeader", () => {
-  it("returns 7 columns", () => {
-    expect(buildUserCsvHeader()).toHaveLength(7);
+  it("returns 11 columns including the latest activity timestamp", () => {
+    expect(buildUserCsvHeader()).toHaveLength(11);
+    expect(buildUserCsvHeader()[6]).toBe("最近活跃时间（北京时间）");
   });
   it("includes ID and 昵称", () => {
     const h = buildUserCsvHeader();
@@ -55,14 +56,31 @@ describe("buildUserCsvRow", () => {
   const fmt = (v: string | null | undefined) => v || "";
   it("builds row for unbanned user", () => {
     const row = buildUserCsvRow(baseUser, fmt);
-    expect(row[3]).toBe("正常");
+    expect(row[3]).toBe("未知");
+    expect(row[4]).toBe("");
     expect(row[5]).toBe("");
+    expect(row[6]).toBe("");
+    expect(row[7]).toBe("正常");
+    expect(row[9]).toBe("");
   });
   it("builds row for banned user", () => {
     const row = buildUserCsvRow({ ...baseUser, is_banned: true, banned_reason: "spam", banned_at: "2024-06-01T00:00:00Z" }, fmt);
-    expect(row[3]).toBe("已封禁");
-    expect(row[4]).toBe("spam");
-    expect(row[5]).toBe("2024-06-01T00:00:00Z");
+    expect(row[7]).toBe("已封禁");
+    expect(row[8]).toBe("spam");
+    expect(row[9]).toBe("2024-06-01T00:00:00Z");
+  });
+  it("builds client boundary columns", () => {
+    const row = buildUserCsvRow({
+      ...baseUser,
+      user_type: "both",
+      registration_source: "miniprogram",
+      last_active_client: "web",
+      last_active_at: "2024-02-03T04:05:06Z",
+    }, fmt);
+    expect(row[3]).toBe("Web + 小程序");
+    expect(row[4]).toBe("小程序");
+    expect(row[5]).toBe("Web");
+    expect(row[6]).toBe("2024-02-03T04:05:06Z");
   });
   it("uses fallback nickname", () => {
     const row = buildUserCsvRow({ ...baseUser, nickname: null }, fmt);

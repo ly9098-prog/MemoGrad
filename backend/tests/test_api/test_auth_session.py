@@ -10,14 +10,18 @@ from previous test runs.
 """
 import asyncio
 import uuid
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.api.v1 import auth as auth_api
 from app.core.database import Base, get_db
+from app.core.security import decode_token
 from app.main import app
+from app.models.user import User
 
 client = TestClient(app)
 
@@ -40,7 +44,7 @@ def isolated_database(tmp_path_factory):
 
     asyncio.run(create_schema())
     app.dependency_overrides[get_db] = override_db
-    yield
+    yield factory
     app.dependency_overrides.pop(get_db, None)
     asyncio.run(engine.dispose())
 
@@ -64,6 +68,50 @@ def _login(code=None):
 
 def _auth_header(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_login_and_refresh_record_miniprogram_activity(isolated_database):
+    token, refresh_token = _login()
+    user_id = decode_token(token)
+    old_time = datetime(2026, 11, 21, 8, 0)
+
+    async def mark_stale():
+        async with isolated_database() as db:
+            user = await db.get(User, user_id)
+            user.last_active_client = "web"
+            user.last_active_at = old_time
+            await db.commit()
+
+    asyncio.run(mark_stale())
+    response = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+    assert response.status_code == 200
+
+    async def read_activity():
+        async with isolated_database() as db:
+            user = await db.get(User, user_id)
+            return user.last_active_client, user.last_active_at
+
+    active_client, active_at = asyncio.run(read_activity())
+    assert active_client == "miniprogram"
+    assert active_at > old_time
+
+
+def test_login_and_refresh_survive_activity_write_failure(monkeypatch):
+    async def fail_activity(db, user, client):
+        await db.rollback()
+
+    monkeypatch.setattr(auth_api, "record_user_activity", fail_activity)
+    token, refresh_token = _login()
+    retried = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+
+    assert retried.status_code == 200
+    assert retried.json()["user"]["id"] == decode_token(token)
 
 
 def test_wechat_login_requires_current_consent_versions():

@@ -352,7 +352,7 @@ export type Permission = {
 
 export type AppUser = {
   id: number;
-  openid: string;
+  openid?: string | null;
   nickname?: string | null;
   avatar_url?: string | null;
   is_banned: boolean;
@@ -360,13 +360,26 @@ export type AppUser = {
   banned_at?: string | null;
   banned_by?: number | null;
   created_at?: string;
+  registration_source?: "web" | "miniprogram" | null;
+  last_active_client?: "web" | "miniprogram" | null;
+  last_active_at?: string | null;
+  user_type?: "web" | "miniprogram" | "both" | "unknown";
+  identities?: AdminUserIdentitySummary[];
   updated_at?: string;
+};
+
+export type AdminUserIdentitySummary = {
+  provider: string;
+  masked_subject: string;
+  verified: boolean;
+  created_at?: string | null;
 };
 
 export type AppUserDetail = AppUser & {
   practice_count: number;
   wrong_count: number;
   recent_active_at?: string | null;
+  login_identities?: AdminUserIdentitySummary[];
 };
 
 export type QuestionEditRequest = {

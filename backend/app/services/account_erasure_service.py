@@ -50,6 +50,9 @@ def tombstone_cancelled_user(user: User) -> None:
     """Clear profile fields and enter the cancellation lifecycle."""
     user.nickname = None
     user.avatar_url = None
+    user.registration_source = None
+    user.last_active_client = None
+    user.last_active_at = None
     if not user.is_banned:
         user.lifecycle_status = "erasing"
 
@@ -347,6 +350,9 @@ async def purge_cancelled_user(db, user: User) -> None:
     user.lifecycle_status = "erased"
     user.nickname = None
     user.avatar_url = None
+    user.registration_source = None
+    user.last_active_client = None
+    user.last_active_at = None
     await db.commit()
 
 
@@ -411,6 +417,9 @@ async def _anonymize_inactive(db) -> int:
     for user in users:
         await identity_service.tombstone_user_identities(db, user.id)
         user.openid = None
+        user.registration_source = None
+        user.last_active_client = None
+        user.last_active_at = None
         user.lifecycle_status = "anonymized"
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     if users:

@@ -102,6 +102,7 @@ async def authenticate_identity(
     subject: str,
     allow_register: bool,
     display_name: str | None = None,
+    registration_source: str | None = None,
 ) -> tuple[User, UserAuthIdentity]:
     identity, user = await find_identity_user(
         db, provider=provider, namespace=namespace, subject=subject
@@ -114,7 +115,11 @@ async def authenticate_identity(
     if not allow_register:
         raise IdentityUnavailableError("身份尚未绑定账号")
 
-    user = User(nickname=display_name, lifecycle_status="active")
+    user = User(
+        nickname=display_name,
+        lifecycle_status="active",
+        registration_source=registration_source,
+    )
     db.add(user)
     try:
         await db.flush()

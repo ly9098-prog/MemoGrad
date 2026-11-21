@@ -71,21 +71,21 @@ ADMIN_PERMISSION_DEFINITIONS: tuple[dict[str, str], ...] = (
         "resource": "app-user",
         "action": "read",
         "category": "app_user",
-        "description": "查看小程序用户",
+        "description": "查看普通用户",
     },
     {
         "name": "app-user:write",
         "resource": "app-user",
         "action": "write",
         "category": "app_user",
-        "description": "编辑小程序用户",
+        "description": "编辑普通用户",
     },
     {
         "name": "app-user:ban",
         "resource": "app-user",
         "action": "ban",
         "category": "app_user",
-        "description": "封禁或解封小程序用户",
+        "description": "封禁或解封普通用户",
     },
     {
         "name": "admin-user:read",
@@ -497,6 +497,9 @@ async def _ensure_permissions(db: AsyncSession) -> list[Permission]:
 
     for item in ADMIN_PERMISSION_DEFINITIONS:
         if item["name"] in existing:
+            permission = existing[item["name"]]
+            if permission.description != item["description"]:
+                permission.description = item["description"]
             continue
         permission = Permission(**item)
         db.add(permission)

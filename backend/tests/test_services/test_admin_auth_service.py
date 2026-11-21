@@ -136,6 +136,10 @@ async def test_ensure_dev_super_admin_initializes_defaults_and_is_idempotent(tmp
     assert verify_admin_password("admin", admin_user.password_hash)
     assert len(permissions) == len(ADMIN_PERMISSION_DEFINITIONS)
     assert {permission.name for permission in permissions} == {item["name"] for item in ADMIN_PERMISSION_DEFINITIONS}
+    assert {permission.name: permission.description for permission in permissions} == {
+        item["name"]: item["description"]
+        for item in ADMIN_PERMISSION_DEFINITIONS
+    }
     assert role_permission_ids == {permission.id for permission in permissions}
     assert admin_role_permission_ids == {permission_ids_by_name[name] for name in ADMIN_ROLE_PERMISSION_NAMES}
     assert len(audits) == 1
@@ -146,6 +150,42 @@ async def test_ensure_dev_super_admin_initializes_defaults_and_is_idempotent(tmp
         await db.commit()
 
     assert created_again is False
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_ensure_dev_super_admin_refreshes_existing_permission_descriptions(
+    tmp_path,
+):
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{tmp_path / 'admin-bootstrap-descriptions.db'}"
+    )
+    sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with sessionmaker() as db:
+        await ensure_dev_super_admin(db, "development")
+        await db.commit()
+
+    async with sessionmaker() as db:
+        permission = (
+            await db.execute(select(Permission).where(Permission.name == "app-user:read"))
+        ).scalar_one()
+        permission.description = "旧权限描述"
+        await db.commit()
+
+    async with sessionmaker() as db:
+        await ensure_dev_super_admin(db, "development")
+        await db.commit()
+
+    async with sessionmaker() as db:
+        permission = (
+            await db.execute(select(Permission).where(Permission.name == "app-user:read"))
+        ).scalar_one()
+        assert permission.description == "查看普通用户"
 
     await engine.dispose()
 

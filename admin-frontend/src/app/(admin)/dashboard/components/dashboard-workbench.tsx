@@ -278,7 +278,7 @@ export function renderDashboardWorkbench({
               featured
             />
             <MetricCell
-              label="小程序用户"
+              label="普通用户"
               value={numberValue(overview.data?.users_total)}
               hint={overview.isError ? "数据暂不可用" : `今日新增 +${numberValue(usersToday)}`}
               loading={overview.isLoading}

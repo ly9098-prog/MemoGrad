@@ -4,11 +4,13 @@ from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
 from app.api.v1 import admin_app_users
+from app.core import admin_security
 from app.core.admin_security import AdminPrincipal, get_current_admin
 from app.core.database import get_db
 from app.main import app
 from app.models.admin import AdminUser
 from app.models.user import User
+from app.models.user_auth import UserAuthIdentity
 
 client = TestClient(app)
 
@@ -21,9 +23,8 @@ class _Db:
 
     async def execute(self, _statement):
         class _Scalars:
-            def all(self):
-                return ["app-user:read", "app-user:write", "app-user:ban"]
-
+            def __iter__(self):
+                return iter([])
         class _Result:
             def scalars(self):
                 return _Scalars()
@@ -31,8 +32,17 @@ class _Db:
         return _Result()
 
 
+class _IdentityDb(_Db):
+    async def execute(self, _statement):
+        class _Result:
+            def scalars(self):
+                return []
+
+        return _Result()
+
+
 async def _override_db():
-    yield _Db()
+    yield _IdentityDb()
 
 
 def _principal():
@@ -53,6 +63,7 @@ def _app_user(user_id=1, banned=False):
         banned_by=1 if banned else None,
         created_at=now,
         updated_at=now,
+        lifecycle_status="active",
     )
 
 
@@ -69,6 +80,7 @@ async def _allow_ban():
 
 
 def test_list_app_users(monkeypatch):
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value={"app-user:read"}))
     monkeypatch.setattr(admin_app_users, "list_app_users", AsyncMock(return_value=([_app_user()], 1)))
     app.dependency_overrides[get_current_admin] = _allow_read
     app.dependency_overrides[get_db] = _override_db
@@ -84,6 +96,7 @@ def test_list_app_users(monkeypatch):
 
 def test_get_app_user_detail(monkeypatch):
     detail = _app_user().__dict__ | {"practice_count": 3, "wrong_count": 1, "recent_active_at": None}
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value={"app-user:read"}))
     monkeypatch.setattr(admin_app_users, "get_app_user_detail", AsyncMock(return_value=detail))
     app.dependency_overrides[get_current_admin] = _allow_read
     app.dependency_overrides[get_db] = _override_db
@@ -98,7 +111,21 @@ def test_get_app_user_detail(monkeypatch):
 
 def test_patch_app_user(monkeypatch):
     patch_user = AsyncMock(return_value=_app_user())
+    password_identity = UserAuthIdentity(
+        user_id=1,
+        provider="password",
+        namespace="user",
+        subject="alice",
+        verified_at=datetime(2026, 5, 29),
+        created_at=datetime(2026, 5, 29),
+    )
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value={"app-user:write"}))
     monkeypatch.setattr(admin_app_users, "update_app_user", patch_user)
+    monkeypatch.setattr(
+        admin_app_users,
+        "load_user_identities",
+        AsyncMock(return_value=[password_identity]),
+    )
     app.dependency_overrides[get_current_admin] = _allow_write
     app.dependency_overrides[get_db] = _override_db
     try:
@@ -107,12 +134,15 @@ def test_patch_app_user(monkeypatch):
         app.dependency_overrides.clear()
 
     assert resp.status_code == 200
+    assert resp.json()["user_type"] == "web"
+    assert resp.json()["identities"][0]["masked_subject"] == "password:***"
     patch_user.assert_awaited_once()
 
 
 def test_ban_and_unban_app_user(monkeypatch):
     monkeypatch.setattr(admin_app_users, "ban_app_user", AsyncMock(return_value=_app_user(banned=True)))
     monkeypatch.setattr(admin_app_users, "unban_app_user", AsyncMock(return_value=_app_user(banned=False)))
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value={"app-user:ban"}))
     app.dependency_overrides[get_current_admin] = _allow_ban
     app.dependency_overrides[get_db] = _override_db
     try:

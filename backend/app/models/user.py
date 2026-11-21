@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.orm_base import Base
@@ -8,6 +16,21 @@ from app.core.orm_base import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "registration_source IS NULL OR registration_source IN ('web', 'miniprogram')",
+            name="ck_users_registration_source",
+        ),
+        CheckConstraint(
+            "last_active_client IS NULL OR last_active_client IN ('web', 'miniprogram')",
+            name="ck_users_last_active_client",
+        ),
+        CheckConstraint(
+            "(last_active_client IS NULL AND last_active_at IS NULL) "
+            "OR (last_active_client IS NOT NULL AND last_active_at IS NOT NULL)",
+            name="ck_users_last_active_pair",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # Legacy column retained while consumers move to user_auth_identities. New
@@ -32,6 +55,9 @@ class User(Base):
         index=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    registration_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    last_active_client: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )

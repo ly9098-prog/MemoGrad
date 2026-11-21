@@ -34,6 +34,7 @@ from app.services import (
     user_auth_service,
     user_service,
 )
+from app.services.user_activity_service import record_user_activity
 
 router = APIRouter(prefix=API_V1_PREFIX)
 _STATE_COOKIE = "github_oauth_state"
@@ -248,6 +249,8 @@ async def refresh_web_session(
         delete_user_refresh_cookie(response, request)
         raise HTTPException(status_code=401, detail="会话已失效，请重新登录")
     access_token, expires_at = await issue_user_token(user.id, expected_nbf=nbf_before)
+    user_response = await user_service.get_user_response(db, user)
+    await record_user_activity(db, user, "web")
     from app.core.user_web_auth import set_user_refresh_cookie
 
     set_user_refresh_cookie(response, new_refresh_token, request)
@@ -255,7 +258,7 @@ async def refresh_web_session(
         "access_token": access_token,
         "token_type": "bearer",
         "expires_at": expires_at,
-        "user": await user_service.get_user_response(db, user),
+        "user": user_response,
     }
 
 

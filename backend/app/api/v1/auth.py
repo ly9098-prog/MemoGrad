@@ -30,6 +30,7 @@ from app.services import (
     user_auth_service,
     user_service,
 )
+from app.services.user_activity_service import record_user_activity
 
 router = APIRouter(prefix=f"{API_V1_PREFIX}")
 MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -91,12 +92,14 @@ async def login(
 
     refresh_token = await token_service.create_refresh_token(db, user.id)
     await user_auth_service.record_consents(db, user.id, consent)
+    user_response = await user_service.get_user_response(db, user)
+    await record_user_activity(db, user, "miniprogram")
 
     return TokenResponse(
         access_token=token,
         expires_at=expires_at,
         refresh_token=refresh_token,
-        user=await user_service.get_user_response(db, user),
+        user=user_response,
     )
 
 
@@ -141,12 +144,14 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
     new_jwt, new_expires_at = await issue_user_token(
         user.id, expected_nbf=nbf_before
     )
+    user_response = await user_service.get_user_response(db, user)
+    await record_user_activity(db, user, "miniprogram")
 
     return TokenResponse(
         access_token=new_jwt,
         expires_at=new_expires_at,
         refresh_token=new_refresh_token,
-        user=await user_service.get_user_response(db, user),
+        user=user_response,
     )
 
 

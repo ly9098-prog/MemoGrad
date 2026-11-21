@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.user_auth import UserConsentAcceptance
 from app.schemas.user import TokenResponse, WebTokenResponse
 from app.services import email_otp_service, token_service, user_service
+from app.services.user_activity_service import record_user_activity
 
 
 async def authorize_email_change(
@@ -96,11 +97,13 @@ async def record_consents(
 async def issue_miniprogram_session(db: AsyncSession, user: User) -> TokenResponse:
     access_token, expires_at = await issue_user_token(user.id)
     refresh_token = await token_service.create_refresh_token(db, user.id)
+    user_response = await user_service.get_user_response(db, user)
+    await record_user_activity(db, user, "miniprogram")
     return TokenResponse(
         access_token=access_token,
         expires_at=expires_at,
         refresh_token=refresh_token,
-        user=await user_service.get_user_response(db, user),
+        user=user_response,
     )
 
 
@@ -112,11 +115,13 @@ async def issue_web_session(
 ) -> WebTokenResponse:
     access_token, expires_at = await issue_user_token(user.id)
     refresh_token = await token_service.create_refresh_token(db, user.id)
+    user_response = await user_service.get_user_response(db, user)
+    await record_user_activity(db, user, "web")
     set_user_refresh_cookie(response, refresh_token, request)
     return WebTokenResponse(
         access_token=access_token,
         expires_at=expires_at,
-        user=await user_service.get_user_response(db, user),
+        user=user_response,
     )
 
 

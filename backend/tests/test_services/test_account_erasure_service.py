@@ -63,9 +63,17 @@ async def _count(db, model, user_id):
 def test_cancellation_tombstones_openid():
     from app.services import account_erasure_service as svc
 
-    user = User(openid="wx-real-openid")
+    user = User(
+        openid="wx-real-openid",
+        registration_source="miniprogram",
+        last_active_client="web",
+        last_active_at=utcnow(),
+    )
     svc.tombstone_cancelled_user(user)
     assert user.lifecycle_status == "erasing"
+    assert user.registration_source is None
+    assert user.last_active_client is None
+    assert user.last_active_at is None
 
 
 @pytest.mark.asyncio
@@ -75,7 +83,14 @@ async def test_sweep_purges_cancelled_user_data_and_marks_erased(factory, monkey
     storage = type("S", (), {"delete": AsyncMock(return_value=True), "exists": AsyncMock(return_value=False)})()
     monkeypatch.setattr(svc, "get_export_storage", lambda: storage)
     async with factory() as db:
-        user = await _seed_user(db, "wx-cancelled", deleted_at=utcnow())
+        user = await _seed_user(
+            db,
+            "wx-cancelled",
+            deleted_at=utcnow(),
+            registration_source="miniprogram",
+            last_active_client="web",
+            last_active_at=utcnow(),
+        )
         other = await _seed_user(db, "wx-keep")
         db.add(ExportTask(user_id=user.id, status="completed", range_type="all", title="t", export_date="2026-01-01", file_name="a.docx", file_key="exports/a.docx"))
         await db.commit()
@@ -92,6 +107,9 @@ async def test_sweep_purges_cancelled_user_data_and_marks_erased(factory, monkey
         assert refreshed.lifecycle_status == "erased"
         assert refreshed.openid is None
         assert refreshed.nickname is None
+        assert refreshed.registration_source is None
+        assert refreshed.last_active_client is None
+        assert refreshed.last_active_at is None
 
 
 @pytest.mark.asyncio
@@ -248,7 +266,13 @@ async def test_inactive_accounts_get_login_identifier_anonymized(factory, monkey
     monkeypatch.setattr(svc, "get_export_storage", lambda: type("S", (), {"delete": AsyncMock(return_value=True), "exists": AsyncMock(return_value=False)})())
     old = utcnow() - timedelta(days=svc.INACTIVITY_DAYS + 30)
     async with factory() as db:
-        stale = await _seed_user(db, "wx-stale")
+        stale = await _seed_user(
+            db,
+            "wx-stale",
+            registration_source="miniprogram",
+            last_active_client="web",
+            last_active_at=utcnow(),
+        )
         active = await _seed_user(db, "wx-active")
         for u, when in ((stale, old), (active, utcnow())):
             await db.execute(User.__table__.update().where(User.id == u.id).values(updated_at=when))
@@ -261,6 +285,9 @@ async def test_inactive_accounts_get_login_identifier_anonymized(factory, monkey
         a = (await db.execute(select(User).where(User.id == active.id))).scalar_one()
         assert s.lifecycle_status == "anonymized"
         assert s.openid is None
+        assert s.registration_source is None
+        assert s.last_active_client is None
+        assert s.last_active_at is None
         assert a.openid == "wx-active"
         assert await _count(db, RefreshToken, stale.id) == 0
 
@@ -307,7 +334,15 @@ async def test_deletion_request_tombstones_openid_and_revokes_sessions(factory, 
     monkeypatch.setattr(auth_api.user_service, "delete_user_avatar_file", AsyncMock())
     monkeypatch.setattr(auth_api, "set_user_nbf", AsyncMock())
     async with factory() as db:
-        user = await _seed_user(db, "wx-real-openid", nickname="n", avatar_url="/a.jpg")
+        user = await _seed_user(
+            db,
+            "wx-real-openid",
+            nickname="n",
+            avatar_url="/a.jpg",
+            registration_source="miniprogram",
+            last_active_client="web",
+            last_active_at=utcnow(),
+        )
         uid = user.id
 
         response = await auth_api.request_deletion(db=db, current_user=user)
@@ -318,6 +353,9 @@ async def test_deletion_request_tombstones_openid_and_revokes_sessions(factory, 
         assert row.lifecycle_status == "erasing"
         assert row.openid == "wx-real-openid"
         assert row.nickname is None and row.avatar_url is None
+        assert row.registration_source is None
+        assert row.last_active_client is None
+        assert row.last_active_at is None
         tokens = (await db.execute(select(RefreshToken).where(RefreshToken.user_id == uid))).scalars().all()
         assert tokens and all(t.revoked_at is not None for t in tokens)
 
@@ -367,10 +405,20 @@ async def test_undeletable_export_file_keeps_user_pending(factory, monkeypatch):
 def test_banned_user_keeps_openid_so_cancelling_cannot_shed_a_ban():
     from app.services import account_erasure_service as svc
 
-    user = User(openid="wx-banned", is_banned=True, nickname="n")
+    user = User(
+        openid="wx-banned",
+        is_banned=True,
+        nickname="n",
+        registration_source="miniprogram",
+        last_active_client="web",
+        last_active_at=utcnow(),
+    )
     svc.tombstone_cancelled_user(user)
     assert user.openid == "wx-banned"
     assert user.nickname is None
+    assert user.registration_source is None
+    assert user.last_active_client is None
+    assert user.last_active_at is None
 
 
 @pytest.mark.asyncio

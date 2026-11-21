@@ -22,7 +22,6 @@ from app.services import (
     identity_service,
     slider_captcha_service,
     user_auth_service,
-    user_service,
 )
 
 
@@ -501,19 +500,10 @@ async def test_browser_email_login_requires_a_slider_ticket(flow):
 
 
 @pytest.mark.asyncio
-async def test_miniprogram_email_login_requires_wechat_proof_but_not_a_slider_ticket(
-    flow, monkeypatch,
-):
+async def test_miniprogram_email_login_is_rejected(flow):
     client, *_ = flow
 
-    async def resolve_wechat_subject(code: str):
-        assert code == "verified-miniprogram-code"
-        return "miniprogram-openid"
-
-    monkeypatch.setattr(
-        user_service, "resolve_wechat_subject", resolve_wechat_subject
-    )
-    unverified = await client.post(
+    started = await client.post(
         "/api/v1/auth/email/start",
         json={
             "email": "reader@example.com",
@@ -523,49 +513,14 @@ async def test_miniprogram_email_login_requires_wechat_proof_but_not_a_slider_ti
             "privacy_version": "2026-11-20",
         },
     )
-    assert unverified.status_code == 422
-    assert unverified.json()["detail"] == "请完成微信客户端校验"
+    assert started.status_code == 422
 
-    response = await client.post(
-        "/api/v1/auth/email/start",
-        json={
-            "email": "reader@example.com",
-            "wechat_code": "verified-miniprogram-code",
-            "client": "miniprogram",
-            "accepted_terms": True,
-            "agreement_version": "2026-11-20",
-            "privacy_version": "2026-11-20",
-        },
-    )
-
-    assert response.status_code == 200
-    challenge_id = response.json()["challenge_id"]
-    assert len(challenge_id) == 32
-
-    wrong_client = await client.post(
+    verified = await client.post(
         "/api/v1/auth/email/verify",
         json={
-            "challenge_id": challenge_id,
-            "code": "000000",
-            "client": "web",
-        },
-    )
-    assert wrong_client.status_code == 400
-
-    failed = await client.post(
-        "/api/v1/auth/email/verify",
-        json={
-            "challenge_id": challenge_id,
-            "code": "000000",
+            "challenge_id": "x" * 32,
+            "code": "123456",
             "client": "miniprogram",
         },
     )
-    assert failed.status_code == 400
-    assert (
-        await cache.get_strict(
-            email_otp_service._ip_failure_key(
-                "user", "login", "127.0.0.1"
-            )
-        )
-        is None
-    )
+    assert verified.status_code == 422

@@ -296,6 +296,7 @@ async def verify_password_registration(
             email=str(challenge["email"]),
             password_hash=password_hash,
             consent_versions={str(key): str(value) for key, value in consent.items()},
+            registration_source="web" if data.client == "web" else None,
         )
     except user_password_service.PasswordRegistrationConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

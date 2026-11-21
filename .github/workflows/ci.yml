@@ -571,6 +571,8 @@ jobs:
             tests/test_api/test_admin_questions.py \
             tests/test_api/test_admin_read_access.py \
             tests/test_api/test_user_wechat_bind_unavailable.py \
+            tests/test_api/test_user_client_boundary.py \
+            tests/test_services/test_user_activity_service.py \
             tests/core/test_http_error_contract.py \
             tests/core/test_http_middleware_contract.py \
             tests/core/test_runtime_metrics_contract.py \

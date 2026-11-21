@@ -1,8 +1,18 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from app.schemas.base import BaseModel
+
+
+class AdminAppUserIdentitySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    provider: str
+    masked_subject: str
+    verified: bool
+    created_at: datetime | None = None
 
 
 class AdminAppUserListItem(BaseModel):
@@ -17,6 +27,11 @@ class AdminAppUserListItem(BaseModel):
     banned_at: datetime | None = None
     banned_by: int | None = None
     created_at: datetime
+    registration_source: Literal["web", "miniprogram"] | None = None
+    last_active_client: Literal["web", "miniprogram"] | None = None
+    last_active_at: datetime | None = None
+    user_type: Literal["web", "miniprogram", "both", "unknown"] = "unknown"
+    identities: list[AdminAppUserIdentitySummary] = Field(default_factory=list)
     updated_at: datetime
     lifecycle_status: str = "active"
 
@@ -25,7 +40,7 @@ class AdminAppUserDetail(AdminAppUserListItem):
     practice_count: int
     wrong_count: int
     recent_active_at: datetime | None = None
-    login_identities: list[dict] = Field(default_factory=list)
+    login_identities: list[AdminAppUserIdentitySummary] = Field(default_factory=list)
 
 
 class AdminAppUserUpdateRequest(BaseModel):

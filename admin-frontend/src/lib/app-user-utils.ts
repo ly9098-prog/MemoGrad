@@ -48,11 +48,15 @@ export function endOfChinaDateUtcIso(date: string): string {
 export type AppUserLike = {
   id: number;
   nickname?: string | null;
-  openid: string;
+  openid?: string | null;
   is_banned: boolean;
   banned_reason?: string | null;
   banned_at?: string | null;
   created_at?: string | null;
+  user_type?: "web" | "miniprogram" | "both" | "unknown";
+  registration_source?: "web" | "miniprogram" | null;
+  last_active_client?: "web" | "miniprogram" | null;
+  last_active_at?: string | null;
 };
 
 /**
@@ -67,7 +71,7 @@ export function csvEscape(value: string | number | null | undefined): string {
  * Build the CSV header row for user export.
  */
 export function buildUserCsvHeader(): string[] {
-  return ["ID", "昵称", "OpenID", "状态", "封禁原因", "封禁时间（北京时间）", "创建时间（北京时间）"];
+  return ["ID", "昵称", "OpenID", "类型", "注册来源", "最近活跃端", "最近活跃时间（北京时间）", "状态", "封禁原因", "封禁时间（北京时间）", "创建时间（北京时间）"];
 }
 
 /**
@@ -81,7 +85,11 @@ export function buildUserCsvRow(
   return [
     user.id,
     user.nickname || "未设置昵称",
-    user.openid,
+    user.openid || "",
+    user.user_type === "web" ? "Web" : user.user_type === "miniprogram" ? "小程序" : user.user_type === "both" ? "Web + 小程序" : "未知",
+    user.registration_source === "web" ? "Web" : user.registration_source === "miniprogram" ? "小程序" : "",
+    user.last_active_client === "web" ? "Web" : user.last_active_client === "miniprogram" ? "小程序" : "",
+    user.last_active_at ? formatDate(user.last_active_at) : "",
     user.is_banned ? "已封禁" : "正常",
     user.banned_reason || "",
     user.banned_at ? formatDate(user.banned_at) : "",

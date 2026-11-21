@@ -220,8 +220,13 @@ async def create_password_account(
     email: str,
     password_hash: str,
     consent_versions: dict[str, str],
+    registration_source: str | None = None,
 ) -> tuple[User, UserAuthIdentity]:
-    user = User(nickname=display_name, lifecycle_status="active")
+    user = User(
+        nickname=display_name,
+        lifecycle_status="active",
+        registration_source=registration_source,
+    )
     db.add(user)
     try:
         await db.flush()
