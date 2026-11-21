@@ -12,7 +12,6 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
-  GitBranch,
   KeyRound,
   Loader2,
   Mail,
@@ -21,6 +20,7 @@ import {
   Unlink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GithubMark } from "@/components/icons/github-mark";
 import { Input } from "@/components/ui/input";
 import { OtpInput } from "@/components/ui/otp-input";
 import { apiRequest } from "@/lib/api/client";
@@ -310,7 +310,7 @@ export default function AccountSettingsPage() {
 
   const identityIcon = (provider: string) => {
     if (provider === "email") return <Mail className="h-4 w-4" aria-hidden="true" />;
-    if (provider === "github") return <GitBranch className="h-4 w-4" aria-hidden="true" />;
+    if (provider === "github") return <GithubMark className="h-4 w-4" />;
     if (provider === "wechat") return <MessageCircle className="h-4 w-4" aria-hidden="true" />;
     return <KeyRound className="h-4 w-4" aria-hidden="true" />;
   };
@@ -442,7 +442,7 @@ export default function AccountSettingsPage() {
                     disabled={busy}
                     onClick={() => void startGithubStepUp()}
                   >
-                    <GitBranch className="h-4 w-4" aria-hidden="true" />
+                    <GithubMark className="h-4 w-4" />
                     验证 GitHub
                   </Button>
                 ) : null}
@@ -502,7 +502,7 @@ export default function AccountSettingsPage() {
                   disabled={busy}
                   onClick={() => void startGithubLink()}
                 >
-                  <span className="inline-flex items-center gap-2"><GitBranch className="h-4 w-4" />绑定 GitHub</span>
+                  <span className="inline-flex items-center gap-2"><GithubMark className="h-4 w-4" />绑定 GitHub</span>
                   <span className="text-xs text-muted-foreground">开始</span>
                 </Button>
               ) : null}

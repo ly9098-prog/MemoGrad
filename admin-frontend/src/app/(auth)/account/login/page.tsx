@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -11,19 +12,18 @@ import {
 import {
   ArrowRight,
   Check,
-  CircleAlert,
   Eye,
   EyeOff,
-  GitBranch,
   Loader2,
   LockKeyhole,
   Mail,
   ShieldCheck,
   UserRound,
-  X,
 } from "lucide-react";
 import { SliderCaptcha } from "@/components/security/slider-captcha";
+import { AuthToast, type AuthToastState, type AuthToastTone } from "@/components/auth/auth-toast";
 import { LoginCard } from "@/components/auth/login-card";
+import { GithubMark } from "@/components/icons/github-mark";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogClose, DialogContent, DialogDescription,
@@ -111,6 +111,7 @@ export default function LearnerLoginPage() {
   const acceptLearnerLogin = useAuthStore((state) => state.acceptLearnerLogin);
   const consentRef = useRef<HTMLInputElement>(null);
   const autoSubmittedCodeRef = useRef("");
+  const loginFinishingRef = useRef(false);
   useAuthBootstrap();
 
   const [mode, setMode] = useState<LoginMode>("password");
@@ -120,8 +121,15 @@ export default function LearnerLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<AuthToastState | null>(null);
+  const pendingConsentRef = useRef<(() => void) | null>(null);
+  const showToast = useCallback(
+    (message: string, tone: AuthToastTone = "info") => {
+      setToast({ id: Date.now(), message, tone });
+    },
+    [],
+  );
+  const closeToast = useCallback(() => setToast(null), []);
 
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -150,13 +158,14 @@ export default function LearnerLoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authError = AUTH_ERRORS[params.get("auth_error") || ""];
-    if (authError) setError(authError);
+    if (authError) showToast(authError, "danger");
     if (params.has("identity_unlinked")) {
-      setNotice("登录身份已解绑，请重新登录。");
+      showToast("登录身份已解绑，请重新登录。", "info");
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
+    if (loginFinishingRef.current) return;
     if (accessMode === "user") {
       router.replace(
         safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
@@ -166,14 +175,14 @@ export default function LearnerLoginPage() {
     }
   }, [accessMode, router]);
 
-  function requireConsent() {
+  function requireConsent(resume?: () => void) {
     if (agreed) return true;
+    pendingConsentRef.current = resume ?? null;
     setConsentOpen(true);
     return false;
   }
 
   function begin(action: PendingAction) {
-    setError("");
     setPending(action);
     setBusy(true);
   }
@@ -183,16 +192,22 @@ export default function LearnerLoginPage() {
     setBusy(false);
   }
 
+  function finishLogin(response: LearnerAuthResponse) {
+    loginFinishingRef.current = true;
+    acceptLearnerLogin(response);
+    showToast("登录成功，正在进入学习中心", "success");
+    window.setTimeout(() => {
+      router.replace(
+        safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
+      );
+    }, 900);
+  }
+
   function switchMode(nextMode: LoginMode) {
     if (busy) return;
     setMode(nextMode);
     setRegistering(false);
     setCaptchaOpen(false);
-    setError("");
-  }
-
-  function clearError() {
-    if (error) setError("");
   }
 
   async function loginWithPassword(event: FormEvent<HTMLFormElement>) {
@@ -215,12 +230,9 @@ export default function LearnerLoginPage() {
           }),
         },
       );
-      acceptLearnerLogin(response);
-      router.replace(
-        safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
-      );
+      finishLogin(response);
     } catch (submitError) {
-      setError(messageFor(submitError, "password"));
+      showToast(messageFor(submitError, "password"), "danger");
     } finally {
       finish();
     }
@@ -229,12 +241,11 @@ export default function LearnerLoginPage() {
   function openRegisterCaptcha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || captchaOpen) return;
-    if (!username.trim()) return setError("请输入账号名称");
-    if (!registerEmail.trim()) return setError("请输入邮箱地址");
-    if (registerPassword.length < 12) return setError("密码至少需要 12 位");
-    if (registerPassword !== confirmPassword) return setError("两次输入的密码不一致");
+    if (!username.trim()) return showToast("请输入账号名称", "danger");
+    if (!registerEmail.trim()) return showToast("请输入邮箱地址", "danger");
+    if (registerPassword.length < 12) return showToast("密码至少需要 12 位", "danger");
+    if (registerPassword !== confirmPassword) return showToast("两次输入的密码不一致", "danger");
     if (!requireConsent()) return;
-    setError("");
     setCaptchaPurpose("register");
     setCaptchaOpen(true);
   }
@@ -266,8 +277,9 @@ export default function LearnerLoginPage() {
       setRegisterResendAfter(response.resend_after);
       setRegisterCode("");
       setSentEmail(registerEmail.trim());
+      showToast("注册验证码已发送，5 分钟内有效。请勿转发给他人。", "info");
     } catch (submitError) {
-      setError(messageFor(submitError, "email"));
+      showToast(messageFor(submitError, "email"), "danger");
     } finally {
       finish();
     }
@@ -293,25 +305,32 @@ export default function LearnerLoginPage() {
           }),
         },
       );
-      acceptLearnerLogin(response);
-      router.replace(
-        safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
-      );
+      finishLogin(response);
     } catch (submitError) {
-      setError(messageFor(submitError, "email"));
+      showToast(messageFor(submitError, "email"), "danger");
     } finally {
       finish();
     }
   }
 
+  function requestEmailCode() {
+    if (busy || captchaOpen) return;
+    setCaptchaPurpose("login-email");
+    setCaptchaOpen(true);
+  }
+
   function openEmailCaptcha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || captchaOpen) return;
-    if (!email.trim()) return setError("请输入邮箱地址");
-    if (!requireConsent()) return;
-    setError("");
-    setCaptchaPurpose("login-email");
-    setCaptchaOpen(true);
+    if (!email.trim()) return showToast("请输入邮箱地址", "danger");
+    if (!requireConsent(requestEmailCode)) return;
+    requestEmailCode();
+  }
+
+  function resetEmailChallenge() {
+    setChallengeId("");
+    setCode("");
+    autoSubmittedCodeRef.current = "";
   }
 
   async function sendEmailCode(ticket: string) {
@@ -340,8 +359,9 @@ export default function LearnerLoginPage() {
       setResendAfter(response.resend_after);
       setCode("");
       setSentEmail(email.trim());
+      showToast("验证码已发送，5 分钟内有效。请勿转发给他人。", "info");
     } catch (submitError) {
-      setError(messageFor(submitError, "email"));
+      showToast(messageFor(submitError, "email"), "danger");
     } finally {
       finish();
     }
@@ -366,13 +386,10 @@ export default function LearnerLoginPage() {
           client: "web",
         }),
       });
-      acceptLearnerLogin(response);
-      router.replace(
-        safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
-      );
+      finishLogin(response);
     } catch (submitError) {
       autoSubmittedCodeRef.current = "";
-      setError(messageFor(submitError, "email"));
+      showToast(messageFor(submitError, "email"), "danger");
     } finally {
       finish();
     }
@@ -398,7 +415,7 @@ export default function LearnerLoginPage() {
       });
       window.location.assign(response.authorization_url);
     } catch (submitError) {
-      setError(messageFor(submitError));
+      showToast(messageFor(submitError), "danger");
       finish();
     }
   }
@@ -473,10 +490,7 @@ export default function LearnerLoginPage() {
                       variant="ghost"
                       className={styles.input}
                       value={account}
-                      onChange={(event) => {
-                        setAccount(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setAccount(event.target.value)}
                       autoComplete="username"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -496,10 +510,7 @@ export default function LearnerLoginPage() {
                       className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      onChange={(event) => {
-                        setPassword(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setPassword(event.target.value)}
                       autoComplete="current-password"
                       placeholder="请输入登录密码"
                       required
@@ -534,10 +545,7 @@ export default function LearnerLoginPage() {
                     type="button"
                     className={styles.inlineAction}
                     disabled={disabled}
-                    onClick={() => {
-                      setRegistering(true);
-                      setError("");
-                    }}
+                    onClick={() => setRegistering(true)}
                   >
                     注册学习账号
                   </button>
@@ -559,10 +567,7 @@ export default function LearnerLoginPage() {
                       variant="ghost"
                       className={styles.input}
                       value={username}
-                      onChange={(event) => {
-                        setUsername(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setUsername(event.target.value)}
                       autoComplete="username"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -584,10 +589,7 @@ export default function LearnerLoginPage() {
                       className={styles.input}
                       type="email"
                       value={registerEmail}
-                      onChange={(event) => {
-                        setRegisterEmail(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setRegisterEmail(event.target.value)}
                       autoComplete="email"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -607,10 +609,7 @@ export default function LearnerLoginPage() {
                       className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={registerPassword}
-                      onChange={(event) => {
-                        setRegisterPassword(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setRegisterPassword(event.target.value)}
                       autoComplete="new-password"
                       placeholder="至少 12 位"
                       minLength={12}
@@ -629,10 +628,7 @@ export default function LearnerLoginPage() {
                       className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={confirmPassword}
-                      onChange={(event) => {
-                        setConfirmPassword(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
                       autoComplete="new-password"
                       placeholder="再次输入密码"
                       minLength={12}
@@ -725,9 +721,9 @@ export default function LearnerLoginPage() {
             {!registering ? (
               <form
                 className={`${styles.form} ${styles.emailForm}`}
-                onSubmit={openEmailCaptcha}
-                inert={mode !== "email" || emailCodeSent}
-                aria-hidden={mode !== "email" || emailCodeSent}
+                onSubmit={emailCodeSent ? verifyEmail : openEmailCaptcha}
+                inert={mode !== "email"}
+                aria-hidden={mode !== "email"}
               >
                 <div className={styles.field}>
                   <label htmlFor="learner-email">邮箱地址</label>
@@ -739,55 +735,28 @@ export default function LearnerLoginPage() {
                       className={styles.input}
                       type="email"
                       value={email}
-                      onChange={(event) => {
-                        setEmail(event.target.value);
-                        clearError();
-                      }}
+                      onChange={(event) => setEmail(event.target.value)}
                       autoComplete="email"
                       autoCapitalize="none"
                       spellCheck={false}
                       placeholder="name@example.com"
                       required
-                      disabled={disabled}
+                      disabled={disabled || emailCodeSent}
                     />
                   </div>
                 </div>
-                <div className={styles.emailNote}>
-                  <ShieldCheck aria-hidden="true" />
-                  <p>
-                    <strong>验证码 5 分钟内有效</strong>
-                    <br />
-                    仅用于本次登录，请勿转发给他人。
-                  </p>
-                </div>
-                <button
-                  type="submit"
-                  className={styles.submit}
-                  disabled={disabled || !email.trim()}
-                  aria-busy={pending === "email"}
-                >
-                  {pending === "email" ? (
-                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
-                  ) : (
-                    <><span>发送登录验证码</span><Mail aria-hidden="true" /></>
-                  )}
-                </button>
-              </form>
-            ) : null}
-
-            {!registering ? (
-              <form
-                className={styles.form}
-                onSubmit={verifyEmail}
-                inert={mode !== "email" || !emailCodeSent}
-                aria-hidden={mode !== "email" || !emailCodeSent}
-              >
                 <div className={styles.field}>
                   <div className={styles.fieldLabel}>
                     <label htmlFor="learner-email-code">6 位邮箱验证码</label>
-                    <span className={styles.fieldMeta} title={sentEmail}>
-                      已发送至 {sentEmail}
-                    </span>
+                    {emailCodeSent ? (
+                      <span className={styles.fieldMeta} title={sentEmail}>
+                        {pending === "email" ? (
+                          <><Loader2 className={styles.spinner} aria-hidden="true" />正在验证</>
+                        ) : (
+                          <>已发送至 {sentEmail}</>
+                        )}
+                      </span>
+                    ) : null}
                   </div>
                   <OtpInput
                     id="learner-email-code"
@@ -795,46 +764,50 @@ export default function LearnerLoginPage() {
                     value={code}
                     onChange={(value) => {
                       setCode(value);
-                      if (value.length !== 6) return;
+                      if (!emailCodeSent || value.length !== 6) return;
                       const submission = `${challengeId}:${value}`;
                       if (autoSubmittedCodeRef.current === submission) return;
                       autoSubmittedCodeRef.current = submission;
                       void verifyEmail(undefined, value);
                     }}
-                    disabled={disabled}
+                    disabled={disabled || !emailCodeSent}
                     required
                   />
                 </div>
-                <div className={styles.otpActions}>
+                {emailCodeSent ? (
+                  <div className={`${styles.otpActions} ${styles.otpActionsWithNote}`}>
+                    <button
+                      type="button"
+                      className={styles.backButton}
+                      disabled={disabled}
+                      onClick={resetEmailChallenge}
+                    >
+                      修改邮箱
+                    </button>
+                    <ResendButton
+                      seconds={resendAfter}
+                      busy={disabled}
+                      onResend={requestEmailCode}
+                    />
+                    <span className={styles.otpFootnote}>
+                      <ShieldCheck aria-hidden="true" />
+                      验证码仅用于本次登录，请勿转发给他人。
+                    </span>
+                  </div>
+                ) : (
                   <button
-                    type="button"
-                    className={styles.backButton}
-                    disabled={disabled}
-                    onClick={() => {
-                      setChallengeId("");
-                      setCode("");
-                    }}
+                    type="submit"
+                    className={styles.submit}
+                    disabled={disabled || !email.trim()}
+                    aria-busy={pending === "email"}
                   >
-                    修改邮箱
+                    {pending === "email" ? (
+                      <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
+                    ) : (
+                      <><span>发送登录验证码</span><Mail aria-hidden="true" /></>
+                    )}
                   </button>
-                  <ResendButton
-                    seconds={resendAfter}
-                    busy={disabled}
-                    onResend={() => {
-                      setChallengeId("");
-                      setCode("");
-                    }}
-                  />
-                </div>
-                <p className={styles.autoSubmitHint} aria-live="polite">
-                  {pending === "email" ? (
-                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证验证码</span></>
-                  ) : code.length === 6 ? (
-                    <><ShieldCheck aria-hidden="true" /><span>未完成登录，修改或按回车重试</span></>
-                  ) : (
-                    <><ShieldCheck aria-hidden="true" /><span>输入满 6 位后自动登录</span></>
-                  )}
-                </p>
+                )}
               </form>
             ) : null}
 
@@ -855,7 +828,7 @@ export default function LearnerLoginPage() {
                   {pending === "github" ? (
                     <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在前往 GitHub</span></>
                   ) : (
-                    <><GitBranch aria-hidden="true" /><span>使用 GitHub 登录</span></>
+                    <><GithubMark /><span>使用 GitHub 登录</span></>
                   )}
                 </button>
               </>
@@ -882,26 +855,16 @@ export default function LearnerLoginPage() {
               </span>
             </label>
 
-            {error ? (
-              <div className={styles.errorNotice} role="alert">
-                <CircleAlert aria-hidden="true" />
-                <p>{error}</p>
-                <button type="button" aria-label="关闭错误提示" onClick={() => setError("")}>
-                  <X aria-hidden="true" />
-                </button>
-              </div>
-            ) : null}
-            {notice ? (
-              <div className={styles.notice} role="status">
-                <Check aria-hidden="true" />
-                <p>{notice}</p>
-              </div>
-            ) : null}
-
           </div>
         </LoginCard>
       </main>
-      <Dialog open={consentOpen} onOpenChange={setConsentOpen}>
+      <Dialog
+        open={consentOpen}
+        onOpenChange={(open) => {
+          setConsentOpen(open);
+          if (!open) pendingConsentRef.current = null;
+        }}
+      >
         <DialogContent
           overlayClassName={styles.loginDialogOverlay}
           onCloseAutoFocus={(event) => {
@@ -921,7 +884,17 @@ export default function LearnerLoginPage() {
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild><Button variant="secondary">暂不登录</Button></DialogClose>
-            <Button onClick={() => { setAgreed(true); setConsentOpen(false); }}>同意并勾选</Button>
+            <Button
+              onClick={() => {
+                const resume = pendingConsentRef.current;
+                pendingConsentRef.current = null;
+                setAgreed(true);
+                setConsentOpen(false);
+                resume?.();
+              }}
+            >
+              同意并勾选
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -947,6 +920,7 @@ export default function LearnerLoginPage() {
             />
         </DialogContent>
       </Dialog>
+      <AuthToast toast={toast} onClose={closeToast} />
     </div>
   );
 }

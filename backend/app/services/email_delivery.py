@@ -74,39 +74,46 @@ def _render_otp_email(
     expiry_minutes: int,
     badge: str,
 ) -> str:
+    security_scope = "管理员账号安全通知" if badge == "ADMIN" else "学习账号安全通知"
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>{title}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#07131c;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#07131c" style="background-color:#07131c;padding:36px 16px;">
+<body style="margin:0;padding:0;background-color:#eef4fa;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#eef4fa" style="background-color:#eef4fa;background-image:linear-gradient(180deg,#f8fcff 0%,#eef4fa 100%);padding:40px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0b1b28" style="max-width:520px;border:1px solid #1d3a4d;border-radius:16px;background-color:#0b1b28;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif;">
-<tr><td style="padding:30px 32px 0;">
-<p style="margin:0;font-size:17px;font-weight:600;letter-spacing:-0.2px;color:#f3faff;">MemoGrad<span style="margin-left:10px;padding-left:10px;border-left:1px solid #2c4b5e;font-size:10px;font-weight:400;letter-spacing:2px;color:#8fa6b4;">{badge}</span></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+<tr><td style="border:1px solid #dce9f3;border-radius:20px;background-color:#ffffff;box-shadow:0 22px 60px rgba(37,99,138,0.13);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="border-radius:20px;background-color:#ffffff;background-image:linear-gradient(150deg,#ffffff 0%,#fbfdff 55%,#f2f9fe 100%);">
+<tr><td style="padding:26px 32px 0;">
+<p style="margin:0;font-size:17px;font-weight:600;letter-spacing:-0.2px;color:#152b3b;">MemoGrad<span style="margin-left:10px;padding:4px 8px;border:1px solid #d6e8f3;border-radius:999px;background-color:#f2f9fe;font-size:9px;font-weight:500;letter-spacing:1.6px;color:#25638a;">{badge}</span></p>
 </td></tr>
-<tr><td style="padding:28px 32px 0;">
-<p style="margin:0;font-size:12px;letter-spacing:1px;color:#8fa6b4;">{title}</p>
-<h1 style="margin:8px 0 0;font-size:22px;line-height:1.5;font-weight:600;color:#f3faff;">你的验证码</h1>
-<p style="margin:10px 0 0;font-size:13px;line-height:22px;color:#a9bdcc;">{intro}</p>
+<tr><td style="padding:26px 32px 0;">
+<p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#25638a;">{title}</p>
+<h1 style="margin:9px 0 0;font-size:25px;line-height:1.4;font-weight:600;letter-spacing:-0.4px;color:#152b3b;">你的验证码</h1>
+<p style="margin:10px 0 0;font-size:13px;line-height:22px;color:#52697a;">{intro}</p>
 </td></tr>
 <tr><td style="padding:22px 32px 0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#071a26" style="border:1px solid #22475c;border-radius:12px;background-color:#071a26;">
-<tr><td align="center" style="padding:18px 12px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:30px;font-weight:600;letter-spacing:8px;color:#ffffff;">{escape(code)}</td></tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4faff" style="border:1px solid #d8eaf5;border-radius:14px;background-color:#f4faff;background-image:linear-gradient(160deg,#f8fcff 0%,#eff8fe 100%);">
+<tr><td align="center" style="padding:20px 12px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:600;letter-spacing:9px;color:#152b3b;">{escape(code)}</td></tr>
 </table>
 </td></tr>
-<tr><td style="padding:18px 32px 0;">
-<p style="margin:0;font-size:12px;line-height:20px;color:#8fa6b4;">验证码 <strong style="color:#dbeaf3;font-weight:500;">{expiry_minutes} 分钟内有效</strong>，请勿转发给他人。</p>
+<tr><td style="padding:16px 32px 0;">
+<p style="margin:0;font-size:12px;line-height:20px;color:#52697a;">验证码 <strong style="color:#24735b;font-weight:600;">{expiry_minutes} 分钟内有效</strong>，请勿转发给他人。</p>
 </td></tr>
-<tr><td style="padding:24px 32px 30px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #1d3a4d;padding-top:16px;">
-<p style="margin:0;font-size:11px;line-height:18px;color:#6f8796;">如果不是你本人操作，请忽略本邮件，你的账号不会发生变更。<br>此邮件由系统自动发送，请勿直接回复。</p>
+<tr><td style="padding:22px 32px 26px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e6eff6;padding-top:16px;">
+<p style="margin:0;font-size:11px;line-height:18px;color:#7c93a3;">如果不是你本人操作，请忽略本邮件，你的账号不会发生变更。<br>此邮件由系统自动发送，请勿直接回复。</p>
 </td></tr></table>
 </td></tr>
 </table>
+</td></tr>
+</table>
+<p style="margin:16px 0 0;font-size:10px;line-height:16px;color:#94a9b8;text-align:center;">MemoGrad · {security_scope}</p>
 </td></tr>
 </table>
 </body>

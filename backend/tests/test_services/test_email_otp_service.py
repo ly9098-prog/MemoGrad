@@ -318,6 +318,7 @@ def test_otp_email_ships_matching_html_and_plain_text():
     assert html.lstrip().startswith("<!doctype html>")
     assert "246810" in html
     assert f"{minutes} 分钟内有效" in html
+    assert "学习账号安全通知" in html
     assert "text/html" not in html
 
 
@@ -328,3 +329,4 @@ def test_admin_otp_email_subject_marks_the_admin_domain():
 
     assert subject == "【MemoGrad 管理员】密码恢复验证码"
     assert ">ADMIN<" in html
+    assert "管理员账号安全通知" in html
