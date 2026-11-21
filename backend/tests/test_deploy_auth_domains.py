@@ -16,7 +16,7 @@ SPEC.loader.exec_module(gate)
 @pytest.fixture()
 def network(monkeypatch):
     responses = {
-        ("example.com", "/login"): (200, None),
+        ("example.com", "/account/login"): (200, None),
         ("admin.example.com", "/login"): (200, None),
         ("api.example.com", "/"): (404, None),
         ("www.example.com", "/login?from=domain-check"): (
@@ -30,6 +30,13 @@ def network(monkeypatch):
         ("admin.example.com", "/api/v1/users/me"): (404, None),
         ("api.example.com", "/api/admin/v1/auth/me"): (404, None),
         ("api.example.com", "/api/v1/health"): (200, None),
+        ("example.com", "/api/admin/v1/questions"): (403, None),
+        ("example.com", "/api/admin/v1/questions/subject-options"): (403, None),
+        ("example.com", "/api/admin/v1/questions/1"): (403, None),
+        ("example.com", "/api/admin/v1/knowledge/subjects"): (403, None),
+        ("example.com", "/api/admin/v1/knowledge/graph"): (403, None),
+        ("example.com", "/api/admin/v1/questions/export"): (404, None),
+        ("example.com", "/api/admin/v1/knowledge/status"): (404, None),
     }
     connections = []
 
@@ -68,7 +75,7 @@ def test_gate_checks_tls_authentication_and_all_route_boundaries(network):
     _, connections = network
     result = gate.inspect_domains("example.com")
     assert result["ok"]
-    assert len(result["checks"]) == len(connections) == 11
+    assert len(result["checks"]) == len(connections) == 18
     assert all(item["tls_verified"] for item in result["checks"])
     assert all(connection.closed for connection in connections)
 
@@ -94,7 +101,7 @@ def test_gate_rejects_redirects_that_drop_the_path_or_query(network):
     result = gate.inspect_domains("example.com")
     assert not result["ok"]
     assert sum(not item["ok"] for item in result["checks"]) == 1
-    assert len(connections) == 11  # Redirects never cause a follow-up request.
+    assert len(connections) == 18  # Redirects never cause a follow-up request.
 
 
 @pytest.mark.parametrize(

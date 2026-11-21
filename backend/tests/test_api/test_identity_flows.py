@@ -160,6 +160,7 @@ async def test_github_callback_rejects_another_browser_before_exchange(
     )
     assert callback.status_code == 303
     assert "auth_error=" in callback.headers["location"]
+    assert urlsplit(callback.headers["location"]).path == "/account/login"
     assert calls == []
 
 

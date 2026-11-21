@@ -78,7 +78,8 @@ def _with_verified_flag(target: str) -> str:
 
 def _redirect_error(code: str) -> RedirectResponse:
     return RedirectResponse(
-        f"{settings.USER_WEB_BASE_URL}/?auth_error={quote(code)}", status_code=303
+        f"{settings.USER_WEB_BASE_URL}/account/login?auth_error={quote(code)}",
+        status_code=303,
     )
 
 
