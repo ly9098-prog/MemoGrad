@@ -25,6 +25,17 @@ logger = logging.getLogger("postgraduate-ai.background-tasks")
 _background_tasks: set[asyncio.Task] = set()
 
 
+def _consume_late_task_result(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    try:
+        task.result()
+    except Exception as e:
+        logger.warning(
+            "Background task %s: late shutdown error: %s", task.get_name(), e
+        )
+
+
 def create_background_task(
     coro,
     *,
@@ -51,8 +62,8 @@ def create_background_task(
 async def cancel_all_tasks(timeout: float = 30.0) -> None:
     """Cancel all tracked background tasks and wait for them to complete.
 
-    Each task is individually cancelled and awaited with a per-task timeout.
-    Tasks that don't stop within the timeout are logged as warnings.
+    Cancellation and waiting share one deadline so shutdown time cannot grow
+    linearly with the number of tracked tasks.
     """
     if not _background_tasks:
         logger.debug("No background tasks to cancel")
@@ -61,24 +72,31 @@ async def cancel_all_tasks(timeout: float = 30.0) -> None:
     task_list = list(_background_tasks)
     _background_tasks.clear()
 
-    logger.info("Cancelling %d background tasks", len(task_list))
-    for task in task_list:
-        if task.done():
-            continue
-
+    running = [task for task in task_list if not task.done()]
+    logger.info("Cancelling %d background tasks", len(running))
+    for task in running:
         task.cancel()
+    if running:
+        done, pending = await asyncio.wait(running, timeout=timeout)
+    else:
+        done, pending = set(), set()
+    for task in done:
         try:
-            await asyncio.wait_for(task, timeout=timeout)
+            task.result()
             logger.info("Background task %s: completed after cancel", task.get_name())
         except asyncio.CancelledError:
             logger.info("Background task %s: cancelled", task.get_name())
-        except TimeoutError:
-            logger.warning(
-                "Background task %s: did not stop within %ss grace period",
-                task.get_name(),
-                timeout,
-            )
         except Exception as e:
             logger.warning(
                 "Background task %s: error during cancel: %s", task.get_name(), e
             )
+    for task in pending:
+        task.cancel()
+        task.add_done_callback(_consume_late_task_result)
+        logger.warning(
+            "Background task %s: did not stop within %ss grace period",
+            task.get_name(),
+            timeout,
+        )
+    if pending:
+        await asyncio.sleep(0)

@@ -5,7 +5,7 @@ const { toPlainInlineMathText } = require('../utils/stem-render')
 const storage = require('../../../utils/storage')
 const aiCache = require('../utils/ai-diagnosis-cache')
 const errorDiagnosis = require('../utils/error-diagnosis')
-const { getSubjectName, getSubjectShortName } = require('../utils/subject-meta')
+const { getSubjectName, getSubjectShortName, localizeSubjectCodes } = require('../utils/subject-meta')
 const exportApi = require('../utils/export-capability')
 const dateFilter = require('../../../components/question-filter-panel/date-range')
 const { parseServerUtc, getChinaDayRangeUtcMs, chinaCalendarDayDiff, formatChinaMonthDayCn } = require('../../../utils/china-time')
@@ -118,6 +118,8 @@ return requestFlow._beginFilterReload(this, patch)
 _ready: false,
 _alive: false,
 _aiDiagnosisPromise: null,
+_aiDiagnosisPollPromise: null,
+_aiDiagnosisResumePending: false,
 _aiDiagnosisRequestId: 0,
 _aiDiagnosisCachedAt: 0,
 _aiStatsLoaded: false,
@@ -381,7 +383,7 @@ return aiPersistence._commitAiDiagnosisContent(this, normalized, { diagnosisCach
 return aiRequestFlow._handleAiDiagnosisError(this, e, opts, hasData, requestId, { getPlatform: () => wx })
 },
 _buildAiInsightDetails(diagnosis) {
-return aiState._buildAiInsightDetails(diagnosis)
+return aiState._buildAiInsightDetails(diagnosis, localizeSubjectCodes)
 },
 async toggleAiInsight() {
 return aiInteraction.toggleAiInsight(this, { getPlatform: () => wx })
@@ -425,7 +427,7 @@ _buildTaskGroups(list = []) {
 return buildTaskGroups(list, parseServerUtc)
 },
 _oneLineInsight(text) {
-return oneLineInsight(text)
+return oneLineInsight(text, localizeSubjectCodes)
 },
 _buildAnalysis(stats = {}, list = []) {
 return buildAnalysis(stats, list, buildAnalysisViewCapabilities(this))

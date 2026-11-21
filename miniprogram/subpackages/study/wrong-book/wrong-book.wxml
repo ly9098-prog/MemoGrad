@@ -111,7 +111,7 @@
 </view>
 </block>
 <block wx:else>
-<view class="insight-main {{aiDiagnosisRefreshing ? 'insight-main-dimmed' : ''}}" bindtap="{{aiDiagnosisRefreshing ? '' : 'toggleAiInsight'}}" hover-class="{{aiDiagnosisRefreshing ? 'none' : 'insight-main-pressed'}}">
+<view class="insight-main" bindtap="toggleAiInsight" hover-class="insight-main-pressed">
 <view class="insight-icon">
 <image class="insight-icon-image" src="/assets/icons/wrong-book/ai-insight.png" mode="aspectFit" />
 </view>
@@ -119,7 +119,7 @@
 <view class="insight-head">
 <view class="insight-title-row">
 <text class="insight-title">AI 洞察</text>
-<text class="insight-state" wx:if="{{aiDiagnosisCacheTimeLabel}}">{{aiDiagnosisCacheTimeLabel}}</text>
+<text class="insight-state" wx:if="{{aiDiagnosisCacheTimeLabel}}">{{aiDiagnosis.generated === false ? '数据洞察' : aiDiagnosisCacheTimeLabel}}</text>
 </view>
 <view
             class="insight-refresh {{aiDiagnosisRefreshing || aiDiagnosisLoading ? 'disabled' : ''}}"

@@ -8,9 +8,9 @@ from app.services.stats_ai_projection import (
     build_dashboard_ai_payload,
     build_dashboard_ai_prompt,
     build_dashboard_ai_response,
-    build_rule_based_dashboard_analysis,
     build_knowledge_point_stats,
     build_local_ai_diagnosis,
+    build_rule_based_dashboard_analysis,
     normalize_knowledge_points,
 )
 
@@ -200,6 +200,15 @@ def test_knowledge_point_stats_project_subject_rows():
     ]
 
 
+def test_knowledge_point_stats_prefers_canonical_subject_names_for_display():
+    stats = build_knowledge_point_stats(
+        [("computer_organization", "计算机组成原理", 4, 1)]
+    )
+
+    assert stats[0]["knowledge_point"] == "计算机组成原理"
+    assert stats[0]["mastery_rate"] == 0.25
+
+
 def test_local_ai_diagnosis_sorts_weak_and_strong_points():
     diagnosis = build_local_ai_diagnosis(
         knowledge_point_stats=[
@@ -235,4 +244,4 @@ def test_local_ai_diagnosis_provider_failure_summary_and_caps():
 
     assert len(diagnosis["weak_points"]) == 3
     assert diagnosis["learning_suggestions"][-1] == "优先处理重复出错且尚未掌握的题目，并按复习计划回看"
-    assert diagnosis["summary"].startswith("AI 模型响应较慢")
+    assert diagnosis["summary"] == "已根据最近 60 天错题数据生成即时洞察。"

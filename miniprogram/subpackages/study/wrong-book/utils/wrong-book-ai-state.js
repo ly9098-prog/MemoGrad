@@ -48,26 +48,28 @@ return !!(
 function _isAiDiagnosisPending(value) {
 if (!value || typeof value !== 'object') return false
 const status = String(value.status || value.state || value.generation_status || '').toLowerCase()
+if (status === 'ready' || status === 'done') return false
 const message = String(value.message || value.detail || value.summary || '').toLowerCase()
 const pendingText = /正在生成|生成中|处理中|排队中|generating|processing|queued/.test(message)
 return ['pending', 'processing', 'generating', 'queued', 'running'].includes(status) || value.generating === true || pendingText
 }
 
-function _buildAiInsightDetails(diagnosis) {
+function _buildAiInsightDetails(diagnosis, localizeText) {
+const localize = typeof localizeText === 'function' ? localizeText : value => value
 const data = diagnosis || {}
 const weakPoints = (Array.isArray(data.weak_points) ? data.weak_points : [])
 .slice(0, 3)
 .map(item => ({
-name: String((item && item.knowledge_point) || '待识别薄弱点'),
+name: localize(String((item && item.knowledge_point) || '待识别薄弱点')),
 accuracyPercent: Number(
 item && typeof item._accuracyPercent === 'number'
 ? item._accuracyPercent
 : Math.round(Math.max(0, Math.min(1, Number((item && item.accuracy) || 0))) * 100)
 ),
-suggestion: String((item && item.suggestion) || ''),
+suggestion: localize(String((item && item.suggestion) || '')),
 }))
 const suggestions = (Array.isArray(data.learning_suggestions) ? data.learning_suggestions : [])
-.map(item => String(item || '').trim())
+.map(item => localize(String(item || '').trim()))
 .filter(Boolean)
 .slice(0, 3)
 return {

@@ -472,17 +472,22 @@ test('review completion retries only while the server still reports due reviews'
 test('review completion immediately refetches a stale home hub snapshot', async () => {
   await withHomePage(async ({ page }) => {
     let hubCalls = 0
+    const statCalls = []
     const originalSetTimeout = global.setTimeout
     global.setTimeout = callback => {
       callback()
       return 1
     }
     page._growthApi = {
-      get(url) {
+      get(url, data) {
         if (url === '/stats/dashboard') {
+          statCalls.push([url, data])
           return Promise.resolve({ overview: { due_review_count: 0 }, subject_stats: [] })
         }
-        if (url === '/stats/growth') return Promise.resolve({})
+        if (url === '/stats/growth') {
+          statCalls.push([url, data])
+          return Promise.resolve({})
+        }
         if (url === '/study-hub/overview') {
           hubCalls += 1
           return Promise.resolve({
@@ -504,5 +509,11 @@ test('review completion immediately refetches a stale home hub snapshot', async 
 
     assert.equal(hubCalls, 2)
     assert.equal(page.data._animDueReviewCount, 0)
+    assert.deepEqual(statCalls, [
+      ['/stats/dashboard', { refresh: true }],
+      ['/stats/growth', { refresh: true }],
+      ['/stats/dashboard', { refresh: true }],
+      ['/stats/growth', { refresh: true }],
+    ])
   })
 })

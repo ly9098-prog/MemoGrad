@@ -23,6 +23,7 @@ from app.schemas.stats import (
 )
 from app.schemas.stats_v2 import DashboardV2Response
 from app.services import stats_service as svc
+from app.services.stats_diagnosis_jobs import get_diagnosis
 
 router = APIRouter(prefix=f"{API_V1_PREFIX}/stats")
 
@@ -102,9 +103,10 @@ async def get_forgetting(
 async def get_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    refresh: bool = Query(False),
 ):
     cache_key = f"stats:dashboard:{current_user.id}"
-    cached_data = await cache.get(cache_key)
+    cached_data = None if refresh else await cache.get(cache_key)
     if cached_data is not None:
         return cached_data
     overview = await svc.get_overview(db, current_user.id)
@@ -127,9 +129,10 @@ async def get_dashboard(
 async def get_growth(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    refresh: bool = Query(False),
 ):
     cache_key = f"stats:growth:{current_user.id}"
-    cached_data = await cache.get(cache_key)
+    cached_data = None if refresh else await cache.get(cache_key)
     if cached_data is not None:
         return cached_data
     data = await svc.get_growth_profile(db, current_user.id)
@@ -161,9 +164,15 @@ async def get_dashboard_v2(
 @router.get("/ai-diagnosis", response_model=AiDiagnosis)
 async def get_ai_diagnosis(
     refresh: bool = Query(False),
+    background: bool = Query(False),
+    poll_only: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if background or poll_only:
+        return AiDiagnosis(**await get_diagnosis(
+            db, current_user.id, refresh=refresh, poll_only=poll_only
+        ))
     cache_key = f"stats:ai_diagnosis:{current_user.id}"
     if not refresh:
         cached_data = await cache.get(cache_key)

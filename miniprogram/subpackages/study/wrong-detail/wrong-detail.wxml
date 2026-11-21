@@ -136,7 +136,7 @@
 <text wx:else>AI</text>
 </view>
 </view>
-<view wx:if="{{!aiCards && (aiSkeletonVisible || aiLoading)}}" class="ai-loading-state">
+<view wx:if="{{!aiCards && !aiFallback && (aiSkeletonVisible || aiLoading)}}" class="ai-loading-state">
 <template is="ai-loading-sections" data="{{sections: aiSkeletonSections}}" />
 </view>
 <view wx:elif="{{aiCards && !aiFallback}}" class="ai-result-state">
@@ -196,17 +196,19 @@
 <text>{{aiAvailabilityPending ? '确认服务中…' : (aiAvailabilityEnabled || aiAvailabilityChecking ? '重试复盘' : '等待服务恢复')}}</text>
 </button>
 </view>
-<view wx:elif="{{!aiRequested && !aiCards}}" class="ai-idle">
+<view wx:elif="{{!aiRequested && !aiCards}}" class="ai-idle {{aiAvailabilityChecking ? 'has-service-check' : ''}}">
+<view wx:if="{{aiAvailabilityChecking}}" class="ai-loading-state ai-availability-checking" aria-live="polite">
+<template is="ai-loading-sections" data="{{sections: aiSkeletonSections}}" />
+</view>
 <view class="ai-idle-copy">
 <text class="ai-idle-title">生成完整复盘</text>
 <text class="ai-idle-desc">结合你的答案，梳理错因、补漏重点和下一步</text>
 </view>
 <button class="ai-action-btn ai-generate-btn" hover-class="ai-control-pressed" hover-stay-time="90" disabled="{{aiAvailabilityPending || (!aiAvailabilityEnabled && !aiAvailabilityChecking)}}" bindtap="onTapAiAnalysis">
 <text class="ai-action-btn-label">{{aiAvailabilityPending ? '确认服务中…' : '开始复盘'}}</text>
-<text class="ai-action-arrow">→</text>
 </button>
 </view>
-<text wx:if="{{!aiAvailabilityEnabled && aiAvailabilityMessage && (!aiFallback || aiCards)}}" class="ai-availability-note {{aiAvailabilityChecking ? 'is-checking' : 'is-blocked'}}" aria-live="polite">{{aiAvailabilityMessage}}</text>
+<text wx:if="{{!aiAvailabilityEnabled && !aiAvailabilityChecking && aiAvailabilityMessage && !aiFallback}}" class="ai-service-unavailable" aria-live="polite">{{aiAvailabilityMessage}}</text>
 <view class="ai-deep-dive {{aiCards && !aiFallback ? 'has-review' : ''}}">
 <view class="ai-deep-head">
 <view class="ai-deep-copy">

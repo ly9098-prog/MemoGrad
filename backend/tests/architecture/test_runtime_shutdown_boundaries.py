@@ -62,3 +62,21 @@ for name in ('app.main', 'app.core.config', 'app.core.database'):
         capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_lifespan_cancels_tracked_analysis_before_closing_connections():
+    from app import main
+    from app.core.background_tasks import cancel_all_tasks
+
+    assert main.cancel_all_tasks is cancel_all_tasks
+    source = (APP / "main.py").read_text()
+    assert source.index("await cancel_and_wait_runtime_tasks") < source.index("await cancel_all_tasks")
+    assert source.index("await cancel_all_tasks") < source.index("await close_runtime_connections")
+    tries = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Try)]
+    tracked = [node for node in tries if any(
+        isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+        and call.func.id == "cancel_all_tasks" for statement in node.body
+        for call in ast.walk(statement)
+    )]
+    assert len(tracked) == 1
+    assert "cancel_and_wait_runtime_tasks" not in ast.unparse(tracked[0])

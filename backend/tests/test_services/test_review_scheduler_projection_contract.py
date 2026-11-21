@@ -211,12 +211,19 @@ def seams(monkeypatch):
             monkeypatch.setattr(rs, "lock_question_review_state", lock_question)
             return self
 
-        def replay(self, existing=None):
+        def replay(self, existing=None, wrong_question_id=None):
             async def loader(db, *, user_id, request_id):
                 self.calls.append(("replay", request_id))
                 return existing
 
+            async def wrong_loader(db, *, user_id, existing):
+                self.calls.append(("replay_wrong", user_id, existing.question_id))
+                return wrong_question_id
+
             monkeypatch.setattr(rs, "_get_review_record_by_request", loader)
+            monkeypatch.setattr(
+                rs, "_get_review_replay_wrong_question_id", wrong_loader
+            )
             return self
 
         def sync(self, result=None):
@@ -431,8 +438,24 @@ async def test_submit_review_replays_identical_request(monkeypatch, seams):
     assert payload["ease_factor_after"] == existing.ease_factor_after
     assert payload["mastery_percent"] == 65
     assert payload["mastered"] is False
+    assert payload["wrong_question_id"] is None
     assert db.statements == []
     assert db.events == []
+
+
+@pytest.mark.asyncio
+async def test_review_replay_restores_active_wrong_question_id():
+    existing = review_record(is_correct=False)
+    db = FakeDb(scalar_responses=[55])
+
+    wrong_question_id = await rs._get_review_replay_wrong_question_id(
+        db, user_id=USER, existing=existing
+    )
+
+    assert wrong_question_id == 55
+    assert "wrong_questions.user_id" in db.sql(0)
+    assert "wrong_questions.question_id" in db.sql(0)
+    assert "wrong_questions.is_active" in db.sql(0)
 
 
 @pytest.mark.asyncio
@@ -1416,6 +1439,7 @@ async def test_grade_batch_review_grades_orders_and_prewarms(monkeypatch, seams)
     assert wrong["correct_answer"] == "B"
     assert wrong["rating"] == 1
     assert wrong["mastery_percent"] == 20
+    assert wrong["wrong_question_id"] == 55
 
 
 @pytest.mark.asyncio
@@ -1537,7 +1561,7 @@ async def test_submit_review_replay_payload_defaults_and_flags(monkeypatch, seam
         is_correct=False,
         mastered=False,
     )
-    seams.now().locks().loaders().replay(existing=existing)
+    seams.now().locks().loaders().replay(existing=existing, wrong_question_id=55)
     db = FakeDb()
 
     payload = await rs.submit_review(
@@ -1556,6 +1580,7 @@ async def test_submit_review_replay_payload_defaults_and_flags(monkeypatch, seam
         "schedule_id": 11,
         "question_id": 100,
         "question_version_id": 900,
+        "wrong_question_id": 55,
         "occurrence_seq": 4,
         "request_id": "req-1",
         "rating": 4,
@@ -1781,7 +1806,7 @@ async def test_grade_batch_review_prewarms_only_wrong_successes(monkeypatch, sea
 
     assert payload["correct_count"] == 1
     assert prewarm_calls == []
-    assert "wrong_question_id" not in payload["results"][0]
+    assert payload["results"][0]["wrong_question_id"] is None
 
 
 @pytest.mark.asyncio
@@ -1912,6 +1937,7 @@ async def test_grade_batch_review_payload_field_contract(monkeypatch, seams):
     assert success["is_correct"] is True
     assert success["rating"] == 4
     assert success["correct_answer"] == "A"
+    assert success["wrong_question_id"] is None
 
 
 @pytest.mark.asyncio

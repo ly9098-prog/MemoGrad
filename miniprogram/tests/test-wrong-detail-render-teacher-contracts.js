@@ -37,7 +37,12 @@ if (process.argv[2]) test('compiled AI states retain recovery controls and accur
       aiAvailabilityEnabled: enabled, aiAvailabilityChecking: checking,
       aiAvailabilityPending: pending,
     })
-    assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), pending || (!enabled && !checking))
+    if (checking) {
+      assert.equal(byClass(idle, 'ai-loading-state').length, 1)
+      assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), false)
+    } else {
+      assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), pending || !enabled)
+    }
   }
   const terminal = render({ ...base, aiRetryable: false })
   assert.equal(byClass(terminal, 'ai-review-error').length, 1)

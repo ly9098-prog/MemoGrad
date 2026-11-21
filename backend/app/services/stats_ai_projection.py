@@ -117,9 +117,12 @@ def build_knowledge_point_stats(subject_rows: list) -> list[dict]:
     """Project recent wrong-question subject rows into prompt statistics."""
     stats: list[dict] = []
     for row in subject_rows:
-        subject = row[0]
-        total = int(row[1] or 0)
-        mastered = int(row[2] or 0)
+        # The diagnosis query includes the canonical display name. Keep the
+        # three-column shape as a compatibility input for older callers/tests.
+        has_display_name = len(row) >= 4
+        subject = row[1] if has_display_name and row[1] else row[0]
+        total = int((row[2] if has_display_name else row[1]) or 0)
+        mastered = int((row[3] if has_display_name else row[2]) or 0)
         mastery_rate = round(mastered / total, 2) if total > 0 else 0.0
         stats.append(
             {
@@ -180,7 +183,7 @@ def build_local_ai_diagnosis(
         ],
         "learning_suggestions": suggestions[:5],
         "summary": (
-            "AI 模型响应较慢，本次先基于最近 60 天错题数据生成即时洞察；可稍后刷新获取 AI 增强分析。"
+            "已根据最近 60 天错题数据生成即时洞察。"
             if provider_failed
             else f"基于最近60天{subject_count}个科目的错题数据生成诊断。"
         ),
@@ -432,7 +435,9 @@ def build_ai_diagnosis_messages(
     from app.ai.prompts_learning import build_report_prompt
 
     return build_report_prompt(
-        subject=subject_rows[0][0] if subject_rows else "全科",
+        subject=(subject_rows[0][1] if len(subject_rows[0]) >= 4 else subject_rows[0][0])
+        if subject_rows
+        else "全科",
         days=60,
         total=total_q,
         accuracy=accuracy,

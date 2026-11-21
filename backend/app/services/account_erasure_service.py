@@ -237,6 +237,10 @@ async def _purge_import_registrations(db, user_id: int) -> tuple[list[str], list
 
 
 async def _invalidate_user_caches(user_id: int, pipeline_ids: list[str]) -> None:
+    # Revoke task ownership before deleting the result. Redis failure must
+    # keep erasure retryable rather than permit a late analysis to reappear.
+    await cache.delete_strict(f"ai_diagnosis_job_lease:v1:{user_id}")
+    await cache.delete_strict(f"ai_diagnosis_job:v1:{user_id}")
     for pattern in (
         f"stats:*:{user_id}*",
         f"stats:dashboard*:{user_id}:*",

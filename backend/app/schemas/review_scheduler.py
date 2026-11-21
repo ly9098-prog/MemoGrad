@@ -90,6 +90,7 @@ class BatchGradeResult(BaseModel):
     schedule_id: int
     question_id: int
     question_version_id: int
+    wrong_question_id: int | None = None
     occurrence_seq: int
     request_id: str
     success: bool = True

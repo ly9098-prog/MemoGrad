@@ -52,7 +52,7 @@ test('skips invalid schedule matches and falls back to question id', () => {
     results: [
       { schedule_id: 2, question_version_id: 22, occurrence_seq: 1, success: true, is_correct: true, correct_answer: 'B', mastery_percent: 80, mastered: true },
       { schedule_id: 1, question_version_id: 99, occurrence_seq: 1, success: false, error: 'version changed', error_code: 'VERSION' },
-      { question_id: 11, success: true, is_correct: false, correct_answer: 'A' },
+      { question_id: 11, success: true, is_correct: false, correct_answer: 'A', wrong_question_id: 71 },
     ],
     reviews: questions.map(question => ({ schedule_id: question.schedule_id })),
     answers,
@@ -74,6 +74,7 @@ test('skips invalid schedule matches and falls back to question id', () => {
   assert.equal(first.retryable, false)
   assert.equal(first.submitError, '')
   assert.equal(first.submitErrorCode, '')
+  assert.equal(first.wrongQuestionId, 71)
 })
 
 test('marks missing submitted results and unsubmitted skipped questions', () => {

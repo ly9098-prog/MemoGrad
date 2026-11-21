@@ -6,7 +6,7 @@ const ROOT = path.resolve(__dirname, '../../..')
 const ts = createRequire(path.join(ROOT, 'admin-frontend/package.json'))('typescript')
 const PAGE = 'miniprogram/subpackages/study/wrong-book/wrong-book.js'
 const DIRECTORY = 'miniprogram/subpackages/study/wrong-book/utils'
-const PAGE_CEILING = 478
+const PAGE_CEILING = 480
 const MODULES = ['wrong-book-value-view.js', 'wrong-book-item-view.js',
   'wrong-book-analysis-view.js', 'wrong-book-view-page-adapter.js', 'wrong-book-request-flow.js',
   'wrong-book-selection-flow.js', 'wrong-book-batch-flow.js', 'wrong-book-batch-undo.js',
@@ -82,7 +82,7 @@ const AI_STATE_DELEGATES = {
   "_hasAiDiagnosisContent": "_hasAiDiagnosisContent(value) {\nreturn aiState._hasAiDiagnosisContent(this, value)\n}",
   "_isAiDiagnosisPending": "_isAiDiagnosisPending(value) {\nreturn aiState._isAiDiagnosisPending(value)\n}",
   "_commitAiDiagnosisContent": "_commitAiDiagnosisContent(normalized) {\nreturn aiPersistence._commitAiDiagnosisContent(this, normalized, { diagnosisCache: aiCache })\n}",
-  "_buildAiInsightDetails": "_buildAiInsightDetails(diagnosis) {\nreturn aiState._buildAiInsightDetails(diagnosis)\n}"
+  "_buildAiInsightDetails": "_buildAiInsightDetails(diagnosis) {\nreturn aiState._buildAiInsightDetails(diagnosis, localizeSubjectCodes)\n}"
 }
 const AI_REQUEST_DELEGATES = {
   "_checkAiDiagnosis": "async _checkAiDiagnosis() {\nreturn aiRequestFlow._checkAiDiagnosis(this, { diagnosisCache: aiCache })\n}",
@@ -130,7 +130,7 @@ const DELEGATES = {
   "_isRecentDate": "_isRecentDate(raw, days) {\nreturn isRecentDate(raw, days, parseServerUtc)\n}",
   "_shortDateLabel": "_shortDateLabel(date) {\nreturn shortDateLabel(date, formatChinaMonthDayCn)\n}",
   "_buildTaskGroups": "_buildTaskGroups(list = []) {\nreturn buildTaskGroups(list, parseServerUtc)\n}",
-  "_oneLineInsight": "_oneLineInsight(text) {\nreturn oneLineInsight(text)\n}",
+  "_oneLineInsight": "_oneLineInsight(text) {\nreturn oneLineInsight(text, localizeSubjectCodes)\n}",
   "_buildAnalysis": "_buildAnalysis(stats = {}, list = []) {\nreturn buildAnalysis(stats, list, buildAnalysisViewCapabilities(this))\n}",
   "_buildSummaryCards": "_buildSummaryCards(stats = {}, list = [], weaknessTags = []) {\nreturn buildSummaryCards(stats, list, weaknessTags, buildAnalysisViewCapabilities(this))\n}",
   "_buildActionPlan": "_buildActionPlan(weaknessTags = [], subjectItems = [], list = []) {\nreturn buildActionPlan(weaknessTags, subjectItems, list, buildAnalysisViewCapabilities(this))\n}",
@@ -154,6 +154,8 @@ const PAGE_FIELDS = {
   "_ready": "_ready: false",
   "_alive": "_alive: false",
   "_aiDiagnosisPromise": "_aiDiagnosisPromise: null",
+  "_aiDiagnosisPollPromise": "_aiDiagnosisPollPromise: null",
+  "_aiDiagnosisResumePending": "_aiDiagnosisResumePending: false",
   "_aiDiagnosisRequestId": "_aiDiagnosisRequestId: 0",
   "_aiDiagnosisCachedAt": "_aiDiagnosisCachedAt: 0",
   "_aiStatsLoaded": "_aiStatsLoaded: false",

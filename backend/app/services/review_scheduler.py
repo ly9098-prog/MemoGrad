@@ -559,6 +559,21 @@ async def _get_review_record_by_request(
     )
 
 
+async def _get_review_replay_wrong_question_id(
+    db: AsyncSession, *, user_id: int, existing: ReviewRecord
+) -> int | None:
+    if existing.is_correct is not False:
+        return None
+    wrong_question_id = await db.scalar(
+        select(WrongQuestion.id).where(
+            WrongQuestion.user_id == user_id,
+            WrongQuestion.question_id == existing.question_id,
+            WrongQuestion.is_active.is_(True),
+        )
+    )
+    return int(wrong_question_id) if wrong_question_id is not None else None
+
+
 def _validate_review_replay(
     existing: ReviewRecord,
     *,
@@ -587,11 +602,13 @@ def _review_replay_payload(
     question_id: int,
     question_version_id: int,
     request_id: str,
+    wrong_question_id: int | None,
 ) -> dict:
     return {
         "schedule_id": existing.schedule_id or schedule_id,
         "question_id": question_id,
         "question_version_id": question_version_id,
+        "wrong_question_id": wrong_question_id,
         "occurrence_seq": int(existing.occurrence_seq),
         "request_id": request_id,
         "rating": existing.rating,
@@ -625,12 +642,16 @@ async def _resolve_review_replay(
         rating=request["rating"],
         user_answer=request["user_answer"],
     )
+    wrong_question_id = await _get_review_replay_wrong_question_id(
+        db, user_id=user_id, existing=existing
+    )
     return _review_replay_payload(
         existing,
         schedule_id=request["schedule_id"],
         question_id=request["question_id"],
         question_version_id=request["question_version_id"],
         request_id=request["request_id"],
+        wrong_question_id=wrong_question_id,
     )
 
 
@@ -1108,6 +1129,11 @@ def _batch_review_success_payload(
         "schedule_id": result["schedule_id"],
         "question_id": item["question_id"],
         "question_version_id": version_id,
+        "wrong_question_id": (
+            result.get("wrong_question_id")
+            if not bool(result["is_correct"])
+            else None
+        ),
         "occurrence_seq": occurrence_seq,
         "request_id": request_id,
         "success": True,

@@ -13,7 +13,8 @@ function fixture() {
       safeDecodeURIComponent(value, fallback) { calls.push(['decode', value, fallback]); return value || fallback },
     },
     '../utils/stem-render': {}, '../utils/ai-diagnosis-cache': {}, '../utils/error-diagnosis': {},
-    '../utils/subject-meta': {}, '../utils/export-capability': exportApi,
+    '../utils/subject-meta': require('../../subpackages/study/utils/subject-meta'),
+    '../utils/export-capability': exportApi,
     '../../../components/question-filter-panel/date-range': {}, '../../../utils/china-time': {},
   }
   const app = { getGlobalData() { calls.push(['globalData', this === app]); return globalData } }

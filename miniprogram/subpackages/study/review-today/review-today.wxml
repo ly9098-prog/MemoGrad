@@ -314,13 +314,12 @@
 <view class="undo-divider"></view>
 <text class="undo-action" bindtap="undoMaster">撤销</text>
 </view>
-<motion-sheet show="{{showBatchSizeSheet}}" label="每组题数" background="#FAFCF8" safe-area="{{false}}" bind:close="closeBatchSizeSheet">
+<motion-sheet show="{{showBatchSizeSheet}}" label="每组题数" background="#FBFFFD" safe-area="{{false}}" bind:close="closeBatchSizeSheet">
 <view
     class="batch-sheet motion-sheet-panel"
     catchtap="stopBatchSheetPropagation"
   >
 <view class="batch-sheet-head">
-<text class="batch-sheet-kicker">REVIEW BATCH</text>
 <text class="batch-sheet-title">每组题数</text>
 <text class="batch-sheet-desc">选择每轮复习包含的题目数量</text>
 </view>
@@ -348,7 +347,6 @@
 <view wx:if="{{item === 10}}" class="batch-size-badge">推荐</view>
 </view>
 </view>
-<view class="batch-sheet-current-hint">当前选择：每组 {{reviewBatchSize}} 道</view>
 <view class="batch-sheet-actions">
 <button class="batch-sheet-action batch-sheet-cancel" bindtap="closeBatchSizeSheet">取消</button>
 <button class="batch-sheet-action batch-sheet-confirm" bindtap="confirmBatchSize">确认使用</button>

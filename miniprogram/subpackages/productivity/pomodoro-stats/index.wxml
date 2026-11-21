@@ -246,7 +246,7 @@
             </view>
           </view>
           <view class="history-list" wx:elif="{{history.length > 0}}">
-            <view class="bleed-hint" wx:if="{{selectedDate === _todayDate && _crossDayBleedIn}}">部分时长来自跨统计日（前一统计日开始）</view>
+            <text class="history-day-note" wx:if="{{selectedDate === _todayDate && _crossDayBleedIn}}">含上一统计日开始的学习时长</text>
             <view class="history-item" wx:for="{{history}}" wx:key="record_key">
               <view class="hist-icon" style="color: {{item._color}};" aria-hidden="true">
                 <view class="hist-icon-tint"></view>

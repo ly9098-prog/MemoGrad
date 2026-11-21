@@ -135,11 +135,11 @@ const growthPageMethods = {
     const requestSeq = ++this._growthSeq
     this._clearAnimTimer()
     try {
-      let growthResponses = await this._fetchGrowthResponses()
+      let growthResponses = await this._fetchGrowthResponses(options.refreshAfterReview)
       if (options.refreshAfterReview && growthClient.needsReviewCompletionRetry(growthResponses)) {
         await new Promise(resolve => setTimeout(resolve, 320))
         if (this._isGrowthStale(requestSeq, showSeq)) return
-        growthResponses = await this._fetchGrowthResponses()
+        growthResponses = await this._fetchGrowthResponses(options.refreshAfterReview)
       }
       if (this._isGrowthStale(requestSeq, showSeq)) return
       this._applyGrowthResponses(growthResponses, requestSeq)
@@ -149,8 +149,10 @@ const growthPageMethods = {
     }
   },
 
-  _fetchGrowthResponses() {
-    return growthClient.fetchGrowthResponses(this._growthApi || api)
+  _fetchGrowthResponses(refreshAfterReview = false) {
+    return growthClient.fetchGrowthResponses(this._growthApi || api, {
+      refresh: refreshAfterReview === true,
+    })
   },
 
   _takeReviewGrowthRefresh() {

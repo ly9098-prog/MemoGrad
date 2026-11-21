@@ -20,10 +20,22 @@ const SUBJECT_META = {
   english: { name: '英语', shortName: '英语' },
 }
 
+const SUBJECT_CODE_PATTERN = new RegExp(
+  `\\b(${Object.keys(SUBJECT_META).join('|')})\\b`,
+  'gi'
+)
+
 function getSubjectName(code) {
   if (!code) return '其他科目'
   const meta = SUBJECT_META[String(code).trim().toLowerCase()]
   return meta ? meta.name : '其他科目'
+}
+
+function localizeSubjectCodes(text) {
+  return String(text || '').replace(
+    SUBJECT_CODE_PATTERN,
+    code => getSubjectName(code.toLowerCase())
+  )
 }
 
 function getSubjectShortName(code) {
@@ -41,6 +53,7 @@ function normalizeSubjectCode(code) {
 module.exports = {
   SUBJECT_META,
   getSubjectName,
+  localizeSubjectCodes,
   getSubjectShortName,
   normalizeSubjectCode,
 }

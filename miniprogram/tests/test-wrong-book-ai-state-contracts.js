@@ -1,6 +1,10 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
 const { fixture, deferred, flush } = require('./helpers/wrong-book-ai-state-fixture')
+const {
+  SUBJECT_META,
+  localizeSubjectCodes,
+} = require('../subpackages/study/utils/subject-meta')
 const plain = value => JSON.parse(JSON.stringify(value))
 
 test('AI user lookup preserves storage receiver/key, catches failures and resolves current user helper', () => {
@@ -100,6 +104,29 @@ test('AI detail projection keeps three-item limits, percentage precedence and ex
     aiInsightSuggestions: ['a', 'b', 'c'], aiInsightHasDetails: true,
   })
   assert.equal(f.page._buildAiInsightDetails(null).aiInsightHasDetails, false)
+})
+
+test('legacy cached subject codes are localized throughout visible insight copy', () => {
+  const f = fixture()
+  const details = f.page._buildAiInsightDetails({
+    weak_points: [{
+      knowledge_point: 'computer_organization',
+      suggestion: '巩固 operating_system、math、politics、english',
+    }],
+    learning_suggestions: ['复盘 data_structure'],
+  })
+  assert.equal(details.aiInsightWeakPoints[0].name, '计算机组成原理')
+  assert.equal(
+    details.aiInsightWeakPoints[0].suggestion,
+    '巩固 操作系统、数学、政治、英语'
+  )
+  assert.equal(details.aiInsightSuggestions[0], '复盘 数据结构')
+})
+
+test('every canonical subject code has a visible Chinese localization', () => {
+  for (const [code, meta] of Object.entries(SUBJECT_META)) {
+    assert.equal(localizeSubjectCodes(`科目 ${code}`), `科目 ${meta.name}`)
+  }
 })
 
 test('AI signature preserves current stats/list identity and the original first-item read', () => {

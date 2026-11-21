@@ -1,3 +1,5 @@
+from typing import Literal
+
 from app.schemas.base import BaseModel
 
 
@@ -19,3 +21,4 @@ class AiDiagnosis(BaseModel):
     learning_suggestions: list[str] = []
     summary: str = ""
     generated: bool = False
+    status: Literal["pending", "ready"] = "ready"

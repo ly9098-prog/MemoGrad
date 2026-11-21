@@ -112,6 +112,30 @@ class TestGradeBatchAPI:
         assert response.status_code == 200
         assert service.await_args.kwargs["session_meta"] == session
 
+    def test_wrong_result_preserves_wrong_question_id(self, monkeypatch):
+        service = AsyncMock(return_value={
+            "results": [
+                _grade_result(
+                    is_correct=False,
+                    correct_answer="B",
+                    wrong_question_id=91,
+                )
+            ],
+            "total": 1,
+            "correct_count": 0,
+            "wrong_count": 1,
+        })
+        monkeypatch.setattr(review.review_scheduler, "grade_batch_review", service)
+        monkeypatch.setattr(review.cache, "delete", AsyncMock())
+
+        response = client.post(
+            "/api/v1/review/grade-batch",
+            json={"reviews": [_review_item()]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["results"][0]["wrong_question_id"] == 91
+
     def test_rejects_missing_immutable_identity(self):
         item = _review_item()
         item.pop("question_version_id")

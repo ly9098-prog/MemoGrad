@@ -481,7 +481,7 @@ class TestAiDiagnosisContract:
             async with session_factory() as db:
                 fallback = await stats_service.get_ai_diagnosis(db, user_id=1)
             assert fallback["generated"] is False
-            assert "AI 模型响应较慢" in fallback["summary"]
+            assert fallback["summary"] == "已根据最近 60 天错题数据生成即时洞察。"
         finally:
             await engine.dispose()
 
@@ -520,7 +520,7 @@ class TestAiDiagnosisContract:
                 result = await stats_service.get_ai_diagnosis(db, user_id=1)
 
             assert result["generated"] is False
-            assert "AI 模型响应较慢" in result["summary"]
+            assert result["summary"] == "已根据最近 60 天错题数据生成即时洞察。"
         finally:
             await engine.dispose()
 

@@ -3,7 +3,7 @@ if (pageContext.data.aiInsightExpanded) {
 pageContext.setData({ aiInsightExpanded: false })
 return
 }
-if (pageContext.data.aiDiagnosisLoading || pageContext.data.aiDiagnosisRefreshing) {
+if (!pageContext.data.aiDiagnosis && (pageContext.data.aiDiagnosisLoading || pageContext.data.aiDiagnosisRefreshing)) {
 getPlatform().showToast({ title: 'AI 正在分析，请稍候', icon: 'none' })
 return
 }
@@ -11,6 +11,7 @@ if (!pageContext.data.aiDiagnosis) {
 getPlatform().showLoading({ title: '正在生成洞察', mask: false })
 try {
 const diagnosis = await pageContext.ensureAiDiagnosis({ force: false })
+if (!pageContext._alive || pageContext._destroyed) return
 if (!diagnosis) {
 getPlatform().showToast({ title: '暂未生成有效洞察', icon: 'none' })
 return
@@ -19,7 +20,7 @@ return
 getPlatform().hideLoading()
 }
 }
-pageContext.setData({ aiInsightExpanded: true })
+if (pageContext._alive && !pageContext._destroyed) pageContext.setData({ aiInsightExpanded: true })
 }
 
 function refreshAiDiagnosis(pageContext, { getPlatform }) {

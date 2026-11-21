@@ -58,6 +58,9 @@ function buildGroupResult(options) {
     submitErrorCode: matched && matched.error_code ? String(matched.error_code) : '',
     refreshRequired,
     retryable,
+    wrongQuestionId: wasSubmitted && matched && matched.wrong_question_id != null
+      ? matched.wrong_question_id
+      : null,
     wasSkipped: !expectedResult && !isAnswered && !wasSubmitted && !submitFailed,
     masteryPercent: wasSubmitted && matched && Number.isFinite(Number(matched.mastery_percent))
       ? Number(matched.mastery_percent)

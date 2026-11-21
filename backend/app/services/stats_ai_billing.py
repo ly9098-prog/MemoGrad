@@ -18,7 +18,12 @@ from app.services.ai_learning_service import (
 async def lock_active_user(db: AsyncSession, user_id: int) -> bool:
     return await db.scalar(
         select(User.id)
-        .where(User.id == user_id, User.deleted_at.is_(None), User.is_banned.is_(False))
+        .where(
+            User.id == user_id,
+            User.deleted_at.is_(None),
+            User.is_banned.is_(False),
+            User.lifecycle_status == "active",
+        )
         .with_for_update()
     ) is not None
 

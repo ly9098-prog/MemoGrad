@@ -285,6 +285,7 @@ async def load_ai_diagnosis_subject_rows(
     result = await db.execute(
         select(
             Subject.code,
+            Subject.name,
             func.count(WrongQuestion.id),
             func.coalesce(func.sum(case((WrongQuestion.mastered, 1), else_=0)), 0),
         )
@@ -294,6 +295,6 @@ async def load_ai_diagnosis_subject_rows(
             WrongQuestion.user_id == user_id,
             WrongQuestion.created_at >= since,
         )
-        .group_by(Subject.id, Subject.code)
+        .group_by(Subject.id, Subject.code, Subject.name)
     )
     return result.all()

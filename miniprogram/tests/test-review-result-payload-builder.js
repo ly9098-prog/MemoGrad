@@ -13,7 +13,7 @@ const groupQuestions = [
 
 const groupResults = [
   { question_id: 11, question_version_id: 3, schedule_id: 1, occurrence_seq: 0, wasSubmitted: true, isCorrect: true, userAnswer: 'A', correctAnswer: 'A' },
-  { question_id: 12, question_version_id: 4, schedule_id: 2, occurrence_seq: 1, wasSubmitted: true, isCorrect: false, userAnswer: 'B', correctAnswer: 'C' },
+  { question_id: 12, question_version_id: 4, schedule_id: 2, occurrence_seq: 1, wasSubmitted: true, isCorrect: false, userAnswer: 'B', correctAnswer: 'C', wrongQuestionId: 71 },
   { question_id: 13, question_version_id: 5, schedule_id: 3, occurrence_seq: 2, wasSubmitted: false, isCorrect: false, userAnswer: '', correctAnswer: '' },
 ]
 
@@ -30,7 +30,9 @@ test('maps review results onto the practice-result cache contract', () => {
   assert.equal(payload.results.length, 3)
   assert.equal(payload.questions.length, 3)
   assert.equal(payload.results[0].status, 'correct')
+  assert.equal(payload.results[0].wrong_question_id, null)
   assert.equal(payload.results[1].status, 'wrong')
+  assert.equal(payload.results[1].wrong_question_id, 71)
   assert.equal(payload.results[2].status, 'skipped')
   assert.equal(payload.questions[0].id, 11)
   assert.equal(payload.questions[0].stem, '题目甲')

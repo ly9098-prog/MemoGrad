@@ -194,9 +194,9 @@ t('空状态文案已通用化（不再只提番茄钟）', () => {
   assert.ok(wxml.indexOf('开始专注或刷一组题吧') >= 0, '空状态应提示专注或刷题')
   assert.ok(wxml.indexOf('开始一个番茄钟吧') === -1, '空状态不应只建议开始番茄钟')
 })
-t('跨统计日提示不再特指「专注」', () => {
-  assert.ok(wxml.indexOf('部分时长来自跨统计日（前一统计日开始）') >= 0)
-  assert.ok(wxml.indexOf('部分时长来自跨统计日的专注') === -1)
+t('跨统计日提示使用轻量文本，不再渲染长条矩形', () => {
+  assert.ok(wxml.indexOf('含上一统计日开始的学习时长') >= 0)
+  assert.ok(wxml.indexOf('class="bleed-hint"') === -1)
 })
 
 console.log('\n=== 刷题提交、计时、恢复与结果的当前行为契约 ===')

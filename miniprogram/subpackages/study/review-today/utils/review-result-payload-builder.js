@@ -21,6 +21,7 @@ function toStoredResult(result) {
     user_answer: result.userAnswer || '',
     correct_answer: result.correctAnswer || '',
     is_correct: wasSubmitted ? Boolean(result.isCorrect) : false,
+    wrong_question_id: result.wrongQuestionId != null ? result.wrongQuestionId : null,
     status,
     _local_partial: status === 'partial',
     _local_skipped: status === 'skipped',

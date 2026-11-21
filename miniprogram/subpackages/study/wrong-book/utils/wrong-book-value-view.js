@@ -73,8 +73,9 @@ if (!date || Number.isNaN(date.getTime())) return ''
 return formatChinaMonthDayCn(date.getTime())
 }
 
-function oneLineInsight(text) {
-const cleaned = String(text || '').replace(/\s+/g, ' ').trim()
+function oneLineInsight(text, localizeText) {
+const source = typeof localizeText === 'function' ? localizeText(text) : text
+const cleaned = String(source || '').replace(/\s+/g, ' ').trim()
 if (!cleaned) return '错题数据积累后，AI 会自动发现最需要优先复盘的错误模式。'
 return cleaned.length > 70 ? `${cleaned.slice(0, 70)}…` : cleaned
 }

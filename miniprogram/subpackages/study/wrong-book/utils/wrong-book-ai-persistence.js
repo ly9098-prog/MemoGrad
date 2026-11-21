@@ -33,6 +33,8 @@ pageContext._aiAutoSwitchTimer = null
 if (!enabled) {
 if (pageContext.data.aiDiagnosisLoading || pageContext.data.aiDiagnosisRefreshing) {
 pageContext._aiDiagnosisRequestId++
+pageContext._aiDiagnosisPromise = null
+pageContext._aiDiagnosisPollPromise = null
 pageContext.setData({ aiDiagnosisLoading: false, aiDiagnosisRefreshing: false, aiDiagnosisError: false })
 }
 getPlatform().showToast({ title: '已切换为手动分析', icon: 'none' })

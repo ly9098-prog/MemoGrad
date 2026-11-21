@@ -46,6 +46,11 @@ pageContext.loadList(true),
 
 function onHide(pageContext) {
 pageContext._alive = false
+pageContext._aiDiagnosisResumePending = !!(pageContext.data.aiDiagnosisLoading || pageContext.data.aiDiagnosisRefreshing)
+pageContext._aiDiagnosisRequestId++
+pageContext._aiDiagnosisPromise = null
+pageContext._aiDiagnosisPollPromise = null
+pageContext.setData({ aiDiagnosisLoading: false, aiDiagnosisRefreshing: false })
 pageContext._clearBatchCapsuleIdleTimer()
 }
 

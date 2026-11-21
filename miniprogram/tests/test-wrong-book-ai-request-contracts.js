@@ -126,7 +126,7 @@ test('executor resolves current application helper after await and clears promis
   application.resolve('applied'); assert.equal(await work, 'applied')
 })
 
-test('executor stale/hidden results return current data and finally clears even a newer stored promise', async () => {
+test('executor stale/hidden results return current data without clearing a newer request', async () => {
   for (const stale of [false, true]) {
     const f = fixture(), fetch = deferred(), current = { summary: 'current' }
     f.page._fetchAiDiagnosisData = () => fetch.promise
@@ -134,9 +134,10 @@ test('executor stale/hidden results return current data and finally clears even 
     const work = f.page._executeAiDiagnosisRequest({}, false, 0)
     if (stale) f.page._aiDiagnosisRequestId++
     else f.page._alive = false
-    f.page.data.aiDiagnosis = current; f.page._aiDiagnosisPromise = Promise.resolve('newer')
+    const newer = Promise.resolve('newer')
+    f.page.data.aiDiagnosis = current; f.page._aiDiagnosisPromise = newer
     fetch.resolve({ summary: 'late' })
-    assert.equal(await work, current); assert.equal(f.page._aiDiagnosisPromise, null)
+    assert.equal(await work, current); assert.equal(f.page._aiDiagnosisPromise, stale ? newer : null)
   }
 })
 
@@ -156,37 +157,118 @@ test('executor catches fetch/application errors using current handler and clears
   }
 })
 
-test('fetch keeps refresh payload/timeout/API receiver and uses current pending/poll helpers after await', async () => {
-  for (const options of [{}, { force: true }, { refresh: true }]) {
-    const f = fixture(), request = deferred(), pending = { status: 'pending' }, result = { summary: 'done' }
+test('fetch requests a background job or read-only poll and returns the immediate response', async () => {
+  for (const options of [{}, { force: true }, { refresh: true }, { pollOnly: true }]) {
+    const f = fixture(), request = deferred(), pending = { status: 'pending' }
+    f.page._aiDiagnosisRequestId = 7
     f.api.get = function (path, params, opts) {
       assert.equal(this, f.api); assert.equal(path, '/stats/ai-diagnosis')
-      assert.deepEqual(plain(params), options.force || options.refresh ? { refresh: true } : {})
+      assert.deepEqual(plain(params), options.pollOnly ? { poll_only: true }
+        : (options.force || options.refresh ? { background: true, refresh: true } : { background: true }))
       assert.deepEqual(plain(opts), { timeout: 55000 }); return request.promise
     }
     const work = f.page._fetchAiDiagnosisData(options, 7)
-    f.page._pollAiDiagnosis = function (value, id) { assert.equal(this, f.page); assert.equal(value, pending); assert.equal(id, 7); return Promise.resolve(result) }
-    request.resolve(pending); assert.equal(await work, result)
+    f.page._pollAiDiagnosis = () => assert.fail('initial request must not wait for AI')
+    request.resolve(pending); assert.equal(await work, pending)
   }
   const f = fixture()
   f.api.get = async () => ({ status: 'pending', detail: 'still pending' })
   f.page._pollAiDiagnosis = async value => value
-  await assert.rejects(f.page._fetchAiDiagnosisData({}, 0), error => error.message === 'still pending')
+  assert.equal((await f.page._fetchAiDiagnosisData({}, 0)).status, 'pending')
 })
 
-test('poll keeps four delay/request attempts and returns a still-pending fourth response without an added final guard', async () => {
+test('manual generation displays immediate content then applies the AI result without another click', async () => {
+  const f = fixture(), completion = deferred()
+  const local = { summary: '即时洞察', generated: false, status: 'pending', learning_suggestions: ['先复盘错题'] }
+  const final = { summary: '完整洞察', generated: true, status: 'ready', learning_suggestions: ['练习链表'] }
+  f.api.get = async () => local
+  f.page._pollAiDiagnosis = () => completion.promise
+  f.page.data.stats = { total: 2 }
+  const immediate = await f.page.ensureAiDiagnosis({ force: true })
+  assert.equal(immediate.summary, '即时洞察')
+  assert.equal(f.page.data.aiDiagnosisRefreshing, true)
+  assert.equal(f.page.data.aiDiagnosisLoading, false)
+  assert.equal(f.page.data.autoAiInsightEnabled, false)
+  await f.page.toggleAiInsight()
+  assert.equal(f.page.data.aiInsightExpanded, true)
+  completion.resolve(final)
+  await f.page._aiDiagnosisPollPromise
+  assert.equal(f.page.data.aiDiagnosis.summary, '完整洞察')
+  assert.equal(f.page.data.aiDiagnosisRefreshing, false)
+  assert.equal(f.page.data.aiInsightExpanded, true)
+})
+
+test('poll failure retains the immediate content and returning to the page only reads the existing job', async () => {
+  const f = fixture(), completion = deferred()
+  f.api.get = async () => ({ summary: '即时洞察', generated: false, status: 'pending' })
+  f.page._pollAiDiagnosis = () => completion.promise
+  await f.page.ensureAiDiagnosis({ force: true })
+  completion.reject(new Error('network'))
+  await f.page._aiDiagnosisPollPromise
+  assert.equal(f.page.data.aiDiagnosis.summary, '即时洞察')
+  assert.equal(f.page.data.aiDiagnosisRefreshing, false)
+  f.page._aiStatsLoaded = true; f.page.data.stats = { total: 1 }
+  const params = []
+  f.api.get = async (url, query) => { params.push(plain(query)); return { summary: '完整洞察', status: 'ready' } }
+  await f.page._checkAiDiagnosis()
+  assert.deepEqual(params, [{ poll_only: true }])
+  assert.equal(f.page.data.aiDiagnosis.summary, '完整洞察')
+})
+
+test('manual default does not start analysis when stats finish loading', async () => {
+  const f = fixture()
+  f.page._aiStatsLoaded = true; f.page.data.stats = { total: 8 }
+  f.api.get = () => assert.fail('manual mode must not invoke AI on entry')
+  assert.equal(await f.page._checkAiDiagnosis(), null)
+})
+
+test('a temporary poll network failure automatically recovers without resubmitting generation', async () => {
+  const f = fixture(), queries = []
+  f.page._delay = async () => {}
+  f.api.get = async (url, query) => {
+    queries.push(plain(query))
+    if (queries.length === 1) throw new Error('network')
+    return { summary: '完整洞察', generated: true, status: 'ready' }
+  }
+  const result = await f.page._pollAiDiagnosis({ status: 'pending' }, 0)
+  assert.equal(result.summary, '完整洞察')
+  assert.deepEqual(queries, [{ poll_only: true }, { poll_only: true }])
+})
+
+test('returning to a hidden manual job resumes polling and rejects the previous page request', async () => {
+  const f = fixture(), oldPoll = deferred(), requests = []
+  f.page._aiStatsLoaded = true; f.page._ready = true; f.page.data.stats = { total: 2 }
+  f.api.get = async (url, query) => {
+    requests.push(plain(query))
+    return requests.length === 1
+      ? { summary: '即时洞察', status: 'pending', generated: false }
+      : { summary: '当前完整洞察', status: 'ready', generated: true }
+  }
+  f.page._pollAiDiagnosis = () => oldPoll.promise
+  await f.page.ensureAiDiagnosis({ force: true })
+  const previous = f.page._aiDiagnosisPollPromise
+  f.page.onHide()
+  f.page.onShow()
+  await flush()
+  assert.equal(f.page.data.aiDiagnosis.summary, '当前完整洞察')
+  assert.deepEqual(requests, [{ background: true, refresh: true }, { poll_only: true }])
+  oldPoll.resolve({ summary: '过期响应', status: 'ready' })
+  await previous
+  assert.equal(f.page.data.aiDiagnosis.summary, '当前完整洞察')
+})
+
+test('poll covers the bounded job lifetime without submitting new generation requests', async () => {
   const f = fixture(), pending = { status: 'pending' }, delays = []
   f.page._delay = function (ms) { assert.equal(this, f.page); delays.push(ms); return Promise.resolve() }
   let requests = 0
   f.api.get = function (path, params, options) {
     assert.equal(this, f.api); assert.equal(path, '/stats/ai-diagnosis')
-    assert.deepEqual(plain(params), {}); assert.deepEqual(plain(options), { timeout: 55000 })
+    assert.deepEqual(plain(params), { poll_only: true }); assert.deepEqual(plain(options), { timeout: 55000 })
     requests++
-    if (requests === 4) { f.page._alive = false; f.page._aiDiagnosisRequestId++ }
     return Promise.resolve(pending)
   }
   assert.equal(await f.page._pollAiDiagnosis(pending, 0), pending)
-  assert.deepEqual(delays, [1200, 1550, 1900, 2250]); assert.equal(requests, 4)
+  assert.equal(requests, 36); assert.equal(delays.reduce((sum, ms) => sum + ms, 0), 90000)
 })
 
 test('poll checks sequence/alive only after delay and resolves API method live before each request', async () => {
@@ -225,6 +307,8 @@ test('result application uses current normalizer/content/commit and retains old 
   const current = { summary: 'old' }; f.page.data.aiDiagnosis = current
   assert.equal(f.page._applyAiDiagnosisResult(raw, true), current)
   assert.deepEqual(plain(f.calls.at(-1)[1]), { aiDiagnosisLoading: false, aiDiagnosisRefreshing: false })
+  assert.equal(f.page._applyAiDiagnosisResult(raw, false), current)
+  f.page.data.aiDiagnosis = null
   assert.equal(f.page._applyAiDiagnosisResult(raw, false), null)
   assert.equal(f.page.data.aiDiagnosisError, true)
 })
@@ -232,10 +316,10 @@ test('result application uses current normalizer/content/commit and retains old 
 test('AI error handling logs before guards, preserves old data and only force+hasData toasts', () => {
   for (const alive of [false, true]) for (const hasData of [false, true]) for (const force of [false, true]) {
     const f = fixture(), old = { summary: 'old' }, error = { message: 9 }
-    f.page.data.aiDiagnosis = old; f.page._alive = alive
+    f.page.data.aiDiagnosis = hasData ? old : null; f.page._alive = alive
     const value = f.page._handleAiDiagnosisError(error, { force }, hasData, 0)
     assert.equal(f.calls[0][0], 'error')
-    assert.equal(value, !alive || hasData ? old : null)
+    assert.equal(value, hasData ? old : null)
     assert.equal(f.calls.some(c => c[0] === 'toast'), alive && hasData && force)
     if (alive && hasData && force) assert.equal(f.calls.at(-1)[1].title, '更新失败，请稍后重试')
   }
@@ -251,7 +335,7 @@ test('insight toggle collapse precedes busy guard and available data opens witho
   await f.page.toggleAiInsight(); assert.equal(f.page.data.aiInsightExpanded, true)
 })
 
-test('insight generation keeps loading outside try, late platform hide in finally and original no-alive-guard expansion', async () => {
+test('insight generation releases loading and ignores late results after leaving the page', async () => {
   for (const outcome of ['value', 'empty', 'reject']) {
     const f = fixture(), request = deferred(), error = Error('analysis')
     f.page.ensureAiDiagnosis = function (opts) { assert.equal(this, f.page); assert.deepEqual(plain(opts), { force: false }); return request.promise }
@@ -264,8 +348,8 @@ test('insight generation keeps loading outside try, late platform hide in finall
     if (outcome === 'reject') await assert.rejects(work, value => value === error)
     else await work
     assert.ok(f.calls.some(c => c[0] === 'lateHide'))
-    assert.equal(f.page.data.aiInsightExpanded, outcome === 'value')
-    assert.equal(f.calls.some(c => c[0] === 'toast'), outcome === 'empty')
+    assert.equal(f.page.data.aiInsightExpanded, false)
+    assert.equal(f.calls.some(c => c[0] === 'toast'), false)
   }
 })
 

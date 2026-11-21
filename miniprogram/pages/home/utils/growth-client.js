@@ -1,10 +1,14 @@
-function fetchGrowthResponses(apiClient) {
+function fetchGrowthResponses(apiClient, options = {}) {
   if (!apiClient || typeof apiClient.get !== 'function') {
     return Promise.reject(new TypeError('growth API client must expose get()'))
   }
+  const refresh = options && options.refresh === true
+  const getStats = url => refresh
+    ? apiClient.get(url, { refresh: true })
+    : apiClient.get(url)
   return Promise.all([
-    apiClient.get('/stats/dashboard'),
-    apiClient.get('/stats/growth').catch(() => null),
+    getStats('/stats/dashboard'),
+    getStats('/stats/growth').catch(() => null),
     apiClient.get('/study-hub/overview').catch((error) => {
       console.warn('加载智能学习中心失败，回退基础首页', error)
       return null

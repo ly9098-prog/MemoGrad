@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core import runtime_paths
+from app.core.background_tasks import cancel_all_tasks
 from app.core.config import resolve_effective_process_role, settings
 from app.core.database import async_session, init_db
 from app.core.deployment_profile import is_restricted_environment
@@ -254,6 +255,11 @@ async def lifespan(app: FastAPI):
                 ("answer-projection-reconciler", scheduler_tasks.answer_projection_task),
                 ("async-task-health-monitor", scheduler_tasks.health_monitor_task),
             ], grace_seconds=settings.WORKER_SHUTDOWN_GRACE_SEC)
+        except Exception as e:
+            shutdown_error = shutdown_error or e
+
+        try:
+            await cancel_all_tasks(timeout=settings.WORKER_SHUTDOWN_GRACE_SEC)
         except Exception as e:
             shutdown_error = shutdown_error or e
 
