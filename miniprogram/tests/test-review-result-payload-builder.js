@@ -53,6 +53,22 @@ test('failed submissions keep their slot without fake correctness', () => {
   assert.equal(payload.partial, 1)
 })
 
+test('total counts every normalized status and excludes absent results', () => {
+  const payload = buildReviewResultPayload({
+    groupResults: [...groupResults, null, undefined,
+      { question_id: 14, wasSubmitted: true, submitFailed: true, isCorrect: true }],
+    now: 1,
+    random: 0.2,
+  })
+  assert.equal(payload.total, 4)
+  assert.equal(payload.total, payload.results.length)
+  assert.equal(payload.total, payload.correct + payload.wrong + payload.skipped + payload.partial)
+  assert.deepEqual(payload.results.map(item => item.status), ['correct', 'wrong', 'skipped', 'partial'])
+  const empty = buildReviewResultPayload({ groupResults: [null, undefined], now: 1, random: 0.2 })
+  assert.equal(empty.total, 0)
+  assert.equal(buildReviewResultUrl(empty), '')
+})
+
 test('builds the redirect url with the cache key and review source', () => {
   const payload = buildReviewResultPayload({ groupResults, groupQuestions, durationSec: 10, now: 1700000000000, random: 0.5 })
   const url = buildReviewResultUrl(payload)

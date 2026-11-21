@@ -86,7 +86,6 @@ function buildReviewResultPayload(input) {
     .map(toLightQuestion)
     .filter(item => item && item.id != null && item.id !== undefined)
   const counts = countByStatus(storedResults)
-  const total = counts.correct + counts.wrong + counts.skipped + counts.partial
   const now = Number(options.now) || (typeof Date !== 'undefined' ? Date.now() : 0)
   const randomValue = typeof options.random === 'number' ? options.random : Math.random()
   const cacheKey = options.cacheKey || buildCacheKey(now, randomValue)
@@ -95,7 +94,7 @@ function buildReviewResultPayload(input) {
     wrong: counts.wrong,
     skipped: counts.skipped,
     partial: counts.partial,
-    total,
+    total: storedResults.length,
     subject_id: null,
     subject_name: '今日复习',
     duration: Math.max(0, Math.round(Number(options.durationSec) || 0)),
