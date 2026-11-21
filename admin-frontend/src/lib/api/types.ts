@@ -341,22 +341,6 @@ export type GithubStartResponse = {
   state: string;
 };
 
-export type WechatBindStartResponse = {
-  challenge_id: string;
-  poll_token: string;
-  expires_in: number;
-  miniprogram_path: string;
-  miniprogram_scene: string;
-  qrcode_data_url?: string | null;
-  qrcode_error?: string | null;
-};
-
-export type WechatBindStatusResponse = {
-  status: "pending" | "completed" | "cancelled" | "expired" | "conflict";
-  identity_id?: number | null;
-  message?: string | null;
-};
-
 export type Permission = {
   id: number;
   name: string;

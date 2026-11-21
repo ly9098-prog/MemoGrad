@@ -86,6 +86,14 @@ test('login redirects directly to resolved target only after auth and consent su
 })
 
 test('mini-program account binding and email login entry points are removed', () => {
+  const appConfig = require('../app.json')
+  const pages = appConfig.pages.concat((appConfig.subPackages || []).flatMap(
+    group => group.pages.map(page => `${group.root}/${page}`),
+  ))
+  assert.doesNotMatch(pages.join('\n'), /wechat-bind|account-security|email-login/)
+  assert.equal(fs.existsSync(path.join(__dirname, '../pages/wechat-bind/confirm.js')), false)
+  assert.equal(fs.existsSync(path.join(__dirname, '../pages/wechat-bind/confirm.wxml')), false)
+  assert.equal(fs.existsSync(path.join(__dirname, '../pages/wechat-bind/confirm.wxss')), false)
   assert.doesNotMatch(homeMarkup, /account-security-entry|账号与登录|openAccountSecurity/)
   assert.doesNotMatch(homeSource, /account-navigation|openAccountSecurity/)
   assert.equal(fs.existsSync(path.join(__dirname, '../pages/home/utils/account-navigation.js')), false)

@@ -12,14 +12,12 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
-  Copy,
   GitBranch,
   KeyRound,
   Loader2,
   Mail,
   MessageCircle,
   ShieldCheck,
-  Smartphone,
   Unlink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,8 +30,6 @@ import type {
   LearnerAuthResponse,
   LearnerOtpStartResponse,
   UserIdentity,
-  WechatBindStartResponse,
-  WechatBindStatusResponse,
 } from "@/lib/api/types";
 import {
   accountInitial,
@@ -47,36 +43,6 @@ function errorMessage(error: unknown) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError) return "网络连接失败，请稍后重试";
   return "操作未完成，请稍后重试";
-}
-
-function Countdown({
-  seconds,
-  busy,
-  label,
-  onExpire,
-}: {
-  seconds: number;
-  busy: boolean;
-  label: string;
-  onExpire?: () => void;
-}) {
-  const [remaining, setRemaining] = useState(seconds);
-  const onExpireRef = useRef(onExpire);
-  useEffect(() => {
-    onExpireRef.current = onExpire;
-  }, [onExpire]);
-  useEffect(() => {
-    if (seconds <= 0) return;
-    const deadline = Date.now() + seconds * 1000;
-    const timer = window.setInterval(() => {
-      const next = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setRemaining(next);
-      if (next === 0) onExpireRef.current?.();
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [seconds]);
-  if (busy) return null;
-  return <span className="text-xs text-muted-foreground">{label} {remaining} 秒</span>;
 }
 
 export default function AccountSettingsPage() {
@@ -100,11 +66,6 @@ export default function AccountSettingsPage() {
   const [targetEmail, setTargetEmail] = useState("");
   const [emailChallenge, setEmailChallenge] = useState("");
   const [emailCode, setEmailCode] = useState("");
-
-  const [wechatBind, setWechatBind] = useState<WechatBindStartResponse | null>(null);
-  const [wechatStatus, setWechatStatus] = useState<WechatBindStatusResponse | null>(null);
-  const wechatStatusRef = useRef<WechatBindStatusResponse | null>(null);
-  const wechatBindIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (accessMode === "admin") router.replace("/profile");
@@ -146,77 +107,11 @@ export default function AccountSettingsPage() {
     if (stepUpChallenge) stepUpInputRef.current?.focus();
   }, [stepUpChallenge]);
 
-  useEffect(() => {
-    const bind = wechatBind;
-    if (!bind) return;
-    let active = true;
-    let polling = false;
-    const poll = async () => {
-      if (!active || polling) return;
-      if (
-        wechatStatusRef.current?.status !== undefined
-        && wechatStatusRef.current.status !== "pending"
-      ) {
-        return;
-      }
-      polling = true;
-      try {
-        const status = await apiRequest<WechatBindStatusResponse>(
-          `/users/me/identities/wechat/bind/status/${encodeURIComponent(bind.challenge_id)}`,
-          {
-            scope: "user",
-            skipRefresh: true,
-            headers: { "X-Wechat-Bind-Token": bind.poll_token },
-          },
-        );
-        if (!active || wechatBindIdRef.current !== bind.challenge_id) return;
-        wechatStatusRef.current = status;
-        setWechatStatus(status);
-        if (status.status === "completed") {
-          clear();
-          router.replace("/account/login?wechat_bound=1");
-        } else if (status.status === "conflict" || status.status === "expired") {
-          wechatBindIdRef.current = null;
-          setError(status.message || "微信绑定未完成，请重新生成绑定码");
-          setWechatBind(null);
-        }
-      } catch (reason) {
-        if (!active || wechatBindIdRef.current !== bind.challenge_id) return;
-        setError(errorMessage(reason));
-      } finally {
-        polling = false;
-      }
-    };
-    const timer = window.setInterval(() => void poll(), 2500);
-    void poll();
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [clear, router, wechatBind]);
-
-  useEffect(() => {
-    const bind = wechatBind;
-    if (!bind) return;
-    return () => {
-      void apiRequest(
-        `/users/me/identities/wechat/bind/${encodeURIComponent(bind.challenge_id)}/cancel`,
-        {
-          method: "POST",
-          scope: "user",
-          skipRefresh: true,
-          headers: { "X-Wechat-Bind-Token": bind.poll_token },
-        },
-      ).catch(() => undefined);
-    };
-  }, [wechatBind]);
-
   if (accessMode === "admin") return null;
   if (!user || !accessToken) return null;
 
   const emailIdentity = user.identities.find((identity) => identity.provider === "email");
   const githubIdentity = user.identities.find((identity) => identity.provider === "github");
-  const wechatIdentity = user.identities.find((identity) => identity.provider === "wechat");
   const canUnlink = user.identities.length > 1;
 
   function resetFeedback() {
@@ -410,63 +305,6 @@ export default function AccountSettingsPage() {
       setError(errorMessage(reason));
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function startWechatBind() {
-    if (busy) return;
-    resetFeedback();
-    setBusy(true);
-    try {
-      const response = await apiRequest<WechatBindStartResponse>(
-        "/users/me/identities/wechat/bind/start",
-        { method: "POST", scope: "user", skipRefresh: true },
-      );
-      wechatBindIdRef.current = response.challenge_id;
-      wechatStatusRef.current = { status: "pending" };
-      setWechatBind(response);
-      setWechatStatus({ status: "pending" });
-      if (response.qrcode_error) {
-        setMessage("小程序码暂时不可用，可在小程序中手动输入绑定码。");
-      }
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function cancelWechatBind() {
-    const bind = wechatBind;
-    if (!bind) return;
-    try {
-      await apiRequest(
-        `/users/me/identities/wechat/bind/${encodeURIComponent(bind.challenge_id)}/cancel`,
-        {
-          method: "POST",
-          scope: "user",
-          skipRefresh: true,
-          headers: { "X-Wechat-Bind-Token": bind.poll_token },
-        },
-      );
-    } catch (reason) {
-      if (wechatBindIdRef.current === bind.challenge_id) setError(errorMessage(reason));
-      return;
-    }
-    if (wechatBindIdRef.current !== bind.challenge_id) return;
-    wechatBindIdRef.current = null;
-    wechatStatusRef.current = null;
-    setWechatBind(null);
-    setWechatStatus(null);
-  }
-
-  async function copyChallenge() {
-    if (!wechatBind) return;
-    try {
-      await navigator.clipboard.writeText(wechatBind.challenge_id);
-      setMessage("绑定码已复制，请在小程序确认页输入。");
-    } catch {
-      setError("浏览器无法自动复制，请手动选择绑定码。");
     }
   }
 
@@ -668,18 +506,6 @@ export default function AccountSettingsPage() {
                   <span className="text-xs text-muted-foreground">开始</span>
                 </Button>
               ) : null}
-              {!wechatIdentity ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full justify-between"
-                  disabled={busy || Boolean(wechatBind)}
-                  onClick={() => void startWechatBind()}
-                >
-                  <span className="inline-flex items-center gap-2"><MessageCircle className="h-4 w-4" />绑定微信</span>
-                  <span className="text-xs text-muted-foreground">{wechatBind ? "等待确认" : "生成小程序码"}</span>
-                </Button>
-              ) : null}
             </div>
           </section>
         </aside>
@@ -691,7 +517,7 @@ export default function AccountSettingsPage() {
             <div>
               <h2 className="font-semibold text-foreground">绑定邮箱</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                验证完成后该邮箱可登录 Web 与小程序。
+                验证完成后该邮箱可用于登录 Web。
               </p>
             </div>
             <Button
@@ -750,83 +576,6 @@ export default function AccountSettingsPage() {
         </section>
       ) : null}
 
-      {wechatBind ? (
-        <section className="admin-panel rounded-[18px] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="font-semibold text-foreground">在小程序中确认绑定</h2>
-              <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-                使用微信扫描小程序码，在确认页点击确认以验证当前微信身份。
-                扫码本身不会自动绑定，绑定成功后当前网页会话会退出，请重新登录。
-              </p>
-            </div>
-            <Button type="button" variant="ghost" size="sm" onClick={() => void cancelWechatBind()}>
-              取消
-            </Button>
-          </div>
-          <div className="mt-4 flex flex-wrap items-start gap-5">
-            {wechatBind.qrcode_data_url ? (
-              <div className="rounded-[16px] border border-border bg-white p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element -- backend-generated WeChat code */}
-                <img
-                  src={wechatBind.qrcode_data_url}
-                  alt="微信小程序绑定码"
-                  width={240}
-                  height={240}
-                  className="h-[240px] w-[240px]"
-                />
-              </div>
-            ) : (
-              <div className="grid h-[240px] w-[240px] place-items-center rounded-[16px] border border-dashed border-border bg-secondary/50 p-6 text-center text-xs leading-5 text-muted-foreground">
-                {wechatBind.qrcode_error || "小程序码暂不可用"}
-              </div>
-            )}
-            <div className="min-w-[260px] flex-1 space-y-3">
-              <div className="rounded-xl border border-border bg-card p-3">
-                <p className="text-[11px] font-medium text-muted-foreground">绑定码</p>
-                <p className="mt-1 break-all font-mono text-sm text-foreground">
-                  {wechatBind.challenge_id}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void copyChallenge()}>
-                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                    复制绑定码
-                  </Button>
-                  <Countdown
-                    seconds={wechatBind.expires_in}
-                    busy={false}
-                    label="剩余"
-                    onExpire={() => {
-                      if (wechatBindIdRef.current !== wechatBind.challenge_id) return;
-                      wechatBindIdRef.current = null;
-                      wechatStatusRef.current = null;
-                      setWechatBind(null);
-                      setWechatStatus(null);
-                      setError("绑定码已过期，请重新生成。");
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl bg-accent/55 px-3 py-2 text-xs text-accent-foreground">
-                {wechatStatus?.status === "pending" ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    等待小程序确认…
-                  </>
-                ) : (
-                  <>
-                    <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
-                    打开小程序“绑定微信”确认页
-                  </>
-                )}
-              </div>
-              <p className="text-xs leading-5 text-muted-foreground">
-                小程序路径：<code>{wechatBind.miniprogram_path}</code>
-              </p>
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

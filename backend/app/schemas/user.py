@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import Field, field_validator
 
 from app.schemas.base import BaseModel
@@ -11,31 +9,6 @@ class WechatLogin(BaseModel):
     accepted_terms: bool = False
     agreement_version: str | None = Field(default=None, max_length=32)
     privacy_version: str | None = Field(default=None, max_length=32)
-
-
-class WechatBindStartResponse(BaseModel):
-    challenge_id: str
-    poll_token: str
-    expires_in: int
-    miniprogram_path: str
-    miniprogram_scene: str
-    qrcode_data_url: str | None = None
-    qrcode_error: str | None = None
-
-
-class WechatBindStatusResponse(BaseModel):
-    status: Literal["pending", "completed", "cancelled", "expired", "conflict"]
-    identity_id: int | None = None
-    message: str | None = None
-
-
-class WechatBindConfirmRequest(BaseModel):
-    challenge_id: str = Field(
-        min_length=16,
-        max_length=64,
-        pattern=r"^[A-Za-z0-9_-]+$",
-    )
-    code: str = Field(min_length=1, max_length=256)
 
 
 class UserIdentityResponse(BaseModel):

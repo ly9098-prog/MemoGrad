@@ -1,8 +1,7 @@
 {
   "pages": [
     "pages/home/home",
-    "pages/login/login",
-    "pages/wechat-bind/confirm"
+    "pages/login/login"
   ],
   "window": {
     "navigationBarBackgroundColor": "#F4F4EE",
