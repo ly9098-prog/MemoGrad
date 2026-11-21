@@ -90,3 +90,30 @@ def test_nginx_keeps_user_admin_and_api_domains_separate():
     assert "location ^~ /api/v1/ {" in body
     assert "proxy_pass http://user_frontend;" in body
     assert "proxy_pass http://admin_frontend;" in body
+
+
+def test_user_admin_proxy_allows_only_five_read_routes():
+    text = (ROOT / "deploy/nginx/nginx.conf.template").read_text(encoding="utf-8")
+    mapping = text.split('map "$request_method:$uri" $user_admin_read_allowed {', 1)[1]
+    mapping = mapping.split("}", 1)[0]
+    allowed_patterns = [
+        line.strip().split()[0]
+        for line in mapping.splitlines()
+        if line.strip().startswith("~")
+    ]
+    assert allowed_patterns == [
+        "~^GET:/api/admin/v1/questions$",
+        "~^GET:/api/admin/v1/questions/subject-options$",
+        "~^GET:/api/admin/v1/questions/[1-9][0-9]*$",
+        "~^GET:/api/admin/v1/knowledge/subjects$",
+        "~^GET:/api/admin/v1/knowledge/graph$",
+    ]
+    user_host = text.split("server_name ${PRODUCTION_DOMAIN};", 1)[1]
+    user_host = user_host.split("server_name admin.${PRODUCTION_DOMAIN};", 1)[0]
+    guarded_proxy = next(
+        block for block in _location_blocks(user_host)
+        if block.startswith("location ^~ /api/admin/ {")
+    )
+    assert "if ($user_admin_read_allowed = 0)" in guarded_proxy
+    assert "return 404;" in guarded_proxy
+    assert "proxy_pass http://backend;" in guarded_proxy

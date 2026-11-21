@@ -329,6 +329,7 @@ services:
       NODE_ENV: production
       TZ: Asia/Shanghai
       NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-/api/admin/v1}
+      ADMIN_WEB_HOST: admin.${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
       PORT: 3000
       HOSTNAME: 0.0.0.0
     ports:
@@ -338,18 +339,17 @@ services:
 
   web:
     build:
-      context: ../web-frontend
+      context: ../admin-frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_USER_API_BASE_URL: ${NEXT_PUBLIC_USER_API_BASE_URL:-/api/v1}
-        NEXT_PUBLIC_USER_AGREEMENT_VERSION: ${USER_AGREEMENT_VERSION:-2026-11-20}
-        NEXT_PUBLIC_PRIVACY_POLICY_VERSION: ${PRIVACY_POLICY_VERSION:-2026-11-20}
+        NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-/api/admin/v1}
     restart: always
     mem_limit: 256m
     mem_reservation: 128m
     environment:
       NODE_ENV: production
       TZ: Asia/Shanghai
+      ADMIN_WEB_HOST: admin.${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
       PORT: 3000
       HOSTNAME: 0.0.0.0
     ports:

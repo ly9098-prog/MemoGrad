@@ -25,7 +25,7 @@ def domain_name(value: str) -> str:
 def checks(domain: str) -> list[tuple[str, str, str, int, str | None]]:
     admin, api = f"admin.{domain}", f"api.{domain}"
     return [
-        ("user_login", domain, "/login", 200, None),
+        ("user_login", domain, "/account/login", 200, None),
         ("admin_login", admin, "/login", 200, None),
         ("api_has_no_frontend", api, "/", 404, None),
         (
@@ -42,6 +42,25 @@ def checks(domain: str) -> list[tuple[str, str, str, int, str | None]]:
         ("admin_blocks_user_api", admin, "/api/v1/users/me", 404, None),
         ("api_blocks_admin_api", api, "/api/admin/v1/auth/me", 404, None),
         ("api_health", api, "/api/v1/health", 200, None),
+        ("user_questions_auth_required", domain, "/api/admin/v1/questions", 401, None),
+        (
+            "user_subject_options_auth_required",
+            domain,
+            "/api/admin/v1/questions/subject-options",
+            401,
+            None,
+        ),
+        ("user_question_auth_required", domain, "/api/admin/v1/questions/1", 401, None),
+        (
+            "user_subjects_auth_required",
+            domain,
+            "/api/admin/v1/knowledge/subjects",
+            401,
+            None,
+        ),
+        ("user_graph_auth_required", domain, "/api/admin/v1/knowledge/graph", 401, None),
+        ("user_blocks_export", domain, "/api/admin/v1/questions/export", 404, None),
+        ("user_blocks_knowledge_status", domain, "/api/admin/v1/knowledge/status", 404, None),
     ]
 
 

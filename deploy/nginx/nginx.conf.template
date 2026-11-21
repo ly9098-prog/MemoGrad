@@ -18,6 +18,15 @@ map $http_upgrade $connection_upgrade {
     ""      close;
 }
 
+map "$request_method:$uri" $user_admin_read_allowed {
+    default 0;
+    ~^GET:/api/admin/v1/questions$ 1;
+    ~^GET:/api/admin/v1/questions/subject-options$ 1;
+    ~^GET:/api/admin/v1/questions/[1-9][0-9]*$ 1;
+    ~^GET:/api/admin/v1/knowledge/subjects$ 1;
+    ~^GET:/api/admin/v1/knowledge/graph$ 1;
+}
+
 # Next.js documents may advertise long shared-cache lifetimes. Override HTML and
 # RSC documents with no-cache so a rebuilt image cannot strand a tab on deleted
 # chunks. Hash-addressed /_next/static responses remain immutable.
@@ -116,7 +125,27 @@ server {
     }
 
     location ^~ /api/admin/ {
-        return 404;
+        if ($user_admin_read_allowed = 0) {
+            return 404;
+        }
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+        proxy_buffering off;
+    }
+
+    location = /login {
+        return 307 /account/login$is_args$args;
+    }
+
+    location = /settings {
+        return 307 /account/settings$is_args$args;
     }
 
     location /static/formulas/ {
