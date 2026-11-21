@@ -2,7 +2,14 @@
 
 import "./knowledge-graph.css";
 import KnowledgeGraphWorkspace from "./graph-workspace";
+import { useAuthStore } from "@/lib/auth/auth-store";
 
 export default function KnowledgeGraphPage() {
-  return <KnowledgeGraphWorkspace />;
+  const accessMode = useAuthStore((state) => state.accessMode);
+  return (
+    <KnowledgeGraphWorkspace
+      readOnly={accessMode === "user"}
+      apiBasePath="/knowledge"
+    />
+  );
 }

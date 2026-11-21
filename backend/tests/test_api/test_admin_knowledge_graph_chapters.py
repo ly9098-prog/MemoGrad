@@ -88,7 +88,7 @@ async def test_only_first_level_chapters_are_ancestors(subject_root, relation_ty
                     search=None,
                     depth=2,
                     max_nodes=10,
-                    _=None,
+                    principal=SimpleNamespace(identity_kind="admin"),
                     db=db,
                 )
                 for node in result["nodes"]:

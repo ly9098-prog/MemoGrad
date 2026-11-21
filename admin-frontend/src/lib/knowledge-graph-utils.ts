@@ -23,7 +23,7 @@ export function clamp(value: number, min: number, max: number): number {
 
 export function edgeStrength(edge: Pick<KnowledgeGraphEdge, "weight" | "confidence">): number {
   const normalizedWeight = clamp(edge.weight / 10, 0, 1);
-  return edge.confidence * 0.76 + normalizedWeight * 0.24;
+  return (edge.confidence ?? 0) * 0.76 + normalizedWeight * 0.24;
 }
 
 export function graphNodeRadius(

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { LoginWorkspace } from "@/components/login-workspace";
 import { useUserAuth } from "@/lib/auth-store";
+import { safeUserNext } from "@/lib/safe-next";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +17,10 @@ export default function LoginPage() {
   }, [bootstrap]);
 
   useEffect(() => {
-    if (bootstrapped && user) router.replace("/");
+    if (!bootstrapped || !user) return;
+    router.replace(
+      safeUserNext(new URLSearchParams(window.location.search).get("next")),
+    );
   }, [bootstrapped, router, user]);
 
   return <LoginWorkspace />;

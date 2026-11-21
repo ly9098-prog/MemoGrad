@@ -34,6 +34,7 @@ import type {
 } from "@/lib/types";
 import styles from "@/styles/user-login.module.css";
 import { useOtpCountdown } from "@/lib/use-otp-countdown";
+import { safeGithubLoginNext, safeUserNext } from "@/lib/safe-next";
 
 const USER_AGREEMENT_VERSION =
   process.env.NEXT_PUBLIC_USER_AGREEMENT_VERSION || "2026-11-20";
@@ -92,6 +93,11 @@ function messageFor(error: unknown) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof TypeError) return "网络连接异常，请检查后重试";
   return "操作未完成，请稍后重试";
+}
+
+function safeNextPath(): string {
+  if (typeof window === "undefined") return "/";
+  return safeUserNext(new URLSearchParams(window.location.search).get("next"));
 }
 
 function ResendButton({
@@ -235,7 +241,9 @@ function LoginForm() {
           accepted_terms: true,
           agreement_version: USER_AGREEMENT_VERSION,
           privacy_version: PRIVACY_POLICY_VERSION,
-          return_to: "/",
+          return_to: safeGithubLoginNext(
+            new URLSearchParams(window.location.search).get("next"),
+          ),
         }),
       });
       window.location.assign(response.authorization_url);
@@ -257,7 +265,7 @@ function LoginForm() {
         body: JSON.stringify({ account: account.trim(), password, client: "web" }),
       });
       applyAuth(response);
-      router.replace("/");
+      router.replace(safeNextPath());
     } catch (submitError) {
       setError({
         message: messageFor(submitError),
@@ -349,7 +357,7 @@ function LoginForm() {
         },
       );
       applyAuth(response);
-      router.replace("/");
+      router.replace(safeNextPath());
     } catch (submitError) {
       setError({
         message: messageFor(submitError),
@@ -421,7 +429,7 @@ function LoginForm() {
         }),
       });
       applyAuth(response);
-      router.replace("/");
+      router.replace(safeNextPath());
     } catch (submitError) {
       setError({
         message: messageFor(submitError),

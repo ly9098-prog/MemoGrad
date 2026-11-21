@@ -1,6 +1,7 @@
 import { ApiError } from "./errors";
 
 const DEFAULT_BASE_URL = "/api/admin/v1";
+const DEFAULT_USER_BASE_URL = "/api/v1";
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 function generateCorrelationId(prefix: "tr" | "req") {
@@ -33,8 +34,7 @@ let accessToken: string | null = null;
 let accessTokenProvider: (() => string | null) | null = null;
 let onAccessTokenChanged: ((token: string | null) => void) | null = null;
 
-// Single-flight refresh state
-let refreshPromise: Promise<string | null> | null = null;
+const refreshPromises = new Map<number, Promise<string | null>>();
 let onAuthExpired: (() => void) | null = null;
 
 // sessionStorage backing so a page reload reuses the still-valid token
@@ -42,6 +42,20 @@ let onAuthExpired: (() => void) | null = null;
 // writes an admin:refresh:used marker in Redis). Centralized here so every
 // write path (login, bootstrap, auto-refresh) stays in sync.
 const ACCESS_TOKEN_STORAGE_KEY = "admin_access_token";
+const AUTH_MODE_STORAGE_KEY = "admin_auth_mode";
+export type ApiAuthMode = "admin" | "user";
+export type ApiScope = ApiAuthMode;
+let authMode: ApiAuthMode | null = "admin";
+let authRevision = 0;
+
+type AuthSession = {
+  mode: ApiAuthMode | null;
+  revision: number;
+};
+
+function isCurrentSession(session: AuthSession) {
+  return session.mode !== null && session.mode === authMode && session.revision === authRevision;
+}
 
 function persistApiAccessToken(token: string | null) {
   try {
@@ -57,6 +71,27 @@ export function readStoredApiAccessToken(): string | null {
     return sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
   } catch {
     return null;
+  }
+}
+
+export function readStoredApiAuthMode(): ApiAuthMode {
+  try {
+    return sessionStorage.getItem(AUTH_MODE_STORAGE_KEY) === "user"
+      ? "user"
+      : "admin";
+  } catch {
+    return "admin";
+  }
+}
+
+export function setApiAuthMode(mode: ApiAuthMode | null) {
+  authRevision++;
+  authMode = mode === "user" ? "user" : mode === "admin" ? "admin" : null;
+  try {
+    if (mode) sessionStorage.setItem(AUTH_MODE_STORAGE_KEY, mode);
+    else sessionStorage.removeItem(AUTH_MODE_STORAGE_KEY);
+  } catch {
+    // Memory-only fallback remains usable when storage is unavailable.
   }
 }
 
@@ -87,7 +122,10 @@ export function setOnAuthExpired(callback: (() => void) | null) {
   onAuthExpired = callback;
 }
 
-function getBaseUrl() {
+function getBaseUrl(scope: ApiScope = "admin") {
+  if (scope === "user") {
+    return process.env.NEXT_PUBLIC_USER_API_BASE_URL ?? DEFAULT_USER_BASE_URL;
+  }
   return process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL ?? DEFAULT_BASE_URL;
 }
 
@@ -167,6 +205,8 @@ function buildHeaders(init: RequestInit, traceId: string, requestId: string): He
 }
 
 interface ApiRequestOptions extends RequestInit {
+  /** API host/path family. Business Admin calls default to "admin". */
+  scope?: ApiScope;
   /** Override default timeout in ms. 0 = no timeout. */
   timeoutMs?: number;
   /** Skip auto-refresh on 401 for this request. */
@@ -306,12 +346,15 @@ async function handleBlobResponse(response: Response, exposeErrorDetail = false)
   };
 }
 
-async function attemptRefresh(traceId: string): Promise<string | null> {
-  // Single-flight: if a refresh is already in-flight, join it
-  if (refreshPromise) return refreshPromise;
+async function attemptRefresh(traceId: string, session: AuthSession): Promise<string | null> {
+  if (!isCurrentSession(session)) return null;
+  const existing = refreshPromises.get(session.revision);
+  if (existing) return existing;
 
-  refreshPromise = (async () => {
-    const refreshUrl = `${getBaseUrl()}/auth/refresh`;
+  const refreshPromise = (async () => {
+    const refreshUrl = session.mode === "user"
+      ? `${getBaseUrl("user")}/auth/web/refresh`
+      : `${getBaseUrl("admin")}/auth/refresh`;
     try {
       const response = await fetch(refreshUrl, {
         method: "POST",
@@ -326,15 +369,17 @@ async function attemptRefresh(traceId: string): Promise<string | null> {
       const data = await response.json();
       const newToken: string | undefined = data.access_token;
       if (!newToken) return null;
+      if (!isCurrentSession(session)) return null;
       setApiAccessToken(newToken);
       return newToken;
     } catch {
       return null;
     } finally {
-      refreshPromise = null;
+      refreshPromises.delete(session.revision);
     }
   })();
 
+  refreshPromises.set(session.revision, refreshPromise);
   return refreshPromise;
 }
 
@@ -342,11 +387,12 @@ export async function apiRequest<T>(
   path: string,
   init: ApiRequestOptions = {},
 ): Promise<T> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, skipRefresh, traceId: requestedTraceId, exposeErrorDetail = false, ...fetchInit } = init;
-  const url = `${getBaseUrl()}${normalizePath(path)}`;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, skipRefresh, traceId: requestedTraceId, exposeErrorDetail = false, scope = "admin", ...fetchInit } = init;
+  const url = `${getBaseUrl(scope)}${normalizePath(path)}`;
   const traceId = normalizeCorrelationId(requestedTraceId, "tr");
   let requestId = createApiRequestId();
   const headers = buildHeaders(fetchInit, traceId, requestId);
+  const session = { mode: authMode, revision: authRevision };
   const signal = fetchInit.signal ?? undefined;
 
   try {
@@ -355,8 +401,8 @@ export async function apiRequest<T>(
   } catch (error) {
     // If it's a 401, try refresh and retry once
     if (error instanceof ApiError && error.status === 401 && !skipRefresh && path !== "/auth/refresh") {
-      const newToken = await attemptRefresh(traceId);
-      if (newToken) {
+      const newToken = await attemptRefresh(traceId, session);
+      if (newToken && isCurrentSession(session)) {
         // Retry the original request with the new token
         const retryHeaders = new Headers(headers);
         retryHeaders.set("Authorization", `Bearer ${newToken}`);
@@ -366,15 +412,14 @@ export async function apiRequest<T>(
           const retryResponse = await requestWithTimeout(url, { ...fetchInit, headers: retryHeaders, credentials: "include" }, timeoutMs, signal);
           return (await handleResponse(retryResponse, exposeErrorDetail)) as T;
         } catch (retryError) {
-          if (retryError instanceof ApiError && retryError.status === 401) {
+          if (retryError instanceof ApiError && retryError.status === 401 && isCurrentSession(session)) {
             // Retry also got 401 — token was invalidated between refresh and retry
             onAuthExpired?.();
           }
           throw retryError;
         }
       }
-      // Refresh failed
-      onAuthExpired?.();
+      if (isCurrentSession(session)) onAuthExpired?.();
       throw new ApiError(401, "认证已过期，请重新登录", { traceId, requestId });
     }
 
@@ -404,11 +449,12 @@ export async function apiRequestBlob(
   path: string,
   init: ApiRequestOptions = {},
 ): Promise<ApiBlobResponse> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, skipRefresh, traceId: requestedTraceId, exposeErrorDetail = false, ...fetchInit } = init;
-  const url = `${getBaseUrl()}${normalizePath(path)}`;
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, skipRefresh, traceId: requestedTraceId, exposeErrorDetail = false, scope = "admin", ...fetchInit } = init;
+  const url = `${getBaseUrl(scope)}${normalizePath(path)}`;
   const traceId = normalizeCorrelationId(requestedTraceId, 'tr');
   let requestId = createApiRequestId();
   const headers = buildHeaders(fetchInit, traceId, requestId);
+  const session = { mode: authMode, revision: authRevision };
   const signal = fetchInit.signal ?? undefined;
 
   try {
@@ -416,8 +462,8 @@ export async function apiRequestBlob(
     return await handleBlobResponse(response, exposeErrorDetail);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401 && !skipRefresh && path !== '/auth/refresh') {
-      const newToken = await attemptRefresh(traceId);
-      if (newToken) {
+      const newToken = await attemptRefresh(traceId, session);
+      if (newToken && isCurrentSession(session)) {
         const retryHeaders = new Headers(headers);
         retryHeaders.set('Authorization', `Bearer ${newToken}`);
         requestId = createApiRequestId();
@@ -426,11 +472,11 @@ export async function apiRequestBlob(
           const retryResponse = await requestWithTimeout(url, { ...fetchInit, headers: retryHeaders, credentials: 'include' }, timeoutMs, signal);
           return await handleBlobResponse(retryResponse, exposeErrorDetail);
         } catch (retryError) {
-          if (retryError instanceof ApiError && retryError.status === 401) onAuthExpired?.();
+          if (retryError instanceof ApiError && retryError.status === 401 && isCurrentSession(session)) onAuthExpired?.();
           throw retryError;
         }
       }
-      onAuthExpired?.();
+      if (isCurrentSession(session)) onAuthExpired?.();
       throw new ApiError(401, '认证已过期，请重新登录', { traceId, requestId });
     }
 

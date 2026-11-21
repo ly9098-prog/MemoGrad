@@ -293,6 +293,56 @@ async def test_list_admin_questions_keyword_keeps_content_or_semantics(db):
 
 
 @pytest.mark.asyncio
+async def test_list_admin_questions_can_exclude_internal_search_fields(db):
+    """只读调用方不得通过搜索命中未投影的 OCR 原文或导入文件路径。"""
+    from app.services.admin_question_service import list_admin_questions
+
+    now = datetime(2026, 8, 1)
+    async with db.session_factory() as s:
+        q1 = Question(
+            subject_id=1,
+            question_type="single_choice",
+            content={"text": "公开题干"},
+            raw_content="内部OCR标记",
+            source_file="/internal/import.pdf",
+            answer="A",
+            difficulty=2,
+            created_at=now,
+        )
+        s.add(q1)
+        await s.commit()
+
+        _questions, total = await list_admin_questions(
+            s, page=1, page_size=20, keyword="内部OCR标记"
+        )
+        assert total == 1
+        _questions, total = await list_admin_questions(
+            s,
+            page=1,
+            page_size=20,
+            keyword="内部OCR标记",
+            include_internal_search_fields=False,
+        )
+        assert total == 0
+        _questions, total = await list_admin_questions(
+            s,
+            page=1,
+            page_size=20,
+            keyword="internal/import.pdf",
+            include_internal_search_fields=False,
+        )
+        assert total == 0
+        _questions, total = await list_admin_questions(
+            s,
+            page=1,
+            page_size=20,
+            keyword="公开题干",
+            include_internal_search_fields=False,
+        )
+        assert total == 1
+
+
+@pytest.mark.asyncio
 async def test_list_admin_questions_keyword_escapes_like_wildcards(db):
     """用户输入中的 %/_ 必须按字面匹配，不能当 LIKE 通配符用（转义回归）。"""
     from app.services.admin_question_service import list_admin_questions

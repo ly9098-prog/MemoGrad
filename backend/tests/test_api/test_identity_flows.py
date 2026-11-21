@@ -26,6 +26,32 @@ from app.services import (
 )
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "//evil.example/steal",
+        "https://evil.example/steal",
+        "/\\evil.example",
+        "/account\r\nLocation: https://evil.example",
+        "/account\x00tail",
+    ],
+)
+def test_safe_return_to_rejects_foreign_or_control_characters(value):
+    assert auth_oauth._safe_return_to(value) == "/"
+
+
+def test_safe_return_to_keeps_internal_path():
+    assert auth_oauth._safe_return_to("/account/settings?tab=security") == (
+        "/account/settings?tab=security"
+    )
+
+
+def test_step_up_verified_flag_is_replaced_not_duplicated():
+    assert auth_oauth._with_verified_flag("/account?tab=security&verified=old") == (
+        "/account?tab=security&verified=github"
+    )
+
+
 @pytest_asyncio.fixture()
 async def flow(tmp_path, monkeypatch):
     import app.models  # noqa: F401

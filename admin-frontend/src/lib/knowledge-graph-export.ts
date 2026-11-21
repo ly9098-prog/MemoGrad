@@ -18,7 +18,7 @@ export type ExportGraphLink = {
   target: number | { id?: string | number };
   relation_type: string;
   source_type?: string;
-  confidence: number;
+  confidence?: number;
 };
 
 export type ExportGraphCluster = {
@@ -160,7 +160,9 @@ export function buildKnowledgeGraphSvg(input: ExportGraphInput): string | null {
         const [x1, y1, x2, y2] = exportLinkCoordinates(source, target);
       const dash = link.source_type === "inferred" ? ' stroke-dasharray="5 4"' : "";
       const arrow = input.arrows ? ' marker-end="url(#kg-arrow)"' : "";
-        const confidence = Number.isFinite(link.confidence) ? Math.max(0, Math.min(1, link.confidence)) : 0;
+        const confidence = Number.isFinite(link.confidence)
+          ? Math.max(0, Math.min(1, link.confidence ?? 0))
+          : 0;
         const lineWidth = Number.isFinite(input.linkWidth) ? Math.max(0.6, input.linkWidth) : 0.72;
       return (
           `<line data-source="${source.id}" data-target="${target.id}" ` +

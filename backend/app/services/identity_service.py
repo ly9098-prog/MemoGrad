@@ -148,6 +148,7 @@ async def bind_identity(
     provider: str,
     namespace: str,
     subject: str,
+    commit: bool = True,
 ) -> UserAuthIdentity:
     await _lock_user(db, user.id)
     existing, owner = await find_identity_user(
@@ -156,7 +157,10 @@ async def bind_identity(
     if existing and owner:
         if owner.id == user.id:
             existing.last_authenticated_at = utcnow()
-            await db.commit()
+            if commit:
+                await db.commit()
+            else:
+                await db.flush()
             return existing
         raise IdentityConflictError("该身份已绑定到其他账号，请使用原账号登录")
     same_provider = await db.scalar(
@@ -179,7 +183,8 @@ async def bind_identity(
     db.add(identity)
     try:
         await db.flush()
-        await db.commit()
+        if commit:
+            await db.commit()
         return identity
     except IntegrityError as exc:
         await db.rollback()

@@ -17,7 +17,6 @@ export function AccountHome() {
   if (!user) return null;
   const identities = user.identities;
   const username = accountName(user);
-
   return (
     <div className="app-surface">
       <BrandHeader authenticated />
@@ -28,10 +27,12 @@ export function AccountHome() {
             <h1 title={username}>{username}</h1>
             <p className="account-id">MemoGrad 用户 #{user.id}</p>
           </div>
-          <Link href="/settings" className="secondary-action">
-            管理登录方式
-            <ArrowRight aria-hidden="true" />
-          </Link>
+          <div className="account-actions">
+            <Link href="/settings" className="secondary-action">
+              管理登录方式
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </div>
         </section>
 
         <div className="account-grid">

@@ -45,10 +45,12 @@ import { useQuestionDetail, useQuestionList } from "./hooks/use-question-queries
 import { positiveInt } from "./question-list-state";
 import { buildExportPayload } from "./question-export-payload";
 
-export default function QuestionsPage() {
+function AdminQuestionsPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const permissions = useAuthStore((state) => state.permissions);
+  const accessMode = useAuthStore((state) => state.accessMode);
+  const isLearner = accessMode === "user";
   const subjectOptions = useQuestionSubjectOptions();
   const {
     filters,
@@ -58,7 +60,7 @@ export default function QuestionsPage() {
     setFilters,
     setPage,
     setPageSize,
-  } = useQuestionPagination(searchParams);
+  } = useQuestionPagination(searchParams, isLearner);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
   const { message, setMessage, clearMessage } = useQuestionFeedback();
   const editorCallbacks = useRef<{
@@ -76,8 +78,8 @@ export default function QuestionsPage() {
     closeAllMenus,
   } = useQuestionMenus();
 
-  const canWrite = hasPermission(permissions, "question:write");
-  const canDelete = hasPermission(permissions, "question:delete");
+  const canWrite = !isLearner && hasPermission(permissions, "question:write");
+  const canDelete = !isLearner && hasPermission(permissions, "question:delete");
 
   const questions = useQuestionList(queryParams);
   const safeLastPage = resolveQuestionSafeLastPage(questions.data?.total_pages);
@@ -97,6 +99,10 @@ export default function QuestionsPage() {
     toggleAll,
     toggleOne,
   } = useQuestionSelection({ items });
+
+  useEffect(() => {
+    if (isLearner) clearSelection();
+  }, [isLearner, clearSelection]);
 
   const {
     selectedQuestionId,
@@ -153,7 +159,7 @@ export default function QuestionsPage() {
     setCompareVersion,
     toggleVersionHistory,
     swapVersions,
-  } = useQuestionVersionHistory(selectedQuestionId);
+  } = useQuestionVersionHistory(selectedQuestionId, !isLearner);
   const deleteDialog = useQuestionDeleteDialog(selectedIds, selectedQuestionId, {
     clearSelection,
     setSelectedQuestionId,
@@ -285,8 +291,10 @@ export default function QuestionsPage() {
   return (
     <ManagementPage className="space-y-5 pb-10">
       <ManagementPageHeader
-        title="正式题库"
-        description="检索、审核与维护正式题目；列表用于快速扫描，右侧预览用于阅读，完整详情用于编辑。"
+        title={isLearner ? "学习题库" : "正式题库"}
+        description={isLearner
+          ? "浏览已发布题目与解析；管理操作仅对具备权限的管理员开放。"
+          : "检索、审核与维护正式题目；列表用于快速扫描，右侧预览用于阅读，完整详情用于编辑。"}
         meta={
           <span className="inline-flex h-7 items-center rounded-[7px] border border-white/70 bg-white/55 px-2.5 font-semibold tabular-nums text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md">
             全库 {questions.data?.total?.toLocaleString("zh-CN") ?? "--"} 题
@@ -314,6 +322,7 @@ export default function QuestionsPage() {
         onSaveCurrentFilters={handleSaveCurrentFilters}
         onFilterChange={updateFilter}
         onImportBatchChange={handleImportBatchChange}
+        learnerMode={isLearner}
       />
 
       <div className="@container">
@@ -335,6 +344,8 @@ export default function QuestionsPage() {
             exportOpen={menus.isExportOpen}
             exportingFormat={exportingFormat}
             exportMenuRef={exportMenuRef}
+            canSelect={!isLearner}
+            canExport={!isLearner}
             onToggleAll={toggleAll}
             onToggleOne={toggleOne}
             onSelectQuestion={selectQuestion}
@@ -375,13 +386,15 @@ export default function QuestionsPage() {
 
       <QuestionMessageToast message={message} onClose={clearMessage} />
 
-      <QuestionBatchSelectionBar
-        selectedCount={selectedIds.size}
-        canDelete={canDelete}
-        deleting={deleteMutation.isPending}
-        onBatchDelete={requestBatchDelete}
-        onClearSelection={clearSelection}
-      />
+      {!isLearner ? (
+        <QuestionBatchSelectionBar
+          selectedCount={selectedIds.size}
+          canDelete={canDelete}
+          deleting={deleteMutation.isPending}
+          onBatchDelete={requestBatchDelete}
+          onClearSelection={clearSelection}
+        />
+      ) : null}
 
       <QuestionDetailDrawer
         open={isDetailDrawerOpen}
@@ -437,6 +450,7 @@ export default function QuestionsPage() {
             versionComparisonLoading,
             pendingVersionLabel,
           }}
+          showVersionHistory={!isLearner}
           onRetry={() => detail.refetch()}
         />
       </QuestionDetailDrawer>
@@ -470,4 +484,8 @@ export default function QuestionsPage() {
       />
     </ManagementPage>
   );
+}
+
+export default function QuestionsPage() {
+  return <AdminQuestionsPage />;
 }

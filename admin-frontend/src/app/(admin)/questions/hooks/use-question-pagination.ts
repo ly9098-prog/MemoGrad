@@ -11,7 +11,10 @@ export function resolveQuestionSafeLastPage(totalPages: number | undefined): num
   return typeof totalPages === "number" ? Math.max(1, totalPages) : 1;
 }
 
-export function useQuestionPagination(searchParams: URLSearchParams) {
+export function useQuestionPagination(
+  searchParams: URLSearchParams,
+  learnerMode = false,
+) {
   const [filters, setFilters] = useState<QuestionListFilters>(() =>
     readQuestionListFilters(searchParams),
   );
@@ -20,8 +23,8 @@ export function useQuestionPagination(searchParams: URLSearchParams) {
     normalizeQuestionPageSize(searchParams.get("page_size")),
   );
   const queryParams = useMemo(
-    () => buildQueryParams(filters, page, pageSize),
-    [filters, page, pageSize],
+    () => buildQueryParams(filters, page, pageSize, learnerMode),
+    [filters, page, pageSize, learnerMode],
   );
 
   return {

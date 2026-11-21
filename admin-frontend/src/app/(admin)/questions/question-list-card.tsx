@@ -32,6 +32,8 @@ type QuestionListCardProps = {
   exportOpen: boolean;
   exportingFormat: "csv" | "docx" | null;
   exportMenuRef: React.RefObject<HTMLDivElement | null>;
+  canSelect?: boolean;
+  canExport?: boolean;
   onToggleAll: () => void;
   onToggleOne: (id: number) => void;
   onSelectQuestion: (id: number) => void;
@@ -70,10 +72,12 @@ function QuestionListItem({
   onToggle,
   onSelect,
   onOpenDetail,
+  selectable,
 }: {
   question: AdminQuestion;
   selected: boolean;
   checked: boolean;
+  selectable: boolean;
   onPrefetch: () => void;
   onToggle: () => void;
   onSelect: () => void;
@@ -91,7 +95,9 @@ function QuestionListItem({
       }`}
     >
       <div className="flex items-start gap-3 px-4 py-2.5">
-        <CustomCheckbox checked={checked} onChange={onToggle} className="mt-1" />
+        {selectable ? (
+          <CustomCheckbox checked={checked} onChange={onToggle} className="mt-1" />
+        ) : null}
 
         <div className="min-w-0 flex-1">
           <button type="button" onClick={onSelect} className="w-full text-left">
@@ -169,6 +175,8 @@ export function QuestionListCard({
   exportOpen,
   exportingFormat,
   exportMenuRef,
+  canSelect = true,
+  canExport = true,
   onToggleAll,
   onToggleOne,
   onSelectQuestion,
@@ -200,6 +208,8 @@ export function QuestionListCard({
         exportOpen={exportOpen}
         exportingFormat={exportingFormat}
         exportMenuRef={exportMenuRef}
+        canSelect={canSelect}
+        canExport={canExport}
         onToggleAll={onToggleAll}
         onToggleExportMenu={onToggleExportMenu}
         onExport={onExport}
@@ -219,6 +229,7 @@ export function QuestionListCard({
               question={question}
               selected={selectedQuestionId === question.id}
               checked={selectedIds.has(question.id)}
+              selectable={canSelect}
               onPrefetch={() => onPrefetchDetail(question.id)}
               onToggle={() => onToggleOne(question.id)}
               onSelect={() => onSelectQuestion(question.id)}

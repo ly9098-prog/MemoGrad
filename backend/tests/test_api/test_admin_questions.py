@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import admin_questions
+from app.core.admin_read_access import ReadAccessPrincipal, question_read_access
 from app.core.admin_security import AdminPrincipal, get_current_admin
 from app.core.database import get_db
 from app.main import app
@@ -79,6 +80,10 @@ async def _allow():
     return _principal()
 
 
+async def _allow_read():
+    return ReadAccessPrincipal(identity_kind="admin", admin=_principal())
+
+
 def _question(question_id=1, review_status="approved", is_active=True):
     now = datetime(2026, 5, 29)
     return Question(
@@ -142,6 +147,7 @@ def test_list_admin_questions(monkeypatch):
         AsyncMock(return_value=([_question()], 1)),
     )
     app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[question_read_access] = _allow_read
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/questions")
@@ -168,6 +174,7 @@ def test_list_questions_rejects_unsafe_input_before_query(monkeypatch, params):
     query = AsyncMock(return_value=([], 0))
     monkeypatch.setattr(admin_questions, "list_admin_questions", query)
     app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[question_read_access] = _allow_read
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/questions", params=params)
@@ -201,6 +208,7 @@ def test_question_search_database_failure_is_safe_and_next_request_recovers(
     ])
     monkeypatch.setattr(admin_questions, "list_admin_questions", query)
     app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[question_read_access] = _allow_read
     app.dependency_overrides[get_db] = _override_db
     safe_client = TestClient(app, raise_server_exceptions=False)
     try:
@@ -248,6 +256,7 @@ def test_question_subject_options_use_question_read_permission(monkeypatch):
         AsyncMock(return_value=[subject]),
     )
     app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[question_read_access] = _allow_read
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/questions/subject-options")
@@ -266,6 +275,7 @@ def test_get_admin_question_detail(monkeypatch):
         admin_questions, "get_admin_question_detail", AsyncMock(return_value=detail)
     )
     app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[question_read_access] = _allow_read
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/questions/1")

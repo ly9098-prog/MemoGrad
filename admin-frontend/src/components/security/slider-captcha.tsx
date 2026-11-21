@@ -7,7 +7,7 @@ import SliderCaptchaBase, {
   type VerifyParam,
 } from "rc-slider-captcha";
 import { RotateCw, ShieldCheck } from "lucide-react";
-import { apiRequest } from "@/lib/api/client";
+import { apiRequest, type ApiScope } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { buildSliderVerification } from "./slider-captcha-geometry";
 import styles from "./slider-captcha.module.css";
@@ -31,6 +31,7 @@ type SliderTicket = {
 type SliderCaptchaProps = {
   onVerified: (ticket: string) => void;
   onCancel: () => void;
+  scope?: ApiScope;
 };
 
 const RENDER_WIDTH = 280;
@@ -44,7 +45,11 @@ function messageFor(error: unknown) {
   return "安全验证未完成，请稍后重试";
 }
 
-export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
+export function SliderCaptcha({
+  onVerified,
+  onCancel,
+  scope = "admin",
+}: SliderCaptchaProps) {
   const keyboardInputId = useId();
   const challengeRef = useRef<SliderChallenge | null>(null);
   const actionRef = useRef<ActionType | undefined>(undefined);
@@ -86,6 +91,7 @@ export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
         "/auth/captcha/slider/start",
         {
           method: "POST",
+          scope,
           skipRefresh: true,
           exposeErrorDetail: true,
           signal: controller.signal,
@@ -112,7 +118,7 @@ export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
       }
       throw loadError;
     }
-  }, []);
+  }, [scope]);
 
   const verify = useCallback(
     async (data: VerifyParam) => {
@@ -150,6 +156,7 @@ export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
           "/auth/captcha/slider/verify",
           {
             method: "POST",
+            scope,
             skipRefresh: true,
             exposeErrorDetail: true,
             signal: controller.signal,
@@ -171,7 +178,7 @@ export function SliderCaptcha({ onVerified, onCancel }: SliderCaptchaProps) {
         throw verifyError;
       }
     },
-    [onVerified],
+    [onVerified, scope],
   );
 
   const verifyWithKeyboard = useCallback(() => {

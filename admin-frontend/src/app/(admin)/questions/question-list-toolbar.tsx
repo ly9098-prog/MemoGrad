@@ -12,6 +12,8 @@ type QuestionListToolbarProps = {
   hasActiveFilters: boolean;
   selectedCount: number;
   allChecked: boolean;
+  canSelect?: boolean;
+  canExport?: boolean;
   exportOpen: boolean;
   exportingFormat: "csv" | "docx" | null;
   exportMenuRef: RefObject<HTMLDivElement | null>;
@@ -28,6 +30,8 @@ export function QuestionListToolbar({
   hasActiveFilters,
   selectedCount,
   allChecked,
+  canSelect = true,
+  canExport = true,
   exportOpen,
   exportingFormat,
   exportMenuRef,
@@ -56,7 +60,7 @@ export function QuestionListToolbar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        {canSelect ? <button
           type="button"
           role="checkbox"
           aria-checked={allChecked}
@@ -72,9 +76,9 @@ export function QuestionListToolbar({
             {allChecked ? <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} /> : null}
           </span>
           <span className="font-medium">选择当前页</span>
-        </button>
+        </button> : null}
 
-        <div ref={exportMenuRef} className="relative">
+        {canExport ? <div ref={exportMenuRef} className="relative">
           <Button
             variant="secondary"
             size="sm"
@@ -113,7 +117,7 @@ export function QuestionListToolbar({
               </button>
             </div>
           ) : null}
-        </div>
+        </div> : null}
       </div>
     </div>
   );

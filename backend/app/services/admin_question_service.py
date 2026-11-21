@@ -262,8 +262,12 @@ async def list_admin_questions(
     difficulty: int | None = None,
     knowledge_point_id: int | None = None,
     subject_codes: list[str] | tuple[str, ...] | None = None,
+    include_internal_search_fields: bool = True,
+    visible_subjects_only: bool = False,
 ) -> tuple[list[Question], int]:
     conditions = []
+    if visible_subjects_only:
+        conditions.append(Question.subject_ref.has(Subject.is_active.is_(True)))
     if subject_id is not None:
         conditions.append(Question.subject_id == subject_id)
     if subject_codes:
@@ -337,12 +341,17 @@ async def list_admin_questions(
                 Question.content["title"].as_string().ilike(pattern, escape="\\"),
                 Question.answer.ilike(pattern, escape="\\"),
                 Question.analysis.ilike(pattern, escape="\\"),
-                Question.raw_content.ilike(pattern, escape="\\"),
-                Question.source.ilike(pattern, escape="\\"),
-                Question.source_file.ilike(pattern, escape="\\"),
                 Question.id.in_(kp_qids),
                 Question.subject_id.in_(matching_subject_ids),
             ]
+            if include_internal_search_fields:
+                term_conditions.extend(
+                    [
+                        Question.source.ilike(pattern, escape="\\"),
+                        Question.raw_content.ilike(pattern, escape="\\"),
+                        Question.source_file.ilike(pattern, escape="\\"),
+                    ]
+                )
             numeric_term = term.removeprefix("#")
             numeric_value = _search_integer_value(numeric_term)
             if numeric_value is not None:
@@ -392,6 +401,32 @@ async def list_admin_questions(
 
 async def get_admin_question(db: AsyncSession, question_id: int) -> Question:
     question = await db.get(Question, question_id)
+    if not question:
+        raise ValueError("题目不存在")
+    return question
+
+
+async def get_publicly_visible_question(
+    db: AsyncSession, question_id: int
+) -> Question:
+    """Load a question that ordinary users may read.
+
+    Visibility is enforced in SQL, before relationships or import metadata are
+    loaded, so an unapproved or disabled row is indistinguishable from a
+    missing row on the shared read surface.
+    """
+    from sqlalchemy.orm import selectinload
+
+    question = await db.scalar(
+        select(Question)
+        .options(selectinload(Question.subject_ref))
+        .where(
+            Question.id == question_id,
+            Question.is_active.is_(True),
+            Question.review_status == "approved",
+            Question.subject_ref.has(Subject.is_active.is_(True)),
+        )
+    )
     if not question:
         raise ValueError("题目不存在")
     return question

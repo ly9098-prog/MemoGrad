@@ -45,6 +45,7 @@ type QuestionFilterToolbarProps = {
   onSaveCurrentFilters: (filters: QuestionListFilters) => void;
   onFilterChange: <K extends keyof QuestionListFilters>(key: K, value: QuestionListFilters[K]) => void;
   onImportBatchChange: (value: string) => void;
+  learnerMode?: boolean;
 };
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
@@ -76,6 +77,7 @@ export function QuestionFilterToolbar({
   onSaveCurrentFilters,
   onFilterChange,
   onImportBatchChange,
+  learnerMode = false,
 }: QuestionFilterToolbarProps) {
   return (
     <div className="relative z-20 space-y-3">
@@ -109,7 +111,7 @@ export function QuestionFilterToolbar({
           </label>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div ref={commonFilterRef} className="relative shrink-0">
+            {!learnerMode ? <div ref={commonFilterRef} className="relative shrink-0">
               <Button
                 variant="secondary"
                 size="sm"
@@ -157,9 +159,9 @@ export function QuestionFilterToolbar({
                   </button>
                 </div>
               ) : null}
-            </div>
+            </div> : null}
 
-            <Button
+            {!learnerMode ? <Button
               variant="ghost"
               size="sm"
               onClick={() => onSaveCurrentFilters(filters)}
@@ -167,7 +169,7 @@ export function QuestionFilterToolbar({
             >
               <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               保存筛选
-            </Button>
+            </Button> : null}
 
             <Button
               variant="ghost"
@@ -182,7 +184,10 @@ export function QuestionFilterToolbar({
           </div>
         </div>
 
-        <div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-[1.08fr_1fr_1fr_0.82fr_1fr_auto]">
+        <div className={learnerMode
+          ? "grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-[1.08fr_1fr_0.82fr_1fr]"
+          : "grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-[1.08fr_1fr_1fr_0.82fr_1fr_auto]"}
+        >
           <FilterField label="科目">
             <CustomSelect
               className="h-8 rounded-md !border-0 !bg-transparent pl-0 pr-1 text-[12px] shadow-none !ring-0 hover:!border-transparent"
@@ -208,14 +213,14 @@ export function QuestionFilterToolbar({
             />
           </FilterField>
 
-          <FilterField label="状态">
+          {!learnerMode ? <FilterField label="状态">
             <CustomSelect
               className="h-8 rounded-md !border-0 !bg-transparent pl-0 pr-1 text-[12px] shadow-none !ring-0 hover:!border-transparent"
               value={filters.is_active}
               onChange={(value) => onFilterChange("is_active", value)}
               options={activeOptions}
             />
-          </FilterField>
+          </FilterField> : null}
 
           <FilterField label="年份">
             <input
@@ -240,7 +245,7 @@ export function QuestionFilterToolbar({
             />
           </FilterField>
 
-          <div ref={moreFilterRef} className="relative">
+          {!learnerMode ? <div ref={moreFilterRef} className="relative">
             <button
               type="button"
               onClick={() => onToggleMenu("isMoreFilterOpen")}
@@ -262,7 +267,7 @@ export function QuestionFilterToolbar({
                 />
               </div>
             ) : null}
-          </div>
+          </div> : null}
         </div>
       </section>
 

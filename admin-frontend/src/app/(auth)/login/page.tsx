@@ -442,7 +442,11 @@ function LoginForm() {
               </div>
             </section>
           </div>
-          <p className={styles.support}>没有后台权限？<a href="mailto:{{SECRET_d8zo1uvg}}">联系超级管理员</a></p>
+          <p className={styles.support}>
+            <Link href="/account/login">普通用户登录</Link>
+            <span aria-hidden="true">·</span>
+            管理员问题请<a href="mailto:{{SECRET_d8zo1uvg}}">联系超级管理员</a>
+          </p>
         </div>
       </main>
       <div className={styles.footer}><AdminFooter variant="auth" /></div>

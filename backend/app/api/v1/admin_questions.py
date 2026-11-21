@@ -21,6 +21,10 @@ from app.core.admin_guards import (
     finish_idempotency,
     require_idempotency,
 )
+from app.core.admin_read_access import (
+    ReadAccessPrincipal,
+    question_read_access,
+)
 from app.core.admin_redis import IdempotencyClaim, release_idempotent_request
 from app.core.admin_security import AdminPrincipal, require_permissions
 from app.core.database import get_db
@@ -30,7 +34,6 @@ from app.schemas.admin_questions import (
     AdminQuestionBatchRequest,
     AdminQuestionBatchResult,
     AdminQuestionDeleteImageRequest,
-    AdminQuestionDetail,
     AdminQuestionExportRequest,
     AdminQuestionListItem,
     AdminQuestionPatchRequest,
@@ -40,6 +43,11 @@ from app.schemas.admin_questions import (
     AdminQuestionVersionDetail,
     AdminQuestionVersionListItem,
     validate_image_target,
+)
+from app.schemas.admin_read_access import (
+    VisibleQuestionDetail,
+    VisibleQuestionListItem,
+    VisibleSubjectNode,
 )
 from app.schemas.admin_subjects import AdminSubjectTreeNode
 from app.schemas.common import paginated_response
@@ -51,6 +59,7 @@ from app.services.admin_question_service import (
     delete_question_asset_if_orphan,
     get_admin_question,
     get_admin_question_detail,
+    get_publicly_visible_question,
     get_question_version_detail,
     list_admin_questions,
     list_question_versions,
@@ -67,6 +76,7 @@ from app.services.admin_question_service import (
 )
 from app.services.admin_subject_service import list_subject_tree
 from app.services.knowledge_point_service import load_question_kps
+from app.services.practice.response_content import sanitize_question_content
 from app.services.storage_backend import compress_image, get_question_assets_storage
 from app.services.streaming_upload_handler import stream_to_temp
 from app.utils.question_content import (
@@ -107,6 +117,42 @@ def _to_admin_item(question, kps=None) -> AdminQuestionListItem:
     if kps is not None:
         update["knowledge_points"] = kps
     return item.model_copy(update=update) if update else item
+
+
+def _to_visible_item(question, kps=None) -> VisibleQuestionListItem:
+    subject_ref = getattr(question, "subject_ref", None)
+    return VisibleQuestionListItem(
+        id=question.id,
+        subject_id=question.subject_id,
+        subject_code=getattr(subject_ref, "code", None),
+        subject_name=getattr(subject_ref, "name", None),
+        subject_path=getattr(subject_ref, "path", None),
+        question_type=question.question_type,
+        content=sanitize_question_content(question.content or {}) or {},
+        options=question.options,
+        answer=question.answer,
+        analysis=question.analysis,
+        knowledge_points=list(kps or []),
+        difficulty=question.difficulty,
+        source=None,
+        image_url=question.image_url,
+        year=question.year,
+        is_active=True,
+    )
+
+
+def _to_visible_subject(node: dict) -> VisibleSubjectNode:
+    return VisibleSubjectNode(
+        id=int(node["id"]),
+        code=str(node["code"]),
+        name=str(node["name"]),
+        level=int(node["level"]),
+        path=str(node["path"]),
+        children=[
+            _to_visible_subject(child)
+            for child in (node.get("children") or [])
+        ],
+    )
 
 
 def _image_url_from_legacy_entry(value) -> str:
@@ -307,31 +353,35 @@ async def list_questions(
     import_batch_id: str | None = None,
     difficulty: int | None = Query(None, ge=1, le=5),
     knowledge_point_id: int | None = Query(None, ge=1, le=2**31 - 1),
-    _=Depends(require_permissions("question:read")),
+    principal: ReadAccessPrincipal = Depends(question_read_access),
     db: AsyncSession = Depends(get_db),
 ):
     normalized_subject_codes = [
         code.strip() for code in (subject_codes or "").split(",") if code.strip()
     ]
+    learner_view = principal.identity_kind == "user"
     questions, total = await list_admin_questions(
         db,
         page,
         page_size,
-        subject_id,
-        review_status,
-        is_active,
-        question_type,
-        keyword,
-        year,
-        import_batch_id,
-        difficulty,
-        knowledge_point_id,
-        normalized_subject_codes or None,
+        subject_id=subject_id,
+        review_status="approved" if learner_view else review_status,
+        is_active=True if learner_view else is_active,
+        question_type=question_type,
+        keyword=keyword,
+        year=year,
+        import_batch_id=None if learner_view else import_batch_id,
+        difficulty=difficulty,
+        knowledge_point_id=knowledge_point_id,
+        subject_codes=normalized_subject_codes or None,
+        include_internal_search_fields=not learner_view,
+        visible_subjects_only=learner_view,
     )
     kp_map = await load_question_kps(db, [q.id for q in questions])
+    serializer = _to_visible_item if learner_view else _to_admin_item
     return paginated_response(
         [
-            _to_admin_item(question, kp_map.get(question.id, []))
+            serializer(question, kp_map.get(question.id, []))
             for question in questions
         ],
         total,
@@ -340,13 +390,15 @@ async def list_questions(
     )
 
 
-@router.get("/subject-options", response_model=list[AdminSubjectTreeNode])
+@router.get("/subject-options")
 async def list_question_subject_options(
-    _=Depends(require_permissions("question:read")),
+    principal: ReadAccessPrincipal = Depends(question_read_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Expose the active subject tree to question readers without subject governance."""
     tree = await list_subject_tree(db)
+    if principal.identity_kind == "user":
+        return [_to_visible_subject(item) for item in tree]
     return [AdminSubjectTreeNode.model_validate(item) for item in tree]
 
 
@@ -527,13 +579,22 @@ async def embedding_status(
     return EmbeddingStatusResponse(**result)
 
 
-@router.get("/{question_id}", response_model=AdminQuestionDetail)
+@router.get("/{question_id}")
 async def get_question(
     question_id: int,
-    _=Depends(require_permissions("question:read")),
+    principal: ReadAccessPrincipal = Depends(question_read_access),
     db: AsyncSession = Depends(get_db),
 ):
     try:
+        if principal.identity_kind == "user":
+            question = await get_publicly_visible_question(db, question_id)
+            kp_map = await load_question_kps(db, [question.id])
+            return VisibleQuestionDetail(
+                **_to_visible_item(
+                    question,
+                    kp_map.get(question.id, []),
+                ).model_dump()
+            )
         return await get_admin_question_detail(db, question_id)
     except ValueError as exc:
         _raise_question_error(exc)

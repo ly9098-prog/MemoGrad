@@ -4,12 +4,32 @@ import {
   apiRequestBlob,
   getApiAccessToken,
   readStoredApiAccessToken,
+  setApiAuthMode,
   setApiAccessToken,
 } from "@/lib/api/client";
 import { useAuthStore } from "./auth-store";
+import type { LearnerAuthResponse } from "@/lib/api/types";
 
 const EXPIRED_TOKEN = "expired-access-token";
 const FRESH_TOKEN = "fresh-access-token";
+
+function learnerSession(): LearnerAuthResponse {
+  return {
+    access_token: FRESH_TOKEN,
+    token_type: "bearer",
+    expires_at: 4102444800,
+    user: {
+      id: 7,
+      profile_completed: true,
+      email_verified: true,
+      identities: [],
+      is_admin: false,
+      role: "user",
+      role_name: "user",
+      permissions: [],
+    },
+  };
+}
 
 beforeEach(() => {
   const storage = new Map<string, string>();
@@ -20,6 +40,7 @@ beforeEach(() => {
   });
   useAuthStore.getState().clear();
   useAuthStore.setState({ accessToken: EXPIRED_TOKEN, isAuthenticated: true });
+  setApiAuthMode("admin");
   setApiAccessToken(EXPIRED_TOKEN);
 });
 
@@ -134,5 +155,183 @@ describe("auth store — API token synchronization", () => {
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/auth\/me$/);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(getApiAccessToken()).toBe(EXPIRED_TOKEN);
+  });
+
+  it("uses the ordinary-user refresh endpoint for learner sessions", async () => {
+    useAuthStore.getState().acceptLearnerLogin({
+      access_token: EXPIRED_TOKEN,
+      token_type: "bearer",
+      expires_at: 4102444800,
+      user: {
+        id: 7,
+        profile_completed: true,
+        email_verified: true,
+        identities: [],
+        is_admin: false,
+        role: "user",
+        role_name: "user",
+        permissions: [],
+      },
+    });
+    let businessCalls = 0;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/auth/web/refresh")) {
+        return Response.json({
+          access_token: FRESH_TOKEN,
+          token_type: "bearer",
+          expires_at: 4102444800,
+          user: {
+            id: 7,
+            profile_completed: true,
+            email_verified: true,
+            identities: [],
+            is_admin: false,
+            role: "user",
+            role_name: "user",
+            permissions: [],
+          },
+        });
+      }
+      businessCalls++;
+      const token = new Headers(init?.headers).get("Authorization");
+      if (businessCalls === 1 && token === `Bearer ${EXPIRED_TOKEN}`) {
+        return Response.json({ detail: "Unauthorized" }, { status: 401 });
+      }
+      return Response.json({ id: 7 });
+    });
+
+    await expect(apiRequest("/users/me", { scope: "user" })).resolves.toEqual({ id: 7 });
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
+      "/api/v1/users/me",
+      "/api/v1/auth/web/refresh",
+      "/api/v1/users/me",
+    ]);
+    expect(useAuthStore.getState().accessToken).toBe(FRESH_TOKEN);
+  });
+
+  it("bootstraps a learner from the user refresh cookie and /api/v1", async () => {
+    useAuthStore.getState().clear();
+    useAuthStore.setState({ isBootstrapping: true });
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).endsWith("/api/admin/v1/auth/refresh")) {
+        return Response.json({ detail: "Unauthorized" }, { status: 401 });
+      }
+      if (String(input).endsWith("/api/v1/auth/web/refresh")) {
+        return Response.json({
+          access_token: FRESH_TOKEN,
+          token_type: "bearer",
+          expires_at: 4102444800,
+          user: {
+            id: 7,
+            nickname: "Reader",
+            profile_completed: true,
+            email: "reader@example.com",
+            email_verified: true,
+            identities: [],
+            is_admin: false,
+            role: "user",
+            role_name: "user",
+            permissions: [],
+          },
+        });
+      }
+      throw new Error(`unexpected request: ${String(input)}`);
+    });
+
+    await useAuthStore.getState().bootstrap();
+
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
+      "/api/admin/v1/auth/refresh",
+      "/api/v1/auth/web/refresh",
+    ]);
+    expect(useAuthStore.getState().accessMode).toBe("user");
+    expect(useAuthStore.getState().learnerUser?.id).toBe(7);
+    expect(useAuthStore.getState().permissions).toEqual([]);
+  });
+
+  it("shares one bootstrap refresh between concurrent callers", async () => {
+    useAuthStore.getState().clear();
+    let resolveRefresh!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveRefresh = resolve; }),
+    );
+    const first = useAuthStore.getState().bootstrap();
+    const second = useAuthStore.getState().bootstrap();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    resolveRefresh(Response.json({
+      access_token: FRESH_TOKEN,
+      user: { id: 1 },
+      role: null,
+      permissions: [],
+    }));
+
+    await Promise.all([first, second]);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(getApiAccessToken()).toBe(FRESH_TOKEN);
+  });
+
+  it.each([200, 401])("ignores stale bootstrap results (%s) after a new login", async (status) => {
+    useAuthStore.setState({ isAuthenticated: false, isBootstrapping: true });
+    let resolveMe!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveMe = resolve; }),
+    );
+    const bootstrap = useAuthStore.getState().bootstrap();
+    useAuthStore.getState().acceptLearnerLogin(learnerSession());
+    resolveMe(Response.json({ user: { id: 1 }, role: null, permissions: ["internal:read"] }, { status }));
+    await bootstrap;
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().accessMode).toBe("user");
+    expect(useAuthStore.getState().learnerUser?.id).toBe(7);
+    expect(useAuthStore.getState().permissions).toEqual([]);
+    expect(getApiAccessToken()).toBe(FRESH_TOKEN);
+  });
+
+  it("does not restore a session cleared during bootstrap", async () => {
+    useAuthStore.getState().clear();
+    let resolveRefresh!: (response: Response) => void;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveRefresh = resolve; }),
+    );
+    const bootstrap = useAuthStore.getState().bootstrap();
+    useAuthStore.getState().clear();
+    resolveRefresh(Response.json({ access_token: FRESH_TOKEN, user: { id: 1 }, permissions: [] }));
+    await bootstrap;
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(getApiAccessToken()).toBeNull();
+  });
+
+  it("does not clear a new login when a previous logout finishes", async () => {
+    let resolveLogout!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveLogout = resolve; }),
+    );
+    const logout = useAuthStore.getState().logout();
+    useAuthStore.getState().acceptLearnerLogin(learnerSession());
+    resolveLogout(Response.json({ status: "ok" }));
+    await logout;
+
+    expect(useAuthStore.getState().accessMode).toBe("user");
+    expect(useAuthStore.getState().learnerUser?.id).toBe(7);
+    expect(getApiAccessToken()).toBe(FRESH_TOKEN);
+  });
+
+  it.each(["login", "clear"] as const)("rejects a late Admin login after %s replaces the session", async (action) => {
+    let resolveLogin!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveLogin = resolve; }),
+    );
+    const login = useAuthStore.getState().login("operator", "fixture-password");
+    const outcome = login.catch((error: unknown) => error);
+    if (action === "login") useAuthStore.getState().acceptLearnerLogin(learnerSession());
+    else useAuthStore.getState().clear();
+    resolveLogin(Response.json({ access_token: "late-admin", user: { id: 1 }, permissions: [] }));
+
+    expect(await outcome).toMatchObject({ status: 409 });
+    expect(useAuthStore.getState().accessMode).toBe(action === "login" ? "user" : null);
+    expect(getApiAccessToken()).toBe(action === "login" ? FRESH_TOKEN : null);
   });
 });

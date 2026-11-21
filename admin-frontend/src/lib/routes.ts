@@ -273,6 +273,13 @@ const coverageRoute: AdminRoute = {
   icon: BarChart3,
 };
 
+const accountRoute: AdminRoute = {
+  href: "/account",
+  label: "账号中心",
+  description: "登录身份与安全设置",
+  icon: UserRoundCog,
+};
+
 /**
  * Flat route list kept for route matching and permission-aware consumers.
  */
@@ -360,3 +367,15 @@ export const adminNavigation: AdminNavigationItem[] = [
     ],
   },
 ];
+
+export const learnerRoutes: AdminRoute[] = [
+  questionsRoute,
+  knowledgeGraphRoute,
+  accountRoute,
+];
+
+export function isLearnerPath(pathname: string): boolean {
+  return learnerRoutes.some(
+    (route) => pathname === route.href || pathname.startsWith(`${route.href}/`),
+  );
+}

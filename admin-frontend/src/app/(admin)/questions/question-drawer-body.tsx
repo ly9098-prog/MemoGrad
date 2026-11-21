@@ -36,6 +36,7 @@ type QuestionDrawerBodyProps = {
   history: Parameters<typeof QuestionVersionHistorySection>[0]["history"];
   details: Parameters<typeof QuestionVersionHistorySection>[0]["details"];
   labels: QuestionVersionLabels;
+  showVersionHistory?: boolean;
   onRetry: () => void;
 };
 
@@ -94,6 +95,7 @@ export function QuestionDrawerBody({
   history,
   details,
   labels,
+  showVersionHistory = true,
   onRetry,
 }: QuestionDrawerBodyProps) {
   if (!question) {
@@ -126,14 +128,16 @@ export function QuestionDrawerBody({
   return (
     <>
       <QuestionDetailView question={question} />
-      <QuestionVersionHistorySection
-        className="px-7"
-        question={question}
-        versions={versions}
-        history={history}
-        details={details}
-        labels={labels}
-      />
+      {showVersionHistory ? (
+        <QuestionVersionHistorySection
+          className="px-7"
+          question={question}
+          versions={versions}
+          history={history}
+          details={details}
+          labels={labels}
+        />
+      ) : null}
       <QuestionSecondaryInfo className="px-7" question={question} />
     </>
   );

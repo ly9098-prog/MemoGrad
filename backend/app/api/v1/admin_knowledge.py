@@ -5,9 +5,22 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.admin_read_access import (
+    ReadAccessPrincipal,
+    knowledge_read_access,
+)
 from app.core.admin_security import require_permissions
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
+from app.schemas.admin_read_access import (
+    VisibleKnowledgeEdge,
+    VisibleKnowledgeGraphResponse,
+    VisibleKnowledgeHotNode,
+    VisibleKnowledgeNode,
+    VisibleKnowledgeSubject,
+    VisibleKnowledgeSummary,
+    VisibleKnowledgeTopic,
+)
 from app.schemas.knowledge_mastery import (
     KnowledgeStatusResponse,
 )
@@ -24,6 +37,78 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/knowledge", tags=["admin-knowledge"])
 
 
+def _visible_graph_payload(payload: dict) -> VisibleKnowledgeGraphResponse:
+    summary = payload.get("summary") or {}
+    return VisibleKnowledgeGraphResponse(
+        subject={
+            key: value
+            for key, value in (payload.get("subject") or {}).items()
+            if key in {"id", "code", "name"}
+        },
+        summary=VisibleKnowledgeSummary(
+            total_nodes=int(summary.get("total_nodes") or 0),
+            total_edges=int(summary.get("total_edges") or 0),
+            visible_nodes=int(summary.get("visible_nodes") or 0),
+            visible_edges=int(summary.get("visible_edges") or 0),
+            isolated_nodes=int(summary.get("isolated_nodes") or 0),
+            relation_counts={
+                str(key): int(value)
+                for key, value in (summary.get("relation_counts") or {}).items()
+            },
+        ),
+        nodes=[
+            VisibleKnowledgeNode(
+                id=int(node["id"]),
+                name=str(node["name"]),
+                aliases=[str(alias) for alias in node.get("aliases") or []],
+                description=node.get("description"),
+                difficulty_level=int(node.get("difficulty_level") or 3),
+                subject_id=int(node["subject_id"]),
+                question_count=int(node.get("question_count") or 0),
+                in_degree=int(node.get("in_degree") or 0),
+                out_degree=int(node.get("out_degree") or 0),
+                degree=int(node.get("degree") or 0),
+                relation_counts={
+                    str(key): int(value)
+                    for key, value in (node.get("relation_counts") or {}).items()
+                },
+                is_chapter_root=node.get("is_chapter_root"),
+                chapter_id=node.get("chapter_id"),
+                chapter_order=node.get("chapter_order"),
+            )
+            for node in payload.get("nodes") or []
+        ],
+        edges=[
+            VisibleKnowledgeEdge(
+                id=int(edge["id"]),
+                source=int(edge["source"]),
+                target=int(edge["target"]),
+                relation_type=edge["relation_type"],
+                weight=float(edge.get("weight") or 0.0),
+            )
+            for edge in payload.get("edges") or []
+        ],
+        hot_nodes=[
+            VisibleKnowledgeHotNode(
+                id=int(item["id"]),
+                name=str(item["name"]),
+                degree=int(item.get("degree") or 0),
+            )
+            for item in payload.get("hot_nodes") or []
+        ],
+        overview_topics=[
+            VisibleKnowledgeTopic(
+                id=int(item["id"]),
+                name=str(item["name"]),
+                direct_child_count=int(item.get("direct_child_count") or 0),
+                question_count=int(item.get("question_count") or 0),
+            )
+            for item in payload.get("overview_topics") or []
+        ],
+        focus_id=payload.get("focus_id"),
+    )
+
+
 @router.get("/status", response_model=KnowledgeStatusResponse)
 async def get_knowledge_status(
     _=Depends(require_permissions("knowledge:read")),
@@ -38,7 +123,7 @@ async def get_knowledge_status(
 
 @router.get("/subjects")
 async def list_knowledge_graph_subjects(
-    _=Depends(require_permissions("knowledge:read")),
+    principal: ReadAccessPrincipal = Depends(knowledge_read_access),
     db: AsyncSession = Depends(get_db),
 ):
     """返回存在知识点的科目，供管理端知识图谱筛选。"""
@@ -71,7 +156,7 @@ async def list_knowledge_graph_subjects(
         int(subject_id): int(count) for subject_id, count in edge_result.all()
     }
 
-    return [
+    payload = [
         {
             "id": subject.id,
             "code": subject.code,
@@ -84,6 +169,9 @@ async def list_knowledge_graph_subjects(
         for subject in subjects
         if kp_counts.get(subject.id, 0) > 0
     ]
+    if principal.identity_kind == "user":
+        return [VisibleKnowledgeSubject(**item) for item in payload]
+    return payload
 
 
 @router.get("/graph")
@@ -94,7 +182,7 @@ async def get_knowledge_graph(
     search: str | None = Query(None, max_length=128),
     depth: int = Query(2, ge=1, le=3),
     max_nodes: int = Query(70, ge=10, le=120),
-    _=Depends(require_permissions("knowledge:read")),
+    principal: ReadAccessPrincipal = Depends(knowledge_read_access),
     db: AsyncSession = Depends(get_db),
 ):
     """返回管理端知识图谱可视化所需的节点、边与汇总信息。
@@ -115,6 +203,7 @@ async def get_knowledge_graph(
     from app.models.question_knowledge_point import QuestionKnowledgePoint
     from app.services.knowledge_graph_chapters import graph_chapter_metadata
 
+    learner_view = principal.identity_kind == "user"
     valid_relations = {"prerequisite", "parent", "related", "next"}
     if relation_type and relation_type not in valid_relations:
         raise HTTPException(status_code=422, detail="relation_type 不合法")
@@ -133,7 +222,7 @@ async def get_knowledge_graph(
     kp_ids = set(kp_map)
 
     if not kp_ids:
-        return {
+        empty_payload = {
             "subject": {"id": subject.id, "code": subject.code, "name": subject.name},
             "summary": {
                 "total_nodes": 0,
@@ -152,6 +241,11 @@ async def get_knowledge_graph(
             "overview_topics": [],
             "focus_id": None,
         }
+        return (
+            _visible_graph_payload(empty_payload)
+            if learner_view
+            else empty_payload
+        )
 
     qcount_result = await db.execute(
         select(
@@ -162,6 +256,11 @@ async def get_knowledge_graph(
         .where(
             QuestionKnowledgePoint.knowledge_point_id.in_(kp_ids),
             Question.is_active == True,  # noqa: E712
+            *(
+                (Question.review_status == "approved",)
+                if learner_view
+                else ()
+            ),
         )
         .group_by(QuestionKnowledgePoint.knowledge_point_id)
     )
@@ -452,7 +551,7 @@ async def get_knowledge_graph(
     ]
 
     total_confidence = sum(float(edge.confidence or 0.0) for edge in all_edges)
-    return {
+    payload = {
         "subject": {"id": subject.id, "code": subject.code, "name": subject.name},
         "summary": {
             "total_nodes": len(kp_ids),
@@ -479,6 +578,7 @@ async def get_knowledge_graph(
         "overview_topics": overview_topics,
         "focus_id": focus_id,
     }
+    return _visible_graph_payload(payload) if learner_view else payload
 
 
 # ── Phase 3: 知识图谱边管理 ──

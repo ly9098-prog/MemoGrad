@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
   auth: { role: { name: "super_admin" }, permissions: [] as string[], isBootstrapping: false, isAuthenticated: false },
   next: "/admin-users", path: "/roles",
+  requestHost: "admin.example.com", adminHost: "admin.example.com",
   request: vi.fn(), toQuery: vi.fn(() => "?fixture"),
   invalidate: vi.fn(), replace: vi.fn(), redirect: vi.fn(), login: vi.fn(),
 }));
@@ -42,7 +43,7 @@ vi.mock("react", async (original) => ({
 }));
 vi.mock("@tanstack/react-query", () => ({
   keepPreviousData: (data: unknown) => data,
-  useQueryClient: () => ({ invalidateQueries: h.invalidate }),
+  useQueryClient: () => ({ invalidateQueries: h.invalidate, clear: vi.fn() }),
   useQuery: (query: Query) => {
     h.queries.push(query);
     return { data: h.data[JSON.stringify(query.queryKey)], isLoading: false, isFetching: false };
@@ -57,6 +58,9 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams({ next: h.next }),
   usePathname: () => h.path,
   redirect: (path: string) => { h.redirect(path); throw new Error("redirect"); },
+}));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ host: h.requestHost }),
 }));
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: typeof h.auth & { login: typeof h.login }) => unknown) =>
@@ -90,15 +94,23 @@ beforeEach(() => {
   h.queries = []; h.mutations = []; h.data = {};
   h.auth = { role: { name: "super_admin" }, permissions: [], isBootstrapping: false, isAuthenticated: false };
   h.next = "/admin-users"; h.path = "/roles";
+  h.requestHost = "admin.example.com"; h.adminHost = "admin.example.com";
+  vi.stubEnv("ADMIN_WEB_HOST", h.adminHost);
   h.request.mockReset().mockResolvedValue({ id: 12 });
   h.invalidate.mockReset().mockResolvedValue(undefined);
   h.login.mockReset().mockResolvedValue(undefined);
 });
 
 describe("login and shell ownership", () => {
-  it("keeps the root redirect in Next navigation", () => {
-    expect(() => Home()).toThrow("redirect");
+  it("keeps the Admin root redirect on the Admin host", async () => {
+    await expect(Home()).rejects.toThrow("redirect");
     expect(h.redirect).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("sends the ordinary-user root to the question browser", async () => {
+    h.requestHost = "www.example.com";
+    await expect(Home()).rejects.toThrow("redirect");
+    expect(h.redirect).toHaveBeenCalledWith("/questions");
   });
 
   it("waits for login before redirecting to a safe internal destination", async () => {
@@ -135,13 +147,13 @@ describe("login and shell ownership", () => {
   it("waits for bootstrap before redirecting unauthenticated shell users", () => {
     h.auth.isBootstrapping = true;
     AdminShell({ children: null });
-    h.effects[0]();
+    h.effects[1]();
     expect(h.replace).not.toHaveBeenCalled();
   });
 
   it("preserves the protected pathname for the login return route", () => {
     expect(AdminShell({ children: null })).toBeNull();
-    h.effects[0]();
+    h.effects[1]();
     expect(h.replace).toHaveBeenCalledWith("/login?next=%2Froles");
   });
 

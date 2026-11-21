@@ -121,7 +121,7 @@ type Cluster = {
 type NeighborEntry = {
   node: KnowledgeGraphNode;
   relations: Array<{ edge: KgLinkPayload; outgoing: boolean }>;
-  maxConfidence: number;
+  maxConfidence: number | null;
 };
 
 type LabelSprite = { canvas: HTMLCanvasElement; width: number; height: number; textWidth: number };
@@ -339,7 +339,13 @@ function RangeControl({
   );
 }
 
-export default function KnowledgeGraphWorkspace() {
+export default function KnowledgeGraphWorkspace({
+  readOnly = false,
+  apiBasePath = "/knowledge",
+}: {
+  readOnly?: boolean;
+  apiBasePath?: string;
+} = {}) {
   const [subjectId, setSubjectId] = useState("");
   const [relationType, setRelationType] = useState("");
   const [depth, setDepth] = useState("2");
@@ -382,8 +388,8 @@ export default function KnowledgeGraphWorkspace() {
   const hasFittedRef = useRef(false);
 
   const subjects = useQuery({
-    queryKey: ["knowledge-graph", "subjects"],
-    queryFn: () => apiRequest<KnowledgeGraphSubject[]>("/knowledge/subjects"),
+    queryKey: ["knowledge-graph", "subjects", apiBasePath],
+    queryFn: () => apiRequest<KnowledgeGraphSubject[]>(`${apiBasePath}/subjects`),
   });
 
   useEffect(() => {
@@ -409,7 +415,7 @@ export default function KnowledgeGraphWorkspace() {
     placeholderData: (previousData) => previousData,
     queryFn: () =>
       apiRequest<KnowledgeGraphResponse>(
-        `/knowledge/graph${toQuery({
+        `${apiBasePath}/graph${toQuery({
           subject_id: Number(subjectId),
           relation_type: relationType || undefined,
           knowledge_point_id: centerId ?? undefined,
@@ -596,7 +602,7 @@ export default function KnowledgeGraphWorkspace() {
     if (selectedId == null) return [];
     const grouped = new Map<
       number,
-      { node: KnowledgeGraphNode; relations: NeighborEntry["relations"]; maxConfidence: number }
+      { node: KnowledgeGraphNode; relations: NeighborEntry["relations"]; maxConfidence: number | null }
     >();
 
     for (const edge of graphData.links) {
@@ -608,9 +614,9 @@ export default function KnowledgeGraphWorkspace() {
       if (otherId == null) continue;
       const node = graphData.nodeById.get(otherId);
       if (!node) continue;
-      const current = grouped.get(otherId) ?? { node, relations: [], maxConfidence: 0 };
+      const current = grouped.get(otherId) ?? { node, relations: [], maxConfidence: null };
       current.relations.push({ edge, outgoing });
-      current.maxConfidence = Math.max(current.maxConfidence, edge.confidence);
+      current.maxConfidence = Math.max(current.maxConfidence ?? 0, edge.confidence ?? 0);
       grouped.set(otherId, current);
     }
 
@@ -619,7 +625,7 @@ export default function KnowledgeGraphWorkspace() {
         ...entry,
         relations: entry.relations.sort((a, b) => edgeStrength(b.edge) - edgeStrength(a.edge)),
       }))
-      .sort((a, b) => b.maxConfidence - a.maxConfidence || b.node.degree - a.node.degree);
+      .sort((a, b) => (b.maxConfidence ?? 0) - (a.maxConfidence ?? 0) || b.node.degree - a.node.degree);
   }, [graphData.links, graphData.nodeById, selectedId]);
 
   const focusId = draggingId ?? hoveredId ?? selectedId;
@@ -997,8 +1003,9 @@ export default function KnowledgeGraphWorkspace() {
   function exportGraph(format: GraphExportFormat) {
     setExportOpen(false);
     const title = `${subjectName}知识图谱`;
-    const visibleConfidence = graphData.links.length
-      ? Math.round(graphData.links.reduce((sum, link) => sum + link.confidence, 0) / graphData.links.length * 100)
+    const linksWithConfidence = graphData.links.filter((link) => link.confidence != null);
+    const visibleConfidence = linksWithConfidence.length
+      ? Math.round(linksWithConfidence.reduce((sum, link) => sum + (link.confidence ?? 0), 0) / linksWithConfidence.length * 100)
       : 0;
     const subtitle =
       `当前视图 ${graphData.nodes.length}/${summary?.total_nodes ?? graphData.nodes.length} 个知识点` +
@@ -1115,7 +1122,9 @@ export default function KnowledgeGraphWorkspace() {
     { value: "3", label: "三跳邻居" },
   ];
 
-  const confidence = summary ? Math.round(summary.avg_confidence * 100) : 0;
+  const confidence = summary?.avg_confidence != null
+    ? Math.round(summary.avg_confidence * 100)
+    : null;
   const hasInferredLinks = graphData.links.some((link) => link.source_type === "inferred");
   const donutStops = selectedNode ? buildDonutStops(selectedNode.relation_counts) : [];
   const donutTotal = selectedNode ? computeDonutTotal(selectedNode.relation_counts) : 0;
@@ -1185,39 +1194,41 @@ export default function KnowledgeGraphWorkspace() {
             <RefreshCw className="h-3.5 w-3.5" />
             重置
           </Button>
-          <div className="kg-export" ref={exportMenuRef}>
-            <Button
-              size="sm"
-              aria-haspopup="true"
-              aria-expanded={exportOpen}
-              onClick={() => setExportOpen((current) => !current)}
-            >
-              <Download className="h-3.5 w-3.5" />
-              导出图谱
-              <ChevronDown className={`h-3 w-3 transition-transform ${exportOpen ? "rotate-180" : ""}`} />
-            </Button>
-            {exportOpen && (
-              <div
-                className="kg-export-menu kg-glass"
-                role="group"
-                aria-label="选择导出格式"
+          {!readOnly ? (
+            <div className="kg-export" ref={exportMenuRef}>
+              <Button
+                size="sm"
+                aria-haspopup="true"
+                aria-expanded={exportOpen}
+                onClick={() => setExportOpen((current) => !current)}
               >
-                {EXPORT_OPTIONS.map(({ format, label, hint, Icon }) => (
-                  <button
-                    key={format}
-                    type="button"
-                    onClick={() => exportGraph(format)}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    <span>
-                      <strong>{label}</strong>
-                      <em>{hint}</em>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                <Download className="h-3.5 w-3.5" />
+                导出图谱
+                <ChevronDown className={`h-3 w-3 transition-transform ${exportOpen ? "rotate-180" : ""}`} />
+              </Button>
+              {exportOpen && (
+                <div
+                  className="kg-export-menu kg-glass"
+                  role="group"
+                  aria-label="选择导出格式"
+                >
+                  {EXPORT_OPTIONS.map(({ format, label, hint, Icon }) => (
+                    <button
+                      key={format}
+                      type="button"
+                      onClick={() => exportGraph(format)}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span>
+                        <strong>{label}</strong>
+                        <em>{hint}</em>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -1276,9 +1287,9 @@ export default function KnowledgeGraphWorkspace() {
               linkLabel={(link) => {
                 const payload = link as unknown as KgLinkPayload;
                 return escapeHtml(
-                  `${relationLabel(payload.relation_type)} · ${Math.round(payload.confidence * 100)}%${
-                    payload.source_type === "inferred" ? " · 自动推断" : ""
-                  }`,
+                  `${relationLabel(payload.relation_type)}${
+                    payload.confidence != null ? ` · ${Math.round(payload.confidence * 100)}%` : ""
+                  }${payload.source_type === "inferred" ? " · 自动推断" : ""}`,
                 );
               }}
               linkDirectionalArrowLength={appearance.arrows ? 3.2 : 0}
@@ -1448,8 +1459,12 @@ export default function KnowledgeGraphWorkspace() {
           <span><strong>{graphData.nodes.length}</strong> / {summary?.total_nodes ?? 0} 节点</span>
           <span className="kg-status-divider" />
           <span><strong>{graphData.links.length}</strong> 关系</span>
-          <span className="kg-status-divider" />
-          <span>平均置信度 <strong>{confidence}%</strong></span>
+          {confidence != null ? (
+            <>
+              <span className="kg-status-divider" />
+              <span>平均置信度 <strong>{confidence}%</strong></span>
+            </>
+          ) : null}
           {summary?.isolated_nodes ? (
             <>
               <span className="kg-status-divider" />
@@ -1909,7 +1924,7 @@ export default function KnowledgeGraphWorkspace() {
 
               <div className="kg-subhead">
                 <span>关联关系 <em>({selectedNeighbors.length})</em></span>
-                <em>按最高置信度排序</em>
+                <em>{summary?.relation_confidence ? "按最高置信度排序" : "按关系强度排序"}</em>
               </div>
               <div className="kg-neighbor-list">
                 {selectedNeighbors.length ? (
@@ -1938,7 +1953,9 @@ export default function KnowledgeGraphWorkspace() {
                           </span>
                         ))}
                         {relations.length > 2 && <span className="kg-neighbor-confidence">+{relations.length - 2}</span>}
-                        <span className="kg-neighbor-confidence">{Math.round(maxConfidence * 100)}%</span>
+                        {maxConfidence != null ? (
+                          <span className="kg-neighbor-confidence">{Math.round(maxConfidence * 100)}%</span>
+                        ) : null}
                       </button>
                     );
                   })
@@ -1976,31 +1993,35 @@ export default function KnowledgeGraphWorkspace() {
                 </div>
               </div>
 
-              <div className="kg-subhead">
-                <span className="inline-flex items-center gap-1.5"><GitBranch className="h-3 w-3" />图谱质量</span>
-              </div>
-              {(Object.keys(RELATIONS) as RelationKey[]).map((key) => {
-                const count = Number(summary?.relation_counts?.[key] ?? 0);
-                const relationConfidence = Number(summary?.relation_confidence?.[key] ?? 0);
-                if (!count) return null;
-                return (
-                  <div className="kg-quality-row" key={key}>
-                    <div className="kg-quality-meta">
-                      <span>{RELATIONS[key].label} · {count}</span>
-                      <span>{Math.round(relationConfidence * 100)}% 置信度</span>
-                    </div>
-                    <div className="kg-quality-track">
-                      <div
-                        className="kg-quality-fill"
-                        style={{
-                          width: `${Math.min(100, Math.max(3, relationConfidence * 100))}%`,
-                          background: RELATIONS[key].color,
-                        }}
-                      />
-                    </div>
+              {summary?.relation_confidence ? (
+                <>
+                  <div className="kg-subhead">
+                    <span className="inline-flex items-center gap-1.5"><GitBranch className="h-3 w-3" />图谱质量</span>
                   </div>
-                );
-              })}
+                  {(Object.keys(RELATIONS) as RelationKey[]).map((key) => {
+                    const count = Number(summary?.relation_counts?.[key] ?? 0);
+                    const relationConfidence = Number(summary?.relation_confidence?.[key] ?? 0);
+                    if (!count) return null;
+                    return (
+                      <div className="kg-quality-row" key={key}>
+                        <div className="kg-quality-meta">
+                          <span>{RELATIONS[key].label} · {count}</span>
+                          <span>{Math.round(relationConfidence * 100)}% 置信度</span>
+                        </div>
+                        <div className="kg-quality-track">
+                          <div
+                            className="kg-quality-fill"
+                            style={{
+                              width: `${Math.min(100, Math.max(3, relationConfidence * 100))}%`,
+                              background: RELATIONS[key].color,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              ) : null}
             </div>
 
             <div className="kg-inspector-foot">

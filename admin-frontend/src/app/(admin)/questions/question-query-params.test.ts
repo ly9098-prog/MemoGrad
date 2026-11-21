@@ -49,4 +49,16 @@ describe("buildQueryParams", () => {
     expect(params.page).toBe(2);
     expect(params.page_size).toBe(50);
   });
+
+  it("drops Admin-only filters in learner mode", () => {
+    const params = buildQueryParams(
+      { ...filters, is_active: "false" },
+      1,
+      20,
+      true,
+    );
+
+    expect(params.is_active).toBe("true");
+    expect(params.import_batch_id).toBeUndefined();
+  });
 });

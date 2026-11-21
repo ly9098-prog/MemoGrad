@@ -301,6 +301,62 @@ export type MeResponse = {
   permissions: string[];
 };
 
+export type UserIdentity = {
+  id: number;
+  provider: "email" | "github" | "wechat" | "password" | string;
+  namespace: string;
+  masked_subject: string;
+  verified: boolean;
+};
+
+export type LearnerUser = {
+  id: number;
+  nickname?: string | null;
+  avatar_url?: string | null;
+  profile_completed: boolean;
+  email?: string | null;
+  email_verified: boolean;
+  identities: UserIdentity[];
+  is_admin: boolean;
+  role: string;
+  role_name: string;
+  permissions: string[];
+};
+
+export type LearnerAuthResponse = {
+  access_token: string;
+  token_type: "bearer";
+  expires_at: number;
+  user: LearnerUser;
+};
+
+export type LearnerOtpStartResponse = {
+  challenge_id: string;
+  expires_in: number;
+  resend_after: number;
+};
+
+export type GithubStartResponse = {
+  authorization_url: string;
+  state: string;
+};
+
+export type WechatBindStartResponse = {
+  challenge_id: string;
+  poll_token: string;
+  expires_in: number;
+  miniprogram_path: string;
+  miniprogram_scene: string;
+  qrcode_data_url?: string | null;
+  qrcode_error?: string | null;
+};
+
+export type WechatBindStatusResponse = {
+  status: "pending" | "completed" | "cancelled" | "expired" | "conflict";
+  identity_id?: number | null;
+  message?: string | null;
+};
+
 export type Permission = {
   id: number;
   name: string;
@@ -395,6 +451,33 @@ export type AdminQuestionImportSummary = {
 
 export type AdminQuestionDetail = AdminQuestion & {
   import_record?: AdminQuestionImportSummary | null;
+};
+
+export type VisibleQuestion = {
+  id: number;
+  subject_id: number;
+  subject_code?: string | null;
+  subject_name?: string | null;
+  subject_path?: string | null;
+  question_type: string;
+  content: Record<string, unknown>;
+  options?: QuestionOptionsValue;
+  answer: string;
+  analysis?: string | null;
+  knowledge_points: string[];
+  difficulty: number;
+  source?: string | null;
+  image_url?: unknown[] | null;
+  year?: number | null;
+};
+
+export type VisibleSubjectNode = {
+  id: number;
+  code: string;
+  name: string;
+  level: number;
+  path: string;
+  children: VisibleSubjectNode[];
 };
 
 export type QuestionVersion = {
@@ -1179,8 +1262,8 @@ export type KnowledgeGraphEdge = {
   target: number;
   relation_type: "prerequisite" | "parent" | "related" | "next";
   weight: number;
-  confidence: number;
-  source_type: "manual" | "imported" | "ai" | "inferred" | string;
+  confidence?: number;
+  source_type?: "manual" | "imported" | "ai" | "inferred" | string;
 };
 
 export type KnowledgeGraphSummary = {
@@ -1189,10 +1272,10 @@ export type KnowledgeGraphSummary = {
   visible_nodes: number;
   visible_edges: number;
   isolated_nodes: number;
-  avg_confidence: number;
+  avg_confidence?: number;
   relation_counts: Record<string, number>;
-  source_counts: Record<string, number>;
-  relation_confidence: Record<string, number>;
+  source_counts?: Record<string, number>;
+  relation_confidence?: Record<string, number>;
 };
 
 export type KnowledgeGraphResponse = {

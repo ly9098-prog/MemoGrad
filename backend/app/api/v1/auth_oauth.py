@@ -1,5 +1,5 @@
 import hmac
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -55,9 +55,25 @@ def _set_state_cookie(response: Response, state: str, request: Request) -> None:
 
 def _safe_return_to(value: str) -> str:
     candidate = str(value or "/").strip()
-    if not candidate.startswith("/") or candidate.startswith("//"):
+    if (
+        not candidate.startswith("/")
+        or candidate.startswith("//")
+        or "\\" in candidate
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in candidate)
+    ):
         return "/"
     return candidate[:512]
+
+
+def _with_verified_flag(target: str) -> str:
+    parts = urlsplit(target)
+    query = [
+        (key, item)
+        for key, item in parse_qsl(parts.query, keep_blank_values=True)
+        if key != "verified"
+    ]
+    query.append(("verified", "github"))
+    return urlunsplit(("", "", parts.path, urlencode(query), parts.fragment))
 
 
 def _redirect_error(code: str) -> RedirectResponse:
@@ -117,14 +133,16 @@ async def start_github_link(
 async def start_github_step_up(
     request: Request,
     response: Response,
+    return_to: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
+    target = _safe_return_to(return_to or "/settings")
     try:
         url, state = await github_oauth_service.start_github_oauth(
             mode="step_up",
             user_id=current_user.id,
-            return_to="/settings",
+            return_to=target,
             extra={"nbf": await read_user_nbf(current_user.id)},
         )
     except github_oauth_service.GithubOAuthError as exc:
@@ -174,10 +192,8 @@ async def github_callback(
         return _redirect_error(str(exc))
     step_up = context.get("mode") == "step_up"
     target = _safe_return_to(str(context.get("return_to") or "/"))
-    if context.get("mode") == "link":
-        target = "/settings"
     if step_up:
-        target = "/settings?verified=github"
+        target = _with_verified_flag(target)
     response = RedirectResponse(
         f"{settings.USER_WEB_BASE_URL}{target}", status_code=303
     )

@@ -10,6 +10,7 @@ import {
   adminNavigation,
   adminRoutes,
   getActiveAdminRoute,
+  learnerRoutes,
   type AdminNavigationGroup,
   type AdminNavigationItem,
   type AdminRoute,
@@ -75,19 +76,30 @@ export function Sidebar({
   const router = useRouter();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const learnerUser = useAuthStore((state) => state.learnerUser);
+  const accessMode = useAuthStore((state) => state.accessMode);
   const permissions = useAuthStore((state) => state.permissions);
   const role = useAuthStore((state) => state.role);
   const isSuperAdmin = role?.name === "super_admin";
   const accountUser = user && ("username" in user ? user : user.user);
-  const userName = accountUser?.display_name || accountUser?.username || "Admin";
-  const roleLabel = role?.display_name ?? role?.name ?? "管理员";
+  const userName = accessMode === "user"
+    ? learnerUser?.nickname || learnerUser?.email || `用户 ${learnerUser?.id ?? ""}`
+    : accountUser?.display_name || accountUser?.username || "Admin";
+  const roleLabel = accessMode === "user"
+    ? "普通用户"
+    : role?.display_name ?? role?.name ?? "管理员";
 
   const visibleNavigation = useMemo(
-    () => filterNavigation(adminNavigation, permissions, isSuperAdmin),
-    [permissions, isSuperAdmin],
+    () => accessMode === "user"
+      ? learnerRoutes.map((route): AdminNavigationItem => ({ type: "route", route }))
+      : filterNavigation(adminNavigation, permissions, isSuperAdmin),
+    [accessMode, permissions, isSuperAdmin],
   );
 
-  const activeRoute = getActiveAdminRoute(pathname, adminRoutes);
+  const activeRoute = getActiveAdminRoute(
+    pathname,
+    accessMode === "user" ? learnerRoutes : adminRoutes,
+  );
   const activeGroupKey = findActiveGroupKey(activeRoute, visibleNavigation);
 
   const [groupInteraction, setGroupInteraction] = useState<{ hovered: string | null; open: string | null }>({
@@ -120,7 +132,7 @@ export function Sidebar({
 
   async function handleLogout() {
     await logout().catch(() => undefined);
-    router.replace("/login");
+    router.replace(accessMode === "user" ? "/account/login" : "/login");
   }
 
   function navigate() {
@@ -200,19 +212,21 @@ export function Sidebar({
     >
       <div className={cn(styles.brand, variant === "mobile" && "pr-12")}>
         <Link
-          href="/dashboard"
-          aria-label="MemoGrad 管理工作台"
+          href={accessMode === "user" ? "/questions" : "/dashboard"}
+          aria-label={accessMode === "user" ? "MemoGrad 学习题库" : "MemoGrad 管理工作台"}
           onClick={() => {
             setSearch("");
             navigate();
           }}
           className={styles.brandLink}
-          title={isRail ? "MemoGrad 管理工作台" : undefined}
+          title={isRail ? (accessMode === "user" ? "MemoGrad 学习题库" : "MemoGrad 管理工作台") : undefined}
         >
           <span className={styles.brandMark}>MG</span>
           <span className={styles.copy}>
             <span className="block truncate text-sm font-semibold tracking-tight">MemoGrad</span>
-            <span className="mt-1 block truncate text-xs text-muted-foreground">管理工作台</span>
+            <span className="mt-1 block truncate text-xs text-muted-foreground">
+              {accessMode === "user" ? "学习中心" : "管理工作台"}
+            </span>
           </span>
         </Link>
       </div>
@@ -345,13 +359,29 @@ export function Sidebar({
           title={isRail ? `${userName} · ${roleLabel}` : undefined}
           aria-label={`当前用户：${userName}，${roleLabel}`}
         >
-          <Link href="/profile" onClick={navigate} aria-label="个人信息" aria-current={pathname === "/profile" ? "page" : undefined} title="个人信息" className={styles.profileLink}>
-            <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
-            <span className={cn(styles.copy, styles.accountCopy)}>
-              <span className={styles.accountName}>{userName}</span>
-              <span className={styles.accountRole}>{roleLabel}</span>
-            </span>
-          </Link>
+          {accessMode === "user" ? (
+            <Link
+              href="/account"
+              onClick={navigate}
+              aria-label="账号中心"
+              title="账号中心"
+              className={styles.profileLink}
+            >
+              <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
+              <span className={cn(styles.copy, styles.accountCopy)}>
+                <span className={styles.accountName}>{userName}</span>
+                <span className={styles.accountRole}>{roleLabel}</span>
+              </span>
+            </Link>
+          ) : (
+            <Link href="/profile" onClick={navigate} aria-label="个人信息" aria-current={pathname === "/profile" ? "page" : undefined} title="个人信息" className={styles.profileLink}>
+              <span className={styles.avatar} aria-hidden="true">{Array.from(userName)[0]}</span>
+              <span className={cn(styles.copy, styles.accountCopy)}>
+                <span className={styles.accountName}>{userName}</span>
+                <span className={styles.accountRole}>{roleLabel}</span>
+              </span>
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleLogout}

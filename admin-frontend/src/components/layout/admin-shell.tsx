@@ -3,11 +3,13 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sidebar } from "./sidebar";
 import { OcrImportSessionProvider } from "./ocr-import-session-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
+import { isLearnerPath } from "@/lib/routes";
 import styles from "./navigation.module.css";
 
 function SidebarSkeleton() {
@@ -64,6 +66,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const accessMode = useAuthStore((state) => state.accessMode);
+  const learnerUser = useAuthStore((state) => state.learnerUser);
   const adminId = useAuthStore(({ user }) => user && ("id" in user ? user.id : user.user.id));
   const mustChangepassword = useAuthStore(({ user }) =>
     Boolean(user && "must_change_password" in user && user.must_change_password),
@@ -73,6 +77,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [isNavigationHovered, setNavigationHovered] = useState(false);
   const [isNavigationFocused, setNavigationFocused] = useState(false);
   const navigationButtonRef = useRef<HTMLButtonElement | null>(null);
+  const queryClient = useQueryClient();
   useAuthBootstrap();
 
   const redirectPath = useMemo(() => {
@@ -87,15 +92,28 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const isFocusedFormulaEditor = pathname === "/formulas/new" || pathname.startsWith("/formulas/new/") || isFormulaEditRoute;
   const isMobileNavigationOpen = mobileNavigationPath === pathname;
   const isDesktopNavigationExpanded = isNavigationHovered || isNavigationFocused;
+  const isLearnerRoute = isLearnerPath(pathname);
+  const isLearnerAllowed = accessMode !== "user" || isLearnerRoute;
+  const sessionUserId = adminId ?? learnerUser?.id ?? "anonymous";
+
+  useEffect(() => {
+    queryClient.clear();
+  }, [accessMode, queryClient, sessionUserId]);
 
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {
-      router.replace(`/login${redirectPath}`);
+      const loginPath = isLearnerRoute ? "/account/login" : "/login";
+      router.replace(`${loginPath}${redirectPath}`);
+      return;
+    }
+    if (!isBootstrapping && accessMode === "user" && !isLearnerRoute) {
+      router.replace("/questions");
       return;
     }
     if (
       !isBootstrapping
       && isAuthenticated
+      && accessMode === "admin"
       && mustChangepassword
       && pathname !== "/change-password"
     ) {
@@ -105,7 +123,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [
     isAuthenticated,
     isBootstrapping,
+    isLearnerRoute,
     mustChangepassword,
+    accessMode,
     pathname,
     router,
     redirectPath,
@@ -124,6 +144,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) return null;
+  if (!isLearnerAllowed) return null;
 
   return (
     <div className={styles.shell} data-navigation-expanded={isDesktopNavigationExpanded ? "true" : undefined}>
@@ -153,7 +174,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         }`}
         data-focused-editor={isFocusedFormulaEditor ? "true" : undefined}
       >
-        <OcrImportSessionProvider key={adminId}>{children}</OcrImportSessionProvider>
+        <OcrImportSessionProvider key={`${sessionUserId}:${accessMode ?? "anonymous"}`}>
+          {children}
+        </OcrImportSessionProvider>
       </main>
       <Dialog
         open={isMobileNavigationOpen}

@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { apiRequest, setApiAccessToken, setApiAccessTokenProvider, setOnAuthExpired, setOnAccessTokenChanged } from "./client";
+import {
+  apiRequest,
+  apiRequestBlob,
+  getApiAccessToken,
+  setApiAccessToken,
+  setApiAccessTokenProvider,
+  setApiAuthMode,
+  setOnAuthExpired,
+  setOnAccessTokenChanged,
+} from "./client";
 import { ApiError } from "./errors";
 
 beforeEach(() => {
@@ -7,6 +16,7 @@ beforeEach(() => {
   setApiAccessToken("test-token");
   setApiAccessTokenProvider(null);
   setOnAuthExpired(null);
+  setApiAuthMode("admin");
   vi.restoreAllMocks();
 });
 
@@ -101,6 +111,150 @@ describe("apiRequest — auth refresh", () => {
 
     await expect(apiRequest("/auth/refresh")).rejects.toThrow(ApiError);
     expect(refreshAttempts).toBe(1);
+  });
+
+  it("keeps Admin and user refresh single-flight separate", async () => {
+    const refreshCalls: string[] = [];
+    let resolveUserRefresh!: (response: Response) => void;
+    const pendingUserRefresh = new Promise<Response>((resolve) => {
+      resolveUserRefresh = resolve;
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const path = typeof url === "string" ? url : "";
+      if (path.endsWith("/auth/web/refresh")) {
+        refreshCalls.push("user");
+        return pendingUserRefresh;
+      }
+      if (path.endsWith("/auth/refresh")) {
+        refreshCalls.push("admin");
+        return new Response(JSON.stringify({ access_token: "admin-token" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ detail: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    setApiAuthMode("user");
+    const userRequest = apiRequest("/users/me", { scope: "user" });
+    const userResult = userRequest.catch((error: unknown) => error);
+    await vi.waitFor(() => expect(refreshCalls).toContain("user"));
+
+    setApiAuthMode("admin");
+    const adminRequest = apiRequest("/auth/me", { scope: "admin" });
+    const settled = Promise.allSettled([userResult, adminRequest]);
+
+    await vi.waitFor(() => expect(refreshCalls).toContain("admin"));
+    resolveUserRefresh(
+      new Response(JSON.stringify({ access_token: "user-token" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await settled;
+    expect(refreshCalls.filter((call) => call === "admin")).toHaveLength(1);
+    expect(refreshCalls.filter((call) => call === "user")).toHaveLength(1);
+  });
+
+  it.each(["json", "blob"] as const)(
+    "refreshes learner credentials for shared Admin API %s requests",
+    async (kind) => {
+      setApiAuthMode("user");
+      const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+        if (String(url) === "/api/v1/auth/web/refresh") {
+          return Response.json({ access_token: "fresh-user-token" });
+        }
+        if (new Headers(init?.headers).get("Authorization") === "Bearer fresh-user-token") {
+          return Response.json({ data: "shared questions" });
+        }
+        return Response.json({}, { status: 401 });
+      });
+
+      const result = kind === "blob"
+        ? await (await apiRequestBlob("/questions")).blob.text()
+        : await apiRequest("/questions");
+
+      expect(result).toEqual(kind === "blob"
+        ? JSON.stringify({ data: "shared questions" })
+        : { data: "shared questions" });
+      expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+        "/api/admin/v1/questions",
+        "/api/v1/auth/web/refresh",
+        "/api/admin/v1/questions",
+      ]);
+    },
+  );
+
+  it.each(["json", "blob"] as const)(
+    "ignores a late %s 401 from a previous login",
+    async (kind) => {
+      let resolveRequest!: (response: Response) => void;
+      const fetch = vi.spyOn(globalThis, "fetch").mockImplementationOnce(
+        () => new Promise<Response>((resolve) => { resolveRequest = resolve; }),
+      );
+      const expired = vi.fn();
+      setOnAuthExpired(expired);
+      const request = kind === "blob" ? apiRequestBlob("/questions") : apiRequest("/questions");
+      const outcome = request.catch((error: unknown) => error);
+      setApiAuthMode("user");
+      setApiAccessToken("new-account-token");
+      resolveRequest(Response.json({}, { status: 401 }));
+
+      expect(await outcome).toBeInstanceOf(ApiError);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(getApiAccessToken()).toBe("new-account-token");
+      expect(expired).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([200, 401])(
+    "ignores a late refresh result (%s) after switching accounts in the same domain",
+    async (status) => {
+      let resolveRefresh!: (response: Response) => void;
+      const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (String(url).endsWith("/auth/refresh")) {
+          return new Promise<Response>((resolve) => { resolveRefresh = resolve; });
+        }
+        return Response.json({}, { status: 401 });
+      });
+      const expired = vi.fn();
+      setOnAuthExpired(expired);
+      const outcome = apiRequest("/questions").catch((error: unknown) => error);
+      await vi.waitFor(() => expect(resolveRefresh).toBeTypeOf("function"));
+      setApiAuthMode("admin");
+      setApiAccessToken("new-account-token");
+      resolveRefresh(Response.json({ access_token: "old-account-rotated-token" }, { status }));
+
+      expect(await outcome).toBeInstanceOf(ApiError);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(getApiAccessToken()).toBe("new-account-token");
+      expect(expired).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not refresh after the identity has been cleared", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const onExpired = vi.fn();
+    setOnAuthExpired(onExpired);
+
+    setApiAuthMode(null);
+    await expect(apiRequest("/auth/me")).rejects.toThrow(ApiError);
+
+    const refreshCalls = fetch.mock.calls.filter(([url]) =>
+      String(url).endsWith("/auth/refresh"),
+    );
+    expect(refreshCalls).toHaveLength(0);
+    expect(onExpired).not.toHaveBeenCalled();
   });
 });
 

@@ -4,14 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 import type { QuestionVersionSelection } from "@/components/questions/question-version-picker";
 import { useQuestionVersion, useQuestionVersions } from "./use-question-queries";
 
-export function useQuestionVersionHistory(questionId: number | null) {
+export function useQuestionVersionHistory(
+  questionId: number | null,
+  enabled = true,
+) {
   const [baseVersion, setBaseVersion] = useState<QuestionVersionSelection>("current");
   const [compareVersion, setCompareVersion] = useState<QuestionVersionSelection | null>(null);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
-  const versions = useQuestionVersions(questionId);
-  const baseVersionDetail = useQuestionVersion(questionId, baseVersion);
-  const compareVersionDetail = useQuestionVersion(questionId, compareVersion);
+  const effectiveQuestionId = enabled ? questionId : null;
+  const versions = useQuestionVersions(effectiveQuestionId);
+  const baseVersionDetail = useQuestionVersion(effectiveQuestionId, baseVersion);
+  const compareVersionDetail = useQuestionVersion(
+    effectiveQuestionId,
+    compareVersion,
+  );
 
   useEffect(() => {
     if (!versionHistoryOpen || compareVersion !== null) return;

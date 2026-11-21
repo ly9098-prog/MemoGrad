@@ -416,13 +416,14 @@ async def bump_role_version(db: AsyncSession, role_id: int) -> None:
         pass
 
 
-async def _resolve_current_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(admin_security),
-    db: AsyncSession = Depends(get_db),
+async def resolve_admin_token(
+    token: str,
+    db: AsyncSession,
     *,
     allow_restricted: bool,
 ) -> AdminPrincipal:
-    payload = decode_admin_token(credentials.credentials)
+    """Validate only the Admin token domain for a supplied bearer token."""
+    payload = decode_admin_token(token)
     if payload.get("scope") == "password_change" and not allow_restricted:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -472,6 +473,41 @@ async def _resolve_current_admin(
         pass
 
     return AdminPrincipal(user, payload)
+
+
+async def _resolve_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(admin_security),
+    db: AsyncSession = Depends(get_db),
+    *,
+    allow_restricted: bool,
+) -> AdminPrincipal:
+    try:
+        return await resolve_admin_token(
+            credentials.credentials,
+            db,
+            allow_restricted=allow_restricted,
+        )
+    except HTTPException as admin_error:
+        # A valid ordinary-user token must not make an Admin route look like an
+        # authentication failure.  Keep the identity domains separate, but
+        # reject the wrong identity kind with the same authorization result as
+        # an Admin who lacks the permission.
+        if admin_error.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
+        from app.core.security import authenticate_user_token
+
+        try:
+            await authenticate_user_token(credentials.credentials, db)
+        except HTTPException as user_error:
+            if user_error.status_code == status.HTTP_503_SERVICE_UNAVAILABLE:
+                raise user_error
+            if user_error.status_code == status.HTTP_403_FORBIDDEN:
+                raise user_error
+            raise admin_error from user_error
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied",
+        ) from admin_error
 
 
 async def get_current_admin(
