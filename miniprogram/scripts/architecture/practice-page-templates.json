@@ -42,7 +42,7 @@
   "openSubjectSheet": "openSubjectSheet() {\nthis._subjectSheetController().open()\n}",
   "_subjectSheetController": "_subjectSheetController() {\nreturn subjectPage._subjectSheetController(this, { createSubjectSheetController, getClearTimeout: () => clearTimeout, getDate: () => Date, getSetTimeout: () => setTimeout })\n}",
   "_hideSubjectSheet": "_hideSubjectSheet(afterClose) {\nthis._subjectSheetController().hide(afterClose)\n}",
-  "closeSubjectSheet": "closeSubjectSheet() {\nthis._subjectSheetController().hide()\n}",
+  "closeSubjectSheet": "closeSubjectSheet(event) {\nthis._subjectSheetController().hide(undefined, Boolean(event && event.detail && event.detail.completed))\n}",
   "_handleSubjectOptionTap": "_handleSubjectOptionTap(subjectId, source) {\nthis._subjectSheetController().handleOptionTap(subjectId, source)\n}",
   "_clearLaunchOverridesForManualConfig": "_clearLaunchOverridesForManualConfig() {\nreturn launchFlow._clearLaunchOverridesForManualConfig(this)\n}",
   "_selectSubject": "_selectSubject(subjectId, subjectName, expandedSubjectId, hasChildren) {\nthis._subjectSelectionController().select(subjectId, subjectName, expandedSubjectId, hasChildren)\n}",

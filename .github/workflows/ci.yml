@@ -915,9 +915,11 @@ jobs:
           AI_CONFIG_ENCRYPT_KEY=ci-encrypt-key-not-for-production-use
           PRODUCTION_DOMAIN=ci.example
           PRODUCTION_CERT_NAME=ci.example
-          CORS_ORIGINS=["https://ci.example"]
-          ALLOWED_HOSTS=["ci.example"]
+          CORS_ORIGINS=["https://ci.example","https://admin.ci.example"]
+          ALLOWED_HOSTS=["ci.example","admin.ci.example"]
           PUBLIC_BASE_URL=https://ci.example
+          USER_WEB_BASE_URL=https://ci.example
+          ADMIN_WEB_BASE_URL=https://admin.ci.example
           HEALTH_HOST=ci.example
           CIEOF
 
