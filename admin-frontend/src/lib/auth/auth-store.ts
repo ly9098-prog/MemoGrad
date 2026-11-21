@@ -12,6 +12,7 @@ import {
   setOnAuthExpired,
 } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { syncSessionCache } from "@/lib/auth/session-cache";
 import type {
   AuthUser,
   LearnerAuthResponse,
@@ -78,6 +79,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   acceptLogin(data) {
     authRevision++;
+    syncSessionCache("admin", data.user.id);
     setApiAuthMode("admin");
     set({
       accessToken: data.access_token,
@@ -93,6 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   acceptLearnerLogin(data) {
     authRevision++;
+    syncSessionCache("user", data.user.id);
     setApiAuthMode("user");
     set({
       accessToken: data.access_token,
@@ -152,6 +155,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               skipRefresh: true,
             });
             if (!isCurrent()) return;
+            syncSessionCache("user", learner.id);
             set({
               user: null,
               learnerUser: learner,
@@ -167,6 +171,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               skipRefresh: true,
             });
             if (!isCurrent()) return;
+            syncSessionCache("admin", me.user.id);
             set({
               user: me.user,
               learnerUser: null,
@@ -225,6 +230,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   clear() {
     authRevision++;
+    syncSessionCache(null, "anonymous");
     setApiAuthMode(null);
     setApiAccessToken(null);
     set({

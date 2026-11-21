@@ -3,13 +3,11 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Sidebar } from "./sidebar";
 import { OcrImportSessionProvider } from "./ocr-import-session-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import { sessionCacheKey, shouldClearSessionCache } from "@/lib/auth/session-cache";
 import { isLearnerPath } from "@/lib/routes";
 import styles from "./navigation.module.css";
 
@@ -78,8 +76,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [isNavigationHovered, setNavigationHovered] = useState(false);
   const [isNavigationFocused, setNavigationFocused] = useState(false);
   const navigationButtonRef = useRef<HTMLButtonElement | null>(null);
-  const previousSessionKeyRef = useRef<string | null>(null);
-  const queryClient = useQueryClient();
   useAuthBootstrap();
 
   const redirectPath = useMemo(() => {
@@ -97,15 +93,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const isLearnerRoute = isLearnerPath(pathname);
   const isLearnerAllowed = accessMode !== "user" || isLearnerRoute;
   const sessionUserId = adminId ?? learnerUser?.id ?? "anonymous";
-
-  useEffect(() => {
-    const sessionKey = sessionCacheKey(accessMode, sessionUserId);
-    const previousSessionKey = previousSessionKeyRef.current;
-    previousSessionKeyRef.current = sessionKey;
-    if (shouldClearSessionCache(previousSessionKey, sessionKey)) {
-      queryClient.clear();
-    }
-  }, [accessMode, queryClient, sessionUserId]);
 
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {

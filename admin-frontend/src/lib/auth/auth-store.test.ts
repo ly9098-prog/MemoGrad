@@ -8,7 +8,8 @@ import {
   setApiAccessToken,
 } from "@/lib/api/client";
 import { useAuthStore } from "./auth-store";
-import type { LearnerAuthResponse } from "@/lib/api/types";
+import type { LearnerAuthResponse, LoginResponse } from "@/lib/api/types";
+import { resetSessionCacheTracking, setSessionCacheClearer } from "./session-cache";
 
 const EXPIRED_TOKEN = "expired-access-token";
 const FRESH_TOKEN = "fresh-access-token";
@@ -46,9 +47,21 @@ beforeEach(() => {
 
 afterEach(() => {
   useAuthStore.getState().clear();
+  resetSessionCacheTracking();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+function adminSession(id: number) {
+  return {
+    access_token: `admin-token-${id}`,
+    token_type: "bearer",
+    expires_at: 4102444800,
+    user: { id, username: `admin-${id}` },
+    role: null,
+    permissions: [],
+  } as unknown as LoginResponse;
+}
 
 function mockSuccessfulRotation() {
   let refreshCount = 0;
@@ -69,6 +82,18 @@ function mockSuccessfulRotation() {
 }
 
 describe("auth store — API token synchronization", () => {
+  it("clears cached queries before replacing an authenticated admin", () => {
+    const clearCache = vi.fn();
+    resetSessionCacheTracking();
+    setSessionCacheClearer(clearCache);
+
+    useAuthStore.getState().acceptLogin(adminSession(1));
+    expect(clearCache).not.toHaveBeenCalled();
+
+    useAuthStore.getState().acceptLogin(adminSession(2));
+    expect(clearCache).toHaveBeenCalledOnce();
+  });
+
   it("does not refresh or clear the session when login credentials are rejected", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       Response.json({ detail: "Unauthorized" }, { status: 401 }),

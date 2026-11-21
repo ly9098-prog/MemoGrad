@@ -163,13 +163,13 @@ describe("login and shell ownership", () => {
   it("waits for bootstrap before redirecting unauthenticated shell users", () => {
     h.auth.isBootstrapping = true;
     AdminShell({ children: null });
-    h.effects[1]();
+    h.effects[0]();
     expect(h.replace).not.toHaveBeenCalled();
   });
 
   it("preserves the protected pathname for the login return route", () => {
     expect(AdminShell({ children: null })).toBeNull();
-    h.effects[1]();
+    h.effects[0]();
     expect(h.replace).toHaveBeenCalledWith("/login?next=%2Froles");
   });
 

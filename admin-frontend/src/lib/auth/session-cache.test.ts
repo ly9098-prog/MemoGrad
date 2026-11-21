@@ -1,7 +1,21 @@
-import { describe, expect, it } from "vitest";
-import { sessionCacheKey, shouldClearSessionCache } from "./session-cache";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  resetSessionCacheTracking,
+  sessionCacheKey,
+  setSessionCacheClearer,
+  shouldClearSessionCache,
+  syncSessionCache,
+} from "./session-cache";
 
 describe("admin session query cache", () => {
+  const clear = vi.fn();
+
+  beforeEach(() => {
+    resetSessionCacheTracking();
+    clear.mockReset();
+    setSessionCacheClearer(clear);
+  });
+
   it("builds a key that separates access modes and users", () => {
     expect(sessionCacheKey(null, "anonymous")).toBe("none:anonymous");
     expect(sessionCacheKey("admin", 1)).toBe("admin:1");
@@ -21,5 +35,27 @@ describe("admin session query cache", () => {
 
   it("does not clear on an unchanged identity", () => {
     expect(shouldClearSessionCache("admin:1", "admin:1")).toBe(false);
+  });
+
+  it("keeps the cache while the initial session is established", () => {
+    syncSessionCache(null, "anonymous");
+    syncSessionCache("admin", 1);
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it("clears when an authenticated identity is replaced", () => {
+    syncSessionCache("admin", 1);
+    syncSessionCache("admin", 2);
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("clears when the access mode or logout changes the session", () => {
+    syncSessionCache("admin", 1);
+    syncSessionCache("user", 1);
+    expect(clear).toHaveBeenCalledOnce();
+
+    clear.mockReset();
+    syncSessionCache(null, "anonymous");
+    expect(clear).toHaveBeenCalledOnce();
   });
 });
