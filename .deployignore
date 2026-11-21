@@ -56,6 +56,15 @@ backend/static/uploads/
 backend/static/
 backend/debug_snapshots/
 
+# Server-only runtime state and credentials
+/cert/
+/certbot/
+/redis_backups/
+/backups/
+/.deploy-revision
+/backend/service_compatibility.py
+*:Zone.Identifier
+
 # Build outputs
 dist/
 build/
