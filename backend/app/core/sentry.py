@@ -2,8 +2,8 @@
 
 支持 environment-aware 配置：
 - production: 低采样率 (0.1 trace, 0.05 profile)
-- test/staging: 中等采样率 (0.5 trace, 0.1 profile)
-- development: 禁用 Sentry，不初始化，不上报
+- staging: 中等采样率 (0.5 trace, 0.1 profile)
+- development/test: 禁用 Sentry，不初始化，不上报
 """
 
 import logging
@@ -11,6 +11,30 @@ import logging
 from app.core.config import settings
 
 logger = logging.getLogger("postgraduate-ai.sentry")
+_DISABLED_APP_ENVS = frozenset({"development", "dev", "local", "test", "testing"})
+_STAGING_ENVS = frozenset({"staging", "stage"})
+_PRODUCTION_ENVS = frozenset({"production", "prod"})
+
+
+def resolve_sentry_options(
+    app_env: str,
+    sentry_env: str,
+    dsn: str,
+) -> tuple[str, float, float] | None:
+    """Return (environment, trace rate, profile rate), or None when disabled."""
+    normalized_app_env = (app_env or "").strip().lower()
+    if normalized_app_env in _DISABLED_APP_ENVS:
+        return None
+    if not dsn:
+        return None
+
+    environment = (sentry_env or app_env or "development").strip()
+    normalized_env = environment.lower()
+    if normalized_env in _PRODUCTION_ENVS:
+        return environment, 0.1, 0.05
+    if normalized_env in _STAGING_ENVS:
+        return environment, 0.5, 0.1
+    return environment, 1.0, 0.0
 
 
 def _redact_sentry_event(event, _hint):
@@ -57,29 +81,23 @@ def _redact_sentry_breadcrumb(breadcrumb, _hint):
 
 
 def init_sentry():
-    if settings.APP_ENV == "development":
-        logger.info("Sentry disabled: APP_ENV=development")
+    options = resolve_sentry_options(
+        settings.APP_ENV,
+        settings.SENTRY_ENV,
+        settings.SENTRY_DSN,
+    )
+    if options is None:
+        normalized_app_env = (settings.APP_ENV or "").strip().lower()
+        if normalized_app_env in _DISABLED_APP_ENVS:
+            logger.info(
+                "Sentry disabled: APP_ENV=%s",
+                normalized_app_env,
+            )
+        else:
+            logger.info("Sentry disabled: SENTRY_DSN not configured")
         return
 
-    dsn = settings.SENTRY_DSN
-    if not dsn:
-        logger.info("Sentry disabled: SENTRY_DSN not configured")
-        return
-
-    env = settings.SENTRY_ENV or settings.APP_ENV or "development"
-
-    # 按环境设置不同的采样率
-    env_lower = env.lower()
-    if env_lower in ("production", "prod"):
-        traces_sample_rate = 0.1
-        profiles_sample_rate = 0.05
-    elif env_lower in ("staging", "test", "testing"):
-        traces_sample_rate = 0.5
-        profiles_sample_rate = 0.1
-    else:
-        # development: 全量 trace 方便调试，不开启 profile
-        traces_sample_rate = 1.0
-        profiles_sample_rate = 0.0
+    env, traces_sample_rate, profiles_sample_rate = options
 
     try:
         import sentry_sdk
@@ -88,7 +106,7 @@ def init_sentry():
         from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
         sentry_sdk.init(
-            dsn=dsn,
+            dsn=settings.SENTRY_DSN,
             environment=env,
             traces_sample_rate=traces_sample_rate,
             profiles_sample_rate=profiles_sample_rate,
