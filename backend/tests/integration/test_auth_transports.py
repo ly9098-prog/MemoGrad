@@ -166,10 +166,15 @@ def test_smtp_otp_delivery_through_a_real_socket(smtp, transport, monkeypatch):
     smtp.transport = transport
     monkeypatch.setattr(settings, "SMTP_USE_SSL", transport == "ssl")
     monkeypatch.setattr(settings, "SMTP_USE_STARTTLS", transport == "starttls")
-    subject, text = email_delivery.build_otp_email("user", "login", "654321")
+    subject, text, html = email_delivery.build_otp_email(
+        "user", "login", "654321"
+    )
     asyncio.run(
         email_delivery.send_auth_email(
-            to_email="reader@example.com", subject=subject, text=text
+            to_email="reader@example.com",
+            subject=subject,
+            text=text,
+            html=html,
         )
     )
     message = BytesParser(policy=policy.default).parsebytes(
@@ -177,7 +182,12 @@ def test_smtp_otp_delivery_through_a_real_socket(smtp, transport, monkeypatch):
     )
     assert message["To"] == "reader@example.com"
     assert message["Subject"] == subject
-    assert "654321" in message.get_content()
+    assert message.get_content_type() == "multipart/alternative"
+    plain = message.get_body(preferencelist=("plain",))
+    rich = message.get_body(preferencelist=("html",))
+    assert plain is not None and "654321" in plain.get_content()
+    assert rich is not None and "654321" in rich.get_content()
+    assert "MemoGrad" in subject
 
 
 @pytest.mark.parametrize("failure", ["reject", "timeout"])

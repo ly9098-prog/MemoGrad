@@ -292,11 +292,22 @@
   grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   align-content: start;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1) 80ms,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1) 80ms;
 }
 
 .loginPanel > .form[aria-hidden="true"] {
   visibility: hidden;
+  opacity: 0;
+  transform: translateY(7px);
   pointer-events: none;
+  transition:
+    opacity 80ms ease,
+    transform 80ms ease,
+    visibility 0s linear 80ms;
 }
 
 .modeTabs {
@@ -614,6 +625,72 @@
 
 .registerForm .field {
   gap: 7px;
+}
+
+.emailNote {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 75px;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgb(202 233 251 / 10%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 2.5%);
+  padding: 13px 14px;
+  color: var(--login-muted);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.emailForm {
+  align-content: start;
+}
+
+.emailNote > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin-top: 1px;
+  color: #9bdcff;
+}
+
+.emailNote strong {
+  color: #dbeaf3;
+  font-weight: 500;
+}
+
+.fieldLabel {
+  display: flex;
+  min-height: 18px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fieldMeta {
+  min-width: 0;
+  overflow: hidden;
+  color: #7f97a6;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autoSubmitHint {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 5px;
+  color: var(--login-muted);
+  font-size: 12px;
+}
+
+.autoSubmitHint > svg {
+  width: 14px;
+  height: 14px;
+  color: #9bdcff;
 }
 
 .captchaDialog {

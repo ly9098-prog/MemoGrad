@@ -110,6 +110,7 @@ export default function LearnerLoginPage() {
   const accessMode = useAuthStore((state) => state.accessMode);
   const acceptLearnerLogin = useAuthStore((state) => state.acceptLearnerLogin);
   const consentRef = useRef<HTMLInputElement>(null);
+  const autoSubmittedCodeRef = useRef("");
   useAuthBootstrap();
 
   const [mode, setMode] = useState<LoginMode>("password");
@@ -346,9 +347,12 @@ export default function LearnerLoginPage() {
     }
   }
 
-  async function verifyEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || code.length !== 6 || !requireConsent()) return;
+  async function verifyEmail(
+    event?: FormEvent<HTMLFormElement>,
+    submittedCode = code,
+  ) {
+    event?.preventDefault();
+    if (busy || submittedCode.length !== 6) return;
     begin("email");
     try {
       const response = await apiRequest<LearnerAuthResponse>("/auth/email/verify", {
@@ -358,7 +362,7 @@ export default function LearnerLoginPage() {
         exposeErrorDetail: true,
         body: JSON.stringify({
           challenge_id: challengeId,
-          code,
+          code: submittedCode,
           client: "web",
         }),
       });
@@ -367,6 +371,7 @@ export default function LearnerLoginPage() {
         safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
       );
     } catch (submitError) {
+      autoSubmittedCodeRef.current = "";
       setError(messageFor(submitError, "email"));
     } finally {
       finish();
@@ -717,12 +722,12 @@ export default function LearnerLoginPage() {
               </form>
             ) : null}
 
-            {!registering && !emailCodeSent ? (
+            {!registering ? (
               <form
-                className={styles.form}
+                className={`${styles.form} ${styles.emailForm}`}
                 onSubmit={openEmailCaptcha}
-                inert={mode !== "email"}
-                aria-hidden={mode !== "email"}
+                inert={mode !== "email" || emailCodeSent}
+                aria-hidden={mode !== "email" || emailCodeSent}
               >
                 <div className={styles.field}>
                   <label htmlFor="learner-email">邮箱地址</label>
@@ -747,6 +752,14 @@ export default function LearnerLoginPage() {
                     />
                   </div>
                 </div>
+                <div className={styles.emailNote}>
+                  <ShieldCheck aria-hidden="true" />
+                  <p>
+                    <strong>验证码 5 分钟内有效</strong>
+                    <br />
+                    仅用于本次登录，请勿转发给他人。
+                  </p>
+                </div>
                 <button
                   type="submit"
                   className={styles.submit}
@@ -762,24 +775,32 @@ export default function LearnerLoginPage() {
               </form>
             ) : null}
 
-            {!registering && emailCodeSent ? (
+            {!registering ? (
               <form
                 className={styles.form}
                 onSubmit={verifyEmail}
-                inert={mode !== "email"}
-                aria-hidden={mode !== "email"}
+                inert={mode !== "email" || !emailCodeSent}
+                aria-hidden={mode !== "email" || !emailCodeSent}
               >
-                <div className={styles.otpIntro}>
-                  <Mail aria-hidden="true" />
-                  <p>验证码已发送至 <strong>{sentEmail}</strong></p>
-                </div>
                 <div className={styles.field}>
-                  <label htmlFor="learner-email-code">6 位邮箱验证码</label>
+                  <div className={styles.fieldLabel}>
+                    <label htmlFor="learner-email-code">6 位邮箱验证码</label>
+                    <span className={styles.fieldMeta} title={sentEmail}>
+                      已发送至 {sentEmail}
+                    </span>
+                  </div>
                   <OtpInput
                     id="learner-email-code"
                     name="learner-email-code"
                     value={code}
-                    onChange={setCode}
+                    onChange={(value) => {
+                      setCode(value);
+                      if (value.length !== 6) return;
+                      const submission = `${challengeId}:${value}`;
+                      if (autoSubmittedCodeRef.current === submission) return;
+                      autoSubmittedCodeRef.current = submission;
+                      void verifyEmail(undefined, value);
+                    }}
                     disabled={disabled}
                     required
                   />
@@ -805,18 +826,15 @@ export default function LearnerLoginPage() {
                     }}
                   />
                 </div>
-                <button
-                  type="submit"
-                  className={styles.submit}
-                  disabled={disabled || code.length !== 6}
-                  aria-busy={pending === "email"}
-                >
+                <p className={styles.autoSubmitHint} aria-live="polite">
                   {pending === "email" ? (
-                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证</span></>
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证验证码</span></>
+                  ) : code.length === 6 ? (
+                    <><ShieldCheck aria-hidden="true" /><span>未完成登录，修改或按回车重试</span></>
                   ) : (
-                    <><span>验证并登录</span><Check aria-hidden="true" /></>
+                    <><ShieldCheck aria-hidden="true" /><span>输入满 6 位后自动登录</span></>
                   )}
-                </button>
+                </p>
               </form>
             ) : null}
 

@@ -12,8 +12,8 @@ function updateCardTilt(event: PointerEvent<HTMLDivElement>) {
   const bounds = (card.parentElement ?? card).getBoundingClientRect();
   const horizontal = Math.max(0, Math.min(1, (event.clientX - bounds.left) / card.offsetWidth));
   const vertical = Math.max(0, Math.min(1, (event.clientY - bounds.top) / card.offsetHeight));
-  card.style.setProperty("--login-rotate-x", `${(0.5 - vertical) * 16}deg`);
-  card.style.setProperty("--login-rotate-y", `${(horizontal - 0.5) * 20}deg`);
+  card.style.setProperty("--login-rotate-x", `${(0.5 - vertical) * 6}deg`);
+  card.style.setProperty("--login-rotate-y", `${(horizontal - 0.5) * 8}deg`);
   card.style.setProperty("--login-pointer-x", `${horizontal * 100}%`);
   card.style.setProperty("--login-pointer-y", `${vertical * 100}%`);
 }

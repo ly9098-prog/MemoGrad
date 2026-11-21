@@ -118,7 +118,11 @@ async def _assert_ip_unlocked(domain: str, purpose: str, client_ip: str) -> None
 
 
 async def _publish_challenge(
-    challenge_id: str, challenge: dict[str, Any], subject: str, text: str
+    challenge_id: str,
+    challenge: dict[str, Any],
+    subject: str,
+    text: str,
+    html: str,
 ) -> None:
     domain, purpose, email = (challenge[key] for key in ("domain", "purpose", "email"))
     active_key = _active_key(domain, purpose, email)
@@ -132,7 +136,7 @@ async def _publish_challenge(
         raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
 
     try:
-        await send_auth_email(to_email=email, subject=subject, text=text)
+        await send_auth_email(to_email=email, subject=subject, text=text, html=html)
     except Exception as exc:
         try:
             await cache.delete_strict(_challenge_key(challenge_id))
@@ -200,8 +204,8 @@ async def issue_otp(
         "code_digest": _digest("otp-code", challenge_id, email, domain, purpose, code),
         "metadata": metadata or {},
     }
-    subject, text = build_otp_email(domain, purpose, code)
-    await _publish_challenge(challenge_id, challenge, subject, text)
+    subject, text, html = build_otp_email(domain, purpose, code)
+    await _publish_challenge(challenge_id, challenge, subject, text, html)
     return IssuedOtp(
         challenge_id=challenge_id,
         expires_in=settings.OTP_EXPIRE_SEC,

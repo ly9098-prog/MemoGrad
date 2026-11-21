@@ -59,18 +59,18 @@ describe("login glass interaction", () => {
     expect(loginErrorMessage(error)).toBe(expected);
   });
 
-  it("uses a stable frame and caps stronger tilt at eight and ten degrees", () => {
+  it("uses a stable frame and caps subtle tilt at three and four degrees", () => {
     vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
     const { card, event, properties } = pointerFixture();
     (renderTilt().props.onPointerMove as PointerHandler)(event);
-    expect(properties.get("--login-rotate-x")).toBe("8deg");
-    expect(properties.get("--login-rotate-y")).toBe("10deg");
+    expect(properties.get("--login-rotate-x")).toBe("3deg");
+    expect(properties.get("--login-rotate-y")).toBe("4deg");
     expect(properties.get("--login-pointer-x")).toBe("100%");
     expect(card.getBoundingClientRect).not.toHaveBeenCalled();
 
     (renderTilt().props.onPointerMove as PointerHandler)({ ...event, clientX: 900, clientY: -100 });
-    expect(properties.get("--login-rotate-y")).toBe("10deg");
-    expect(properties.get("--login-rotate-x")).toBe("8deg");
+    expect(properties.get("--login-rotate-y")).toBe("4deg");
+    expect(properties.get("--login-rotate-x")).toBe("3deg");
   });
 
   it.each(["touch", "pen"])("does not tilt for %s input", (pointerType) => {

@@ -36,6 +36,25 @@ def trajectory(offset: int) -> list[dict[str, int]]:
     ]
 
 
+def test_target_x_leaves_a_visible_gap_from_the_start():
+    minimum = (
+        slider_captcha_service.PIECE_MARGIN
+        + slider_captcha_service.MIN_PIECE_OFFSET
+    )
+    maximum = (
+        slider_captcha_service.IMAGE_WIDTH
+        - slider_captcha_service.PIECE_SIZE
+        - slider_captcha_service.PIECE_MARGIN
+    )
+    values = {slider_captcha_service._pick_target_x() for _ in range(200)}
+    assert min(values) >= minimum
+    assert max(values) <= maximum
+    assert (
+        minimum - slider_captcha_service.PIECE_MARGIN
+        > slider_captcha_service.TARGET_TOLERANCE
+    )
+
+
 @pytest.mark.asyncio
 async def test_slider_challenge_verifies_once_and_returns_png_images():
     issued = await slider_captcha_service.issue_challenge(

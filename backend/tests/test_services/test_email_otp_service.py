@@ -21,8 +21,8 @@ async def local_cache(monkeypatch):
 async def test_otp_is_hashed_verified_once_and_not_logged(monkeypatch):
     messages = []
 
-    async def capture(*, to_email, subject, text):
-        messages.append((to_email, subject, text))
+    async def capture(*, to_email, subject, text, html):
+        messages.append((to_email, subject, text, html))
 
     monkeypatch.setattr(email_otp_service, "send_auth_email", capture)
     monkeypatch.setattr(email_otp_service.secrets, "randbelow", lambda _limit: 123456)
@@ -38,6 +38,7 @@ async def test_otp_is_hashed_verified_once_and_not_logged(monkeypatch):
     )
     assert "123456" not in json.dumps(stored)
     assert "123456" in messages[0][2]
+    assert "123456" in messages[0][3]
 
     challenge = await email_otp_service.consume_otp(
         challenge_id=issued.challenge_id,
@@ -303,3 +304,27 @@ async def test_parallel_sends_reserve_the_domain_budget_atomically(monkeypatch):
         "user", "login", "unused@example.com", "unused"
     )[1]
     assert await cache.get_strict(total_key) == 3
+
+
+def test_otp_email_ships_matching_html_and_plain_text():
+    from app.services.email_delivery import build_otp_email
+
+    minutes = max(1, settings.OTP_EXPIRE_SEC // 60)
+    subject, text, html = build_otp_email("user", "login", "246810")
+
+    assert subject == "【MemoGrad】登录验证码"
+    assert "246810" in text
+    assert f"{minutes} 分钟内有效" in text
+    assert html.lstrip().startswith("<!doctype html>")
+    assert "246810" in html
+    assert f"{minutes} 分钟内有效" in html
+    assert "text/html" not in html
+
+
+def test_admin_otp_email_subject_marks_the_admin_domain():
+    from app.services.email_delivery import build_otp_email
+
+    subject, _, html = build_otp_email("admin", "recover", "135790")
+
+    assert subject == "【MemoGrad 管理员】密码恢复验证码"
+    assert ">ADMIN<" in html

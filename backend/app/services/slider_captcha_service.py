@@ -21,6 +21,7 @@ IMAGE_WIDTH = 320
 IMAGE_HEIGHT = 160
 PIECE_SIZE = 48
 PIECE_MARGIN = 14
+MIN_PIECE_OFFSET = 64
 TARGET_TOLERANCE = 6
 _RNG = random.SystemRandom()
 
@@ -92,6 +93,11 @@ def _random_color(low: int = 40, high: int = 225) -> tuple[int, int, int]:
     return tuple(_RNG.randrange(high - low + 1) + low for _ in range(3))
 
 
+def _pick_target_x() -> int:
+    max_target_x = IMAGE_WIDTH - PIECE_SIZE - PIECE_MARGIN
+    return _RNG.randrange(PIECE_MARGIN + MIN_PIECE_OFFSET, max_target_x + 1)
+
+
 def _build_background() -> tuple[Image.Image, int, int]:
     left = _random_color(30, 150)
     right = _random_color(90, 235)
@@ -139,7 +145,7 @@ def _build_background() -> tuple[Image.Image, int, int]:
     image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
     noise = Image.effect_noise(image.size, 22).convert("RGB")
     image = Image.blend(image, noise, 0.06).filter(ImageFilter.GaussianBlur(0.45))
-    target_x = _RNG.randrange(IMAGE_WIDTH - PIECE_SIZE - PIECE_MARGIN * 2) + PIECE_MARGIN
+    target_x = _pick_target_x()
     target_y = _RNG.randrange(IMAGE_HEIGHT - PIECE_SIZE - PIECE_MARGIN * 2) + PIECE_MARGIN
     return image, target_x, target_y
 
