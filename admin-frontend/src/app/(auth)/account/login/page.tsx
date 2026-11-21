@@ -754,7 +754,7 @@ export default function LearnerLoginPage() {
             ) : null}
 
             <div className={styles.support}>
-              <Link href="/login">
+              <Link href={`${process.env.NEXT_PUBLIC_ADMIN_WEB_BASE_URL || ""}/login`}>
                 管理员登录
                 <ArrowRight className="ml-1 inline h-3 w-3" aria-hidden="true" />
               </Link>

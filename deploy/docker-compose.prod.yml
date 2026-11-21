@@ -322,6 +322,8 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-/api/admin/v1}
+        NEXT_PUBLIC_USER_WEB_BASE_URL: https://${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
+        NEXT_PUBLIC_ADMIN_WEB_BASE_URL: https://admin.${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
     restart: always
     mem_limit: 256m
     mem_reservation: 128m
@@ -343,6 +345,8 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_ADMIN_API_BASE_URL: ${NEXT_PUBLIC_ADMIN_API_BASE_URL:-/api/admin/v1}
+        NEXT_PUBLIC_USER_WEB_BASE_URL: https://${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
+        NEXT_PUBLIC_ADMIN_WEB_BASE_URL: https://admin.${PRODUCTION_DOMAIN:?必须设置 PRODUCTION_DOMAIN}
     restart: always
     mem_limit: 256m
     mem_reservation: 128m

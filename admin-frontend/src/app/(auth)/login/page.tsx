@@ -443,7 +443,9 @@ function LoginForm() {
             </section>
           </div>
           <p className={styles.support}>
-            <Link href="/account/login">普通用户登录</Link>
+            <Link href={`${process.env.NEXT_PUBLIC_USER_WEB_BASE_URL || ""}/account/login`}>
+              普通用户登录
+            </Link>
             <span aria-hidden="true">·</span>
             管理员问题请<a href="mailto:{{SECRET_d8zo1uvg}}">联系超级管理员</a>
           </p>
