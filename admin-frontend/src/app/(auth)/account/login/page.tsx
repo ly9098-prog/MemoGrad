@@ -415,9 +415,11 @@ export default function LearnerLoginPage() {
       <main className={styles.main}>
         <LoginCard titleId="learner-login-title" className={styles.learnerCard}>
           <div className={styles.cardHeading}>
-            <span className={styles.mark} aria-hidden="true">
-              <ShieldCheck />
-            </span>
+            {registering ? null : (
+              <span className={styles.mark} aria-hidden="true">
+                <ShieldCheck />
+              </span>
+            )}
             <h1 id="learner-login-title">
               {registering ? "创建学习账号" : "登录学习中心"}
             </h1>
@@ -450,8 +452,13 @@ export default function LearnerLoginPage() {
           </div>
 
           <div className={styles.loginPanel}>
-            {mode === "password" && !registering ? (
-              <form className={styles.form} onSubmit={loginWithPassword}>
+            {!registering ? (
+              <form
+                className={styles.form}
+                onSubmit={loginWithPassword}
+                inert={mode !== "password"}
+                aria-hidden={mode !== "password"}
+              >
                 <div className={styles.field}>
                   <label htmlFor="learner-account">账号名称或邮箱</label>
                   <div className={styles.inputShell}>
@@ -534,7 +541,10 @@ export default function LearnerLoginPage() {
             ) : null}
 
             {mode === "password" && registering && !registrationCodeSent ? (
-              <form className={styles.form} onSubmit={openRegisterCaptcha}>
+              <form
+                className={`${styles.form} ${styles.registerForm}`}
+                onSubmit={openRegisterCaptcha}
+              >
                 <div className={styles.field}>
                   <label htmlFor="register-username">账号名称</label>
                   <div className={styles.inputShell}>
@@ -652,7 +662,10 @@ export default function LearnerLoginPage() {
             ) : null}
 
             {mode === "password" && registering && registrationCodeSent ? (
-              <form className={styles.form} onSubmit={verifyRegistration}>
+              <form
+                className={`${styles.form} ${styles.registerForm}`}
+                onSubmit={verifyRegistration}
+              >
                 <div className={styles.otpIntro}>
                   <Mail aria-hidden="true" />
                   <p>验证码已发送至 <strong>{sentEmail}</strong></p>
@@ -704,8 +717,13 @@ export default function LearnerLoginPage() {
               </form>
             ) : null}
 
-            {mode === "email" && !emailCodeSent ? (
-              <form className={styles.form} onSubmit={openEmailCaptcha}>
+            {!registering && !emailCodeSent ? (
+              <form
+                className={styles.form}
+                onSubmit={openEmailCaptcha}
+                inert={mode !== "email"}
+                aria-hidden={mode !== "email"}
+              >
                 <div className={styles.field}>
                   <label htmlFor="learner-email">邮箱地址</label>
                   <div className={styles.inputShell}>
@@ -744,8 +762,13 @@ export default function LearnerLoginPage() {
               </form>
             ) : null}
 
-            {mode === "email" && emailCodeSent ? (
-              <form className={styles.form} onSubmit={verifyEmail}>
+            {!registering && emailCodeSent ? (
+              <form
+                className={styles.form}
+                onSubmit={verifyEmail}
+                inert={mode !== "email"}
+                aria-hidden={mode !== "email"}
+              >
                 <div className={styles.otpIntro}>
                   <Mail aria-hidden="true" />
                   <p>验证码已发送至 <strong>{sentEmail}</strong></p>
@@ -797,24 +820,28 @@ export default function LearnerLoginPage() {
               </form>
             ) : null}
 
-            <div className={styles.divider}>
-              <span />
-              <p>或使用 GitHub</p>
-              <span />
-            </div>
-            <button
-              type="button"
-              className={styles.githubButton}
-              disabled={disabled}
-              aria-busy={pending === "github"}
-              onClick={() => void startGithub()}
-            >
-              {pending === "github" ? (
-                <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在前往 GitHub</span></>
-              ) : (
-                <><GitBranch aria-hidden="true" /><span>使用 GitHub 登录</span></>
-              )}
-            </button>
+            {registering ? null : (
+              <>
+                <div className={styles.divider}>
+                  <span />
+                  <p>或使用 GitHub</p>
+                  <span />
+                </div>
+                <button
+                  type="button"
+                  className={styles.githubButton}
+                  disabled={disabled}
+                  aria-busy={pending === "github"}
+                  onClick={() => void startGithub()}
+                >
+                  {pending === "github" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在前往 GitHub</span></>
+                  ) : (
+                    <><GitBranch aria-hidden="true" /><span>使用 GitHub 登录</span></>
+                  )}
+                </button>
+              </>
+            )}
 
             <label className={styles.consent}>
               <input

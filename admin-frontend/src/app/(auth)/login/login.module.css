@@ -607,6 +607,15 @@
   margin-top: 0;
 }
 
+.registerForm {
+  margin-top: 22px;
+  gap: 15px;
+}
+
+.registerForm .field {
+  gap: 7px;
+}
+
 .captchaDialog {
   width: calc(100% - 32px);
   max-width: 480px;
