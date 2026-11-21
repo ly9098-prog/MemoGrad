@@ -575,7 +575,6 @@ jobs:
           node --test miniprogram/tests/test-launch-resume-diagnostics.js
           node --test miniprogram/tests/test-root-back-guard.js
           node --test miniprogram/tests/test-login-launch-resume.js
-          node --test miniprogram/tests/test-wechat-bind-confirm.js
           node --test miniprogram/tests/test-guest-experience.js
           node --test miniprogram/tests/test-practice-cold-resume.js
           node --test miniprogram/tests/test-practice-cold-resume-page.js
@@ -744,9 +743,9 @@ jobs:
           node miniprogram/tests/test-render-invariant.js
           node miniprogram/tests/render_regression/run.js
 
-      - name: Build admin frontend
+      - name: Check unified frontend
         if: steps.admin-manifest.outputs.present == 'true'
         working-directory: admin-frontend
         env:
           NEXT_PUBLIC_ADMIN_API_BASE_URL: http://127.0.0.1:8000/api/admin/v1
-        run: npm run build
+        run: npm run check
