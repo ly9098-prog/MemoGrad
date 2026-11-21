@@ -194,12 +194,6 @@ page {
 .login-panel {
   flex-shrink: 0;
   box-sizing: border-box;
-  padding: 24rpx;
-  border: 1rpx solid rgba(48, 91, 73, .14);
-  border-radius: 32rpx;
-  background: rgba(255, 255, 255, .72);
-  -webkit-backdrop-filter: blur(20rpx);
-  backdrop-filter: blur(20rpx);
 }
 .login-method-panel { margin-top: 0; }
 .login-primary-btn {
