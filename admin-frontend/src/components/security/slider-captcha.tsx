@@ -34,12 +34,6 @@ type SliderCaptchaProps = {
   scope?: ApiScope;
 };
 
-const RENDER_WIDTH = 280;
-const RENDER_HEIGHT = 140;
-const RENDER_PIECE_SIZE = 42;
-const RENDER_PIECE_LEFT = 12;
-const RENDER_MAX_OFFSET = RENDER_WIDTH - RENDER_PIECE_SIZE - RENDER_PIECE_LEFT;
-
 function messageFor(error: unknown) {
   if (error instanceof ApiError) return error.message;
   return "安全验证未完成，请稍后重试";
@@ -51,17 +45,37 @@ export function SliderCaptcha({
   scope = "admin",
 }: SliderCaptchaProps) {
   const keyboardInputId = useId();
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const [renderWidth, setRenderWidth] = useState(280);
+  const renderHeight = Math.round(renderWidth / 2);
+  const renderPieceSize = Math.round(renderWidth * 0.15);
+  const renderPieceLeft = Math.round(renderWidth * 12 / 280);
+  const maxOffset = renderWidth - renderPieceSize - renderPieceLeft;
   const challengeRef = useRef<SliderChallenge | null>(null);
   const actionRef = useRef<ActionType | undefined>(undefined);
   const mountedRef = useRef(false);
   const requestControllerRef = useRef<AbortController | null>(null);
   const verifyControllerRef = useRef<AbortController | null>(null);
   const interactionCancelledRef = useRef(false);
-  const [pieceTop, setPieceTop] = useState(0);
+  const [pieceTopRatio, setPieceTopRatio] = useState(0);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const container = imageContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.floor(entry.contentRect.width);
+      if (width > 0) {
+        setRenderWidth(width);
+        setKeyboardOffset(0);
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -102,11 +116,7 @@ export function SliderCaptcha({
       }
       challengeRef.current = challenge;
       setReady(true);
-      setPieceTop(
-        Math.round(
-          (challenge.piece_y / challenge.height) * RENDER_HEIGHT,
-        ),
-      );
+      setPieceTopRatio(challenge.piece_y / challenge.height);
       return {
         bgUrl: challenge.background_image,
         puzzleUrl: challenge.puzzle_image,
@@ -142,9 +152,9 @@ export function SliderCaptcha({
       }
 
       const verification = buildSliderVerification(data, challenge, {
-        width: RENDER_WIDTH,
-        height: RENDER_HEIGHT,
-        pieceLeft: RENDER_PIECE_LEFT,
+        width: renderWidth,
+        height: renderHeight,
+        pieceLeft: renderPieceLeft,
       });
       const controller = new AbortController();
       verifyControllerRef.current?.abort();
@@ -178,7 +188,7 @@ export function SliderCaptcha({
         throw verifyError;
       }
     },
-    [onVerified, scope],
+    [onVerified, scope, renderWidth, renderHeight, renderPieceLeft],
   );
 
   const verifyWithKeyboard = useCallback(() => {
@@ -233,6 +243,7 @@ export function SliderCaptcha({
       </div>
 
       <div
+        ref={imageContainerRef}
         onPointerDownCapture={() => {
           interactionCancelledRef.current = false;
         }}
@@ -253,12 +264,12 @@ export function SliderCaptcha({
           autoRefreshOnError={false}
           request={request}
           onVerify={verify}
-          bgSize={{ width: RENDER_WIDTH, height: RENDER_HEIGHT }}
+          bgSize={{ width: renderWidth, height: renderHeight }}
           puzzleSize={{
-            width: RENDER_PIECE_SIZE,
-            height: RENDER_PIECE_SIZE,
-            left: RENDER_PIECE_LEFT,
-            top: pieceTop,
+            width: renderPieceSize,
+            height: renderPieceSize,
+            left: renderPieceLeft,
+            top: Math.round(pieceTopRatio * renderHeight),
           }}
           styles={{
             puzzleImg: keyboardOpen
@@ -287,7 +298,7 @@ export function SliderCaptcha({
             id={keyboardInputId}
             type="range"
             min={0}
-            max={RENDER_MAX_OFFSET}
+            max={maxOffset}
             step={1}
             value={keyboardOffset}
             aria-label="拼图水平位置"

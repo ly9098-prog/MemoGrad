@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
-  type PointerEvent,
   useEffect,
   useState,
 } from "react";
@@ -21,6 +20,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { AdminFooter } from "@/components/layout/admin-footer";
+import { LoginCard } from "@/components/auth/login-card";
 import { SliderCaptcha } from "@/components/security/slider-captcha";
 import { Input } from "@/components/ui/input";
 import { OtpInput } from "@/components/ui/otp-input";
@@ -38,30 +38,6 @@ type OtpStartResponse = {
   expires_in: number;
   resend_after: number;
 };
-
-function updateCardTilt(event: PointerEvent<HTMLDivElement>) {
-  if (
-    event.pointerType !== "mouse"
-    || !window.matchMedia("(hover: hover) and (prefers-reduced-motion: no-preference)").matches
-  ) {
-    return;
-  }
-  const card = event.currentTarget;
-  const bounds = (card.parentElement ?? card).getBoundingClientRect();
-  const horizontal = Math.max(0, Math.min(1, (event.clientX - bounds.left) / card.offsetWidth));
-  const vertical = Math.max(0, Math.min(1, (event.clientY - bounds.top) / card.offsetHeight));
-  card.style.setProperty("--login-rotate-x", `${(0.5 - vertical) * 16}deg`);
-  card.style.setProperty("--login-rotate-y", `${(horizontal - 0.5) * 20}deg`);
-  card.style.setProperty("--login-pointer-x", `${horizontal * 100}%`);
-  card.style.setProperty("--login-pointer-y", `${vertical * 100}%`);
-}
-
-function resetCardTilt(event: PointerEvent<HTMLDivElement>) {
-  event.currentTarget.style.removeProperty("--login-rotate-x");
-  event.currentTarget.style.removeProperty("--login-rotate-y");
-  event.currentTarget.style.removeProperty("--login-pointer-x");
-  event.currentTarget.style.removeProperty("--login-pointer-y");
-}
 
 export function loginErrorMessage(
   error: unknown,
@@ -245,14 +221,15 @@ function LoginForm() {
         <span className={styles.accessLabel}><span />内部管理工作台</span>
       </header>
       <main className={styles.main}>
-        <div className={styles.stage}>
-          <div className={styles.cardTilt} onPointerMove={updateCardTilt} onPointerLeave={resetCardTilt}>
-            <div className={styles.cardGlow} aria-hidden="true" />
-            <div className={styles.edgeLights} aria-hidden="true">
-              <span className={styles.edgeTop} /><span className={styles.edgeRight} />
-              <span className={styles.edgeBottom} /><span className={styles.edgeLeft} />
-            </div>
-            <section className={styles.card} aria-labelledby="login-title">
+        <LoginCard titleId="login-title" support={
+          <p className={styles.support}>
+            <Link href={`${process.env.NEXT_PUBLIC_USER_WEB_BASE_URL || ""}/account/login`}>
+              普通用户登录
+            </Link>
+            <span aria-hidden="true">·</span>
+            管理员问题请<a href="mailto:{{SECRET_d8zo1uvg}}">联系超级管理员</a>
+          </p>
+        }>
               <div className={styles.cardHeading}>
                 <span className={styles.mark} aria-hidden="true">
                   <svg viewBox="0 0 32 32" fill="none">
@@ -369,7 +346,7 @@ function LoginForm() {
                       onCancel={() => setCaptchaOpen(false)}
                     />
                   )}
-                  <button type="submit" className={styles.submit} disabled={loading || captchaOpen} aria-busy={loading}>
+                  <button type="submit" className={styles.submit} disabled={loading || captchaOpen || !email.trim()} aria-busy={loading}>
                     {loading ? (
                       <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
                     ) : (
@@ -440,16 +417,7 @@ function LoginForm() {
                   <><ShieldCheck aria-hidden="true" /><p>仅限授权管理员访问 · 用户与管理员会话互相隔离</p></>
                 )}
               </div>
-            </section>
-          </div>
-          <p className={styles.support}>
-            <Link href={`${process.env.NEXT_PUBLIC_USER_WEB_BASE_URL || ""}/account/login`}>
-              普通用户登录
-            </Link>
-            <span aria-hidden="true">·</span>
-            管理员问题请<a href="mailto:{{SECRET_d8zo1uvg}}">联系超级管理员</a>
-          </p>
-        </div>
+        </LoginCard>
       </main>
       <div className={styles.footer}><AdminFooter variant="auth" /></div>
     </div>

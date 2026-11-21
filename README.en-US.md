@@ -152,12 +152,14 @@ The Admin console runs at `http://localhost:3002`.
 ### User Web
 
 ```bash
-cd web-frontend
+cd admin-frontend
 npm ci
-npm run dev
+npx next dev --port 3000
 ```
 
-The user site runs at `http://localhost:3000` and proxies `/api/v1` to the local backend. GitHub OAuth callbacks must use this same user origin so the browser can restore its session.
+The user site and Admin console share this Next.js project, with separate origins and authentication domains. Configure both Web URLs and the Admin host for each process. The user site runs at `http://localhost:3000` and proxies `/api/v1` to the local backend. GitHub OAuth callbacks must use this same user origin so the browser can restore its session.
+
+The Mini Program only offers WeChat one-click login. Email login and identity management belong to the Web UI. The WeChat binding method is undecided and currently unavailable.
 
 ### Mini Program
 

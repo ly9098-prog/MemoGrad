@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LoginPage, { loginErrorMessage } from "./page";
+import { LoginCard } from "@/components/auth/login-card";
 import { ApiError } from "@/lib/api/errors";
 
 type Element = ReactElement<Record<string, unknown>>;
@@ -28,8 +29,7 @@ function findTilt(node: unknown): Element | undefined {
 }
 
 function renderTilt() {
-  const element = LoginPage() as ReactElement<Record<string, unknown>>;
-  return findTilt((element.type as (props: Record<string, unknown>) => unknown)(element.props))!;
+  return findTilt(LoginCard({ titleId: "test-login", children: null }))!;
 }
 
 function pointerFixture() {

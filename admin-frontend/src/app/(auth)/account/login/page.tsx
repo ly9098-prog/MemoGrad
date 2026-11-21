@@ -9,9 +9,9 @@ import {
   useState,
 } from "react";
 import {
-  AlertCircle,
   ArrowRight,
   Check,
+  CircleAlert,
   Eye,
   EyeOff,
   GitBranch,
@@ -20,8 +20,15 @@ import {
   Mail,
   ShieldCheck,
   UserRound,
+  X,
 } from "lucide-react";
 import { SliderCaptcha } from "@/components/security/slider-captcha";
+import { LoginCard } from "@/components/auth/login-card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogClose, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { OtpInput } from "@/components/ui/otp-input";
 import { apiRequest } from "@/lib/api/client";
@@ -51,9 +58,11 @@ const AUTH_ERRORS: Record<string, string> = {
 type LoginMode = "password" | "email";
 type PendingAction = "password" | "register" | "email" | "github";
 
-function messageFor(error: unknown) {
+function messageFor(error: unknown, mode: LoginMode = "password") {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "账号或验证码不正确";
+    if (error.status === 401) {
+      return mode === "email" ? "验证码不正确或已过期" : "账号或密码不正确";
+    }
     if (error.status === 409) return error.message || "账号状态已变化，请刷新后重试";
     if (error.status === 429) return "尝试次数过多，请稍后再试";
     if (error.status >= 500) return "服务暂时不可用，请稍后再试";
@@ -106,6 +115,7 @@ export default function LearnerLoginPage() {
   const [mode, setMode] = useState<LoginMode>("password");
   const [registering, setRegistering] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
@@ -140,9 +150,7 @@ export default function LearnerLoginPage() {
     const params = new URLSearchParams(window.location.search);
     const authError = AUTH_ERRORS[params.get("auth_error") || ""];
     if (authError) setError(authError);
-    if (params.has("wechat_bound")) {
-      setNotice("微信已绑定，原网页会话已安全退出。请使用邮箱、GitHub 或微信重新登录。");
-    } else if (params.has("identity_unlinked")) {
+    if (params.has("identity_unlinked")) {
       setNotice("登录身份已解绑，请重新登录。");
     }
   }, []);
@@ -159,8 +167,7 @@ export default function LearnerLoginPage() {
 
   function requireConsent() {
     if (agreed) return true;
-    setError("请先阅读并同意用户协议和隐私政策");
-    consentRef.current?.focus();
+    setConsentOpen(true);
     return false;
   }
 
@@ -183,9 +190,14 @@ export default function LearnerLoginPage() {
     setError("");
   }
 
+  function clearError() {
+    if (error) setError("");
+  }
+
   async function loginWithPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !account.trim() || !password) return;
+    if (!requireConsent()) return;
     begin("password");
     try {
       const response = await apiRequest<LearnerAuthResponse>(
@@ -207,7 +219,7 @@ export default function LearnerLoginPage() {
         safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
       );
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError(messageFor(submitError, "password"));
     } finally {
       finish();
     }
@@ -254,7 +266,7 @@ export default function LearnerLoginPage() {
       setRegisterCode("");
       setSentEmail(registerEmail.trim());
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError(messageFor(submitError, "email"));
     } finally {
       finish();
     }
@@ -263,6 +275,7 @@ export default function LearnerLoginPage() {
   async function verifyRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || registerCode.length !== 6) return;
+    if (!requireConsent()) return;
     begin("register");
     try {
       const response = await apiRequest<LearnerAuthResponse>(
@@ -284,7 +297,7 @@ export default function LearnerLoginPage() {
         safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
       );
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError(messageFor(submitError, "email"));
     } finally {
       finish();
     }
@@ -327,7 +340,7 @@ export default function LearnerLoginPage() {
       setCode("");
       setSentEmail(email.trim());
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError(messageFor(submitError, "email"));
     } finally {
       finish();
     }
@@ -354,7 +367,7 @@ export default function LearnerLoginPage() {
         safeLearnerNext(new URLSearchParams(window.location.search).get("next")),
       );
     } catch (submitError) {
-      setError(messageFor(submitError));
+      setError(messageFor(submitError, "email"));
     } finally {
       finish();
     }
@@ -400,19 +413,18 @@ export default function LearnerLoginPage() {
         <span className={styles.accessLabel}><span />学习账号</span>
       </header>
       <main className={styles.main}>
-        <section className={styles.card} aria-labelledby="learner-login-title">
+        <LoginCard titleId="learner-login-title" className={styles.learnerCard}>
           <div className={styles.cardHeading}>
             <span className={styles.mark} aria-hidden="true">
               <ShieldCheck />
             </span>
-            <p className={styles.eyebrow}>ONE ACCOUNT · ONE LEARNING RECORD</p>
             <h1 id="learner-login-title">
               {registering ? "创建学习账号" : "登录学习中心"}
             </h1>
             <p className={styles.subtitle}>
               {registering
-                ? "验证邮箱后即可进入题库，并继续在 Web 与小程序使用同一份数据。"
-                : "登录后可直接浏览题库和知识图谱。"}
+                ? "验证邮箱后创建账号，学习记录与小程序保持同步。"
+                : "继续你的学习记录，Web 与小程序共用同一个账号。"}
             </p>
           </div>
 
@@ -447,9 +459,17 @@ export default function LearnerLoginPage() {
                     <Input
                       id="learner-account"
                       variant="ghost"
+                      className={styles.input}
                       value={account}
-                      onChange={(event) => setAccount(event.target.value)}
+                      onChange={(event) => {
+                        setAccount(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="请输入账号名称或邮箱"
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -461,16 +481,23 @@ export default function LearnerLoginPage() {
                     <Input
                       id="learner-password"
                       variant="ghost"
+                      className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      onChange={(event) => {
+                        setPassword(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="current-password"
+                      placeholder="请输入登录密码"
+                      required
                       disabled={disabled}
                     />
                     <button
                       type="button"
                       className={styles.visibilityToggle}
                       aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword((value) => !value)}
                     >
                       {showPassword ? <EyeOff /> : <Eye />}
@@ -481,15 +508,19 @@ export default function LearnerLoginPage() {
                   type="submit"
                   className={styles.submit}
                   disabled={disabled || !account.trim() || !password}
+                  aria-busy={pending === "password"}
                 >
-                  {pending === "password" ? <Loader2 className={styles.spinner} /> : <ArrowRight />}
-                  登录并进入题库
+                  {pending === "password" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在登录</span></>
+                  ) : (
+                    <><span>登录学习中心</span><ArrowRight aria-hidden="true" /></>
+                  )}
                 </button>
                 <div className={styles.formMeta}>
                   <span>还没有账号？</span>
                   <button
                     type="button"
-                    className={styles.resendButton}
+                    className={styles.inlineAction}
                     disabled={disabled}
                     onClick={() => {
                       setRegistering(true);
@@ -511,9 +542,19 @@ export default function LearnerLoginPage() {
                     <Input
                       id="register-username"
                       variant="ghost"
+                      className={styles.input}
                       value={username}
-                      onChange={(event) => setUsername(event.target.value)}
+                      onChange={(event) => {
+                        setUsername(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="3–32 个字符"
+                      minLength={3}
+                      maxLength={32}
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -525,10 +566,18 @@ export default function LearnerLoginPage() {
                     <Input
                       id="register-email"
                       variant="ghost"
+                      className={styles.input}
                       type="email"
                       value={registerEmail}
-                      onChange={(event) => setRegisterEmail(event.target.value)}
+                      onChange={(event) => {
+                        setRegisterEmail(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="name@example.com"
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -540,10 +589,17 @@ export default function LearnerLoginPage() {
                     <Input
                       id="register-password"
                       variant="ghost"
+                      className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={registerPassword}
-                      onChange={(event) => setRegisterPassword(event.target.value)}
+                      onChange={(event) => {
+                        setRegisterPassword(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="new-password"
+                      placeholder="至少 12 位"
+                      minLength={12}
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -555,10 +611,17 @@ export default function LearnerLoginPage() {
                     <Input
                       id="register-password-confirm"
                       variant="ghost"
+                      className={styles.input}
                       type={showPassword ? "text" : "password"}
                       value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      onChange={(event) => {
+                        setConfirmPassword(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="new-password"
+                      placeholder="再次输入密码"
+                      minLength={12}
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -566,15 +629,19 @@ export default function LearnerLoginPage() {
                 <button
                   type="submit"
                   className={styles.submit}
-                  disabled={disabled}
+                  disabled={disabled || !username.trim() || !registerEmail.trim() || !registerPassword || !confirmPassword}
+                  aria-busy={pending === "register"}
                 >
-                  {pending === "register" ? <Loader2 className={styles.spinner} /> : <Mail />}
-                  验证邮箱并创建账号
+                  {pending === "register" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
+                  ) : (
+                    <><span>验证邮箱并创建账号</span><Mail aria-hidden="true" /></>
+                  )}
                 </button>
                 <div className={styles.formMeta}>
                   <button
                     type="button"
-                    className={styles.resendButton}
+                    className={styles.inlineAction}
                     disabled={disabled}
                     onClick={() => setRegistering(false)}
                   >
@@ -586,7 +653,10 @@ export default function LearnerLoginPage() {
 
             {mode === "password" && registering && registrationCodeSent ? (
               <form className={styles.form} onSubmit={verifyRegistration}>
-                <p className={styles.subtitle}>验证码已发送至 {sentEmail}</p>
+                <div className={styles.otpIntro}>
+                  <Mail aria-hidden="true" />
+                  <p>验证码已发送至 <strong>{sentEmail}</strong></p>
+                </div>
                 <div className={styles.field}>
                   <label htmlFor="register-code">6 位邮箱验证码</label>
                   <OtpInput
@@ -623,9 +693,13 @@ export default function LearnerLoginPage() {
                   type="submit"
                   className={styles.submit}
                   disabled={disabled || registerCode.length !== 6}
+                  aria-busy={pending === "register"}
                 >
-                  {pending === "register" ? <Loader2 className={styles.spinner} /> : <Check />}
-                  完成注册
+                  {pending === "register" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证</span></>
+                  ) : (
+                    <><span>完成注册</span><Check aria-hidden="true" /></>
+                  )}
                 </button>
               </form>
             ) : null}
@@ -639,10 +713,18 @@ export default function LearnerLoginPage() {
                     <Input
                       id="learner-email"
                       variant="ghost"
+                      className={styles.input}
                       type="email"
                       value={email}
-                      onChange={(event) => setEmail(event.target.value)}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        clearError();
+                      }}
                       autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="name@example.com"
+                      required
                       disabled={disabled}
                     />
                   </div>
@@ -651,16 +733,23 @@ export default function LearnerLoginPage() {
                   type="submit"
                   className={styles.submit}
                   disabled={disabled || !email.trim()}
+                  aria-busy={pending === "email"}
                 >
-                  {pending === "email" ? <Loader2 className={styles.spinner} /> : <Mail />}
-                  发送登录验证码
+                  {pending === "email" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在发送</span></>
+                  ) : (
+                    <><span>发送登录验证码</span><Mail aria-hidden="true" /></>
+                  )}
                 </button>
               </form>
             ) : null}
 
             {mode === "email" && emailCodeSent ? (
               <form className={styles.form} onSubmit={verifyEmail}>
-                <p className={styles.subtitle}>验证码已发送至 {sentEmail}</p>
+                <div className={styles.otpIntro}>
+                  <Mail aria-hidden="true" />
+                  <p>验证码已发送至 <strong>{sentEmail}</strong></p>
+                </div>
                 <div className={styles.field}>
                   <label htmlFor="learner-email-code">6 位邮箱验证码</label>
                   <OtpInput
@@ -697,74 +786,108 @@ export default function LearnerLoginPage() {
                   type="submit"
                   className={styles.submit}
                   disabled={disabled || code.length !== 6}
+                  aria-busy={pending === "email"}
                 >
-                  {pending === "email" ? <Loader2 className={styles.spinner} /> : <Check />}
-                  验证并登录
+                  {pending === "email" ? (
+                    <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在验证</span></>
+                  ) : (
+                    <><span>验证并登录</span><Check aria-hidden="true" /></>
+                  )}
                 </button>
               </form>
             ) : null}
 
-            <div className="my-5 flex items-center gap-3 text-[11px] text-[#7f99ad]">
-              <span className="h-px flex-1 bg-white/10" />
-              或使用 GitHub
-              <span className="h-px flex-1 bg-white/10" />
+            <div className={styles.divider}>
+              <span />
+              <p>或使用 GitHub</p>
+              <span />
             </div>
             <button
               type="button"
-              className={`${styles.submit} !bg-white/[0.06] !text-[#d7e7f0] shadow-none hover:!bg-white/[0.1]`}
+              className={styles.githubButton}
               disabled={disabled}
+              aria-busy={pending === "github"}
               onClick={() => void startGithub()}
             >
-              {pending === "github" ? <Loader2 className={styles.spinner} /> : <GitBranch />}
-              使用 GitHub 登录
+              {pending === "github" ? (
+                <><Loader2 className={styles.spinner} aria-hidden="true" /><span>正在前往 GitHub</span></>
+              ) : (
+                <><GitBranch aria-hidden="true" /><span>使用 GitHub 登录</span></>
+              )}
             </button>
 
-            <label className="mt-5 flex cursor-pointer items-start gap-2.5 text-[11px] leading-5 text-[#8fa8ba]">
+            <label className={styles.consent}>
               <input
                 ref={consentRef}
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-[#9bdcff]"
+                className={styles.consentCheckbox}
                 checked={agreed}
                 onChange={(event) => setAgreed(event.target.checked)}
                 disabled={disabled}
               />
               <span>
                 我已阅读并同意
-                <Link href="/agreements/user" className="mx-1 text-[#ccebff] underline underline-offset-2">
+                <Link href="/agreements/user" className={styles.consentLink}>
                   用户协议
                 </Link>
                 和
-                <Link href="/agreements/privacy" className="mx-1 text-[#ccebff] underline underline-offset-2">
+                <Link href="/agreements/privacy" className={styles.consentLink}>
                   隐私政策
                 </Link>
               </span>
             </label>
 
             {error ? (
-              <div className={`${styles.cardFooter} mt-4`} data-error="true" role="alert">
-                <AlertCircle aria-hidden="true" />
-                <span>{error}</span>
+              <div className={styles.errorNotice} role="alert">
+                <CircleAlert aria-hidden="true" />
+                <p>{error}</p>
+                <button type="button" aria-label="关闭错误提示" onClick={() => setError("")}>
+                  <X aria-hidden="true" />
+                </button>
               </div>
             ) : null}
             {notice ? (
-              <div className={`${styles.cardFooter} mt-4`} role="status">
+              <div className={styles.notice} role="status">
                 <Check aria-hidden="true" />
-                <span>{notice}</span>
+                <p>{notice}</p>
               </div>
             ) : null}
 
-            <div className={styles.support}>
-              <Link href={`${process.env.NEXT_PUBLIC_ADMIN_WEB_BASE_URL || ""}/login`}>
-                管理员登录
-                <ArrowRight className="ml-1 inline h-3 w-3" aria-hidden="true" />
-              </Link>
-            </div>
           </div>
-        </section>
+        </LoginCard>
       </main>
-      {captchaOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1722] p-1 shadow-2xl">
+      <Dialog open={consentOpen} onOpenChange={setConsentOpen}>
+        <DialogContent
+          overlayClassName={styles.loginDialogOverlay}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            consentRef.current?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>请先阅读并同意协议</DialogTitle>
+            <DialogDescription>
+              登录前，请阅读
+              <Link href="/agreements/user" target="_blank" rel="noopener noreferrer" className="mx-1 text-primary underline underline-offset-4">用户协议</Link>
+              和
+              <Link href="/agreements/privacy" target="_blank" rel="noopener noreferrer" className="mx-1 text-primary underline underline-offset-4">隐私政策</Link>
+              。同意后可继续登录或创建学习账号。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="secondary">暂不登录</Button></DialogClose>
+            <Button onClick={() => { setAgreed(true); setConsentOpen(false); }}>同意并勾选</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
+        <DialogContent
+          className={styles.captchaDialog}
+          overlayClassName={styles.loginDialogOverlay}
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">完成安全验证</DialogTitle>
+          <DialogDescription className="sr-only">拖动滑块，将拼图移到图片缺口处。</DialogDescription>
             <SliderCaptcha
               scope="user"
               onCancel={() => setCaptchaOpen(false)}
@@ -777,9 +900,8 @@ export default function LearnerLoginPage() {
                 }
               }}
             />
-          </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

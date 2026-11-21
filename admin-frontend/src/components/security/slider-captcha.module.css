@@ -1,12 +1,14 @@
 .root {
   display: grid;
-  gap: 8px;
-  width: min(100%, 304px);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
   margin-inline: auto;
   border: 1px solid rgb(163 206 231 / 30%);
   border-radius: 14px;
-  background: rgb(2 14 23 / 34%);
-  padding: 10px;
+  background: #0b1b28;
+  padding: 24px;
   box-shadow: inset 0 1px rgb(255 255 255 / 7%);
 }
 
@@ -23,18 +25,18 @@
   align-items: center;
   gap: 7px;
   color: #eaf7fd;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .title svg {
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 20px;
 }
 
 .hint {
-  color: rgb(208 231 242 / 66%);
-  font-size: 10px;
+  color: #adc9d9;
+  font-size: 12px;
 }
 
 .headingActions {
@@ -49,9 +51,10 @@
   flex: none;
   border: 0;
   background: transparent;
-  padding: 2px 0;
+  min-height: 36px;
+  padding: 4px;
   color: #bfeaff;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -81,9 +84,8 @@
   --rcsc-button-bg-color: #dff4fc;
   --rcsc-panel-border-radius: 10px;
   --rcsc-control-border-radius: 10px;
-  --rcsc-control-height: 40px;
+  --rcsc-control-height: 48px;
   width: 100% !important;
-  max-width: 280px;
   margin-inline: auto;
 }
 
@@ -108,13 +110,14 @@
 }
 
 .captcha :global(.rc-slider-captcha-control-button) {
+  width: 48px;
   border: 1px solid rgb(225 246 255 / 76%);
   box-shadow: 0 4px 12px rgb(0 0 0 / 24%);
 }
 
 .captcha :global(.rc-slider-captcha-control-tips) {
   padding-inline: 46px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .captcha :global(.rc-slider-captcha-jigsaw-refresh) {
@@ -145,7 +148,7 @@
 
 .keyboardPanel label {
   color: rgb(226 242 250 / 82%);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .keyboardPanel input[type="range"] {
@@ -163,18 +166,18 @@
 
 .keyboardHint {
   color: rgb(208 231 242 / 66%);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
 .keyboardConfirm {
-  min-height: 30px;
+  min-height: 44px;
   border: 1px solid rgb(225 246 255 / 52%);
   border-radius: 7px;
   background: #dff4fc;
   padding: 0 10px;
   color: #17384b;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -202,17 +205,18 @@
 .error {
   margin: 0;
   color: #ffb8c8;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .retry {
   justify-self: start;
+  min-height: 44px;
   border: 0;
   background: transparent;
   padding: 2px 0;
   color: #c8edff;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -228,19 +232,30 @@
 
 .cancel {
   justify-self: end;
-  min-height: 32px;
+  min-height: 44px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   padding: 0 5px;
   color: rgb(207 230 240 / 66%);
-  font-size: 11px;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .cancel:hover,
 .cancel:focus-visible {
   color: #f5fbff;
+}
+
+@media (max-width: 480px) {
+  .root {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .hint {
+    display: none;
+  }
 }
 
 .cancel:focus-visible {
