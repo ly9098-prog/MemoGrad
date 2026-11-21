@@ -4,7 +4,7 @@
 .motion-sheet-root.is-leaving .motion-sheet-content { pointer-events: none; }
 .motion-sheet-mask { position: absolute; inset: 0; background: rgba(24,57,44,.38); }
 .motion-sheet-shell { position: absolute; left: 0; right: 0; bottom: 0; max-height: 90vh; }
-.motion-sheet-surface { position: absolute; inset: 0; transform-origin: 0 0; border-radius: 24px 24px 0 0; background: #FBFFFD; pointer-events: none; }
+.motion-sheet-surface { position: absolute; inset: 0; transform-origin: 0 0; border-radius: 24px 24px 0 0; background: #FBFFFD; box-shadow: 0 -12px 36px rgba(18,45,33,.16); pointer-events: none; }
 .motion-sheet-content { position: relative; max-height: 90vh; }
 .motion-sheet-content.has-safe-area { padding-bottom: env(safe-area-inset-bottom); }
 .motion-sheet-body { position: relative; min-height: 0; }
@@ -15,4 +15,5 @@
 @media (prefers-reduced-motion: reduce) {
   .motion-sheet-surface { transform: none !important; border-radius: 24px 24px 0 0 !important; }
   .motion-sheet-shell,.motion-sheet-content,.motion-sheet-grip { transform: none !important; }
+  .motion-sheet-body { clip-path: none !important; }
 }

@@ -1,4 +1,5 @@
 @import '../../../../styles/tokens.wxss';
+@import '../../../../styles/motion-sheet-panel.wxss';
 @import '../code-block/code-block.wxss';
 @import './practice-theme.wxss';
 .quiz-runner{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;box-sizing:border-box;}
