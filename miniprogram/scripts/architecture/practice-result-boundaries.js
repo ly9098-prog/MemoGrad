@@ -24,7 +24,7 @@ const MODULES = {
   'practice-result-diagnosis-page-adapter.js': ['../../utils/error-diagnosis'],
   'practice-result-navigation-page-adapter.js': [],
   'practice-result-payload-page-adapter.js': ['./result-counts', './format-helpers', './growth-helpers'],
-  'practice-result-teacher-page-adapter.js': ['../../utils/ai-teacher-408', '../../utils/teacher-presentation', '../../../../utils/ai-teacher-request'],
+  'practice-result-teacher-page-adapter.js': ['../../utils/ai-teacher-408', '../../utils/teacher-presentation', '../../utils/ai-teacher-request'],
   'practice-result-trend-page-adapter.js': ['./format-helpers', './trend-plot-builder'],
   'recovered-payload-builder.js': [],
   'result-counts.js': [],

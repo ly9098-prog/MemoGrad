@@ -80,5 +80,13 @@ require('./test-katex-upload-syntax')
 const app = readJson('app.json')
 assert.equal(app.usingComponents['app-dialog'], '/components/app-dialog/index')
 assert.equal(app.usingComponents['premium-nav'], '/components/premium-nav/premium-nav')
+const routeTeacherRequest = path.join(miniRoot, 'utils/ai-teacher-request.js')
+assert.equal(fs.existsSync(routeTeacherRequest), false,
+  'subpackage-only teacher request helper must not remain in the main package')
+assert.equal(
+  fs.existsSync(path.join(miniRoot, 'subpackages/study/utils/ai-teacher-request.js')),
+  true,
+  'the shared teacher request helper must stay inside the study subpackage',
+)
 checkBudgets(collectPackageSizes(miniRoot, app, config))
 console.log('Package quality regression checks passed')

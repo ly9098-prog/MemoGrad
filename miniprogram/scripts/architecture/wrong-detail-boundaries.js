@@ -285,7 +285,7 @@ function moduleViolations(name, source) {
         (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
           ['require', 'eval', 'Function'].includes(node.expression.getText(parsed))))) {
       const teacherRequestDependency = name === 'wrong-detail-teacher-page-adapter.js' &&
-        node.getText(parsed) === "require('../../../../utils/ai-teacher-request')"
+        node.getText(parsed) === "require('../../utils/ai-teacher-request')"
       if (!teacherRequestDependency) {
         errors.push(name + ': forbidden dependency or dynamic execution')
       }

@@ -4,11 +4,13 @@ const path = require('node:path')
 const vm = require('node:vm')
 const { test } = require('node:test')
 
+const requestModulePath = path.join(__dirname, '../subpackages/study/utils/ai-teacher-request.js')
+
 function fixture(states) {
   let clock = 0, current = true
   const calls = [], timers = []
   const module = { exports: {} }
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../utils/ai-teacher-request.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(requestModulePath, 'utf8'), {
     module, Date: { now: () => clock },
     setTimeout(resolve, delay) { timers.push(delay); clock += delay; resolve() },
   })

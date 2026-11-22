@@ -92,7 +92,7 @@ const surfaces = [
   },
 ]
 
-const teacherRequest = fs.readFileSync(path.join(miniRoot, 'utils/ai-teacher-request.js'), 'utf8')
+const teacherRequest = fs.readFileSync(path.join(miniRoot, 'subpackages/study/utils/ai-teacher-request.js'), 'utf8')
 assert(teacherRequest.includes("api.get('/ai/error-analysis/availability'"), '老师请求必须先等待共享健康门禁')
 assert(teacherRequest.includes("api.post('/ai/408-teacher'"), '共享老师请求必须调用固定 API')
 surfaces.forEach(surface => {
@@ -143,6 +143,7 @@ const practiceWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/study/prac
 const examJs = fs.readFileSync(path.join(miniRoot, 'subpackages/exam/result/index.js'), 'utf8')
 assert(practiceJs.includes('teacherActions: aiTeacher408.ACTIONS'), '普通练习结果页必须使用自定义 7 动作面板')
 assert(examJs.includes('teacherActions: aiTeacher408.ACTIONS'), '考试结果页必须使用自定义 7 动作面板')
+assert(examJs.includes("require('../../study/utils/ai-teacher-request')"), '考试结果页必须复用 study 分包中的老师请求模块')
 assert(practiceWxml.includes('select408TeacherAction'), '普通练习结果页缺少自定义动作选择处理')
 assert(examWxml.includes('select408TeacherAction'), '考试结果页缺少自定义动作选择处理')
 assert(helper.submitFeedback === undefined, '408 AI helper 不再导出已移除的反馈能力')

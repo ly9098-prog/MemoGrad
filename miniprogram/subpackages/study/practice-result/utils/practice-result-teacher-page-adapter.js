@@ -3,7 +3,7 @@
 
 const aiTeacher408 = require('../../utils/ai-teacher-408')
 const { presentTeacherResult } = require('../../utils/teacher-presentation')
-const { requestTeacher } = require('../../../../utils/ai-teacher-request')
+const { requestTeacher } = require('../../utils/ai-teacher-request')
 
 function buildReview408TeacherPageCapabilities(page, deps) {
   const { api } = deps

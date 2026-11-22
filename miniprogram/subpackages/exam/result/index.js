@@ -1,5 +1,5 @@
 const api = require('../../../utils/api')
-const { requestTeacher } = require('../../../utils/ai-teacher-request')
+const { requestTeacher } = require('../../study/utils/ai-teacher-request')
 const aiTeacher408 = require('../../study/utils/ai-teacher-408')
 const { createExamResultLoadController } = require('../utils/exam-result-load-controller')
 const { createExam408TeacherController } = require('../utils/exam-408-teacher-controller')
