@@ -20,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = { published: "#bcd7e7", approved: 
 function label(name: string, dimension: Dimension) {
   if (dimension === "by_review_status") return STATUS_NAMES[name] ?? name;
   if (dimension === "by_difficulty") return /^\d+$/.test(name) ? `难度 ${name}` : name;
-  return /^\d+$/.test(name) ? `科目 ${name}` : name;
+  return /^\d+$/.test(name) ? "未知科目" : name;
 }
 
 export function QuestionDistribution({ data, loading, error }: { data?: DashboardQuestionStats; loading: boolean; error?: boolean }) {

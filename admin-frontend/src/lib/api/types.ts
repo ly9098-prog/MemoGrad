@@ -602,10 +602,12 @@ export type DashboardDailyPoint = {
 };
 
 export type DashboardQuestionStats = {
-  by_subject: Array<{ name: string; count: number }>;
-  by_review_status: Array<{ name: string; count: number }>;
-  by_difficulty: Array<{ name: string; count: number }>;
+  by_subject: DashboardDistributionItem[];
+  by_review_status: DashboardDistributionItem[];
+  by_difficulty: DashboardDistributionItem[];
 };
+
+export type DashboardDistributionItem = { name: string; count: number };
 
 export type AIUsageMonthly = {
   year_month: string;

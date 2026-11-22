@@ -22,7 +22,12 @@ class AdminDashboardDailyPoint(BaseModel):
     audits_total: int
 
 
+class AdminDashboardDistributionItem(BaseModel):
+    name: str
+    count: int
+
+
 class AdminDashboardQuestionStats(BaseModel):
-    by_subject: list[dict]
-    by_review_status: list[dict]
-    by_difficulty: list[dict]
+    by_subject: list[AdminDashboardDistributionItem]
+    by_review_status: list[AdminDashboardDistributionItem]
+    by_difficulty: list[AdminDashboardDistributionItem]

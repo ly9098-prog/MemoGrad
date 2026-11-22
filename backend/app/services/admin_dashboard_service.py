@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache
 from app.core.time_utils import shanghai_date_utc_range, shanghai_today
-from app.models.admin import AuditLog
+from app.models.admin import AuditLog, Subject
 from app.models.question import Question
 from app.models.question_import import QuestionImport
 from app.models.user import User
@@ -199,8 +199,19 @@ async def get_dashboard_question_stats(db: AsyncSession) -> dict:
             for row in result.all()
         ]
 
+    subject_result = await db.execute(
+        select(Subject.name, func.count())
+        .select_from(Question)
+        .join(Subject, Question.subject_id == Subject.id)
+        .group_by(Subject.id, Subject.name)
+        .order_by(func.count().desc())
+    )
+
     return {
-        "by_subject": await grouped(Question.subject_id),
+        "by_subject": [
+            {"name": row[0] or "未知科目", "count": int(row[1])}
+            for row in subject_result.all()
+        ],
         "by_review_status": await grouped(Question.review_status),
         "by_difficulty": await grouped(Question.difficulty),
     }
