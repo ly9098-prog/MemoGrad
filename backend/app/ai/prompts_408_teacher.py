@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "408-teacher-v7-complete-action-body"
+PROMPT_VERSION = "408-teacher-v8-substantive-action-body"
 
 ACTION_DEFINITIONS: dict[str, dict[str, str]] = {
     "explain_correct": {
@@ -115,6 +115,10 @@ def build_408_teacher_prompt(
             "connect_knowledge 必须在 knowledge_points 的 relation/mastery_hint 或 sections 中说明具体联系，"
             "不能只列知识点名称。"
             "summary 只概括结论；完整依据、适用条件、公式及代入过程写在 points 中，"
+            "即使 summary 已给出答案，points 也必须独立说明依据；"
+            "不得只留下‘题干明确’‘先看条件’等开头短语。"
+            "解释正确项时，必须写完适用条件、关键推理和所得结论；"
+            "简短题可以在一条完整说明中写完，不需要为了分段重复内容。"
             "不得停在‘再由公式’‘因此’等未完成的语句，也不得省略得出结论所需的步骤。"
             "sections 最多 4 组，每组 points 最多 5 条，每条控制在 200 字内并完整收句；"
             "优先保证推理完整，再精简措辞，面向考研专业课复盘。"

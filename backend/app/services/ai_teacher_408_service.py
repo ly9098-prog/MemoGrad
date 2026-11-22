@@ -393,7 +393,9 @@ def _analysis_text_points(
     return [text] if text else []
 
 
-def _structured_analysis_sections(value: object) -> list[dict[str, Any]]:
+def _structured_analysis_sections(
+    value: object, *, allow_unknown_fields: bool = True
+) -> list[dict[str, Any]]:
     if isinstance(value, dict):
         parsed = value
     else:
@@ -457,7 +459,7 @@ def _structured_analysis_sections(value: object) -> list[dict[str, Any]]:
         if points:
             sections.append({"heading": heading, "points": points})
 
-    if not sections:
+    if not sections and allow_unknown_fields:
         for key, raw_value in list(parsed.items())[:4]:
             points = _analysis_text_points(raw_value)
             if points:
@@ -506,7 +508,9 @@ def _normalize_generated_question(value: object, action: str) -> dict[str, Any] 
 
 def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
     sections: list[dict[str, Any]] = []
-    summary_sections = _structured_analysis_sections(value.get("summary"))
+    summary_sections = _structured_analysis_sections(
+        value.get("summary"), allow_unknown_fields=False
+    )
     sections.extend(summary_sections)
 
     raw_sections = value.get("sections")
@@ -584,7 +588,7 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
     summary = _sanitize_user_text(value.get("summary"), 1200)
     if summary_sections:
         summary = _sanitize_user_text(summary_sections[0].get("points", [""])[0], 1200)
-    elif _parse_json_object(summary):
+    elif isinstance(value.get("summary"), (dict, list)) or _parse_json_object(summary):
         summary = deduped_sections[0]["points"][0] if deduped_sections else ""
     return {
         "title": _sanitize_user_text(value.get("title"), 160),
@@ -596,6 +600,32 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
         ),
         "next_action": next_action,
     }
+
+
+def _has_teaching_body(value: dict[str, Any], action: str) -> bool:
+    if action in {"similar_question", "harder_question"}:
+        return value["practice_question"] is not None
+    if action == "explain_options":
+        # Option coverage and verdicts have already passed authoritative validation.
+        return bool(value["sections"])
+    points = [point for section in value["sections"] for point in section["points"]]
+    if action == "connect_knowledge":
+        for item in value["knowledge_points"]:
+            points.extend((item["relation"], item["mastery_hint"]))
+    unique = {re.sub(r"\s", "", point) for point in points if point.strip()}
+    if not unique:
+        return False
+    if len(unique) > 1:
+        return True
+    text = unique.pop()
+    # A fragment guard, not semantic validation. Retain complete short sentences
+    # and formulas, but reject a lone tiny opening such as “题干明确”.
+    return bool(
+        len(text) > 4
+        or re.search(r"[。！？.!?]$", text)
+        or re.fullmatch(r"[^=<>≤≥≠!]+(?:<=|>=|==|!=|[=<>≤≥≠])[^=<>≤≥≠!]+", text)
+        or re.fullmatch(r"[OΩΘ]\([^()]+\)", text)
+    )
 
 
 async def _active_408_subject_ids(db: AsyncSession) -> set[int]:
@@ -1342,17 +1372,7 @@ async def run_teacher_action(
             "from_fallback": True,
         }
 
-    if not (
-        normalized["sections"]
-        or normalized["practice_question"]
-        or (
-            action == "connect_knowledge"
-            and any(
-                item["relation"] or item["mastery_hint"]
-                for item in normalized["knowledge_points"]
-            )
-        )
-    ):
+    if not _has_teaching_body(normalized, action):
         return {
             **base,
             **_fallback_payload(

@@ -495,7 +495,7 @@
 <view class="teacher-sheet-footer mini-choice-sheet-actions" catchtouchmove="noop">
 <button class="mini-choice-sheet-action mini-choice-sheet-action-secondary" hover-class="mini-choice-sheet-action-pressed" bindtap="close408Teacher">返回解析</button>
 <button wx:if="{{teacherLoading}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" disabled>正在生成…</button>
-<button wx:elif="{{teacherErrorText}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="retry408Teacher">重新尝试</button>
+<button wx:elif="{{teacherErrorText || (teacherResult && teacherResult.fromFallback)}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="retry408Teacher">重新尝试</button>
 <button wx:elif="{{teacherResult}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="show408TeacherActions">换个讲解</button>
 </view>
 </block>

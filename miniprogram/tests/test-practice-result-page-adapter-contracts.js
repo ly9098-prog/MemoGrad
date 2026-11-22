@@ -269,6 +269,25 @@ test('review teacher retries after fallback and retains successful result cachin
   assert.equal(posts, 2)
 })
 
+test('a fragment result offers a direct same-action retry and is never cached', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42, status: 'correct' }
+  const actions = []
+  api.post = async (_url, payload) => {
+    actions.push(payload.action)
+    return { action: payload.action, summary: '正确选项为 C，下面给出完整推理链。',
+      sections: [{ heading: '第一步', points: [actions.length === 1 ? '题干明确' : '无噪声信道使用 R=2Wlog₂V，代入可得48kb/s。'] }] }
+  }
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(page.data.teacherResult.fromFallback, true)
+  assert.equal(page.data.teacherErrorText, '')
+  await page.retry408Teacher()
+  assert.deepEqual(actions, ['explain_correct', 'explain_correct'])
+  assert.equal(page.data.teacherResult.fromFallback, false)
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(actions.length, 2, 'only the complete result may be reused')
+})
+
 test('back navigation preserves page lock and invokes runtime platform callbacks', () => {
   const { page, calls, context } = fixture()
   page._returnTo = '/pages/home/home'

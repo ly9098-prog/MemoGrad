@@ -484,7 +484,7 @@ def test_option_prompt_requests_one_minimal_json_envelope():
     assert set(schema) == {"option_explanations"}
     assert set(schema["option_explanations"][0]) == {"option", "is_correct", "reason"}
     assert "不要直接返回数组" in system
-    assert PROMPT_VERSION == "408-teacher-v7-complete-action-body"
+    assert PROMPT_VERSION == "408-teacher-v8-substantive-action-body"
 
 
 @pytest.mark.asyncio
@@ -550,6 +550,126 @@ async def test_teacher_rejects_summary_without_action_body(prepared_teacher, act
     assert "再由公式" not in result["summary"]
     state.usage.assert_awaited_once()
     state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action",
+    ["explain_correct", "core_concept", "connect_knowledge", "high_frequency_traps"],
+)
+async def test_teacher_rejects_opening_fragment_despite_long_summary(
+    prepared_teacher, action
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(
+            {
+                "title": "完整推理链",
+                "summary": "无噪声信道适用奈奎斯特定理，代入条件得到48kb/s。" * 5,
+                "sections": [
+                    {"heading": "第一步：确定适用公式", "points": ["题干明确"]}
+                ],
+            }
+        ),
+        "tokens_used": 21,
+        "finish_reason": "stop",
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action=action
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+    assert "不完整" in result["summary"]
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "points",
+    [
+        ["R=2Wlog₂V=48kb/s"],
+        ["检错能力为最小距离减一。"],
+        ["无噪声信道", "R=2Wlog₂V"],
+        ["栈是后进先出。"],
+        ["O(n)"],
+        ["t=2"],
+        ["互斥", "同步"],
+        ["题干明确无噪声"],
+        ["必须满足全部条件"],
+        ["n<=1"],
+        ["n>=1"],
+        ["n==1"],
+        ["n!=1"],
+    ],
+)
+async def test_teacher_retains_concise_complete_points(prepared_teacher, points):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"sections": [{"heading": "依据", "points": points}]}),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is False
+    assert result["sections"][0]["points"] == points
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("encoded", [False, True])
+async def test_teacher_rejects_metadata_only_structured_summary(
+    prepared_teacher, encoded
+):
+    state = prepared_teacher
+    summary = {
+        "title": "仅标题但并无独立教学正文",
+        "summary": "仅摘要也并无独立教学正文",
+    }
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"summary": json.dumps(summary) if encoded else summary}),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+    payload = {
+        "summary": json.dumps(summary) if encoded else summary,
+        "sections": [{"heading": "依据", "points": ["栈是后进先出。"]}],
+    }
+    state.provider.return_value = {"content": json.dumps(payload), "tokens_used": 21}
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is False
+    assert result["summary"] == "栈是后进先出。"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("points", [["题干明确", "题干明确"], ["t="]])
+async def test_teacher_rejects_repeated_or_unfinished_openings(
+    prepared_teacher, points
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"sections": [{"heading": "依据", "points": points}]}),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
 
 
 @pytest.mark.asyncio

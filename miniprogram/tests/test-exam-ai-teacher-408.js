@@ -218,8 +218,53 @@ test('teacher fallback preserves the new explicit failure reason across wrappers
   }
   const success = teacher.normalizeResult({
     action: 'explain_correct', summary: '有效讲解',
-    sections: [{ heading: '条件', points: ['有效内容'] }],
+    sections: [{ heading: '条件', points: ['根据题干条件可以判断正确项。'] }],
   })
   assert.equal(success.summary, '有效讲解')
   assert.equal(success.sections.length, 1)
+})
+
+test('a long summary and a four-character opening fragment do not constitute a lesson', () => {
+  for (const action of ['explain_correct', 'core_concept', 'high_frequency_traps', 'connect_knowledge']) {
+    const result = teacher.normalizeResult({
+      action, title: '完整推理链', summary: '本题适用奈奎斯特定理，代入题干条件后得到正确答案。'.repeat(5),
+      sections: [{ heading: '第一步：确定适用公式——无噪声→奈奎斯特定理', points: ['题干明确'] }],
+    })
+    assert.equal(result.fromFallback, true, action)
+    assert.match(result.summary, /不完整/)
+    assert.deepEqual(result.sections, [])
+  }
+})
+
+test('concise formulas, a short complete explanation and multiple brief points remain valid', () => {
+  for (const points of [['R=2Wlog₂V=48kb/s'], ['检错能力为最小距离减一。'],
+    ['无噪声信道', 'R=2Wlog₂V'], ['栈是后进先出。'], ['O(n)'], ['t=2'], ['互斥', '同步'],
+    ['题干明确无噪声'], ['必须满足全部条件'], ['n<=1'], ['n>=1'], ['n==1'], ['n!=1']]) {
+    const result = teacher.normalizeResult({ action: 'explain_correct', sections: [{ heading: '依据', points }] })
+    assert.equal(result.fromFallback, false)
+    assert.deepEqual(result.sections[0].points, points)
+  }
+})
+
+test('metadata inside a structured summary never substitutes for teaching points', () => {
+  for (const summary of [{ title: '仅标题但并无独立教学正文', summary: '仅摘要也并无独立教学正文' },
+    JSON.stringify({ title: '仅标题但并无独立教学正文', summary: '仅摘要也并无独立教学正文' })]) {
+    const result = teacher.normalizeResult({ action: 'explain_correct', summary, sections: [] })
+    assert.equal(result.fromFallback, true)
+    assert.deepEqual(result.sections, [])
+    const valid = teacher.normalizeResult({ action: 'explain_correct', summary,
+      sections: [{ heading: '依据', points: ['栈是后进先出。'] }] })
+    assert.equal(valid.fromFallback, false)
+    assert.equal(valid.summary, '栈是后进先出。')
+  }
+  const legacy = teacher.normalizeResult({ action: 'explain_correct',
+    summary: JSON.stringify({ analysis: '检错能力为最小距离减一。' }) })
+  assert.equal(legacy.fromFallback, false, 'known historical teaching fields remain compatible')
+})
+
+test('a repeated opening or an unfinished short formula remains a fragment', () => {
+  for (const points of [['题干明确', '题干明确'], ['t=']]) {
+    const result = teacher.normalizeResult({ action: 'explain_correct', sections: [{ heading: '依据', points }] })
+    assert.equal(result.fromFallback, true)
+  }
 })

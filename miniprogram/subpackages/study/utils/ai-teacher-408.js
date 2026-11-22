@@ -60,25 +60,23 @@ return Object.values(value).map(item => cleanText(item)).filter(text => text && 
 const text = cleanText(value)
 return text ? [text] : []
 }
-function structuredSections(value) {
+function structuredSections(value, allowUnknownFields = true) {
 const obj = tryParseObject(value)
 if (!obj) return []
 const result = []
-const used = new Set()
 STRUCTURED_ANALYSIS_KEYS.forEach(group => {
 let picked
 for (let keyIndex = 0; keyIndex < group.keys.length; keyIndex++) {
 const key = group.keys[keyIndex]
 if (Object.prototype.hasOwnProperty.call(obj, key) && obj[key] != null && obj[key] !== '') {
 picked = obj[key]
-used.add(key)
 break
 }
 }
 const points = textPoints(picked)
 if (points.length) result.push({ heading: group.heading, points })
 })
-if (!result.length) {
+if (!result.length && allowUnknownFields) {
 Object.keys(obj).slice(0, 4).forEach(key => {
 const points = textPoints(obj[key])
 if (points.length) result.push({ heading: cleanText(key).replace(/_/g, ' '), points })
@@ -135,18 +133,33 @@ difficultyDelta: Number(practiceRaw.difficulty_delta ?? practiceRaw.difficultyDe
 }
 return practiceQuestion
 }
+function hasTeachingBody(sections, knowledgePoints, action) {
+if (action === 'explain_options') return sections.length > 0
+const points = sections.reduce((items, section) => items.concat(section.points), [])
+if (action === 'connect_knowledge') {
+knowledgePoints.forEach(item => points.push(item.relation, item.masteryHint))
+}
+const unique = [...new Set(points.map(point => point.replace(/\s/g, '')).filter(Boolean))]
+if (!unique.length) return false
+if (unique.length > 1) return true
+const text = unique[0]
+// Reject a lone tiny opening, while retaining complete short sentences/formulas.
+// This is a fragment guard, not semantic validation of an entire lesson.
+return Array.from(text).length > 4 || /[。！？.!?]$/.test(text) ||
+/^[^=<>≤≥≠!]+(?:<=|>=|==|!=|[=<>≤≥≠])[^=<>≤≥≠!]+$/.test(text) || /^[OΩΘ]\([^()]+\)$/.test(text)
+}
 function normalizeResult(raw) {
 let source = raw
 if (typeof source === 'string') source = tryParseObject(source)
 if (!source || typeof source !== 'object' || Array.isArray(source)) return null
 if (source.result && typeof source.result === 'object') source = source.result
 if (source.data && typeof source.data === 'object' && !source.action && !source.sections) source = source.data
-const summaryStructured = structuredSections(source.summary)
+const summaryStructured = structuredSections(source.summary, false)
 const sections = dedupeSections(summaryStructured.concat(normalizeSections(source.sections)))
 let summary = cleanText(source.summary)
 if (summaryStructured.length) {
 summary = summaryStructured[0].points[0] || ''
-} else if (tryParseObject(summary)) {
+} else if ((source.summary && typeof source.summary === 'object') || tryParseObject(summary)) {
 summary = sections.length ? sections[0].points[0] : ''
 }
 const knowledgePoints = Array.isArray(source.knowledge_points)
@@ -174,10 +187,14 @@ fromFallback: !!(source.from_fallback ?? source.fromFallback),
 personalization: source.personalization || {},
 promptVersion: cleanText(source.prompt_version || source.promptVersion),
 }
+return finalizeResult(result)
+}
+function finalizeResult(result) {
+const { action, sections, knowledgePoints, practiceQuestion } = result
 if (!result.fromFallback && ACTION_BY_KEY[action]) {
 const hasBody = action === 'similar_question' || action === 'harder_question'
 ? !!(practiceQuestion && practiceQuestion.stem && practiceQuestion.options.length && practiceQuestion.answer)
-: sections.length > 0 || (action === 'connect_knowledge' && knowledgePoints.some(item => item.relation || item.masteryHint))
+: hasTeachingBody(sections, knowledgePoints, action)
 if (!hasBody) {
 result.fromFallback = true
 result.title = '讲解未完整生成'

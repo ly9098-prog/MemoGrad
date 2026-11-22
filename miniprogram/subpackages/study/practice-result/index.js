@@ -760,7 +760,7 @@ if (action) this.run408TeacherFromReview(action);
   },
 
 retry408Teacher() {
-if (this.data.teacherLoading || !this.data.teacherErrorText) return;
+if (this.data.teacherLoading || !(this.data.teacherErrorText || (this.data.teacherResult && this.data.teacherResult.fromFallback))) return;
 return this.run408TeacherFromReview(this.data.teacherAction);
 },
 show408TeacherActions() {

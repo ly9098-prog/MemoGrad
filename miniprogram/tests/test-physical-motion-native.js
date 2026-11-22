@@ -120,7 +120,7 @@ test('both teacher pages render shared lessons without losing raw or presented k
       ? '本次未生成 AI 讲解，可返回查看题库解析后重试。'
       : '本次未生成 AI 讲解，可返回查看题库解析，或重新尝试。'))
     assert.ok(nodes.some(node => node.attr && node.attr.bindtap ===
-      (file.includes('practice-result') ? 'show408TeacherActions' : 'run408TeacherAction')))
+      (file.includes('practice-result') ? 'retry408Teacher' : 'run408TeacherAction')))
   }
 })
 
