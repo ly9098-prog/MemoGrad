@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
 const { fixture, deferred } = require('./helpers/wrong-detail-ai-recovery-fixture')
+const { ApiError } = require('../utils/api-error')
 const plain = value => JSON.parse(JSON.stringify(value))
 
 test('analysis request preserves endpoint, payload booleans, timeout and current API receiver', async () => {
@@ -270,5 +271,53 @@ test('checking intent cannot generate after switching questions or leaving the p
     pending.resolve()
     await task
     assert.deepEqual(loaded, [], change)
+  }
+})
+
+test('regeneration business failures use string messages and override shared checking retryability', () => {
+  const { page } = fixture()
+  for (const error_code of ['ai_regeneration_limited', 'ai_regeneration_unavailable', 'ai_regeneration_unchanged']) {
+    const state = page._analysisFailureState('', {
+      error_code, message: '后端复盘提示', retryable: true,
+      availability: { status: 'checking', reason: 'checking' },
+    })
+    assert.deepEqual(plain(state), { aiErrorText: '后端复盘提示', aiRetryable: false })
+    for (const message of [null, 42, false, {}, [], '', '  ']) {
+      const fallback = page._analysisFailureState('', { error_code, message })
+      assert.equal(typeof fallback.aiErrorText, 'string')
+      assert.ok(fallback.aiErrorText.trim())
+      assert.equal(fallback.aiRetryable, false)
+    }
+  }
+})
+
+test('429 detail message takes precedence over ApiError wrapper and raw detail remains supported', () => {
+  const { page } = fixture()
+  for (const location of ['detail', 'raw']) {
+    const detail = { error_code: 'ai_regeneration_limited', message: '请稍后再生成', retry_after_ms: 30000 }
+    const error = new ApiError('Too Many Requests', {
+      statusCode: 429,
+      ...(location === 'detail' ? { detail } : { raw: { data: { detail } } }),
+    })
+    assert.deepEqual(plain(page._analysisFailureState('', error)), {
+      aiErrorText: '请稍后再生成', aiRetryable: false,
+    })
+  }
+  for (const message of [null, {}, 12]) {
+    assert.equal(page._analysisFailureState('', new ApiError('Too Many Requests', {
+      statusCode: 429, detail: { message },
+    })).aiErrorText, 'AI 服务当前繁忙，请稍后重试')
+  }
+})
+
+test('explicit business failures never repeat analysis requests even while availability is checking', async () => {
+  for (const error_code of ['ai_regeneration_limited', 'ai_regeneration_unavailable', 'ai_regeneration_unchanged']) {
+    const { page, api } = fixture(), requests = []
+    const result = { error_code, message: '停止重试', from_fallback: true,
+      availability: { status: 'checking', enabled: false } }
+    api.post = async (...args) => { requests.push(args); return result }
+    page._refreshAiAvailability = () => { throw new Error('business failure must not wait for a probe') }
+    assert.equal(await page._requestAiAnalysis(12, true), result)
+    assert.equal(requests.length, 1)
   }
 })

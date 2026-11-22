@@ -130,6 +130,10 @@ async def _seed(factory):
 @pytest_asyncio.fixture
 async def ai_client(tmp_path, monkeypatch):
     engine, factory = await _make_database(tmp_path)
+    from app.core.cache import CacheClient
+    client_cache = CacheClient()
+    client_cache._enabled = False
+    monkeypatch.setattr("app.api.v1.ai.cache", client_cache)
     try:
         await _seed(factory)
         app = FastAPI()
@@ -627,3 +631,22 @@ async def test_prewarm_enqueues_each_owned_wrong_question_once(ai_client, monkey
     assert response.status_code == 200
     assert response.json()["queued"] == [1]
     enqueue.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_recovery_enqueue_limit_prevents_unbounded_background_tasks(ai_client, monkeypatch):
+    enqueue = AsyncMock(return_value=True)
+    monkeypatch.setattr(ai_prewarm_worker, "enqueue_prewarm", enqueue)
+    for _ in range(3):
+        response = await ai_client.client.post(
+            "/api/v1/ai/error-analysis/recover",
+            json={"wrong_question_id": 1, "force_regenerate": True},
+        )
+        assert response.status_code == 200
+    response = await ai_client.client.post(
+        "/api/v1/ai/error-analysis/recover",
+        json={"wrong_question_id": 1, "force_regenerate": True},
+    )
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "ai_regeneration_limited"
+    assert enqueue.await_count == 3

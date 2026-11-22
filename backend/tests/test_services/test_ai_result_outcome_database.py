@@ -63,3 +63,42 @@ async def assert_terminal_state(db, wrong_id, user_id, kind, image_count, fail_s
     if chats:
         assert chats[0].context_snapshot["visual_input_count"] == image_count
         assert chats[0].tokens_used == 31
+
+
+@pytest.mark.asyncio
+async def test_rejected_regeneration_bills_tokens_without_replacing_persisted_analysis(tmp_path):
+    from types import SimpleNamespace
+
+    from app.services.ai.analysis_regeneration import reject_unsuccessful_regeneration
+    from app.services.ai.analysis_result_review import ReviewedAnalysis
+    from app.services.ai.analysis_validation import AnalysisUsage, GroundingValidation
+
+    engine, sessions = await _make_database(tmp_path)
+    old = {"mistake_diagnosis": "previous diagnosis", "knowledge_patch": "previous knowledge",
+           "review_task": "previous task", "_meta": {"generated_at": "old-marker"}}
+    try:
+        subject_id, user_id = await _seed_subject_user(sessions)
+        async with sessions() as db:
+            wrong, wrong_id = await seed_wrong_question(db, subject_id, user_id)
+            wrong.ai_analysis = old
+            await db.commit()
+            arguments = SimpleNamespace(
+                db=db, user_id=user_id, wrong_question=wrong, effective_force=True,
+                context={"question": "synthetic"}, result={"model": "mock-provider"},
+            )
+            review = ReviewedAnalysis(
+                {}, False, AnalysisUsage("", False, 0, 432, 50),
+                GroundingValidation(False, "invalid"), None,
+            )
+            response = await reject_unsuccessful_regeneration(arguments, review)
+            assert response["force_regenerated"] is False
+            assert response["tokens_used"] == 432
+        async with sessions() as db:
+            persisted = await db.get(WrongQuestion, wrong_id)
+            assert persisted.ai_analysis == old
+            chats = list(await db.scalars(select(AiChat).where(AiChat.user_id == user_id)))
+            assert len(chats) == 1
+            assert chats[0].tokens_used == 432
+            assert chats[0].model == "mock-provider"
+    finally:
+        await engine.dispose()

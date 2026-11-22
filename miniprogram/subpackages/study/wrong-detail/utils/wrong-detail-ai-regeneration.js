@@ -36,7 +36,8 @@ async function _applyRegenerateResult(page, result, wqId, requestId, baselineGen
     const hasContent = _hasAiContent(normalized)
     const model = (result && result.model) || ''
     const fromFallback = !!(result && result.from_fallback)
-    const cachePreserved = !!(result && result.cache_preserved)
+    const cachePreserved = !!(result && (result.cache_preserved ||
+      result.from_cache === true || (!fromFallback && result.force_regenerated === false)))
     if (model === 'generating') {
       await page._handleRegeneratingModel(wqId, requestId, baselineGeneratedAt)
       return
@@ -78,22 +79,26 @@ async function _handleRegeneratingModel(page, wqId, requestId, baselineGenerated
 
 function _commitRegenerateCachePreserved(page, result, normalized, wqId, baselineGeneratedAt, { _normalizeAiResult, showToast }) {
     page._resetAiLoadingState()
+    const failure = page._analysisFailureState('', result)
+    const notice = result && typeof result.message === 'string' && result.message.trim()
+      ? failure.aiErrorText : '重新生成失败，已保留历史解析'
     page._aiResult = normalized
     page._aiGenerationMarker = String((result && result.generated_at) || baselineGeneratedAt || '')
     page._syncWqCacheAi(wqId, normalized, page._aiGenerationMarker)
     page.setData({
       aiCards: _normalizeAiResult(normalized), aiFallback: false, aiFromCache: true,
-      aiFromQuestionAnalysis: false, aiInlineNotice: '重新生成失败，已保留历史解析',
+      aiFromQuestionAnalysis: false, aiInlineNotice: notice, aiRetryable: failure.aiRetryable,
     })
-    showToast({ title: '重新生成失败，已保留历史解析', icon: 'none' })
+    showToast({ title: notice, icon: 'none' })
   }
 
 function _handleRegenerateFallback(page, model, result, oldCards, { showToast }) {
     page._resetAiLoadingState()
     var failure = page._analysisFailureState(model, result)
     if (oldCards) {
-      page.setData({ aiFallback: false, aiInlineNotice: failure.aiErrorText || '重新生成失败，已保留当前解析' })
-      showToast({ title: '重新生成失败，已保留当前解析', icon: 'none' })
+      page.setData({ aiFallback: false, aiRetryable: failure.aiRetryable,
+        aiInlineNotice: failure.aiErrorText || '重新生成失败，已保留当前解析' })
+      showToast({ title: page.data.aiInlineNotice, icon: 'none' })
     } else {
       page.setData(Object.assign({ aiFallback: true }, failure))
     }
@@ -133,7 +138,7 @@ function _handleRegenerateError(page, e, wqId, requestId, baselineGeneratedAt, o
 async function _handleRegenerateRecovery(page, e, wqId, requestId, baselineGeneratedAt, oldCards, oldResult, { _shouldRecoverAiRequest, showToast }) {
     if (!page._isCurrentAiRequest(requestId, wqId)) return
     const availability = _applyAvailabilityFromError(page, e)
-    if (!_shouldRecoverAiRequest(e)) {
+    if (page._analysisFailureState('', e).aiRetryable === false || !_shouldRecoverAiRequest(e)) {
       page._handleRegenerateTimeout(e, oldCards, oldResult)
       _refreshAvailabilityAfterFailure(page, availability)
       return
@@ -156,15 +161,17 @@ async function _handleRegenerateRecovery(page, e, wqId, requestId, baselineGener
 
 function _handleRegenerateTimeout(page, e, oldCards, oldResult, { _isTimeoutError, showToast }) {
     const timeoutText = _isTimeoutError(e) ? '重新生成超时' : '重新生成失败'
+    const failure = page._analysisFailureState(_isTimeoutError(e) ? 'timeout' : '', e)
     if (oldCards) {
       page._resetAiLoadingState()
       page._aiResult = oldResult
-      page.setData({ aiCards: oldCards, aiFallback: false, aiInlineNotice: `${timeoutText}，已保留历史解析` })
-      showToast({ title: `${timeoutText}，已保留历史解析`, icon: 'none' })
+      const notice = failure.aiRetryable === false || Number(e && e.statusCode) === 429
+        ? failure.aiErrorText : `${timeoutText}，已保留历史解析`
+      page.setData({ aiCards: oldCards, aiFallback: false, aiRetryable: failure.aiRetryable, aiInlineNotice: notice })
+      showToast({ title: notice, icon: 'none' })
     } else {
       page._resetAiLoadingState()
-      page.setData(Object.assign({ aiFallback: true },
-        page._analysisFailureState(_isTimeoutError(e) ? 'timeout' : '', e)))
+      page.setData(Object.assign({ aiFallback: true }, failure))
     }
   }
 

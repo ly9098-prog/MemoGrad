@@ -38,6 +38,7 @@ class AiResponse(BaseModel):
     retryable: bool | None = None
     generated_at: str | None = None
     availability: AiModelAvailabilityResponse | None = None
+    message: str | None = None
 
 
 class AiRecoveryRequest(BaseModel):

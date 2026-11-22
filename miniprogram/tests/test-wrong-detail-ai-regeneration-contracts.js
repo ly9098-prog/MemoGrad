@@ -336,7 +336,7 @@ test('timeout restores old result only with old cards and preserves timeout/fail
     assert.deepEqual(f.calls.map(call => call[0]),
       oldCards ? ['reset', 'setData', 'setData', 'toast'] : ['reset', 'setData', 'setData'])
     assert.deepEqual(plain(f.calls[2][1]), oldCards
-      ? { aiCards: oldCards, aiFallback: false, aiInlineNotice: title + '，已保留历史解析' }
+      ? { aiCards: oldCards, aiFallback: false, aiRetryable: true, aiInlineNotice: title + '，已保留历史解析' }
       : { aiFallback: true, aiRetryable: true, aiErrorText: isTimeout
         ? 'AI 分析生成超时，请稍后重试' : 'AI 服务暂时不可用，请稍后重试' })
     if (oldCards) assert.deepEqual(plain(f.calls.at(-1)[1]),
@@ -432,4 +432,130 @@ test('structured regeneration error applies shared state without an extra refres
 
   assert.deepEqual(applied, [shared])
   assert.deepEqual(refreshed, [])
+})
+
+test('valid cached or explicitly unregenerated content never reports regeneration success', async () => {
+  for (const flags of [
+    { from_cache: true }, { force_regenerated: false },
+    { from_cache: true, force_regenerated: true },
+    { cache_preserved: true, force_regenerated: false },
+  ]) {
+    const f = setup(), { page } = f
+    f.api.post = async () => ({ content: '历史解析', generated_at: 'old', ...flags })
+    await page.regenerateAiAnalysis()
+    assert.equal(page._aiResult.content, '历史解析')
+    assert.ok(page.data.aiCards)
+    assert.equal(page.data.aiFromCache, true)
+    assert.equal(page.data.aiRegenerating, false)
+    assert.equal(page.data.aiSkeletonVisible, false)
+    assert.equal(f.calls.some(call => call[0] === 'toast' && call[1].icon === 'success'), false)
+  }
+  for (const flags of [{}, { force_regenerated: true, from_cache: false }]) {
+    const f = setup()
+    f.api.post = async () => ({ content: '新解析', ...flags })
+    await f.page.regenerateAiAnalysis()
+    assert.equal(f.calls.at(-1)[1].title, '已重新生成')
+    assert.equal(f.calls.at(-1)[1].icon, 'success')
+  }
+})
+
+test('business regeneration failures display backend notices and preserve old analysis without recovery', async () => {
+  for (const error_code of ['ai_regeneration_limited', 'ai_regeneration_unavailable', 'ai_regeneration_unchanged']) {
+    for (const cached of [false, true]) for (const existing of [false, true]) {
+      const f = setup(), { page } = f
+      const oldResult = { content: '历史解析' }, oldCards = { previous: true }
+      page._aiResult = oldResult
+      page.data.aiCards = existing ? oldCards : null
+      page._aiGenerationMarker = 'old'
+      const message = '本次重新生成被拒绝，保留历史解析'
+      const result = { error_code, message, from_fallback: true, force_regenerated: false,
+        from_cache: cached, cache_preserved: cached, generated_at: 'old',
+        content: cached ? '历史解析' : '' }
+      const requests = []
+      f.api.post = async (...args) => { requests.push(args); return result }
+      page._enqueueAiRecovery = () => { throw new Error('must not enqueue') }
+      page._pollPersistedAiAnalysis = () => { throw new Error('must not poll') }
+      await page.regenerateAiAnalysis()
+      assert.equal(requests.length, 1)
+      assert.equal(page.data.aiRetryable, false)
+      assert.equal(page._aiGenerationMarker, 'old')
+      if (cached || existing) {
+        assert.equal(page.data.aiInlineNotice, message)
+        assert.deepEqual(plain(f.calls.at(-1)[1]), { title: message, icon: 'none' })
+        assert.equal(page.data.aiFallback, false)
+      } else {
+        assert.equal(page.data.aiErrorText, message)
+        assert.equal(page.data.aiFallback, true)
+      }
+      if (existing && !cached) {
+        assert.equal(page.data.aiCards, oldCards)
+        assert.equal(page._aiResult, oldResult)
+      }
+    }
+  }
+})
+
+test('429 and transport-shaped business errors keep old cards and display structured backend message', async () => {
+  for (const statusCode of [429, 0, 502, 504]) for (const existing of [false, true]) {
+    for (const location of ['detail', 'raw']) {
+      const f = setup(), { page } = f
+      const oldCards = { previous: true }, oldResult = { content: '历史解析' }
+      page.data.aiCards = existing ? oldCards : null
+      page._aiResult = oldResult
+      const detail = { error_code: 'ai_regeneration_limited', message: '请等待片刻再生成' }
+      f.api.post = async () => { throw new ApiError('generic HTTP wrapper', { statusCode,
+        ...(location === 'detail' ? { detail } : { raw: { data: { detail } } }),
+      }) }
+      page._enqueueAiRecovery = () => { throw new Error('must not enqueue') }
+      page._pollPersistedAiAnalysis = () => { throw new Error('must not poll') }
+      await page.regenerateAiAnalysis()
+      assert.equal(page.data.aiRegenerating, false)
+      assert.equal(page.data.aiSkeletonVisible, false)
+      assert.equal(page.data.aiCards, existing ? oldCards : null)
+      assert.equal(page._aiResult, oldResult)
+      assert.equal(page.data.aiRetryable, false)
+      assert.equal(existing ? page.data.aiInlineNotice : page.data.aiErrorText, '请等待片刻再生成')
+      if (existing) assert.equal(f.calls.at(-1)[1].title, '请等待片刻再生成')
+    }
+  }
+})
+
+test('plain HTTP 429 shows detail message with old cards and never enqueues another request', async () => {
+  const f = setup(), { page } = f, oldCards = { previous: true }
+  page.data.aiCards = oldCards
+  f.api.post = async () => { throw new ApiError('Too Many Requests', {
+    statusCode: 429, detail: { message: '请求过于频繁，请稍后再试' },
+  }) }
+  page._enqueueAiRecovery = () => { throw new Error('must not enqueue') }
+  page._pollPersistedAiAnalysis = () => { throw new Error('must not poll') }
+  await page.regenerateAiAnalysis()
+  assert.equal(page.data.aiCards, oldCards)
+  assert.equal(page.data.aiInlineNotice, '请求过于频繁，请稍后再试')
+  assert.equal(f.calls.at(-1)[1].title, '请求过于频繁，请稍后再试')
+})
+
+test('cache preservation rejects non-string backend messages and keeps the legacy notice', async () => {
+  for (const message of [null, 12, {}, [], false, '', '  ']) {
+    const f = setup()
+    f.api.post = async () => ({ content: '历史解析', cache_preserved: true,
+      force_regenerated: false, error_code: 'ai_regeneration_unchanged', message })
+    await f.page.regenerateAiAnalysis()
+    assert.equal(f.page.data.aiInlineNotice, '重新生成失败，已保留历史解析')
+    assert.equal(f.calls.at(-1)[1].title, '重新生成失败，已保留历史解析')
+    assert.equal(f.page.data.aiRetryable, false)
+  }
+})
+
+test('fallback placeholder with force=false cannot overwrite the existing analysis', async () => {
+  const f = setup(), { page } = f, oldCards = { previous: true }, oldResult = { content: 'original' }
+  page.data.aiCards = oldCards
+  page._aiResult = oldResult
+  f.api.post = async () => ({ content: '服务暂时不可用，请参考原解析', from_fallback: true,
+    force_regenerated: false, cache_preserved: false, from_cache: false,
+    error_code: 'ai_regeneration_limited', message: '重新生成次数受限' })
+  await page.regenerateAiAnalysis()
+  assert.equal(page.data.aiCards, oldCards)
+  assert.equal(page._aiResult, oldResult)
+  assert.equal(page.data.aiInlineNotice, '重新生成次数受限')
+  assert.equal(f.calls.some(call => call[0] === 'toast' && call[1].icon === 'success'), false)
 })

@@ -18,6 +18,7 @@ from app.services.ai.analysis_execution import (
     prepare_locked_analysis_inputs,
     review_locked_analysis_cache,
 )
+from app.services.ai.analysis_regeneration import admit_regeneration
 from app.services.ai.analysis_responses import generation_in_progress_response
 from app.services.ai.analysis_review_invocation import (
     invoke_and_review_analysis,
@@ -105,6 +106,15 @@ async def _execute_with_lease(
     inputs = await _prepare_inputs(request)
     if inputs.response is not None:
         return inputs.response
+
+    if request.effective_force:
+        denied = await admit_regeneration(
+            cache=request.cache,
+            user_id=request.user_id,
+            wrong_question=request.wrong_question,
+        )
+        if denied is not None:
+            return denied
 
     context = _grounded_context(inputs)
     invocation, review = await _invoke_review(request, context, input_signature, inputs)

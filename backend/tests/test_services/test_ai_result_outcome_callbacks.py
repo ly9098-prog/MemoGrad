@@ -30,6 +30,8 @@ def arguments(h, kind, images):
         "wrong_question", "user_id", "context", "result", "input_signature",
         "model_signature", "expected_answer_check", "effective_force", "runtime",
     )}
+    if kind == "repair":
+        kwargs["effective_force"] = False
     kwargs.update(
         image_data_urls=images, visual_evidence_is_valid=lambda _value: True,
         max_tokens=800, logger=logging.getLogger("test-real-analysis-outcome"),

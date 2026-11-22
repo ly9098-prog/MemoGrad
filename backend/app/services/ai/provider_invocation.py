@@ -45,6 +45,7 @@ class ProviderInvocationInput:
     resolve_runtime: RuntimeResolver
     quarantine_runtime: Quarantiner
     failure_response: FailureResponse
+    previous_analysis: dict | None = None
 
 
 @dataclass(slots=True)
@@ -88,11 +89,16 @@ async def _invoke_runtime(payload: ProviderInvocationInput, selected_runtime):
         payload.correct_answer,
         answer_grounding=payload.answer_grounding,
         image_data_urls=payload.image_data_urls,
+        **(
+            {"previous_analysis": payload.previous_analysis or {}}
+            if payload.force
+            else {}
+        ),
     )
     async with asyncio.timeout(payload.model_timeout_sec + payload.timeout_guard_sec):
         result = await payload.chat(
             messages,
-            temperature=0.2,
+            temperature=0.6 if payload.force else 0.2,
             model=selected_runtime.model_name,
             api_key=selected_runtime.api_key,
             base_url=selected_runtime.base_url,
@@ -193,7 +199,9 @@ def _auth_failure_without_fallback(
     )
 
 
-def _log_auth_failover(payload: ProviderInvocationInput, runtime, fallback_runtime) -> None:
+def _log_auth_failover(
+    payload: ProviderInvocationInput, runtime, fallback_runtime
+) -> None:
     payload.logger.warning(
         "ai.error_analysis.auth_failover wq_id=%s from_model_config_id=%s "
         "to_model_config_id=%s from_model=%s to_model=%s",

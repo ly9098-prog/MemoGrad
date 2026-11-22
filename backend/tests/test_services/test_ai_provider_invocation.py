@@ -73,7 +73,7 @@ async def test_success_passes_analysis_contract_to_selected_model():
     args, kwargs = item.chat.await_args
     assert args[0][0]["role"] == "system"
     assert kwargs == {
-        "temperature": 0.2,
+        "temperature": 0.6,
         "model": "analysis-primary",
         "api_key": "synthetic-key",
         "base_url": "https://example.test/v1",
@@ -225,3 +225,23 @@ async def test_unverified_model_returns_availability_without_provider_call(monke
     item.chat.assert_not_awaited()
     item.resolve_runtime.assert_not_awaited()
     item.quarantine_runtime.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_force_regeneration_passes_previous_teaching_to_prompt():
+    previous = {"mistake_diagnosis": "旧错因", "knowledge_patch": "旧知识", "review_task": "旧任务"}
+    item = payload(previous_analysis=previous)
+    await invoke_analysis_provider(item)
+    messages = item.chat.await_args.args[0]
+    text = str(messages)
+    assert "旧知识" in text
+    assert "重新生成" in text
+    assert item.chat.await_args.kwargs["temperature"] == 0.6
+
+
+@pytest.mark.asyncio
+async def test_initial_generation_does_not_include_regeneration_prompt():
+    item = payload(force=False)
+    await invoke_analysis_provider(item)
+    assert "重新生成" not in str(item.chat.await_args.args[0])
+    assert item.chat.await_args.kwargs["temperature"] == 0.2

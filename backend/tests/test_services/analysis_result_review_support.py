@@ -91,7 +91,7 @@ def outcome_harness(monkeypatch, *, kind="valid", fail_at=None, failure=None):
     h.kwargs = dict(
         wrong_question=SimpleNamespace(id=7), user_id=8, context={"question": object()},
         result={"model": object()}, image_data_urls=[object()], input_signature=object(),
-        model_signature=object(), expected_answer_check=object(), effective_force=object(),
+        model_signature=object(), expected_answer_check=object(), effective_force=False,
         runtime=object(), visual_evidence_is_valid=object(), max_tokens=800,
         logger=SimpleNamespace(info=log), visual_ack_failure=ack,
         grounding_repair=async_call("repair"), valid_outcome=async_call("valid"),

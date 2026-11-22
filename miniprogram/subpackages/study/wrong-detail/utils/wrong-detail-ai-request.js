@@ -58,6 +58,10 @@ const code = value.error_code || detail.error_code || detail.code || value.code
 const availability = value.availability || detail.availability ||
   (detail.status === 'unavailable' || detail.status === 'checking' ? detail : null)
 const status = Number(value.statusCode) || 0
+const message = !value.name && typeof value.message === 'string' && value.message.trim()
+  ? value.message : detail.message
+const regenerationRejected = ['ai_regeneration_limited', 'ai_regeneration_unavailable',
+  'ai_regeneration_unchanged'].includes(code)
 const messages = {
 401: '登录状态已失效，可返回首页重新登录',
 403: '当前暂不能生成这道题的复盘，可先查看参考答案',
@@ -67,10 +71,10 @@ const messages = {
 429: 'AI 服务当前繁忙，请稍后重试',
 }
 return {
-aiErrorText: availability
+aiErrorText: typeof message === 'string' && message.trim() ? message : availability
   ? _fallbackMessage('', 'availability_' + availability.reason)
   : messages[status] || _fallbackMessage(model, code, value.retryable),
-aiRetryable: availability ? true
+aiRetryable: regenerationRejected ? false : availability ? true
   : ![401, 403, 404, 409, 422].includes(status) && value.retryable !== false,
 }
 }

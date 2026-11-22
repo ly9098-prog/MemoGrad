@@ -53,6 +53,7 @@ async def invoke_prepared_analysis(
             logger=request.logger,
             wrong_question_id=request.wrong_question.id,
             force=request.force,
+            previous_analysis=getattr(request.wrong_question, "ai_analysis", None),
             visual=bool(request.image_data_urls),
             question=request.context["question"],
             wrong_answer=request.wrong_question.wrong_answer,

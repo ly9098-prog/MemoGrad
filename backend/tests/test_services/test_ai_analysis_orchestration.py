@@ -165,3 +165,18 @@ async def test_finally_reads_request_values_after_outcome_callback(monkeypatch):
         wrong_question_id=9, generating=replacement_generating,
         lease=h.lease, cache=replacement_cache,
     ))
+
+
+@pytest.mark.asyncio
+async def test_regeneration_denial_after_lease_releases_without_provider_call(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    h = harness(monkeypatch)
+    h.request.effective_force = True
+    denied = {"error_code": "ai_regeneration_limited"}
+    admit = AsyncMock(return_value=denied)
+    monkeypatch.setattr(module, "admit_regeneration", admit)
+    assert await module.execute_locked_analysis(h.request) is denied
+    assert [name for name, *_ in h.events] == ["begin", "cache", "inputs", "finish"]
+    admit.assert_awaited_once_with(cache=h.request.cache, user_id=8,
+                                  wrong_question=h.request.wrong_question)

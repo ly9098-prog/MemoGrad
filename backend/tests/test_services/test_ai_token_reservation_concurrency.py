@@ -157,7 +157,7 @@ async def test_redis_ledger_preserves_settled_charge_and_expiry(tmp_path):
         "--save", "",
         "--appendonly", "no",
         "--maxmemory", "16mb",
-        "--maxclients", "16",
+        "--maxclients", "64",
         "--dir", str(tmp_path),
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
@@ -187,6 +187,23 @@ async def test_redis_ledger_preserves_settled_charge_and_expiry(tmp_path):
             assert second is not None
             await service.cancel_token_reservation(second)
             assert int(await redis.get(first.day_key)) == 500
+        from types import SimpleNamespace
+
+        from app.services.ai.analysis_regeneration import admit_regeneration
+
+        # Independent clients exercise the shared Redis Lua admission across processes.
+        second_client = CacheClient()
+        second_client._enabled = True
+        second_client._client = redis
+        wrong = SimpleNamespace(id=56, question_id=6, ai_analysis=None)
+        results = await asyncio.gather(*[
+            admit_regeneration(cache=client if index % 2 else second_client,
+                               user_id=56, wrong_question=wrong)
+            for index in range(24)
+        ])
+        assert sum(result is None for result in results) == 1
+        assert all(result["error_code"] == "ai_regeneration_limited"
+                   for result in results if result)
     finally:
         await redis.aclose()
         if process.returncode is None:

@@ -20,6 +20,14 @@ class Cache:
         self.have_lock = have_lock
         self.fail = fail
         self.calls = []
+        from app.core.cache import CacheClient
+        self.admission_cache = CacheClient()
+        self.admission_cache._enabled = False
+
+    def __getattr__(self, name):
+        if name in {"acquire_lock_strict", "get_strict", "commit_guarded_strict"}:
+            return getattr(self.admission_cache, name)
+        raise AttributeError(name)
 
     @property
     def is_enabled(self):
@@ -31,7 +39,12 @@ class Cache:
             raise RuntimeError("redis unavailable")
         return self.have_lock
 
+    async def reserve_rate_limits_strict(self, limits):
+        return True
+
     async def release_lock(self, key, value):
+        if key.endswith(":admission"):
+            return await self.admission_cache.release_lock(key, value)
         self.calls.append(("release", key, value))
 
 
@@ -255,3 +268,113 @@ async def test_locked_inputs_preserve_failure_and_grounding_contracts():
     assert ready.prompt_grounding == {"prompt": {"answer": "B"}}
     assert ready.expected_answer_check == ["B"]
     assert ready.model_timeout_sec == 30
+
+
+@pytest.mark.asyncio
+async def test_regeneration_admission_is_atomic_and_separate_per_user():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.services.ai.analysis_regeneration import admit_regeneration
+
+    client = CacheClient()
+    client._enabled = False
+    wq = SimpleNamespace(id=44, question_id=4, ai_analysis=None)
+    responses = await asyncio.gather(*[
+        admit_regeneration(cache=client, user_id=51, wrong_question=wq)
+        for _ in range(20)
+    ])
+    assert sum(value is None for value in responses) == 1
+    assert all(value["error_code"] == "ai_regeneration_limited" for value in responses if value)
+    assert await admit_regeneration(cache=client, user_id=52, wrong_question=wq) is None
+
+
+@pytest.mark.asyncio
+async def test_regeneration_admission_fails_closed_on_redis_outage():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.core.cache import CacheUnavailableError
+    from app.services.ai.analysis_regeneration import admit_regeneration
+
+    client = SimpleNamespace(acquire_lock_strict=AsyncMock(
+        side_effect=CacheUnavailableError("unavailable")
+    ))
+    result = await admit_regeneration(cache=client, user_id=51,
+                                     wrong_question=SimpleNamespace(id=44, question_id=4, ai_analysis=None))
+    assert result["error_code"] == "ai_regeneration_unavailable"
+    assert result["force_regenerated"] is False
+
+
+@pytest.mark.asyncio
+async def test_daily_regeneration_limits_cannot_be_bypassed_by_switching_questions(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.services.ai.analysis_regeneration import admit_regeneration
+
+    client = CacheClient()
+    client._enabled = False
+    from app.services.ai import analysis_regeneration
+    clock = [100000.0]
+    monkeypatch.setattr(analysis_regeneration, "time", lambda: clock[0])
+    async def attempt(question_id):
+        return await admit_regeneration(cache=client, user_id=51,
+                                        wrong_question=SimpleNamespace(id=question_id, question_id=question_id, ai_analysis=None))
+    def elapse_minute():
+        clock[0] += 61
+    for _ in range(3):
+        assert await attempt(44) is None
+        elapse_minute()
+    assert (await attempt(44))["error_code"] == "ai_regeneration_limited"
+    # Denials do not charge any of the other counters.
+    for i in range(17):
+        assert await attempt(100 + i) is None
+        elapse_minute()
+    assert (await attempt(999))["error_code"] == "ai_regeneration_limited"
+
+
+@pytest.mark.asyncio
+async def test_rolling_day_and_recreated_wrong_record_do_not_reset_question_budget(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.services.ai import analysis_regeneration as module
+
+    client = CacheClient()
+    client._enabled = False
+    clock = [100000.0]
+    monkeypatch.setattr(module, "time", lambda: clock[0])
+    async def attempt(at, wrong_id=44, question_id=4):
+        clock[0] = 100000 + at
+        return await module.admit_regeneration(
+            cache=client, user_id=51,
+            wrong_question=SimpleNamespace(id=wrong_id, question_id=question_id, ai_analysis=None),
+        )
+    assert await attempt(0) is None
+    assert await attempt(86280) is None
+    assert await attempt(86341) is None
+    assert await attempt(86402) is None
+    assert (await attempt(86463))["error_code"] == "ai_regeneration_limited"
+    assert (await attempt(86524, wrong_id=999))["error_code"] == "ai_regeneration_limited"
+    # Other questions have their own allowance but the user rolling cap is shared.
+    for i in range(17):
+        assert await attempt(86600 + 61 * i, question_id=100 + i) is None
+    assert (await attempt(88000, question_id=888))["error_code"] == "ai_regeneration_limited"
+
+
+@pytest.mark.asyncio
+async def test_expired_regeneration_admission_lease_cannot_commit_a_paid_attempt():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.services.ai.analysis_regeneration import admit_regeneration
+
+    client = SimpleNamespace(acquire_lock_strict=AsyncMock(return_value=True),
+                             release_lock=AsyncMock(), get_strict=AsyncMock(return_value=None),
+                             commit_guarded_strict=AsyncMock(return_value=False))
+    result = await admit_regeneration(cache=client, user_id=51,
+        wrong_question=SimpleNamespace(id=44, question_id=4, ai_analysis=None))
+    assert result["error_code"] == "ai_regeneration_unavailable"
+    client.release_lock.assert_awaited_once()

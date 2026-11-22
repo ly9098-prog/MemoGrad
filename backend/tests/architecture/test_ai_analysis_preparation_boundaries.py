@@ -72,6 +72,7 @@ CALLS = {
     "_execute_with_lease": {
         "_review_cache",
         "_prepare_inputs",
+        "admit_regeneration",
         "_grounded_context",
         "_invoke_review",
         "_resolve_review_outcome",
@@ -96,6 +97,7 @@ IMPORTS = {
         "vision_input_missing_response",
         "generation_in_progress_response",
     },
+    "app.services.ai.analysis_regeneration": {"admit_regeneration"},
     "app.services.ai.analysis_execution": {
         "AnalysisLease",
         "LockedAnalysisInputs",

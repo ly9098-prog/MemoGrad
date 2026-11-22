@@ -14,6 +14,7 @@ def harness(monkeypatch, *, fail_at=None, failure=None):
         **{field.name: object() for field in fields(module.AnalysisOrchestrationRequest)}
     )
     request.wrong_question = SimpleNamespace(id=7)
+    monkeypatch.setattr(module, "admit_regeneration", _allow_regeneration)
     request.generating = {7}
     request.user_id = 8
     lease = object()
@@ -106,3 +107,7 @@ async def assert_task_cancellation(task, entered):
             done, _ = await asyncio.wait({task}, timeout=1)
             assert task in done, "task cleanup did not finish within deadline"
         await asyncio.gather(task, return_exceptions=True)
+
+
+async def _allow_regeneration(**kwargs):
+    return None

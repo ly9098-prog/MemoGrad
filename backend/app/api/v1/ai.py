@@ -182,6 +182,7 @@ async def recover_error_analysis(
     backup when the original request has already committed a newer generation.
     """
     from app.ai.prewarm_revision import build_prewarm_revision
+    from app.services.ai.analysis_regeneration import admit_recovery_enqueue
     from app.services.ai_prewarm_worker import enqueue_prewarm
 
     wq = await _get_wrong_question_for_answer_ai(
@@ -189,6 +190,11 @@ async def recover_error_analysis(
         user_id=current_user.id,
         wrong_question_id=data.wrong_question_id,
     )
+
+    denied = await admit_recovery_enqueue(cache=cache, user_id=current_user.id)
+    if denied is not None:
+        status = 503 if denied["code"] == "ai_regeneration_unavailable" else 429
+        raise HTTPException(status_code=status, detail=denied)
 
     revision = build_prewarm_revision(
         review_count=wq.review_count,

@@ -13,6 +13,7 @@ from app.services.ai.analysis_outcomes import (
     VisualAckFailure,
     detect_visual_ack_failure,
 )
+from app.services.ai.analysis_regeneration import reject_unsuccessful_regeneration
 from app.services.ai.analysis_responses import parse_failed_response
 from app.services.ai.analysis_validation import (
     AnalysisUsage,
@@ -208,6 +209,9 @@ async def resolve_analysis_outcome(
         grounding_repair=grounding_repair,
         valid_outcome=valid_outcome,
     )
+    rejected = await reject_unsuccessful_regeneration(arguments, review)
+    if rejected is not None:
+        return rejected
     handled, response = _resolve_early_outcome(
         review, arguments, image_data_urls, visual_ack_failure
     )

@@ -86,7 +86,7 @@ async def test_outcome_selection_preserves_parse_and_grounding_order(caplog):
         input_signature="input",
         model_signature="model",
         expected_answer_check=["B"],
-        effective_force=True,
+        effective_force=False,
         runtime=object(),
         visual_evidence_is_valid=bool,
         max_tokens=800,
@@ -101,10 +101,8 @@ async def test_outcome_selection_preserves_parse_and_grounding_order(caplog):
     )
 
     assert response["model"] == "parse_failed"
-    assert response["force_regenerated"] is False
-    assert response["cache_preserved"] is False
     assert caplog.records[0].getMessage() == (
-        "ai.error_analysis.empty wq_id=7 force=True model=parse_failed"
+        "ai.error_analysis.empty wq_id=7 force=False model=parse_failed"
     )
 
 
@@ -158,3 +156,61 @@ async def test_valid_review_dispatches_to_valid_outcome_with_contract_fields():
         "runtime": "runtime",
         "logger": calls[0][1]["logger"],
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["duplicate", "echo", "repair", "invalid", "new"])
+async def test_force_regeneration_keeps_old_marker_unless_new_teaching_is_valid(monkeypatch, kind):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.ai.answer_grounding import build_answer_grounding, merge_grounded_diagnosis
+    from app.services.ai import analysis_regeneration
+    from app.services.ai.analysis_result_review import ReviewedAnalysis
+    from app.services.ai.analysis_validation import GroundingValidation
+
+    grounding = build_answer_grounding(
+        question_type="single_choice", content={"text": "question"},
+        options={"A": "one", "B": "two"}, correct_answer="B", user_answer="A",
+    )
+    parsed = {"mistake_diagnosis": "confused concept", "knowledge_patch": "explanation",
+              "review_task": "practice"}
+    old = dict(parsed)
+    old["mistake_diagnosis"] = merge_grounded_diagnosis(grounding, parsed["mistake_diagnosis"])
+    old["_meta"] = {"generated_at": "original-marker"}
+    if kind == "echo":
+        parsed["mistake_diagnosis"] = old["mistake_diagnosis"]
+    if kind == "new":
+        parsed["knowledge_patch"] = "a new example with a different explanation"
+    wrong = SimpleNamespace(id=7, ai_analysis=old)
+    valid_outcome = AsyncMock(return_value={"fresh": True})
+    repair = AsyncMock()
+    billed = AsyncMock()
+    monkeypatch.setattr(analysis_regeneration, "record_token_usage", billed)
+    review = ReviewedAnalysis(
+        parsed, kind != "invalid", AnalysisUsage("", False, 0, 321, 40),
+        GroundingValidation(kind != "repair", "reason", answer_grounding=grounding), None,
+    )
+    response = await resolve_analysis_outcome(
+        None, review, wrong_question=wrong, user_id=2, context={"question": {}},
+        result={"model": "mock"}, image_data_urls=[], input_signature="sig",
+        model_signature="model", expected_answer_check={}, effective_force=True,
+        runtime=object(), visual_evidence_is_valid=bool, max_tokens=800,
+        logger=logging.getLogger("regeneration-test"), visual_ack_failure=lambda **kw: None,
+        grounding_repair=repair, valid_outcome=valid_outcome,
+    )
+    repair.assert_not_awaited()
+    if kind == "new":
+        assert response == {"fresh": True}
+        valid_outcome.assert_awaited_once()
+        billed.assert_not_awaited()
+    else:
+        assert response["cache_preserved"] is True
+        assert response["force_regenerated"] is False
+        assert response["tokens_used"] == 321
+        assert response["generated_at"] == "original-marker"
+        assert response["error_code"] == ("ai_response_parse_failed" if kind == "invalid"
+                                          else "ai_regeneration_unchanged")
+        billed.assert_awaited_once()
+        valid_outcome.assert_not_awaited()
+    assert wrong.ai_analysis is old

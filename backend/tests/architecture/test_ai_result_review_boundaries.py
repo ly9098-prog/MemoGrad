@@ -25,6 +25,7 @@ CALLS = {
     "_make_review": {"ReviewedAnalysis", "detect_visual_ack_failure"},
     "resolve_analysis_outcome": {
         "_outcome_arguments",
+        "reject_unsuccessful_regeneration",
         "_resolve_early_outcome",
         "_resolve_grounded_outcome",
     },
@@ -51,7 +52,7 @@ LOCALS = {
     "_build_review_usage": set(),
     "_visual_request": set(),
     "_make_review": set(),
-    "resolve_analysis_outcome": {"arguments", "handled", "response"},
+    "resolve_analysis_outcome": {"arguments", "handled", "response", "rejected"},
     "_outcome_arguments": set(),
     "_resolve_early_outcome": {"response"},
     "_resolve_grounded_outcome": set(),
@@ -67,6 +68,7 @@ IMPORTS = {
         "VisualAckFailure",
         "detect_visual_ack_failure",
     },
+    "app.services.ai.analysis_regeneration": {"reject_unsuccessful_regeneration"},
     "app.services.ai.analysis_responses": {"parse_failed_response"},
     "app.services.ai.analysis_validation": {
         "AnalysisUsage",
