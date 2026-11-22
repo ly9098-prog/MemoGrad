@@ -276,7 +276,7 @@ describe("Admin user request ownership", () => {
 
 describe("App user batch boundaries", () => {
   function setup() {
-    h.states[11] = " review ";
+    h.states[10] = " review ";
     AppUsersPage();
     return h.mutations[0];
   }
@@ -308,7 +308,7 @@ describe("App user batch boundaries", () => {
       init.method === "POST" && init.body === JSON.stringify({ reason: "review" }))).toBe(true);
     h.mutations[0].onSuccess(undefined, { action: "ban", userIds: [1, 2] });
     expect(h.invalidate.mock.calls.map(([q]) => q.queryKey)).toEqual([
-      ["app-users"], ["app-users-summary"],
+      ["app-users"], ["app-users-summary"], ["app-user-detail"],
     ]);
   });
 

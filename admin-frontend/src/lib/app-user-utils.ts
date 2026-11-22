@@ -12,6 +12,17 @@ export type UserStatusFilter = "all" | "active" | "banned";
 
 export type PaginationItem = number | "ellipsis-left" | "ellipsis-right";
 
+const IDENTITY_PROVIDER_LABELS: Record<string, string> = {
+  wechat: "微信",
+  email: "邮箱",
+  github: "GitHub",
+};
+
+export type IdentityLike = {
+  provider: string;
+  masked_subject?: string | null;
+};
+
 /**
  * Build a compact pagination item list with ellipses for large page counts.
  */
@@ -43,6 +54,45 @@ export function endOfChinaDateUtcIso(date: string): string {
   const nextDay = chinaDateToUtcIso(date, 1);
   if (!nextDay) return "";
   return new Date(new Date(nextDay).getTime() - 1000).toISOString().replace(/\.\d{3}Z$/, ".999999Z");
+}
+
+export function identityProviderLabel(provider: string): string {
+  return IDENTITY_PROVIDER_LABELS[provider] ?? provider;
+}
+
+export function summarizeIdentityProviders(
+  identities: readonly IdentityLike[] | null | undefined,
+): string[] {
+  if (!identities?.length) return [];
+  const labels: string[] = [];
+  for (const identity of identities) {
+    const label = identityProviderLabel(identity.provider);
+    if (!labels.includes(label)) labels.push(label);
+  }
+  return labels;
+}
+
+export function userIdentitySubtitle(
+  identities: readonly IdentityLike[] | null | undefined,
+  openid: string | null | undefined,
+): string {
+  const email = identities?.find((identity) => identity.provider === "email");
+  if (email?.masked_subject) return email.masked_subject;
+  if (openid) return `openid ${openid.length > 14 ? `${openid.slice(0, 14)}…` : openid}`;
+  const labels = summarizeIdentityProviders(identities);
+  return labels.length ? `${labels.join(" / ")} 账号` : "未绑定登录身份";
+}
+
+export function buildPageRange(
+  page: number,
+  pageSize: number,
+  total: number,
+): { start: number; end: number } {
+  if (total <= 0) return { start: 0, end: 0 };
+  return {
+    start: (page - 1) * pageSize + 1,
+    end: Math.min(page * pageSize, total),
+  };
 }
 
 export type AppUserLike = {

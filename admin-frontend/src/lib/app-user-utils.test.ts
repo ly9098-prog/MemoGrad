@@ -6,8 +6,12 @@ import {
   filterBatchActionCandidates,
   noCandidatesMessage,
   buildPagination,
+  buildPageRange,
   statusToQueryValue,
   endOfChinaDateUtcIso,
+  identityProviderLabel,
+  summarizeIdentityProviders,
+  userIdentitySubtitle,
   type AppUserLike,
 } from "./app-user-utils";
 
@@ -169,5 +173,51 @@ describe("endOfChinaDateUtcIso", () => {
   it("ends with microsecond precision", () => {
     const result = endOfChinaDateUtcIso("2025-01-15");
     expect(result.endsWith(".999999Z")).toBe(true);
+  });
+});
+
+describe("identity helpers", () => {
+  it("maps known providers and keeps unknown providers verbatim", () => {
+    expect(identityProviderLabel("wechat")).toBe("微信");
+    expect(identityProviderLabel("github")).toBe("GitHub");
+    expect(identityProviderLabel("saml")).toBe("saml");
+  });
+
+  it("de-duplicates providers while preserving first-seen order", () => {
+    expect(
+      summarizeIdentityProviders([
+        { provider: "wechat" },
+        { provider: "email" },
+        { provider: "wechat" },
+        { provider: "github" },
+      ]),
+    ).toEqual(["微信", "邮箱", "GitHub"]);
+    expect(summarizeIdentityProviders(null)).toEqual([]);
+  });
+
+  it("prefers masked email, then shortened openid, then actual identity labels", () => {
+    expect(
+      userIdentitySubtitle(
+        [{ provider: "email", masked_subject: "ab***@example.com" }],
+        "openid-value",
+      ),
+    ).toBe("ab***@example.com");
+    expect(userIdentitySubtitle([{ provider: "wechat" }], "0123456789abcdefghij")).toBe(
+      "openid 0123456789abcd…",
+    );
+    expect(userIdentitySubtitle([], null)).toBe("未绑定登录身份");
+    expect(userIdentitySubtitle([{ provider: "github" }], null)).toBe("GitHub 账号");
+  });
+});
+
+describe("buildPageRange", () => {
+  it("returns an inclusive range inside the page", () => {
+    expect(buildPageRange(2, 20, 45)).toEqual({ start: 21, end: 40 });
+  });
+  it("clamps the final page to the total", () => {
+    expect(buildPageRange(3, 20, 45)).toEqual({ start: 41, end: 45 });
+  });
+  it("returns zero for an empty result", () => {
+    expect(buildPageRange(1, 20, 0)).toEqual({ start: 0, end: 0 });
   });
 });
