@@ -60,27 +60,23 @@ export function AuditLogFilters({ filters, onFilterChange, onReset }: AuditLogFi
   ].filter((chip): chip is { label: string; remove: () => void } => Boolean(chip));
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-        <div className="min-w-0 flex-1 xl:max-w-[400px]">
+    <div className="@container/audit-filters space-y-3">
+      <div role="group" aria-label="审计日志筛选" className="grid grid-cols-2 items-center gap-3 @[40rem]/audit-filters:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] @[64rem]/audit-filters:grid-cols-[minmax(14rem,1.6fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(7rem,0.8fr)_15.625rem_auto]">
+        <div className="col-span-2 min-w-0 @[64rem]/audit-filters:col-span-1 [&>div]:max-w-none">
           <DirectorySearch inputRef={searchRef} label="搜索审计日志" placeholder="输入操作、资源、操作人或资源 ID" value={keyword}
             onChange={(value) => value ? onFilterChange({ keyword: value.slice(0, 200) }) : clearKeyword()} onClear={clearKeyword} />
         </div>
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 xl:ml-auto xl:max-w-[600px]">
-          <div className="col-span-2 min-w-0 sm:col-span-1">
-            <CustomSelect aria-label="筛选操作类型" value={action} onChange={(value) => onFilterChange({ action: value })}
-              options={ACTION_OPTIONS} searchable searchPlaceholder="输入操作名称或标识" className="h-10 w-full bg-card text-xs" />
-          </div>
-          <CustomSelect aria-label="筛选资源类型" value={resourceType} onChange={(value) => onFilterChange({ resourceType: value })}
-            options={RESOURCE_OPTIONS} searchable searchPlaceholder="输入资源名称或标识" className="h-10 w-full bg-card text-xs" />
-          <CustomSelect aria-label="筛选日志级别" value={severity} onChange={(value) => onFilterChange({ severity: value })}
-            options={SEVERITY_OPTIONS} className="h-10 w-full bg-card text-xs" />
+        <div className="col-span-2 min-w-0 @[40rem]/audit-filters:col-span-1">
+          <CustomSelect aria-label="筛选操作类型" value={action} onChange={(value) => onFilterChange({ action: value })}
+            options={ACTION_OPTIONS} searchable searchPlaceholder="输入操作名称或标识" className="h-10 w-full bg-card text-xs [&>span[title]]:hidden" />
         </div>
-      </div>
-      <div className="flex items-center justify-between gap-2.5">
-        <DateRangePicker from={dateFrom} to={dateTo} dateLabel="操作日期" placeholder="选择操作日期范围" className="min-w-0 flex-1 sm:flex-none"
+        <CustomSelect aria-label="筛选资源类型" value={resourceType} onChange={(value) => onFilterChange({ resourceType: value })}
+          options={RESOURCE_OPTIONS} searchable searchPlaceholder="输入资源名称或标识" className="h-10 min-w-0 w-full bg-card text-xs [&>span[title]]:hidden" />
+        <CustomSelect aria-label="筛选日志级别" value={severity} onChange={(value) => onFilterChange({ severity: value })}
+          options={SEVERITY_OPTIONS} className="h-10 min-w-0 w-full bg-card text-xs" />
+        <DateRangePicker from={dateFrom} to={dateTo} dateLabel="操作日期" placeholder="选择操作日期范围" className="col-span-2 min-w-0 w-full sm:w-full @[64rem]/audit-filters:col-span-1"
           onChange={({ from, to }) => onFilterChange({ dateFrom: from, dateTo: to })} />
-        <Button variant="ghost" size="sm" disabled={!chips.length} onClick={onReset} className="h-10 self-end px-3 text-xs">
+        <Button variant="ghost" size="sm" disabled={!chips.length} onClick={onReset} className="col-span-2 h-10 justify-self-end whitespace-nowrap px-3 text-xs @[40rem]/audit-filters:col-span-1">
           <RotateCcw className="h-3.5 w-3.5" />重置筛选
         </Button>
       </div>

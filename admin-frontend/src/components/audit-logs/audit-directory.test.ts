@@ -47,6 +47,21 @@ beforeEach(() => { effects.length = 0; });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("audit directory filters", () => {
+  it("keeps search, selects, date range and reset in one responsive filter group", () => {
+    const reset = vi.fn();
+    const tree = AuditLogFilters({ filters: { ...emptyFilters, severity: "important" }, onFilterChange: vi.fn(), onReset: reset });
+    const group = findAll(tree, (element) => element.props["aria-label"] === "审计日志筛选")[0];
+    expect(group.props.role).toBe("group");
+    expect(byType(group, DirectorySearch)).toHaveLength(1);
+    expect(byType(group, CustomSelect)).toHaveLength(3);
+    expect(byType(group, DateRangePicker)).toHaveLength(1);
+    const resetButton = findAll(group, (element) => element.props.onClick === reset)[0];
+    expect(resetButton.props.disabled).toBe(false);
+    (resetButton.props.onClick as () => void)();
+    expect(reset).toHaveBeenCalledOnce();
+    expect(byType(group, FilterChip)).toHaveLength(0);
+  });
+
   it("reuses the directory search, calendar and independently removable chips", () => {
     const change = vi.fn();
     const tree = AuditLogFilters({ filters: { ...emptyFilters, keyword: "题目", debouncedKeyword: "题目", status: "failed", severity: "important" }, onFilterChange: change, onReset: vi.fn() });
