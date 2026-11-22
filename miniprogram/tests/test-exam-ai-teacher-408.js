@@ -107,6 +107,7 @@ test('practice option getters keep repeated reads and precede field coercion and
     get difficulty_delta() { events.push('difficulty'); return 1 },
   }
   const source = {
+    sections: [{ heading: '考点', points: ['判断依据。'] }],
     get knowledge_points() { events.push('knowledge'); return [] },
     get practice_question() { events.push('practice'); return practice },
     get practiceQuestion() { throw new Error('unexpected alias read') },
@@ -139,6 +140,7 @@ test('result aliases retain truthiness, nullish precedence and referenced object
   const next = [], personalization = []
   const result = teacher.normalizeResult({
     action: 'core_concept', action_label: 0, actionLabel: ' custom ',
+    sections: [{ heading: '考点', points: ['判断依据。'] }],
     next_action: next, nextAction: { ignored: true }, personalization,
     from_fallback: false, fromFallback: true, prompt_version: 0, promptVersion: ' v2 ',
   })
@@ -154,9 +156,10 @@ test('action metadata mutation is observed while replacing its exported object s
   const metadata = teacher.ACTION_BY_KEY, oldLabel = metadata.core_concept.label
   t.after(() => { teacher.ACTION_BY_KEY = metadata; metadata.core_concept.label = oldLabel })
   metadata.core_concept.label = 'patched label'
-  assert.equal(teacher.normalizeResult({ action: 'core_concept' }).title, 'patched label')
+  const lesson = { action: 'core_concept', sections: [{ heading: '考点', points: ['判断依据。'] }] }
+  assert.equal(teacher.normalizeResult(lesson).title, 'patched label')
   teacher.ACTION_BY_KEY = {}
-  assert.equal(teacher.normalizeResult({ action: 'core_concept' }).title, 'patched label')
+  assert.equal(teacher.normalizeResult(lesson).title, 'patched label')
 })
 
 test('error text keeps exam guard and unavailable messages', () => {

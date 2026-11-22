@@ -35,7 +35,7 @@ test('native result template paints one reader for review, teacher and guest sta
     assert.equal(sheets.length, 1)
     assert.equal(sheets[0].attr.show, visible)
     assert.equal(nodes.filter(node => hasClass(node, 'motion-sheet-panel')).length, 1)
-    assert.equal(nodes.filter(node => hasClass(node, content)).length, 1)
+    assert.equal(nodes.filter(node => hasClass(node, content) || node.attr && node.attr.readerClass === content).length, 1)
     assert.equal(nodes.filter(node => hasClass(node, 'review-dialog-head') || hasClass(node, 'teacher-sheet-head')).length, 1,
       'only the active reader content is mounted in the slot')
   }

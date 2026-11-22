@@ -80,7 +80,13 @@ def prepared_teacher(monkeypatch):
     async def provider(*args, **kwargs):
         state.trace.append("provider")
         return {
-            "content": json.dumps({"title": "lesson", "summary": "summary"}),
+            "content": json.dumps(
+                {
+                    "title": "lesson",
+                    "summary": "summary",
+                    "sections": [{"heading": "判断依据", "points": ["满足必要条件。"]}],
+                }
+            ),
             "tokens_used": 17,
         }
 
@@ -459,7 +465,7 @@ def test_option_prompt_requests_one_minimal_json_envelope():
     assert set(schema) == {"option_explanations"}
     assert set(schema["option_explanations"][0]) == {"option", "is_correct", "reason"}
     assert "不要直接返回数组" in system
-    assert PROMPT_VERSION == "408-teacher-v6-single-lesson-envelope"
+    assert PROMPT_VERSION == "408-teacher-v7-complete-action-body"
 
 
 @pytest.mark.asyncio
@@ -497,6 +503,57 @@ async def test_teacher_accepts_complete_single_lesson_envelopes(
     assert result["sections"]
     assert result["tokens_used"] == 21
     state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "action",
+    ["explain_correct", "core_concept", "connect_knowledge", "high_frequency_traps"],
+)
+async def test_teacher_rejects_summary_without_action_body(prepared_teacher, action):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(
+            [{"title": "编码能力判定", "summary": "先求最小海明距离，再由公式"}]
+        ),
+        "tokens_used": 21,
+        "finish_reason": "stop",
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action=action
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+    assert "不完整" in result["summary"]
+    assert "再由公式" not in result["summary"]
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("finish_reason", ["length", "max_tokens", "content_filter"])
+async def test_teacher_rejects_unfinished_provider_response(
+    prepared_teacher, finish_reason
+):
+    state = prepared_teacher
+    raw = await state.provider()
+    raw["content"] = json.dumps(
+        {
+            "summary": "先求最小距离。",
+            "sections": [{"heading": "推导", "points": ["最小距离为四，再由公式"]}],
+        }
+    )
+    raw["finish_reason"] = finish_reason
+    state.provider.side_effect = None
+    state.provider.return_value = raw
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
     state.usage.assert_awaited_once()
     state.settle.assert_awaited_once()
 

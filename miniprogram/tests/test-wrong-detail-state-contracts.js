@@ -168,7 +168,8 @@ test('teacher request preserves version diagnosis payload and cached results', a
   page._teacherCacheKeyForWrong = () => 'live-key'
   api.post = (...args) => {
     calls.push(['post', ...args])
-    return Promise.resolve({ action: 'explain_correct', summary: 'explanation' })
+    return Promise.resolve({ action: 'explain_correct', summary: 'explanation',
+      sections: [{ heading: '依据', points: ['满足题干条件。'] }] })
   }
   const event = { currentTarget: { dataset: { action: 'explain_correct' } } }
   await page.run408TeacherAction(event)
@@ -188,7 +189,8 @@ test('teacher retries a fallback instead of keeping it as a successful cached le
   page.data.wq = { id: 1, question_id: 7 }
   page._teacherCacheKeyForWrong = () => 'key'
   let posts = 0
-  api.post = async () => ({ action: 'explain_options', summary: 'lesson', from_fallback: ++posts === 1 })
+  api.post = async () => ({ action: 'explain_options', summary: 'lesson',
+    sections: [{ heading: 'A', points: ['满足题干条件。'] }], from_fallback: ++posts === 1 })
   const event = { currentTarget: { dataset: { action: 'explain_options' } } }
   await page.run408TeacherAction(event)
   assert.equal(page._teacherCache && page._teacherCache.key, undefined)
@@ -213,7 +215,8 @@ test('late teacher response cannot replace the next question or clear a newer in
   const newer = Promise.resolve('newer request')
   page._teacherInflight.key = newer
   page.data.wq = { id: 2, question_id: 8 }
-  resolve({ action: 'explain_correct', summary: 'old explanation' })
+  resolve({ action: 'explain_correct', summary: 'old explanation',
+    sections: [{ heading: '依据', points: ['满足题干条件。'] }] })
   await pending
   assert.equal(page.data.teacherResult, null)
   assert.equal(page.data.teacherLoadingAction, '')

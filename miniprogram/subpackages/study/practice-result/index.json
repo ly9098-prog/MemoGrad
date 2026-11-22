@@ -6,6 +6,7 @@
   "backgroundColorBottom": "#F3FBF8",
   "disableScroll": true,
   "usingComponents": {
+    "fit-scroll": "/components/fit-scroll/index",
     "app-dialog": "/components/app-dialog/index",
     "wrong-book-empty": "../components/wrong-book-empty/index",
     "root-back-guard": "/components/root-back-guard/index"

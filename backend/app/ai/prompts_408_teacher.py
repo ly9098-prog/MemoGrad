@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "408-teacher-v6-single-lesson-envelope"
+PROMPT_VERSION = "408-teacher-v7-complete-action-body"
 
 ACTION_DEFINITIONS: dict[str, dict[str, str]] = {
     "explain_correct": {
@@ -110,7 +110,14 @@ def build_408_teacher_prompt(
             "。similar_question/harder_question 时 practice_question 必须为："
             '{"stem":"","options":{"A":"","B":"","C":"","D":""},"answer":"A",'
             '"analysis":"","difficulty_delta":0或1}；其他动作应为 null。'
-            "sections 最多 4 组，每组 points 最多 5 条；语言简洁、面向考研专业课复盘。"
+            "explain_correct/core_concept/high_frequency_traps 必须在 sections 中给出完整讲解，"
+            "至少一组含有非空 points，不能只写标题和摘要。"
+            "connect_knowledge 必须在 knowledge_points 的 relation/mastery_hint 或 sections 中说明具体联系，"
+            "不能只列知识点名称。"
+            "summary 只概括结论；完整依据、适用条件、公式及代入过程写在 points 中，"
+            "不得停在‘再由公式’‘因此’等未完成的语句，也不得省略得出结论所需的步骤。"
+            "sections 最多 4 组，每组 points 最多 5 条，每条控制在 200 字内并完整收句；"
+            "优先保证推理完整，再精简措辞，面向考研专业课复盘。"
         )
     user = (
         f"固定动作={action}\n动作说明={meta['instruction']}\n"

@@ -1,0 +1,9 @@
+.fit-scroll {
+  display: block;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.fit-scroll-content {
+  display: flex;
+  flex-direction: column;
+}

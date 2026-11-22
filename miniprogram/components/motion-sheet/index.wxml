@@ -7,7 +7,7 @@
       <view class="motion-sheet-grip" bindtouchstart="{{motion.start}}" catchtouchmove="{{motion.move}}" bindtouchend="{{motion.end}}" bindtouchcancel="{{motion.cancel}}">
         <button class="motion-sheet-grip-button" aria-label="展开抽屉，向下拖动可收起" bindtap="{{motion.expand}}"><view class="motion-sheet-handle" aria-hidden="true"></view></button>
       </view>
-      <view class="motion-sheet-body"><slot /></view>
+      <view class="motion-sheet-body" bind:readerresize="onReaderResize"><slot /></view>
     </view>
   </view>
 </view>

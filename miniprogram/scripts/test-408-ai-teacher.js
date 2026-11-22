@@ -43,7 +43,7 @@ const aiRoute = fs.readFileSync(path.join(backendRoot, 'app/api/v1/ai.py'), 'utf
 
 assert(!/\bprompt\s*:/.test(schema), '客户端请求 schema 不得暴露自由 prompt 字段')
 expectedActions.forEach(action => assert(prompt.includes(`"${action}"`), `服务端缺少固定动作 ${action}`))
-assert(prompt.includes('408-teacher-v6-single-lesson-envelope'), '老师响应契约变更后必须升级 prompt version')
+assert(prompt.includes('408-teacher-v7-complete-action-body'), '老师响应契约变更后必须升级 prompt version')
 assert(prompt.includes('不得重新输出通用的'), '专项讲解 prompt 必须禁止重复完整错题复盘')
 assert(service.includes('QuestionVersion'), '408 AI 必须从题目历史版本加载事实')
 assert(service.includes('question_version_id'), '408 AI 必须携带固定 question_version_id')

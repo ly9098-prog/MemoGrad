@@ -11,6 +11,7 @@ Component({
     safeArea: { type: Boolean, value: true },
     contentMotion: { type: String, value: 'slide' },
     dismissible: { type: Boolean, value: true },
+    layoutKey: { type: String, value: '', observer() { this.onReaderResize() } },
   },
   data: { rendered: false, measuring: false, command: null },
   observers: {
@@ -41,6 +42,14 @@ Component({
     },
   },
   methods: {
+    onReaderResize() {
+      wx.nextTick(() => {
+        if (!this._attached || !this.data.rendered || !this.properties.show ||
+            this.properties.closing || this._closeTimer ||
+            (this.data.command && this.data.command.close)) return
+        this.measure(true)
+      })
+    },
     syncVisibility() {
       if (!this.properties.show) {
         this._notifyClose = false
@@ -100,6 +109,7 @@ Component({
       if (!this._attached || !this.data.rendered) return
       this._notifyClose = this._notifyClose || notify
       if (this._closeTimer) return
+      this._sequence++
       const id = this.data.command && this.data.command.id !== undefined ? this.data.command.id : this._sequence
       this._closeTimer = setTimeout(() => this.finishClose({ id }), 480)
       if (this.data.command) this.setData({ command: { ...this.data.command, close: true, resetDrag: false } })

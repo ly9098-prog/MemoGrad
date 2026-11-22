@@ -174,6 +174,16 @@ fromFallback: !!(source.from_fallback ?? source.fromFallback),
 personalization: source.personalization || {},
 promptVersion: cleanText(source.prompt_version || source.promptVersion),
 }
+if (!result.fromFallback && ACTION_BY_KEY[action]) {
+const hasBody = action === 'similar_question' || action === 'harder_question'
+? !!(practiceQuestion && practiceQuestion.stem && practiceQuestion.options.length && practiceQuestion.answer)
+: sections.length > 0 || (action === 'connect_knowledge' && knowledgePoints.some(item => item.relation || item.masteryHint))
+if (!hasBody) {
+result.fromFallback = true
+result.title = '讲解未完整生成'
+result.summary = '本次未生成 AI 讲解：返回内容不完整，请重新尝试。'
+}
+}
 if (result.fromFallback) {
 if (result.action === 'explain_options') {
 result.title = '逐项讲解暂不可用'

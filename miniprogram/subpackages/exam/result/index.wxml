@@ -172,13 +172,14 @@
       <view><text class="teacher-kicker">AI TEACHER</text><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
       <text class="teacher-sheet-close" bindtap="close408Teacher">×</text>
     </view>
-    <view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
+    <fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherResult || teacherErrorText || teacherLoading || 'actions'}}">
+<view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
       <text class="teacher-action-title">选择一个固定教学动作</text>
       <button wx:for="{{teacherActions}}" wx:key="action" class="teacher-action-choice" data-action="{{item.action}}" bindtap="select408TeacherAction">{{item.label}}</button>
     </view>
     <view wx:elif="{{teacherLoading}}" class="teacher-sheet-loading"><view class="teacher-spinner"></view><text>正在结合本次考试生成…</text></view>
     <view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">{{teacherErrorText}}</view>
-    <scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <block wx:elif="{{teacherResult}}">
       <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card"><text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text><text class="teacher-summary">{{teacherResult.summary}}</text></view>
       <view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
         <view class="teacher-section-head"><view class="teacher-section-rule"></view><text class="teacher-result-heading">{{item.heading}}</text></view>
@@ -203,6 +204,7 @@
       </view>
       <text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可先查看题库解析，稍后重试。' : '内容由专项 AI 老师生成，仅用于本次考试复盘。'}}</text>
       <view class="teacher-scroll-space"></view>
-    </scroll-view>
+    </block>
+</fit-scroll>
   </view>
 </motion-sheet>

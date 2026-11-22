@@ -382,7 +382,7 @@
 <view class="bottom-space"></view>
 </view>
 </scroll-view>
-<motion-sheet show="{{reviewDialogVisible || (!guestMode && teacherSheetVisible)}}" label="{{!guestMode && teacherSheetVisible ? '专项 AI 老师' : '题目解析与复盘'}}" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="closeReviewDialog">
+<motion-sheet show="{{reviewDialogVisible || (!guestMode && teacherSheetVisible)}}" layout-key="{{!guestMode && teacherSheetVisible ? 'teacher' : 'review'}}" label="{{!guestMode && teacherSheetVisible ? '专项 AI 老师' : '题目解析与复盘'}}" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="closeReviewDialog">
 <view class="result-reader-sheet {{!guestMode && teacherSheetVisible ? 'teacher-sheet' : 'review-dialog-sheet'}} motion-sheet-panel" catchtap="stopPropagation">
 <block wx:if="{{guestMode || !teacherSheetVisible}}">
 <view class="review-dialog-head" catchtouchmove="noop">
@@ -464,13 +464,14 @@
 <view class="teacher-title-wrap"><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
 <button class="teacher-review-back" bindtap="close408Teacher">返回解析</button>
 </view>
+<fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherResult || teacherErrorText || teacherLoading || 'actions'}}">
 <view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
 <text class="teacher-action-title">选择一个固定教学动作</text>
 <button wx:for="{{teacherActions}}" wx:key="action" class="teacher-action-choice" data-action="{{item.action}}" bindtap="select408TeacherAction">{{item.label}}</button>
 </view>
 <view wx:elif="{{teacherLoading}}" class="teacher-sheet-loading"><view class="teacher-spinner"></view><text>正在结合本题与学习状态生成…</text></view>
 <view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">{{teacherErrorText}}</view>
-<scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+<block wx:elif="{{teacherResult}}">
 <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
 <text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
 <text class="teacher-summary">{{teacherResult.summary}}</text>
@@ -504,7 +505,8 @@
 </view>
 <text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析后重试。' : '内容由专项 AI 老师生成，仅用于本题复盘。'}}</text>
 <view class="teacher-scroll-space"></view>
-</scroll-view>
+</block>
+</fit-scroll>
 </block>
 </view>
 </motion-sheet>

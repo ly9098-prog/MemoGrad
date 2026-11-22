@@ -1268,6 +1268,22 @@ async def run_teacher_action(
     )
     await settle_token_reservation(reservation, result.get("tokens_used", 0))
 
+    if result.get("finish_reason") in {
+        "length",
+        "max_tokens",
+        "content_filter",
+        "tool_calls",
+        "function_call",
+    }:
+        return {
+            **base,
+            **_fallback_payload(
+                action=action, reason="AI 讲解未完整生成，请重新尝试。"
+            ),
+            "tokens_used": int(result.get("tokens_used") or 0),
+            "from_fallback": True,
+        }
+
     parsed = _parse_json_object(
         result.get("content"),
         allow_option_array=action == "explain_options",
@@ -1322,8 +1338,7 @@ async def run_teacher_action(
         }
 
     if not (
-        normalized["summary"]
-        or normalized["sections"]
+        normalized["sections"]
         or normalized["practice_question"]
         or (
             action == "connect_knowledge"
@@ -1335,7 +1350,9 @@ async def run_teacher_action(
     ):
         return {
             **base,
-            **_fallback_payload(action=action, reason="AI 未返回有效的专项讲解内容。"),
+            **_fallback_payload(
+                action=action, reason="AI 返回的讲解内容不完整，请重新尝试。"
+            ),
             "tokens_used": int(result.get("tokens_used") or 0),
             "from_fallback": True,
         }

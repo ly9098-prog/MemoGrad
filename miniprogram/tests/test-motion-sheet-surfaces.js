@@ -79,7 +79,7 @@ test('surface paint stays outside the untransformed rich-text and scroll body', 
   const markup = read('components/motion-sheet/index.wxml')
   assert.equal((markup.match(/class="motion-sheet-surface"/g) || []).length, 1)
   assert.match(markup, /class="motion-sheet-surface"[^>]*style="background:\{\{background\}\}"/)
-  assert.match(markup, /class="motion-sheet-body"><slot\s*\/>/)
+  assert.match(markup, /class="motion-sheet-body" bind:readerresize="onReaderResize"><slot\s*\/>/)
   const css = read('components/motion-sheet/index.wxss')
   assert.match(css, /\.motion-sheet-grip\s*\{[^}]*display:\s*flex/,
     'the grip must contain its button negative margin instead of collapsing it into the body origin')

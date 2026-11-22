@@ -252,6 +252,7 @@
 </view>
 <text class="teacher-sheet-close" bindtap="close408TeacherSheet">×</text>
 </view>
+<fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherResult || teacherErrorText || teacherLoadingAction || 'idle'}}">
 <view wx:if="{{teacherLoadingAction}}" class="teacher-sheet-loading">
 <view class="loading-spinner"></view>
 <text>正在结合你的学习上下文生成…</text>
@@ -260,7 +261,7 @@
 <text user-select="true">{{teacherErrorText}}</text>
 <button class="teacher-retry" wx:if="{{teacherLastAction}}" disabled="{{!aiAvailabilityEnabled || teacherLoadingAction}}" data-action="{{teacherLastAction}}" bindtap="run408TeacherAction">重新尝试</button>
 </view>
-<scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+<block wx:elif="{{teacherResult}}">
 <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
 <text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
 <text class="teacher-summary" user-select="true">{{teacherResult.summary}}</text>
@@ -302,7 +303,8 @@
 <text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析，或重新尝试。' : '内容由 AI 深入讲解生成，仅用于学习复盘。'}}</text>
 <button wx:if="{{teacherResult.fromFallback && teacherLastAction}}" class="teacher-retry" disabled="{{!aiAvailabilityEnabled || teacherLoadingAction}}" data-action="{{teacherLastAction}}" bindtap="run408TeacherAction">重新尝试</button>
 <view class="teacher-scroll-space"></view>
-</scroll-view>
+</block>
+</fit-scroll>
 </view>
 </motion-sheet>
 <motion-sheet show="{{diagnosisSheetVisible}}" dismissible="{{!diagnosisSaving}}" label="记录错因" background="#FAFCF8" safe-area="{{false}}" layer="{{300}}" bind:close="closeDiagnosisSheet">

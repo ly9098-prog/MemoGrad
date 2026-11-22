@@ -4,5 +4,8 @@
   "backgroundColor": "#F4F8F5",
   "backgroundColorTop": "#FFFFFF",
   "backgroundColorBottom": "#F4F8F5",
-  "disableScroll": true
+  "disableScroll": true,
+  "usingComponents": {
+    "fit-scroll": "/components/fit-scroll/index"
+  }
 }

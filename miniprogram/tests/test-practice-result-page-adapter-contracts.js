@@ -200,7 +200,8 @@ test('review teacher retries after fallback and retains successful result cachin
   const { page, api } = fixture()
   page.data.reviewDialog = { questionId: 42, status: 'correct' }
   let posts = 0
-  api.post = async () => ({ action: 'explain_correct', summary: 'lesson', from_fallback: ++posts === 1 })
+  api.post = async () => ({ action: 'explain_correct', summary: 'lesson',
+    sections: [{ heading: '依据', points: ['满足题干条件。'] }], from_fallback: ++posts === 1 })
   await page.run408TeacherFromReview('explain_correct')
   assert.equal(page.data.teacherResult.fromFallback, true)
   await page.run408TeacherFromReview('explain_correct')

@@ -1,0 +1,3 @@
+<scroll-view class="fit-scroll reader-class" style="height:{{contentHeight}}px" scroll-y enhanced bounces="{{false}}" show-scrollbar="{{false}}">
+  <view class="fit-scroll-content"><slot /></view>
+</scroll-view>
