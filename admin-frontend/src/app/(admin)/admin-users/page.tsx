@@ -2,7 +2,6 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CalendarDays,
   Edit3,
   Eye,
   EyeOff,
@@ -12,7 +11,8 @@ import {
   Mail,
   Plus,
   RefreshCw,
-  Search,
+  ListFilter,
+  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -30,6 +30,12 @@ import {
   MetricCard,
   MetricStrip,
 } from "@/components/admin/management-ui";
+import {
+  DirectoryPagination,
+  DirectorySearch,
+  FilterChip,
+  useDirectorySearchShortcut,
+} from "@/components/admin/directory-controls";
 import { StatusBadge } from "@/components/status-badge";
 import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
@@ -37,6 +43,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import { hasOpenTransientOverlay, isTopModalSurface } from "@/lib/modal-focus";
@@ -148,6 +155,7 @@ export default function AdminUsersPage() {
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const formDialogRef = useRef<HTMLDivElement | null>(null);
   const formReturnFocusRef = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useModalSurface({
     open: showForm,
@@ -457,40 +465,38 @@ export default function AdminUsersPage() {
     : "";
 
   const hasFilters = Boolean(searchInput.trim() || roleFilter || statusFilter !== "all" || dateFrom || dateTo);
+  const dateFilterLabel = dateFrom && dateTo
+    ? dateFrom === dateTo ? dateFrom : `${dateFrom} — ${dateTo}`
+    : dateFrom ? `${dateFrom} 起` : dateTo ? `截至 ${dateTo}` : "";
+
+  useDirectorySearchShortcut(searchInputRef);
 
   return (
     <ManagementPage className="space-y-5 pb-6">
       <ManagementPageHeader
         icon={<ShieldCheck className="h-5 w-5" />}
-        title="后台管理员"
-        description="管理后台账号、角色归属与登录安全操作；保护账号继续遵循前后端双重限制。"
+        title={<span className="inline-flex items-baseline gap-2.5">后台管理员 <span className="text-xs font-medium tabular-nums tracking-normal text-muted-foreground">{totalUsers.data?.total ?? "—"}</span></span>}
+        description="管理后台账号、角色权限与登录安全，与普通用户账号独立。"
         actions={
-          canCreate ? (
-            <Button
-              onClick={(event) => openCreateForm(event.currentTarget)}
-              className="h-11 gap-2 rounded-xl px-5 shadow-none"
-            >
-              <Plus className="h-4 w-4" />
-              新建管理员
+          <>
+            <Button variant="secondary" onClick={refreshAll} disabled={manualRefreshing} className="h-10 gap-2">
+              <RefreshCw className={cn("h-4 w-4", manualRefreshing && "animate-spin")} />
+              刷新
             </Button>
-          ) : null
+            {canCreate ? (
+              <Button
+                onClick={(event) => openCreateForm(event.currentTarget)}
+                className="h-10 gap-2 px-4"
+              >
+                <Plus className="h-4 w-4" />
+                新建管理员
+              </Button>
+            ) : null}
+          </>
         }
         meta={<span>超级管理员账号不可在此页面降级、停用或重置密码。</span>}
       />
-      {(manualRefreshing || (users.isLoading && !hasDisplayedUsers)) ? (
-        <div
-          className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-background/60 backdrop-blur-[2px]"
-          role="status"
-          aria-live="polite"
-          aria-label="正在加载数据"
-        >
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-popover/95 px-5 py-3.5 text-sm font-medium text-muted-foreground shadow-[0_18px_50px_rgba(35,49,42,0.14)]">
-            <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-            <span>加载中…</span>
-          </div>
-        </div>
-      ) : null}
-      <MetricStrip className="sm:grid-cols-2 xl:grid-cols-4">
+      <MetricStrip className="grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="管理员总数"
           value={totalUsers.data?.total ?? 0}
@@ -536,21 +542,29 @@ export default function AdminUsersPage() {
         </div>
       ) : null}
 
-      <Card className="overflow-hidden rounded-2xl">
-        <div className="border-b border-border/70 bg-secondary/20 p-4 lg:p-5">
+      <Card className="overflow-hidden rounded-[18px] border-border/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-secondary/20 px-4 py-3 lg:px-5">
+          <h2 className="inline-flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-primary" />账号目录</h2>
+          <span className="text-[11px] text-muted-foreground">仅展示后台管理账号，不包含普通用户</span>
+        </div>
+        <div className="border-b border-border/70 px-4 py-3.5 lg:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-            <label className="relative min-w-0 flex-1 xl:max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-              <Input
-                className="h-11 bg-card pl-9"
-                placeholder="搜索用户名 / 显示名 / 邮箱"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
-            </label>
+            <DirectorySearch
+              inputRef={searchInputRef}
+              label="搜索管理员"
+              placeholder="输入用户名、姓名或邮箱"
+              value={searchInput}
+              onChange={setSearchInput}
+              onClear={() => {
+                setSearchInput("");
+                setKeyword("");
+                setPage(1);
+              }}
+            />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:flex xl:items-center">
+            <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center xl:ml-auto xl:w-auto xl:shrink-0">
               <CustomSelect
+                aria-label="筛选管理员角色"
                 value={roleFilter}
                 onChange={(value) => {
                   setRoleFilter(value);
@@ -558,9 +572,10 @@ export default function AdminUsersPage() {
                 }}
                 options={roleOptions}
                 placeholder="全部角色"
-                className="w-full xl:w-40"
+                className="h-10 w-full bg-card text-xs sm:w-36"
               />
               <CustomSelect
+                aria-label="筛选管理员状态"
                 value={statusFilter}
                 onChange={(value) => {
                   setStatusFilter(value as StatusFilter);
@@ -568,61 +583,51 @@ export default function AdminUsersPage() {
                 }}
                 options={STATUS_OPTIONS}
                 clearable={false}
-                className="w-full xl:w-40"
+                className="h-10 w-full bg-card text-xs sm:w-32"
               />
-              <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-muted/50 px-3 xl:w-[310px]">
-                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground/70" />
-                <input
-                  type="date"
-                  aria-label="创建开始日期"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setDateFrom(value);
-                    if (dateTo && value && value > dateTo) setDateTo(value);
-                    setPage(1);
-                  }}
-                />
-                <span className="text-muted-foreground/70">—</span>
-                <input
-                  type="date"
-                  aria-label="创建结束日期"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setDateTo(value);
-                    if (dateFrom && value && value < dateFrom) setDateFrom(value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 xl:ml-auto">
-              {hasFilters ? (
-                <Button variant="secondary" onClick={clearFilters} className="h-11 px-3 shadow-none">
-                  清除
-                </Button>
-              ) : null}
-              <Button variant="secondary" onClick={refreshAll} disabled={manualRefreshing} className="h-11 w-11 p-0 shadow-none" title="刷新">
-                <RefreshCw className={cn("h-4 w-4", manualRefreshing && "animate-spin")} />
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                dateLabel="创建日期"
+                placeholder="选择创建日期范围"
+                onChange={({ from, to }) => {
+                  setDateFrom(from);
+                  setDateTo(to);
+                  setPage(1);
+                }}
+              />
+              <Button variant="ghost" onClick={clearFilters} disabled={!hasFilters} className="h-10 gap-2 px-3 text-xs">
+                <RotateCcw className="h-3.5 w-3.5" />重置
               </Button>
             </div>
           </div>
+          {hasFilters ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><ListFilter className="h-3.5 w-3.5" />筛选条件</span>
+              {keyword ? <FilterChip label={`关键词：${keyword}`} onRemove={() => { setSearchInput(""); setKeyword(""); setPage(1); }} /> : null}
+              {roleFilter ? <FilterChip label={`角色：${roleOptions.find((option) => option.value === roleFilter)?.label ?? roleFilter}`} onRemove={() => { setRoleFilter(""); setPage(1); }} /> : null}
+              {statusFilter !== "all" ? <FilterChip label={`状态：${STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label}`} onRemove={() => { setStatusFilter("all"); setPage(1); }} /> : null}
+              {dateFilterLabel ? <FilterChip label={`创建：${dateFilterLabel}`} onRemove={() => { setDateFrom(""); setDateTo(""); setPage(1); }} /> : null}
+              <button type="button" onClick={clearFilters} className="ml-auto h-6 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground">清除全部</button>
+            </div>
+          ) : null}
         </div>
         <CardContent className="p-0">
+          {selectedIds.size ? (
+            <div className="flex items-center justify-between border-b border-primary/15 bg-accent/50 px-5 py-2 text-xs text-primary" role="status">
+              <span>已选择 {selectedIds.size} 位管理员</span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>取消选择</Button>
+            </div>
+          ) : null}
           {users.isError ? (
             <div className="m-4 flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive-light px-4 py-3 text-sm text-destructive">
               <ShieldAlert className="h-4 w-4 shrink-0" />
               {users.error instanceof Error ? users.error.message : "管理员列表接口暂不可用"}
+              <Button variant="ghost" size="sm" className="ml-auto shrink-0" onClick={() => users.refetch()}>重试</Button>
             </div>
           ) : null}
 
-          <div className="relative overflow-x-auto">
+          <div className="relative overflow-x-auto" aria-busy={users.isFetching}>
             <table className="w-full min-w-[1060px] border-collapse text-sm">
               <thead className="bg-secondary/50 text-left">
                 <tr className="border-b border-border">
@@ -635,12 +640,12 @@ export default function AdminUsersPage() {
                     />
                   </th>
                   {[
-                    ["ID", "w-20"],
                     ["用户信息", "min-w-72"],
                     ["角色", "w-36"],
                     ["状态", "w-28"],
+                    ["创建时间", "min-w-40"],
                     ["最后登录", "min-w-56"],
-                    ["操作", "w-48"],
+                    ["操作", "min-w-56"],
                   ].map(([label, width]) => (
                     <th key={label} className={cn("px-4 py-3.5 text-xs font-semibold text-muted-foreground", width)}>
                       {label}
@@ -675,14 +680,14 @@ export default function AdminUsersPage() {
                             aria-label={`选择管理员 ${user.username}`}
                           />
                         </td>
-                        <td className="px-4 py-4 font-mono text-xs text-muted-foreground tabular-nums">{user.id}</td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
                             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-primary ring-1 ring-primary/20">
                               {primaryName.charAt(0).toUpperCase() || "A"}
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate font-semibold text-foreground">{primaryName}</div>
+                              <div className="flex items-center gap-2"><span className="max-w-48 truncate font-semibold text-foreground" title={primaryName}>{primaryName}</span><span className="text-[10px] tabular-nums text-muted-foreground/70">#{user.id}</span>{protectedRow ? <LockKeyhole className="h-3 w-3 shrink-0 text-primary" aria-label="受保护账号" /> : null}</div>
+                              <div className="mt-0.5 max-w-60 truncate text-xs text-muted-foreground" title={user.username}>@{user.username}</div>
                               <div className="mt-0.5 max-w-[300px] truncate text-xs text-muted-foreground/70">
                                 {user.email || (user.display_name ? user.username : "未设置邮箱")}
                               </div>
@@ -693,6 +698,7 @@ export default function AdminUsersPage() {
                         <td className="px-4 py-4">
                           <StatusBadge tone={user.is_active ? "success" : "warning"}>{user.is_active ? "启用中" : "停用中"}</StatusBadge>
                         </td>
+                        <td className="px-4 py-4 text-xs tabular-nums text-muted-foreground">{formatChinaDateTime(user.created_at)}</td>
                         <td className="px-4 py-4">
                           <div className="text-xs font-medium text-muted-foreground">{formatChinaDateTime(user.last_login_at)}</div>
                           <div className="mt-1 font-mono text-[11px] text-muted-foreground/70">{user.last_login_ip || "—"}</div>
@@ -702,18 +708,21 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               title="编辑管理员"
+                              aria-label={`编辑管理员 ${user.username}`}
                               disabled={protectedRow || !canUpdate}
                               onClick={(event) => startEdit(user, event.currentTarget)}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
+                              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 text-xs text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <Edit3 className="h-4 w-4" />
+                              编辑
                             </button>
                             <button
                               type="button"
                               title="强制登出"
+                              aria-label={`强制登出 ${user.username}`}
                               disabled={protectedRow || !canForceLogout}
                               onClick={() => setConfirmState({ action: "force-logout", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
+                              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                             >
                               <LogOut className="h-4 w-4" />
                             </button>
@@ -721,9 +730,10 @@ export default function AdminUsersPage() {
                               <button
                                 type="button"
                                 title="重置密码"
+                                aria-label={`重置密码 ${user.username}`}
                                 disabled={protectedRow}
                                 onClick={() => setConfirmState({ action: "reset-password", userId: user.id, userName: user.username })}
-                                className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-border bg-card text-primary transition hover:border-primary hover:bg-accent disabled:pointer-events-none disabled:opacity-35"
                               >
                                 <KeyRound className="h-4 w-4" />
                               </button>
@@ -731,9 +741,10 @@ export default function AdminUsersPage() {
                             <button
                               type="button"
                               title="停用账号"
+                              aria-label={`停用账号 ${user.username}`}
                               disabled={protectedRow || !canDelete || !user.is_active}
                               onClick={() => setConfirmState({ action: "delete", userId: user.id, userName: user.username })}
-                              className="grid h-9 w-9 place-items-center rounded-xl border border-destructive/15 bg-card text-destructive transition hover:border-destructive/30 hover:bg-destructive-light disabled:pointer-events-none disabled:opacity-30"
+                              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-destructive/15 bg-card text-destructive transition hover:border-destructive/30 hover:bg-destructive-light disabled:pointer-events-none disabled:opacity-30"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -742,66 +753,26 @@ export default function AdminUsersPage() {
                       </tr>
                     );
                   })
-                ) : (
+                ) : !users.isError ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-20 text-center">
                       <UsersRound className="mx-auto h-8 w-8 text-muted-foreground/70" />
                       <p className="mt-3 text-sm font-medium text-muted-foreground">暂无符合条件的管理员</p>
                       <p className="mt-1 text-xs text-muted-foreground/70">调整关键词、角色、状态或日期范围，列表会自动更新。</p>
+                      {hasFilters ? <Button variant="secondary" size="sm" className="mt-4" onClick={clearFilters}><RotateCcw className="h-3.5 w-3.5" />清除筛选</Button> : null}
                     </td>
                   </tr>
-                )}
+                ) : null}
               </tbody>
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-border px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between lg:px-5">
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <span>共 <strong className="font-semibold text-foreground">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 条数据</span>
-              {selectedIds.size ? <span className="text-primary">已选 {selectedIds.size} 条</span> : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <nav className="flex items-center gap-1" aria-label="管理员列表分页">
-                <button
-                  type="button"
-                  aria-label="上一页"
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-sm text-muted-foreground transition hover:border-primary disabled:pointer-events-none disabled:opacity-30"
-                >
-                  ‹
-                </button>
-                {pagination.map((item) =>
-                  typeof item === "number" ? (
-                    <button
-                      type="button"
-                      key={item}
-                      aria-current={page === item ? "page" : undefined}
-                      onClick={() => setPage(item)}
-                      className={cn(
-                        "grid h-9 min-w-9 place-items-center rounded-xl border px-2 text-xs font-semibold transition",
-                        page === item
-                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                          : "border-transparent text-muted-foreground hover:border-border hover:bg-accent",
-                      )}
-                    >
-                      {item}
-                    </button>
-                  ) : (
-                    <span key={item} className="grid h-9 w-7 place-items-center text-xs text-muted-foreground/70">…</span>
-                  ),
-                )}
-                <button
-                  type="button"
-                  aria-label="下一页"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-sm text-muted-foreground transition hover:border-primary disabled:pointer-events-none disabled:opacity-30"
-                >
-                  ›
-                </button>
-              </nav>
+              <span>共 <strong className="font-semibold tabular-nums text-foreground">{(displayedUsers?.total ?? 0).toLocaleString("zh-CN")}</strong> 位管理员</span>
+              <span className="tabular-nums text-muted-foreground/80">{currentItems.length ? (page - 1) * pageSize + 1 : 0}–{currentItems.length ? (page - 1) * pageSize + currentItems.length : 0}</span>
               <CustomSelect
+                aria-label="每页显示条数"
                 value={String(pageSize)}
                 onChange={(value) => {
                   setPageSize(Number(value));
@@ -809,9 +780,16 @@ export default function AdminUsersPage() {
                 }}
                 options={PAGE_SIZE_OPTIONS}
                 clearable={false}
-                className="w-28"
+                className="h-8 w-28 bg-card text-xs"
               />
             </div>
+            <DirectoryPagination
+              page={page}
+              totalPages={totalPages}
+              items={pagination}
+              onPageChange={setPage}
+              label="管理员列表分页"
+            />
           </div>
         </CardContent>
       </Card>

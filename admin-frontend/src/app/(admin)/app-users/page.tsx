@@ -5,15 +5,12 @@ import {
   Ban,
   Blend,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Eye,
   ListFilter,
   Monitor,
   RefreshCw,
   RotateCcw,
-  Search,
   ShieldCheck,
   UserCheck,
   UserPlus,
@@ -28,6 +25,12 @@ import {
   MetricCard,
   MetricStrip,
 } from "@/components/admin/management-ui";
+import {
+  DirectoryPagination,
+  DirectorySearch,
+  FilterChip,
+  useDirectorySearchShortcut,
+} from "@/components/admin/directory-controls";
 import { StatusBadge } from "@/components/status-badge";
 import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
@@ -37,7 +40,6 @@ import { CustomCheckbox } from "@/components/ui/custom-checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WechatMark } from "@/components/icons/wechat-mark";
 import { apiRequest, toQuery } from "@/lib/api/client";
@@ -228,21 +230,6 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-right text-xs font-medium text-foreground">{children}</dd>
     </div>
-  );
-}
-
-function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onRemove}
-      aria-label={`移除筛选：${label}`}
-      title={`${label} · 点击移除`}
-      className="group inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground/80 transition hover:border-primary/25 hover:bg-accent hover:text-foreground"
-    >
-      <span className="max-w-[280px] truncate">{label}</span>
-      <X className="h-3 w-3 shrink-0 text-muted-foreground/70 group-hover:text-foreground" />
-    </button>
   );
 }
 
@@ -474,28 +461,7 @@ export default function AppUsersPage() {
     setSelectedIds(new Set());
   }, [page, pageSize, keyword, userType, status, createdFrom, createdTo]);
 
-  useEffect(() => {
-    const focusSearch = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (document.querySelector('[data-slot="dialog-content"], [role="listbox"], [data-slot="popover-content"]')) return;
-      event.preventDefault();
-      searchInputRef.current?.focus();
-    };
-    window.addEventListener("keydown", focusSearch);
-    return () => window.removeEventListener("keydown", focusSearch);
-  }, []);
+  useDirectorySearchShortcut(searchInputRef);
 
   const resetFilters = () => {
     setSearchInput("");
@@ -795,40 +761,18 @@ export default function AppUsersPage() {
         <div className="border-b border-border/70 px-4 py-3.5 lg:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <div className="group relative min-w-0 flex-1 xl:max-w-[400px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70 transition-colors group-focus-within:text-primary" />
-              <Input
-                ref={searchInputRef}
-                aria-label="搜索普通用户"
-                aria-keyshortcuts="/"
-                autoComplete="off"
-                spellCheck={false}
-                className="h-10 bg-card pl-9 pr-9 placeholder:text-muted-foreground/70"
+              <DirectorySearch
+                inputRef={searchInputRef}
+                label="搜索普通用户"
                 placeholder="输入昵称、OpenID 或邮箱"
                 value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
+                onChange={setSearchInput}
+                onClear={() => {
+                  setSearchInput("");
+                  setKeyword("");
+                  setPage(1);
+                }}
               />
-              {searchInput ? (
-                <button
-                  type="button"
-                  aria-label="清空搜索"
-                  onClick={() => {
-                    setSearchInput("");
-                    setKeyword("");
-                    setPage(1);
-                  }}
-                  className="absolute right-2.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/70 transition hover:bg-secondary hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
-              {!searchInput ? (
-                <kbd
-                  aria-hidden="true"
-                  className="pointer-events-none absolute right-2.5 top-1/2 hidden h-5 min-w-5 -translate-y-1/2 place-items-center rounded border border-border bg-secondary/60 px-1 font-mono text-[10px] text-muted-foreground/70 transition-opacity group-focus-within:opacity-0 sm:grid"
-                >
-                  /
-                </kbd>
-              ) : null}
             </div>
 
             <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center xl:ml-auto">
@@ -1209,54 +1153,13 @@ export default function AppUsersPage() {
               />
             </div>
 
-            <nav className="flex items-center gap-1" aria-label="用户列表分页">
-              <span className="mr-2 hidden text-xs text-muted-foreground sm:inline">
-                第 {page} / {totalPages} 页
-              </span>
-              <button
-                type="button"
-                aria-label="上一页"
-                disabled={page <= 1}
-                onClick={() => setPage((value) => Math.max(1, value - 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {pagination.map((item) =>
-                typeof item === "number" ? (
-                  <button
-                    type="button"
-                    key={item}
-                    aria-current={page === item ? "page" : undefined}
-                    onClick={() => setPage(item)}
-                    className={cn(
-                      "grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold tabular-nums transition",
-                      page === item
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-transparent text-muted-foreground hover:border-border hover:bg-accent",
-                    )}
-                  >
-                    {item}
-                  </button>
-                ) : (
-                  <span
-                    key={item}
-                    className="grid h-8 w-7 place-items-center text-xs text-muted-foreground/60"
-                  >
-                    …
-                  </span>
-                ),
-              )}
-              <button
-                type="button"
-                aria-label="下一页"
-                disabled={page >= totalPages}
-                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </nav>
+            <DirectoryPagination
+              page={page}
+              totalPages={totalPages}
+              items={pagination}
+              onPageChange={setPage}
+              label="用户列表分页"
+            />
           </div>
         </CardContent>
       </Card>

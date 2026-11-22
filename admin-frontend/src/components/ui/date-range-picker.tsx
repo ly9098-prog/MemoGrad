@@ -15,12 +15,14 @@ export function DateRangePicker({
   onChange,
   placeholder = "选择日期范围",
   className,
+  dateLabel = "注册日期",
 }: {
   from: string;
   to: string;
   onChange: (range: { from: string; to: string }) => void;
   placeholder?: string;
   className?: string;
+  dateLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected: DateRange | undefined =
@@ -54,7 +56,7 @@ export function DateRangePicker({
         <Button
           variant="secondary"
           size="md"
-          aria-label={from || to ? `注册日期：${label}` : "选择注册日期"}
+          aria-label={from || to ? `${dateLabel}：${label}` : `选择${dateLabel}`}
           className={cn(
             "h-10 w-full justify-start gap-2 px-3 text-left font-normal sm:w-[250px]",
             !from && !to && "text-muted-foreground",
