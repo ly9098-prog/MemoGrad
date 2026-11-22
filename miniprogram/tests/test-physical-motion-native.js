@@ -20,11 +20,13 @@ test('native result template paints one reader for review, teacher and guest sta
   const hasClass = (node, name) => String(node.attr && node.attr.class || '').split(/\s+/).includes(name)
   const base = { reviewDialogVisible: true, teacherSheetVisible: false, guestMode: false,
     reviewDialog: { title: '题目复盘', analysisSections: [] } }
-  for (const [patch, visible, content] of [
+  for (const [patch, visible, content, teacherAction] of [
     [{}, true, 'review-dialog-head'],
-    [{ teacherSheetVisible: true, teacherLoading: true }, true, 'teacher-sheet-loading'],
-    [{ teacherSheetVisible: true, teacherErrorText: '生成失败' }, true, 'teacher-sheet-error'],
-    [{ teacherSheetVisible: true, teacherResult: { title: '专项讲解', sections: [], knowledgePoints: [] } }, true, 'teacher-sheet-scroll'],
+    [{ teacherSheetVisible: true, teacherLoading: true }, true, 'teacher-sheet-loading', 'loading'],
+    [{ teacherSheetVisible: true, teacherErrorText: '生成失败' }, true, 'teacher-sheet-error', 'retry408Teacher'],
+    [{ teacherSheetVisible: true, teacherResult: { title: '专项讲解',
+      sections: [{ key: 'concept', heading: '考点', points: ['第一段推导', '第二段推导'] }],
+      knowledgePoints: [] } }, true, 'teacher-sheet-scroll', 'show408TeacherActions'],
     [{ teacherSheetVisible: true }, true, 'teacher-action-panel'],
     [{ guestMode: true, teacherSheetVisible: true }, true, 'review-dialog-head'],
     [{ reviewDialogVisible: false, teacherSheetVisible: false }, false, 'review-dialog-head'],
@@ -38,6 +40,23 @@ test('native result template paints one reader for review, teacher and guest sta
     assert.equal(nodes.filter(node => hasClass(node, content) || node.attr && node.attr.readerClass === content).length, 1)
     assert.equal(nodes.filter(node => hasClass(node, 'review-dialog-head') || hasClass(node, 'teacher-sheet-head')).length, 1,
       'only the active reader content is mounted in the slot')
+    if (teacherAction) {
+      const footer = nodes.find(node => hasClass(node, 'teacher-sheet-footer'))
+      const controls = flatten(footer).filter(node => node.tag === 'wx-button')
+      assert.equal(controls.length, 2)
+      assert.equal(controls[0].attr.bindtap, 'close408Teacher', 'return preserves the review instead of closing both readers')
+      if (teacherAction === 'loading') {
+        assert.ok(controls[1].attr.disabled, 'generation must prevent a second action from dispatching')
+        assert.equal(controls[1].attr.bindtap, undefined)
+      } else assert.equal(controls[1].attr.bindtap, teacherAction)
+    }
+    if (patch.teacherResult) {
+      const points = nodes.find(node => hasClass(node, 'teacher-point-list')).children
+        .flatMap(flatten).filter(node => hasClass(node, 'teacher-point-text'))
+      assert.equal(points.length, 2)
+      assert.equal(points.map(node => node.children.join('')).join('|'), '第一段推导|第二段推导')
+      assert.ok(points.every(node => node.attr.userSelect === 'true'), 'lesson text remains selectable after removing unused wrappers')
+    }
   }
 })
 

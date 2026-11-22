@@ -382,7 +382,7 @@
 <view class="bottom-space"></view>
 </view>
 </scroll-view>
-<motion-sheet show="{{reviewDialogVisible || (!guestMode && teacherSheetVisible)}}" layout-key="{{!guestMode && teacherSheetVisible ? 'teacher' : 'review'}}" label="{{!guestMode && teacherSheetVisible ? '专项 AI 老师' : '题目解析与复盘'}}" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="closeReviewDialog">
+<motion-sheet show="{{reviewDialogVisible || (!guestMode && teacherSheetVisible)}}" layout-key="{{!guestMode && teacherSheetVisible ? 'teacher' : 'review'}}" label="{{!guestMode && teacherSheetVisible ? '专项 AI 老师' : '题目解析与复盘'}}" background="{{!guestMode && teacherSheetVisible ? '#FAFCF8' : '#FBFFFD'}}" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="closeReviewDialog">
 <view class="result-reader-sheet {{!guestMode && teacherSheetVisible ? 'teacher-sheet' : 'review-dialog-sheet'}} motion-sheet-panel" catchtap="stopPropagation">
 <block wx:if="{{guestMode || !teacherSheetVisible}}">
 <view class="review-dialog-head" catchtouchmove="noop">
@@ -433,7 +433,7 @@
                     wx:for-item="paragraph"
                     wx:key="key"
                     class="review-analysis-text"
-                    selectable="true"
+                    user-select="true"
                   >{{paragraph.text}}</text>
 </view>
 </view>
@@ -460,53 +460,70 @@
 </view>
 </block>
 <block wx:else>
-<view class="teacher-sheet-head">
-<view class="teacher-title-wrap"><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
-<button class="teacher-review-back" bindtap="close408Teacher">返回解析</button>
+<view class="teacher-sheet-head mini-choice-sheet-header">
+<view class="mini-choice-sheet-heading">
+<text class="mini-choice-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text>
+<text class="mini-choice-sheet-description">围绕本题，弄懂考点与解题思路</text>
+</view>
 </view>
 <fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherResult || teacherErrorText || teacherLoading || 'actions'}}">
+<view class="teacher-sheet-content">
 <view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
-<text class="teacher-action-title">选择一个固定教学动作</text>
-<button wx:for="{{teacherActions}}" wx:key="action" class="teacher-action-choice" data-action="{{item.action}}" bindtap="select408TeacherAction">{{item.label}}</button>
+<text class="teacher-action-title">想从哪里继续理解？</text>
+<view class="mini-choice-grid">
+<button wx:for="{{teacherActions}}" wx:key="action" class="mini-choice-option" hover-class="mini-choice-pressed" data-action="{{item.action}}" bindtap="select408TeacherAction">
+<text class="mini-choice-option-title">{{item.shortLabel}}</text>
+<text class="mini-choice-option-description">{{item.label}}</text>
+</button>
 </view>
-<view wx:elif="{{teacherLoading}}" class="teacher-sheet-loading"><view class="teacher-spinner"></view><text>正在结合本题与学习状态生成…</text></view>
-<view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">{{teacherErrorText}}</view>
+</view>
+<view wx:elif="{{teacherLoading}}" class="teacher-sheet-loading" aria-label="正在生成讲解">
+<text class="teacher-state-title">正在整理本题讲解</text>
+<text class="teacher-state-description">正在结合本题与学习状态生成…</text>
+<view class="teacher-skeleton" aria-hidden="true"><view></view><view></view><view></view></view>
+</view>
+<view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">
+<text class="teacher-state-title">这次讲解未完成</text>
+<text class="teacher-state-description" user-select="true">{{teacherErrorText}}</text>
+</view>
 <block wx:elif="{{teacherResult}}">
 <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
 <text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
-<text class="teacher-summary">{{teacherResult.summary}}</text>
+<text class="teacher-summary" user-select="true">{{teacherResult.summary}}</text>
 </view>
 <view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
 <view class="teacher-section-head">
-<view class="teacher-section-rule"></view>
 <text class="teacher-result-heading">{{item.heading}}</text>
 </view>
 <view class="teacher-point-list">
-<view wx:for="{{item.points}}" wx:for-item="point" wx:key="*this" class="teacher-result-point">
-<view class="teacher-point-dot"></view>
-<text class="teacher-point-text" selectable="true">{{point}}</text>
+<text wx:for="{{item.points}}" wx:for-item="point" wx:key="*this" class="teacher-point-text" user-select="true">{{point}}</text>
 </view>
 </view>
-</view>
-<view wx:if="{{teacherResult.knowledgePoints.length}}" class="teacher-result-section teacher-knowledge-section">
-<view class="teacher-section-head"><view class="teacher-section-rule"></view><text class="teacher-result-heading">知识点串联</text></view>
+<view wx:if="{{teacherResult.knowledgePoints.length}}" class="teacher-result-section">
+<view class="teacher-section-head"><text class="teacher-result-heading">知识点串联</text></view>
 <view wx:for="{{teacherResult.knowledgePoints}}" wx:key="key" class="teacher-kp-row">
 <text class="teacher-kp-name">{{item.name}}</text>
 <text wx:if="{{item.relation}}" class="teacher-kp-note">{{item.relation}}</text>
-<text wx:if="{{item.masteryHint}}" class="teacher-kp-note mastery">{{item.masteryHint}}</text>
+<text wx:if="{{item.masteryHint}}" class="teacher-kp-note">{{item.masteryHint}}</text>
 </view>
 </view>
-<view wx:if="{{teacherResult.practiceQuestion}}" class="teacher-result-section teacher-practice-card">
-<view class="teacher-section-head"><view class="teacher-section-rule"></view><text class="teacher-result-heading">立即检验</text></view>
-<text class="teacher-practice-stem">{{teacherResult.practiceQuestion.stem}}</text>
+<view wx:if="{{teacherResult.practiceQuestion}}" class="teacher-result-section">
+<view class="teacher-section-head"><text class="teacher-result-heading">立即检验</text></view>
+<text class="teacher-practice-stem" user-select="true">{{teacherResult.practiceQuestion.stem}}</text>
 <view wx:for="{{teacherResult.practiceQuestion.options}}" wx:key="key" class="teacher-practice-option"><text class="teacher-practice-key">{{item.key}}</text><text class="teacher-practice-option-text">{{item.text}}</text></view>
 <view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
 <text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis">{{teacherResult.practiceQuestion.analysis}}</text>
 </view>
 <text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析后重试。' : '内容由专项 AI 老师生成，仅用于本题复盘。'}}</text>
-<view class="teacher-scroll-space"></view>
 </block>
+</view>
 </fit-scroll>
+<view class="teacher-sheet-footer mini-choice-sheet-actions {{!teacherLoading && !teacherResult && !teacherErrorText ? 'is-single' : ''}}" catchtouchmove="noop">
+<button class="mini-choice-sheet-action mini-choice-sheet-action-secondary" hover-class="mini-choice-sheet-action-pressed" bindtap="close408Teacher">返回解析</button>
+<button wx:if="{{teacherLoading}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" disabled>正在生成…</button>
+<button wx:elif="{{teacherErrorText}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="retry408Teacher">重新尝试</button>
+<button wx:elif="{{teacherResult}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="show408TeacherActions">换个讲解</button>
+</view>
 </block>
 </view>
 </motion-sheet>

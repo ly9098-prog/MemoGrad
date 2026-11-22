@@ -204,6 +204,41 @@ test('shared reader returns from teacher to review and dismisses both states tog
   assert.equal(page.data.reviewDialogVisible, false)
 })
 
+test('teacher error retries the same action while loading locks the chooser and repeated retries', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 7, status: 'correct', userAnswer: 'A' }
+  api.post = async () => { throw new Error('network unavailable') }
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(page.data.teacherAction, 'explain_correct')
+  assert.ok(page.data.teacherErrorText)
+
+  let resolve
+  const sent = []
+  api.post = (_url, payload) => {
+    sent.push(payload)
+    return new Promise(done => { resolve = done })
+  }
+  const pending = page.retry408Teacher()
+  assert.equal(page.data.teacherLoading, true)
+  page.show408TeacherActions()
+  page.retry408Teacher()
+  await page.run408TeacherFromReview('core_concept')
+  assert.equal(page.data.teacherAction, 'explain_correct', 'a second action cannot replace the in-flight retry')
+  // Availability is asynchronous; allow the existing request port to dispatch.
+  await new Promise(done => setImmediate(done))
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].action, 'explain_correct')
+  resolve({ action: 'explain_correct', title: '正确选项', sections: [{ heading: '推导', points: ['根据题设可得 A'] }] })
+  await pending
+  assert.equal(page.data.teacherResult.title, '正确选项')
+  page.show408TeacherActions()
+  assert.equal(page.data.teacherResult, null)
+  assert.equal(page.data.teacherErrorText, '')
+  assert.equal(page.data.teacherSheetVisible, true)
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(sent.length, 1, 'returning to a successful action retains the existing result cache')
+})
+
 test('teacher cannot generate after changing the reviewed question during the health query', async () => {
   const { page, api } = fixture()
   page.data.reviewDialog = { questionId: 42 }

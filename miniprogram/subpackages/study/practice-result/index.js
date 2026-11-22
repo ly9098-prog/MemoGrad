@@ -168,6 +168,7 @@ questionVersionId: 0,
 diagnosisId: 0
 },
 teacherActions: aiTeacher408.ACTIONS,
+teacherAction: '',
 teacherLoading: false,
 teacherResult: null,
 teacherErrorText: '',
@@ -753,9 +754,19 @@ const action = String(e.currentTarget.dataset.action || '');
 if (action) this.run408TeacherFromReview(action);
 },
   async run408TeacherFromReview(action) {
-    if (this._guestMode) return
+    if (this._guestMode || !aiTeacher408.ACTION_BY_KEY[action]) return
+    if (!this.data.teacherLoading) this.setData({ teacherAction: action })
     return this._review408TeacherController().run(action)
   },
+
+retry408Teacher() {
+if (this.data.teacherLoading || !this.data.teacherErrorText) return;
+return this.run408TeacherFromReview(this.data.teacherAction);
+},
+show408TeacherActions() {
+if (this.data.teacherLoading) return;
+this.setData({ teacherResult: null, teacherErrorText: '' });
+},
 
   _review408TeacherController() {
     if (!this._review408Teacher) {

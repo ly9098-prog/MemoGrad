@@ -6,7 +6,9 @@ const ROOT = path.resolve(__dirname, '../../..')
 const ts = createRequire(path.join(ROOT, 'admin-frontend/package.json'))('typescript')
 
 const PAGE_PATH = 'miniprogram/subpackages/study/practice-result/index.js'
-const PAGE_MAX_LINES = 838
+// +11 lines for the teacher action state and explicit retry/chooser UI handlers.
+// Controller dependencies and all per-module/function budgets stay frozen.
+const PAGE_MAX_LINES = 849
 const MODULE_DIR = 'miniprogram/subpackages/study/practice-result/utils/'
 // Frozen dependency surface for every governed module in the result page utils
 // directory. Page-adapter modules must receive the api client and any storage
