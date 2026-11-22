@@ -1,3 +1,4 @@
+<import src="../components/ai-teacher-content/content.wxml" />
 <root-back-guard />
 <view class="page">
 <app-dialog id="appDialog" theme="mint"></app-dialog>
@@ -487,38 +488,11 @@
 <text class="teacher-state-description" user-select="true">{{teacherErrorText}}</text>
 </view>
 <block wx:elif="{{teacherResult}}">
-<view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
-<text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
-<text class="teacher-summary" user-select="true">{{teacherResult.summary}}</text>
-</view>
-<view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
-<view class="teacher-section-head">
-<text class="teacher-result-heading">{{item.heading}}</text>
-</view>
-<view class="teacher-point-list">
-<text wx:for="{{item.points}}" wx:for-item="point" wx:key="*this" class="teacher-point-text" user-select="true">{{point}}</text>
-</view>
-</view>
-<view wx:if="{{teacherResult.knowledgePoints.length}}" class="teacher-result-section">
-<view class="teacher-section-head"><text class="teacher-result-heading">知识点串联</text></view>
-<view wx:for="{{teacherResult.knowledgePoints}}" wx:key="key" class="teacher-kp-row">
-<text class="teacher-kp-name">{{item.name}}</text>
-<text wx:if="{{item.relation}}" class="teacher-kp-note">{{item.relation}}</text>
-<text wx:if="{{item.masteryHint}}" class="teacher-kp-note">{{item.masteryHint}}</text>
-</view>
-</view>
-<view wx:if="{{teacherResult.practiceQuestion}}" class="teacher-result-section">
-<view class="teacher-section-head"><text class="teacher-result-heading">立即检验</text></view>
-<text class="teacher-practice-stem" user-select="true">{{teacherResult.practiceQuestion.stem}}</text>
-<view wx:for="{{teacherResult.practiceQuestion.options}}" wx:key="key" class="teacher-practice-option"><text class="teacher-practice-key">{{item.key}}</text><text class="teacher-practice-option-text">{{item.text}}</text></view>
-<view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
-<text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis">{{teacherResult.practiceQuestion.analysis}}</text>
-</view>
-<text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析后重试。' : '内容由专项 AI 老师生成，仅用于本题复盘。'}}</text>
+<template is="ai-teacher-content" data="{{teacherResult, comfortable: true, fallbackNote: '本次未生成 AI 讲解，可返回查看题库解析后重试。', generatedNote: '内容由专项 AI 老师生成，仅用于本题复盘。'}}" />
 </block>
 </view>
 </fit-scroll>
-<view class="teacher-sheet-footer mini-choice-sheet-actions {{!teacherLoading && !teacherResult && !teacherErrorText ? 'is-single' : ''}}" catchtouchmove="noop">
+<view class="teacher-sheet-footer mini-choice-sheet-actions" catchtouchmove="noop">
 <button class="mini-choice-sheet-action mini-choice-sheet-action-secondary" hover-class="mini-choice-sheet-action-pressed" bindtap="close408Teacher">返回解析</button>
 <button wx:if="{{teacherLoading}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" disabled>正在生成…</button>
 <button wx:elif="{{teacherErrorText}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="retry408Teacher">重新尝试</button>

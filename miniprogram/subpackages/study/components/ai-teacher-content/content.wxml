@@ -1,0 +1,43 @@
+<template name="ai-teacher-content">
+<view class="teacher-content {{comfortable ? 'is-comfortable' : ''}}">
+<view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
+<text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
+<text class="teacher-summary" user-select="true">{{teacherResult.summary}}</text>
+</view>
+<view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
+<view class="teacher-section-head"><view class="teacher-section-rule" aria-hidden="true"></view><text class="teacher-result-heading">{{item.heading}}</text></view>
+<view class="teacher-point-list">
+<view wx:for="{{item.points}}" wx:for-item="point" wx:key="*this" class="teacher-result-point">
+<view class="teacher-point-dot" aria-hidden="true"></view><text class="teacher-point-text" user-select="true">{{point}}</text>
+</view>
+</view>
+</view>
+<view wx:if="{{teacherResult.knowledgePoints.length}}" class="teacher-result-section">
+<view class="teacher-section-head"><view class="teacher-section-rule" aria-hidden="true"></view><text class="teacher-result-heading">知识点串联</text></view>
+<view wx:for="{{teacherResult.knowledgePoints}}" wx:key="key" class="teacher-kp-row">
+<text class="teacher-kp-name">{{item.name}}</text>
+<view wx:if="{{item.relationItems.length}}" class="teacher-kp-relations">
+<view wx:for="{{item.relationItems}}" wx:for-item="relation" wx:key="key" class="teacher-kp-relation-chip">
+<text class="teacher-kp-relation-label">{{relation.label}}</text>
+<text class="teacher-kp-relation-value">{{relation.value}}</text>
+</view>
+</view>
+<text wx:elif="{{item.relationText || item.relation}}" class="teacher-kp-relation">{{item.relationText || item.relation}}</text>
+<view wx:if="{{item.masteryText || item.learningHint || item.masteryHint}}" class="teacher-kp-learning">
+<text wx:if="{{item.masteryText}}" class="teacher-kp-mastery">{{item.masteryText}}</text>
+<text wx:if="{{item.learningHint || item.masteryHint}}" class="teacher-kp-hint">{{item.learningHint || item.masteryHint}}</text>
+</view>
+</view>
+</view>
+<view wx:if="{{teacherResult.practiceQuestion}}" class="teacher-result-section">
+<view class="teacher-section-head"><view class="teacher-section-rule" aria-hidden="true"></view><text class="teacher-result-heading">立即检验</text></view>
+<text class="teacher-practice-stem" user-select="true">{{teacherResult.practiceQuestion.stem}}</text>
+<view wx:for="{{teacherResult.practiceQuestion.options}}" wx:key="key" class="teacher-practice-option">
+<text class="teacher-practice-key">{{item.key}}</text><text user-select="true" class="teacher-practice-option-text">{{item.text}}</text>
+</view>
+<view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
+<text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis" user-select="true">{{teacherResult.practiceQuestion.analysis}}</text>
+</view>
+<text class="teacher-footnote">{{teacherResult.fromFallback ? fallbackNote : generatedNote}}</text>
+</view>
+</template>

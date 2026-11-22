@@ -1,0 +1,321 @@
+/* Shared lesson body. Drawer chrome, loading and actions belong to each page. */
+.teacher-content {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.teacher-summary-card {
+  padding: 22rpx 24rpx;
+  border: 1rpx solid #E0E8DD;
+  border-radius: 20rpx;
+  background: #EFF5EC;
+}
+
+.teacher-summary-label {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #6E7F72;
+  font-size: 17rpx;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.teacher-summary {
+  display: block;
+  color: #234234;
+  font-size: 24rpx;
+  font-weight: 400;
+  line-height: 1.82;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.teacher-result-section {
+  margin-top: 18rpx;
+  padding: 24rpx;
+  border: 1rpx solid #E0E5DE;
+  border-radius: 20rpx;
+  background: #FFFFFF;
+}
+
+.teacher-section-head {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 14rpx;
+}
+
+.teacher-section-rule {
+  flex: 0 0 5rpx;
+  width: 5rpx;
+  height: 26rpx;
+  margin-right: 12rpx;
+  border-radius: 4rpx;
+  background: #6A915D;
+}
+
+.teacher-result-heading {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  color: #1B3529;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.teacher-result-point {
+  display: flex;
+  align-items: flex-start;
+  color: #435047;
+  font-size: 22rpx;
+  font-weight: 400;
+  line-height: 1.78;
+}
+
+.teacher-result-point + .teacher-result-point {
+  margin-top: 12rpx;
+}
+
+.teacher-point-dot {
+  flex: 0 0 7rpx;
+  width: 7rpx;
+  height: 7rpx;
+  margin: 15rpx 12rpx 0 0;
+  border-radius: 50%;
+  background: #719063;
+}
+
+.teacher-point-text,
+.teacher-practice-option-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.teacher-kp-row {
+  padding: 14rpx 0;
+}
+
+.teacher-kp-row + .teacher-kp-row {
+  border-top: 1rpx solid #EEF0EB;
+}
+
+.teacher-kp-name {
+  display: block;
+  color: #244436;
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.teacher-kp-relation,
+.teacher-kp-hint {
+  display: block;
+  margin-top: 9rpx;
+  color: #667168;
+  font-size: 19rpx;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.teacher-kp-relations {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 10rpx;
+}
+
+.teacher-kp-relation-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: baseline;
+  margin: 0 8rpx 8rpx 0;
+  padding: 7rpx 11rpx;
+  border: 1rpx solid #E1E8DF;
+  border-radius: 16rpx;
+  background: #F7FAF5;
+  box-sizing: border-box;
+}
+
+.teacher-kp-relation-label {
+  flex-shrink: 0;
+  margin-right: 8rpx;
+  color: #62806B;
+  font-size: 17rpx;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.teacher-kp-relation-value {
+  min-width: 0;
+  color: #405B4B;
+  font-size: 18rpx;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.teacher-kp-learning {
+  margin-top: 10rpx;
+}
+
+.teacher-kp-mastery {
+  display: inline-block;
+  padding: 5rpx 10rpx;
+  border-radius: 12rpx;
+  background: #EEF4E9;
+  color: #54704F;
+  font-size: 17rpx;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.teacher-practice-stem {
+  display: block;
+  color: #263B31;
+  font-size: 23rpx;
+  font-weight: 400;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.teacher-practice-option {
+  display: flex;
+  align-items: baseline;
+  margin-top: 12rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 13rpx;
+  background: #F6F7F2;
+  color: #3D4B43;
+  font-size: 21rpx;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.teacher-practice-key {
+  flex: 0 0 auto;
+  margin-right: 12rpx;
+  color: #1F5B40;
+  font-weight: 600;
+}
+
+.teacher-practice-answer-row {
+  display: flex;
+  align-items: baseline;
+  margin-top: 16rpx;
+}
+
+.teacher-practice-answer-label {
+  flex: 0 0 auto;
+  margin-right: 10rpx;
+  padding: 5rpx 10rpx;
+  border-radius: 12rpx;
+  background: #E9F4E2;
+  color: #527246;
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.teacher-practice-answer {
+  min-width: 0;
+  color: #17613F;
+  font-size: 21rpx;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.teacher-practice-analysis {
+  display: block;
+  margin-top: 8rpx;
+  color: #667168;
+  font-size: 20rpx;
+  font-weight: 400;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.teacher-footnote {
+  display: block;
+  margin-top: 18rpx;
+  color: #667168;
+  font-size: 18rpx;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Practice results use larger type while sharing the wrong-detail structure. */
+.teacher-content.is-comfortable .teacher-summary-label {
+  margin-bottom: 12rpx;
+  color: #3A6F5B;
+  font-size: 26rpx;
+}
+
+.teacher-content.is-comfortable .teacher-summary,
+.teacher-content.is-comfortable .teacher-result-heading,
+.teacher-content.is-comfortable .teacher-result-point,
+.teacher-content.is-comfortable .teacher-kp-name,
+.teacher-content.is-comfortable .teacher-practice-stem,
+.teacher-content.is-comfortable .teacher-practice-option,
+.teacher-content.is-comfortable .teacher-practice-answer {
+  font-size: 32rpx;
+}
+
+.teacher-content.is-comfortable .teacher-result-point,
+.teacher-content.is-comfortable .teacher-practice-stem,
+.teacher-content.is-comfortable .teacher-practice-option {
+  line-height: 1.8;
+}
+
+.teacher-content.is-comfortable .teacher-result-section,
+.teacher-content.is-comfortable .teacher-result-point + .teacher-result-point {
+  margin-top: 24rpx;
+}
+
+.teacher-content.is-comfortable .teacher-section-head {
+  margin-bottom: 20rpx;
+}
+
+.teacher-content.is-comfortable .teacher-point-dot {
+  margin-top: 25rpx;
+}
+
+.teacher-content.is-comfortable .teacher-kp-relation,
+.teacher-content.is-comfortable .teacher-kp-hint,
+.teacher-content.is-comfortable .teacher-practice-analysis {
+  font-size: 30rpx;
+  line-height: 1.8;
+}
+
+.teacher-content.is-comfortable .teacher-practice-answer-label,
+.teacher-content.is-comfortable .teacher-footnote {
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+@media (min-width: 600px) and (max-height: 480px) {
+  .teacher-content.is-comfortable .teacher-summary,
+  .teacher-content.is-comfortable .teacher-result-heading,
+  .teacher-content.is-comfortable .teacher-result-point,
+  .teacher-content.is-comfortable .teacher-kp-name,
+  .teacher-content.is-comfortable .teacher-kp-relation,
+  .teacher-content.is-comfortable .teacher-kp-hint,
+  .teacher-content.is-comfortable .teacher-practice-stem,
+  .teacher-content.is-comfortable .teacher-practice-option,
+  .teacher-content.is-comfortable .teacher-practice-analysis,
+  .teacher-content.is-comfortable .teacher-practice-answer {
+    font-size: 16px;
+  }
+
+  .teacher-content.is-comfortable .teacher-point-dot {
+    margin-top: 12px;
+  }
+}
