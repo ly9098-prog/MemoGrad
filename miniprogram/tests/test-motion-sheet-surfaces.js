@@ -91,5 +91,3 @@ test('surface paint stays outside the untransformed rich-text and scroll body', 
       'fade-mode math ancestors must not introduce paint, transforms or clipping')
   }
 })
-
-module.exports = { root, read, sheetHosts, styleImports }
