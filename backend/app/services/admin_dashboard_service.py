@@ -195,7 +195,10 @@ async def get_dashboard_question_stats(db: AsyncSession) -> dict:
             .order_by(func.count().desc())
         )
         return [
-            {"name": row[0] if row[0] is not None else "unknown", "count": int(row[1])}
+            {
+                "name": str(row[0]) if row[0] is not None else "unknown",
+                "count": int(row[1]),
+            }
             for row in result.all()
         ]
 

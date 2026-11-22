@@ -18,7 +18,7 @@ async def test_question_stats_returns_subject_names():
         side_effect=[
             _result([("数据结构", 12), ("计算机网络", 8)]),
             _result([("published", 20)]),
-            _result([("easy", 10)]),
+            _result([(3, 10), (2, 6), (1, 4)]),
         ]
     )
 
@@ -29,4 +29,8 @@ async def test_question_stats_returns_subject_names():
         {"name": "计算机网络", "count": 8},
     ]
     assert stats["by_review_status"] == [{"name": "published", "count": 20}]
-    assert stats["by_difficulty"] == [{"name": "easy", "count": 10}]
+    assert stats["by_difficulty"] == [
+        {"name": "3", "count": 10},
+        {"name": "2", "count": 6},
+        {"name": "1", "count": 4},
+    ]
