@@ -205,7 +205,6 @@ test('loaded field assembly preserves repeated diagnosis normalization and its e
   assert.equal(patch.isCurrentMastered, true)
   assert.equal(patch.errorDiagnosis.marker, 1)
   assert.deepEqual(f.calls, [['normalize'], ['normalize'], ['next', { marker: 2 }]])
-  assert.equal(patch.teacherFeedbackSent, '')
   assert.equal(patch.teacherActionsExpanded, false)
 })
 

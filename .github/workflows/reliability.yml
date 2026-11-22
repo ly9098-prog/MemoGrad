@@ -565,6 +565,7 @@ jobs:
           node --test miniprogram/tests/test-practice-subject-sheet-controller.js
           node --test miniprogram/tests/test-physical-motion.js
           node --test miniprogram/tests/test-motion-sheet-lifecycle.js
+          node --test miniprogram/tests/test-motion-sheet-surfaces.js
           node --test miniprogram/tests/test-physical-motion-native.js
           node --test miniprogram/tests/test-shared-card-navigation.js
           node --test miniprogram/tests/test-practice-subject-selection-controller.js

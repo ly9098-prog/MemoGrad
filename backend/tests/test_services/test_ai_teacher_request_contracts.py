@@ -308,3 +308,90 @@ async def test_teacher_rejects_unknown_action_before_queries(prepared_teacher):
     state.exam.assert_not_awaited()
     state.quota.assert_not_awaited()
     state.provider.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_option_fallback_does_not_relabel_generic_analysis_as_option_explanations(
+    prepared_teacher,
+):
+    state = prepared_teacher
+    state.revision.analysis = "本题属于“总线与 I/O”的典型辨析。注意概念与边界。"
+    state.provider.side_effect = None
+    state.provider.return_value = None
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_options"
+    )
+    assert result["from_fallback"] is True
+    assert result["title"] == "逐项讲解暂不可用"
+    assert state.revision.analysis not in result["summary"]
+    assert "未生成逐项讲解" in result["summary"]
+    assert result["sections"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "defect", ["missing", "duplicate", "wrong_verdict", "empty", "generic"]
+)
+async def test_option_action_rejects_incomplete_or_answer_conflicting_output(
+    prepared_teacher, defect
+):
+    state = prepared_teacher
+    rows = [
+        {"option": "A", "is_correct": True, "reason": "符合题目条件。"},
+        {"option": "B", "is_correct": False, "reason": "遗漏必要条件。"},
+    ]
+    if defect == "missing":
+        rows.pop()
+    elif defect == "duplicate":
+        rows[1]["option"] = "A"
+    elif defect == "wrong_verdict":
+        rows[0]["is_correct"] = False
+    elif defect == "empty":
+        rows[1]["reason"] = ""
+    payload = {"summary": "注意审题", "option_explanations": rows}
+    if defect == "generic":
+        payload.pop("option_explanations")
+    state.provider.side_effect = None
+    state.provider.return_value = {"content": json.dumps(payload), "tokens_used": 21}
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_options"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+    assert result["tokens_used"] == 21
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("answer", ["A", "A,B"])
+async def test_option_action_projects_validated_rows_in_question_order(
+    prepared_teacher, answer
+):
+    state = prepared_teacher
+    state.revision.answer = answer
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(
+            {
+                "summary": "untrusted generic conclusion",
+                "option_explanations": [
+                    {
+                        "option": "B",
+                        "is_correct": "B" in answer,
+                        "reason": "B 项判断依据。",
+                    },
+                    {"option": "A", "is_correct": True, "reason": "A 项判断依据。"},
+                ],
+            }
+        ),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_options"
+    )
+    assert result["from_fallback"] is False
+    assert result["summary"].startswith("正确答案：")
+    assert [section["heading"][0] for section in result["sections"]] == ["A", "B"]
+    assert result["sections"][0]["points"] == ["A 项判断依据。"]
+    assert result["sections"][1]["points"] == ["B 项判断依据。"]

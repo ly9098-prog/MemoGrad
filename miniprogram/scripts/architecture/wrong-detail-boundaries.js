@@ -6,7 +6,7 @@ const ROOT = path.resolve(__dirname, '../../..')
 const ts = createRequire(path.join(ROOT, 'admin-frontend/package.json'))('typescript')
 const PAGE = 'miniprogram/subpackages/study/wrong-detail/wrong-detail.js'
 const DIRECTORY = 'miniprogram/subpackages/study/wrong-detail/utils'
-const PAGE_CEILING = 502
+const PAGE_CEILING = 498
 const MODULES = ['teacher-action-controller.js', 'wrong-detail-ai-state.js',
   'wrong-detail-question-view.js', 'wrong-detail-teacher-page-adapter.js',
   'wrong-detail-content-transition.js',
@@ -142,7 +142,6 @@ const REMAINING_DELEGATES = {
   "toggleTeacherActions": "toggleTeacherActions() {\nreturn teacherInteraction.toggleTeacherActions(this)\n}",
   "_teacherCacheKeyForWrong": "_teacherCacheKeyForWrong(wq, diagnosis, action) {\nreturn teacherInteraction._teacherCacheKeyForWrong(wq, diagnosis, action)\n}",
   "close408TeacherSheet": "close408TeacherSheet() {\nreturn teacherInteraction.close408TeacherSheet(this)\n}",
-  "feedback408Teacher": "async feedback408Teacher(e) {\nreturn teacherInteraction.feedback408Teacher(this, e, { requestClient: api, teacher: aiTeacher408, get platform() { return wx } })\n}",
   "_checkRenderInvariant": "_checkRenderInvariant(renderModel) {\nreturn renderSafety._checkRenderInvariant(this, renderModel)\n}",
   "_recordRenderTrace": "_recordRenderTrace(trace) {\nreturn renderSafety._recordRenderTrace(this, trace, { config })\n}",
   "_enterSafeMode": "_enterSafeMode() {\nreturn renderSafety._enterSafeMode(this, { _processWqData: (wq, safeMode) => _processWqData(wq, safeMode) })\n}"
@@ -191,8 +190,6 @@ const TEACHER_PORTS = {
   "buildCacheKey": "buildCacheKey: (wq, diagnosis, action) => page._teacherCacheKeyForWrong(wq, diagnosis, action)",
   "getCacheEntry": "getCacheEntry: key => page._teacherCache && page._teacherCache[key]",
   "setCacheEntry": "setCacheEntry: (key, value) => {\n          if (!page._teacherCache) page._teacherCache = Object.create(null)\n          page._teacherCache[key] = value\n        }",
-  "getFeedbackEntry": "getFeedbackEntry: key => (page._teacherFeedbackCache && page._teacherFeedbackCache[key]) || ''",
-  "setActiveCacheKey": "setActiveCacheKey: key => { page._activeTeacherCacheKey = key }",
   "getInflight": "getInflight: key => {\n          if (!page._teacherInflight) page._teacherInflight = Object.create(null)\n          return page._teacherInflight[key]\n        }",
   "setInflight": "setInflight: (key, promise) => {\n          if (!page._teacherInflight) page._teacherInflight = Object.create(null)\n          page._teacherInflight[key] = promise\n        }",
   "deleteInflight": "deleteInflight: key => { delete page._teacherInflight[key] }",

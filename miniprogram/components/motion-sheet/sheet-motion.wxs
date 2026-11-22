@@ -23,10 +23,10 @@ function paint(state) {
   state.grip.setStyle({ transform: m.fade ? 'translate3d(0,' + travel + 'px,0)' : 'none' });
   state.content.setStyle({ opacity: P.clamp((p - 0.5) * 2, 0, 1) });
   // Fade-mode math stays stationary while its surface moves. Clip the part
-  // above that surface instead of letting transparent slot roots expose text
-  // on the mask. The body starts below the shared 28px grip; do not clip the
-  // grip's independently moving 44px touch target or transform math ancestors.
-  var bodyCut = m.fade ? Math.max(0, y - 28) : 0;
+  // above the moving grip band, keeping the rounded surface edge free of text.
+  // Body and grip share the same travel distance; the body's layout already
+  // reserves 28px for the grip. Never transform math ancestors or clip the grip.
+  var bodyCut = m.fade ? Math.max(0, y) : 0;
   state.body.setStyle({ opacity: m.fade ? P.clamp(p - state.y / (m.panel.height * 0.65), 0, 1) : 1,
     'clip-path': bodyCut > 0 ? 'inset(' + bodyCut + 'px 0 0)' : 'none' });
   state.mask.setStyle({ opacity: p * P.clamp(1 - state.y / m.panel.height, 0, 1) });

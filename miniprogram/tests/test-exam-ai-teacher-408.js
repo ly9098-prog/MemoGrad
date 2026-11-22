@@ -10,7 +10,7 @@ const test = (name, ...args) => nodeTest(`study: ${name}`, ...args)
 test('teacher retains exports and the complete empty result shape and text', () => {
   assert.deepEqual(Object.keys(teacher), [
     'ACTIONS', 'PRIMARY_ACTIONS', 'MORE_ACTIONS', 'ACTION_BY_KEY',
-    'normalizeResult', 'errorMessage', 'submitFeedback',
+    'normalizeResult', 'errorMessage',
   ])
   assert.deepEqual(teacher.normalizeResult({}), {
     action: '', actionLabel: 'AI 老师', title: 'AI 老师', summary: '', sections: [],
@@ -159,24 +159,28 @@ test('action metadata mutation is observed while replacing its exported object s
   assert.equal(teacher.normalizeResult({ action: 'core_concept' }).title, 'patched label')
 })
 
-test('error text and feedback retain receiver, payload, coercion and rejected error identity', async () => {
+test('error text keeps exam guard and unavailable messages', () => {
   const failure = new Error('network')
   const api = {
     getErrorMessage(error) { assert.equal(this, api); assert.equal(error, failure); return 'exam_in_progress_ai_blocked' },
-    async post(url, payload) {
-      assert.equal(this, api)
-      assert.equal(url, '/ai/feedback')
-      assert.deepEqual(payload, {
-        source: '408_teacher', feedback_type: 'like', question_id: 4,
-        detail: 'action=core_concept;prompt_version=v1;fallback=0',
-      })
-      throw failure
-    },
   }
   assert.equal(teacher.errorMessage(failure, api), '考试进行中不开放答案型 AI 讲解，请交卷后再使用。')
   assert.equal(teacher.errorMessage(null), 'AI 老师暂不可用，请稍后重试')
-  assert.equal(await teacher.submitFeedback({}, {}), false)
-  await assert.rejects(teacher.submitFeedback(api, {
-    questionId: '4', feedbackType: 'like', result: { action: 'core_concept', promptVersion: 'v1' },
-  }), error => error === failure)
+  assert.equal(teacher.submitFeedback, undefined)
+})
+
+test('legacy option fallback never appears as a completed per-option lesson', () => {
+  const result = teacher.normalizeResult({
+    action: 'explain_options', from_fallback: true, prompt_version: '408-teacher-v3',
+    title: '逐项讲解 A/B/C/D', summary: '本题属于“总线与 I/O”的典型辨析。',
+    sections: [{ heading: '通用提示', points: ['注意边界条件。'] }],
+  })
+  assert.equal(result.title, '逐项讲解暂不可用')
+  assert.match(result.summary, /未生成逐项讲解/)
+  assert.doesNotMatch(result.summary, /典型辨析/)
+  assert.deepEqual(result.sections, [])
+  assert.equal(teacher.normalizeResult({
+    action: 'explain_options', from_fallback: true,
+    summary: '今日额度已用尽。本次未生成逐项讲解。',
+  }).summary, '今日额度已用尽。本次未生成逐项讲解。')
 })

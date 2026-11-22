@@ -8,7 +8,7 @@
 .motion-sheet-content { position: relative; max-height: 90vh; }
 .motion-sheet-content.has-safe-area { padding-bottom: env(safe-area-inset-bottom); }
 .motion-sheet-body { position: relative; min-height: 0; }
-.motion-sheet-grip { height: 28px; touch-action: none; }
+.motion-sheet-grip { display: flex; justify-content: center; height: 28px; touch-action: none; }
 .motion-sheet-grip-button { display: flex; align-items: center; justify-content: center; width: 96px; height: 44px; min-height: 44px; margin: -8px auto 0; padding: 0; border: 0; background: transparent; }
 .motion-sheet-grip-button::after { border: 0; }
 .motion-sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: #A8CABB; }

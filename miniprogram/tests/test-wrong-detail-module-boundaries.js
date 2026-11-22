@@ -17,7 +17,7 @@ test('wrong-detail page and twenty modules preserve budgets and teacher ports', 
   assert.deepEqual(result.errors, [])
   assert.equal(result.pageLines, PAGE_CEILING)
   assert.equal(result.modules, 20)
-  assert.equal(result.teacherPorts, 26)
+  assert.equal(result.teacherPorts, 24)
 })
 
 test('page wrappers and lazy teacher assembly cannot drift', () => {

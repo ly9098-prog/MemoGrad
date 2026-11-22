@@ -15,8 +15,6 @@ return {
           if (!page._teacherCache) page._teacherCache = Object.create(null)
           page._teacherCache[key] = value
         },
-        getFeedbackEntry: key => (page._teacherFeedbackCache && page._teacherFeedbackCache[key]) || '',
-        setActiveCacheKey: key => { page._activeTeacherCacheKey = key },
         getInflight: key => {
           if (!page._teacherInflight) page._teacherInflight = Object.create(null)
           return page._teacherInflight[key]

@@ -46,6 +46,7 @@ from app.services.ai_learning_service import (
     reserve_token_budget,
     settle_token_reservation,
 )
+from app.utils.answer_normalizer import normalize_choice_answer
 
 logger = logging.getLogger(__name__)
 
@@ -629,9 +630,7 @@ async def _resolve_exam_context(
 ) -> dict[str, Any]:
     # A selected submitted attempt only authorizes review of that attempt. It
     # must not disable the account-wide guard for a later in-progress retake.
-    await assert_ai_answer_access_allowed(
-        db, user_id=user_id, question_id=question_id
-    )
+    await assert_ai_answer_access_allowed(db, user_id=user_id, question_id=question_id)
     if not exam_attempt_id:
         return {}
 
@@ -990,6 +989,53 @@ async def _latest_practice_context(
     }
 
 
+def _validated_option_sections(
+    payload: dict[str, Any], revision: QuestionVersion
+) -> list[dict[str, Any]] | None:
+    """Only project complete option rows consistent with the immutable answer."""
+    if not isinstance(revision.options, dict):
+        return None
+    keys = list(revision.options)
+    correct = set(normalize_choice_answer(revision.answer))
+    rows = payload.get("option_explanations")
+    if (
+        not 2 <= len(keys) <= 8
+        or any(
+            not isinstance(key, str) or len(key) != 1 or key not in "ABCDEFGH"
+            for key in keys
+        )
+        or not correct
+        or not correct.issubset(keys)
+        or not isinstance(rows, list)
+        or len(rows) != len(keys)
+    ):
+        return None
+    by_key: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        key = row.get("option")
+        if not isinstance(key, str) or key not in keys or key in by_key:
+            return None
+        if type(row.get("is_correct")) is not bool or row["is_correct"] != (
+            key in correct
+        ):
+            return None
+        if not isinstance(row.get("reason"), str):
+            return None
+        reason = _sanitize_user_text(row["reason"], 500)
+        if not reason:
+            return None
+        by_key[key] = reason
+    return [
+        {
+            "heading": f"{key} 项 · {'应选' if key in correct else '不选'}",
+            "points": [by_key[key]],
+        }
+        for key in keys
+    ]
+
+
 def _fallback_payload(
     *,
     action: str,
@@ -1006,7 +1052,7 @@ def _fallback_payload(
     # 降级内容也必须遵守动作边界：不能因为专项动作失败，就把完整的
     # “错因/补漏/复练”报告再次塞回弹层。只有讲解类动作可引用一段题库
     # 解析；生成题与陷阱总结在没有可靠生成结果时明确告知不可用。
-    explanation_actions = {"explain_correct", "explain_options", "core_concept"}
+    explanation_actions = {"explain_correct", "core_concept"}
     summary = reason
     if action in explanation_actions and revision.analysis:
         structured = _structured_analysis_sections(revision.analysis)
@@ -1020,8 +1066,13 @@ def _fallback_payload(
         else:
             summary = _clean_str(revision.analysis, 1200) or reason
     return {
-        "title": meta["label"],
-        "summary": _sanitize_user_text(summary, 1200),
+        "title": "逐项讲解暂不可用" if action == "explain_options" else meta["label"],
+        "summary": _sanitize_user_text(
+            f"{reason} 本次未生成逐项讲解，请稍后重试；可返回查看题库解析。"
+            if action == "explain_options"
+            else summary,
+            1200,
+        ),
         "sections": [],
         "knowledge_points": [
             {"name": name, "relation": "本题知识点", "mastery_hint": ""}
@@ -1239,6 +1290,26 @@ async def run_teacher_action(
         }
 
     normalized = _normalize_ai_payload(parsed, action)
+    if action == "explain_options":
+        option_sections = _validated_option_sections(parsed, revision)
+        if option_sections is None:
+            return {
+                **base,
+                **_fallback_payload(
+                    action=action,
+                    revision=revision,
+                    knowledge_context=knowledge_context,
+                    reason="AI 返回的逐项内容不完整或与标准答案不一致。",
+                ),
+                "tokens_used": int(result.get("tokens_used") or 0),
+                "from_fallback": True,
+            }
+        normalized.update(
+            title=ACTION_DEFINITIONS[action]["label"],
+            summary=f"正确答案：{'、'.join(normalize_choice_answer(revision.answer))}。以下按本题选项逐项说明。",
+            sections=option_sections,
+            knowledge_points=[],
+        )
     # Generated-question actions must not pretend success when the structured
     # question is invalid; fail back to a truthful, non-generated response.
     if (

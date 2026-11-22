@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "408-teacher-v3"
+PROMPT_VERSION = "408-teacher-v4-option-grounding"
 
 ACTION_DEFINITIONS: dict[str, dict[str, str]] = {
     "explain_correct": {
@@ -86,13 +86,24 @@ def build_408_teacher_prompt(
         "输出严格 JSON，不要 markdown，不要额外字段。schema："
         '{"title":"","summary":"","sections":[{"heading":"","points":[""]}],'
         '"knowledge_points":[{"name":"","relation":"","mastery_hint":""}],'
-        '"practice_question":null,'
+        '"practice_question":null,"option_explanations":[],'
         '"next_action":{"type":"none","label":"","params":{}}}'
         "。similar_question/harder_question 时 practice_question 必须为："
         '{"stem":"","options":{"A":"","B":"","C":"","D":""},"answer":"A",'
         '"analysis":"","difficulty_delta":0或1}；其他动作应为 null。'
         "sections 最多 4 组，每组 points 最多 5 条；语言简洁、面向考研专业课复盘。"
     )
+    if action == "explain_options":
+        system += (
+            "本次必须填写 option_explanations，每个实际选项恰好一项："
+            '[{"option":"A","is_correct":true,"reason":"结合该选项原文、题干条件的具体判断依据"}]。'
+            "option 必须逐字对应 question.options 中的键，不得遗漏、重复或虚构选项；"
+            "is_correct 只能是布尔值，表示该选项是否属于题库 correct_answer，"
+            "不得根据用户选择改写标准答案。每项 reason 直接解释该选项，控制在 150 字内；"
+            "选择不正确说法的题目，也须按标准答案确定是否应选，并解释题干的否定条件。"
+            "summary 和 sections 留空，由服务端按标准答案组织逐项结果。"
+            "不能用通用考点、注意审题或知识补漏替代逐项解释；证据不足时不得编造理由。"
+        )
     user = (
         f"固定动作={action}\n动作说明={meta['instruction']}\n"
         "上下文（仅可使用以下事实）：\n" + _bounded_json(context, 18000)

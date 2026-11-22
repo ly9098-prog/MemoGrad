@@ -80,9 +80,6 @@ function setup() {
     warn: (...args) => f.calls.push(['warn', ...args]),
   }
   f.api.getErrorMessage = error => { f.calls.push(['format', error]); return 'formatted' }
-  teacher.submitFeedback = function (...args) {
-    assert.equal(this, teacher); f.calls.push(['feedback', ...args]); return Promise.resolve({})
-  }
   return { ...f, config, teacher }
 }
 
@@ -211,82 +208,4 @@ test('teacher cache keys retain six fields, fallback priority, coercion and fals
   assert.equal(build({ question_id: 0, questionId: '9', questionVersionId: '6', wrong_answer: 0 },
     { question_version_id: 0, questionVersionId: 'bad' }, 0), '0|9|NaN|0||')
   assert.equal(build({ questionVersionId: 6 }, {}, false), '0|0|6|0||')
-})
-
-test('teacher feedback guards avoid event access, while malformed events remain outside try', async () => {
-  const f = setup(), page = f.page
-  await page.feedback408Teacher()
-  page.data.teacherResult = { text: 'result' }; page.data.teacherFeedbackSent = 'sent'
-  await page.feedback408Teacher()
-  assert.deepEqual(f.calls, [])
-  page.data.teacherFeedbackSent = ''
-  await assert.rejects(page.feedback408Teacher(), { name: 'TypeError' })
-  for (const [type, questionId] of [['', 12], ['useful', 0], ['useful', 'bad']]) {
-    page.data.wq = { question_id: questionId }
-    await page.feedback408Teacher({ currentTarget: { dataset: { type } } })
-  }
-  assert.deepEqual(f.calls, [])
-})
-
-test('teacher feedback captures payload/result and uses current cache key and wx after await even when dead', async () => {
-  const f = setup(), page = f.page, request = deferred(), result = { text: 'original' }
-  page.data.teacherResult = result; page.data.wq = { question_id: 0, questionId: '88' }
-  page._activeTeacherCacheKey = 'old'
-  f.teacher.submitFeedback = function (client, payload) {
-    assert.equal(this, f.teacher); assert.equal(client, f.api)
-    assert.equal(payload.result, result)
-    assert.deepEqual(Object.keys(payload), ['questionId', 'feedbackType', 'result'])
-    assert.deepEqual(plain(payload), { questionId: 88, feedbackType: 'useful', result })
-    f.calls.push(['feedback']); return request.promise
-  }
-  const work = page.feedback408Teacher({ currentTarget: { dataset: { type: 'useful' } } })
-  page._activeTeacherCacheKey = 'new'; page._alive = false
-  page.data.teacherResult = { text: 'replacement' }
-  f.context.wx = { showToast(options) {
-    assert.equal(this, f.context.wx); f.calls.push(['lateToast', options])
-  } }
-  request.resolve({}); await work
-  assert.equal(Object.getPrototypeOf(page._teacherFeedbackCache), null)
-  assert.equal(page._teacherFeedbackCache.new, 'useful')
-  assert.equal(page._teacherFeedbackCache.old, undefined)
-  assert.equal(page.data.teacherFeedbackSent, 'useful')
-  assert.deepEqual(f.calls.map(c => c[0]), ['feedback', 'setData', 'lateToast'])
-})
-
-test('teacher feedback retains existing cache identity and permits concurrent calls before responses', async () => {
-  const f = setup(), page = f.page, cache = { retained: 'value' }, requests = [deferred(), deferred()]
-  page.data.teacherResult = {}; page.data.wq = { question_id: 12 }
-  page._activeTeacherCacheKey = 'key'; page._teacherFeedbackCache = cache
-  let count = 0
-  f.teacher.submitFeedback = () => requests[count++].promise
-  const first = page.feedback408Teacher({ currentTarget: { dataset: { type: 'first' } } })
-  const second = page.feedback408Teacher({ currentTarget: { dataset: { type: 'second' } } })
-  assert.equal(count, 2)
-  requests[1].resolve(); await second
-  requests[0].resolve(); await first
-  assert.equal(page._teacherFeedbackCache, cache)
-  assert.deepEqual(cache, { retained: 'value', key: 'first' })
-  assert.equal(page.data.teacherFeedbackSent, 'first')
-})
-
-test('teacher feedback errors retain method-before-formatter evaluation and original propagation', async () => {
-  const f = setup(), page = f.page, error = new Error('request')
-  page.data.teacherResult = {}; page.data.wq = { question_id: 12 }
-  f.teacher.submitFeedback = () => { throw error }
-  const originalPlatform = {
-    showToast(options) { assert.equal(this, originalPlatform); f.calls.push(['originalToast', options]) },
-  }
-  f.context.wx = originalPlatform
-  f.api.getErrorMessage = function (value) {
-    assert.equal(this, f.api); assert.equal(value, error)
-    f.calls.push(['format'])
-    f.context.wx = { showToast: () => assert.fail('toast method must be evaluated before formatter') }
-    return 'formatted'
-  }
-  const event = { currentTarget: { dataset: { type: 'bad' } } }
-  await page.feedback408Teacher(event)
-  assert.deepEqual(plain(f.calls), [['format'], ['originalToast', { title: 'formatted', icon: 'none' }]])
-  const formatError = new Error('format')
-  f.api.getErrorMessage = () => { throw formatError }
-  await assert.rejects(page.feedback408Teacher(event), value => value === formatError)
 })

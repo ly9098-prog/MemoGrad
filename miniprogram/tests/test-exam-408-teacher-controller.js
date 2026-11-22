@@ -11,9 +11,7 @@ function harness(overrides = {}) {
     attemptId: 42,
     teacherLoading: false,
     requestSequence: 0,
-    activeCacheKey: '',
     cache: Object.create(null),
-    feedback: Object.create(null),
     inflight: Object.create(null),
     postResult: { action: 'core_concept' },
     postError: null,
@@ -26,8 +24,6 @@ function harness(overrides = {}) {
     setData: patch => calls.setsData.push(patch),
     getCacheEntry: key => state.cache[key],
     setCacheEntry: (key, value) => { state.cache[key] = value },
-    getFeedbackEntry: key => state.feedback[key],
-    setActiveCacheKey: key => { state.activeCacheKey = key },
     getInflight: key => state.inflight[key],
     setInflight: (key, p) => { state.inflight[key] = p },
     deleteInflight: key => { delete state.inflight[key] },
@@ -71,14 +67,11 @@ test('missing attemptId or questionId is a no-op', async () => {
 test('cached result is shown without posting', async () => {
   const h = harness()
   h.state.cache['42|101|core_concept'] = { action: 'core_concept', cached: true }
-  h.state.feedback['42|101|core_concept'] = 'like'
   await h.controller.run('core_concept', 101)
   assert.deepEqual(h.calls.posts, [])
   const patch = h.calls.setsData[h.calls.setsData.length - 1]
   assert.equal(patch.teacherLoading, false)
   assert.deepEqual(patch.teacherResult, { action: 'core_concept', cached: true })
-  assert.equal(patch.teacherFeedbackSent, 'like')
-  assert.equal(h.state.activeCacheKey, '42|101|core_concept')
 })
 
 test('happy path posts, normalizes, caches and commits', async () => {
@@ -92,6 +85,18 @@ test('happy path posts, normalizes, caches and commits', async () => {
   const patch = h.calls.setsData[h.calls.setsData.length - 1]
   assert.equal(patch.teacherLoading, false)
   assert.deepEqual(patch.teacherResult, h.state.postResult)
+})
+
+test('fallback is shown once but a later attempt requests a fresh lesson', async () => {
+  const h = harness()
+  h.state.postResult = { action: 'core_concept', fromFallback: true }
+  await h.controller.run('core_concept', 101)
+  assert.equal(h.state.cache['42|101|core_concept'], undefined)
+  h.state.postResult = { action: 'core_concept', summary: 'fresh lesson' }
+  await h.controller.run('core_concept', 101)
+  assert.equal(h.calls.posts.length, 2)
+  await h.controller.run('core_concept', 101)
+  assert.equal(h.calls.posts.length, 2, 'successful lessons still reuse their cache')
 })
 
 test('invalid normalized result throws and shows error', async () => {

@@ -172,7 +172,6 @@ teacherLoading: false,
 teacherResult: null,
 teacherErrorText: '',
 teacherSheetVisible: false,
-teacherFeedbackSent: '',
 heroTopPaddingPx: 28
 },
 onLoad(options) {
@@ -190,8 +189,6 @@ this._dashboardLoadId = 0;
 this._teacherRequestSeq = 0;
 this._teacherCache = Object.create(null);
 this._teacherInflight = Object.create(null);
-this._teacherFeedbackCache = Object.create(null);
-this._activeTeacherCacheKey = '';
 this.measureSafeNavigation();
 if (String((options || {}).guest) === '1') {
   this._bootGuestResult();
@@ -713,14 +710,12 @@ const title = target.statusLabel === '参考自查' ? '参考题复盘'
 : (target.status === 'skipped' ? '跳过题复盘' : '题目复盘'));
 const analysisView = buildReviewAnalysisView(target.analysis);
 this._teacherRequestSeq++;
-this._activeTeacherCacheKey = '';
 this.setData({
 reviewDialogVisible: true,
 teacherSheetVisible: false,
 teacherLoading: false,
 teacherResult: null,
 teacherErrorText: '',
-teacherFeedbackSent: '',
 reviewDialog: {
 title,
 questionTitle: target.title || '',
@@ -773,27 +768,9 @@ if (action) this.run408TeacherFromReview(action);
 close408Teacher() {
 this.setData({ teacherSheetVisible: false });
 },
-async feedback408Teacher(e) {
-if (this.data.teacherFeedbackSent || !this.data.teacherResult) return;
-const type = String(e.currentTarget.dataset.type || '');
-const dialog = this.data.reviewDialog || {};
-const questionId = Number(dialog.questionId || 0);
-if (!type || !questionId) return;
-try {
-await aiTeacher408.submitFeedback(api, { questionId, feedbackType: type, result: this.data.teacherResult });
-if (this._activeTeacherCacheKey) {
-if (!this._teacherFeedbackCache) this._teacherFeedbackCache = Object.create(null);
-this._teacherFeedbackCache[this._activeTeacherCacheKey] = type;
-}
-this.setData({ teacherFeedbackSent: type });
-wx.showToast({ title: '反馈已记录', icon: 'success' });
-} catch (error) {
-wx.showToast({ title: api.getErrorMessage(error), icon: 'none' });
-}
-},
 closeReviewDialog() {
-if (!this.data.reviewDialogVisible) return;
-this.setData({ reviewDialogVisible: false });
+if (!this.data.reviewDialogVisible && !this.data.teacherSheetVisible) return;
+this.setData({ reviewDialogVisible: false, teacherSheetVisible: false });
 },
 stopPropagation() {},
 noop() {},

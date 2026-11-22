@@ -18,8 +18,6 @@ function _initWrongDetailState(page, { setRenderGuardPage }) {
     page._diagnosisRequestSeq = 0
     page._teacherCache = Object.create(null)
     page._teacherInflight = Object.create(null)
-    page._teacherFeedbackCache = Object.create(null)
-    page._activeTeacherCacheKey = ''
     page._wqCache = {}
     page._switchMaskTimer = null
     page._contentTransitionTimer = null
@@ -140,8 +138,6 @@ page._clearMasterUndo()
 page._wqCache = null
 page._teacherCache = null
 page._teacherInflight = null
-page._teacherFeedbackCache = null
-page._activeTeacherCacheKey = ''
 if (page._clearAiAvailabilityState) page._clearAiAvailabilityState()
 page._aiGenerationMarker = ''
 resetRenderGuard()

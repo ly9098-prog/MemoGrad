@@ -173,6 +173,43 @@ test('teacher ports preserve request contract, inflight identity and live caches
   assert.equal(calls[0][3].timeout, 55000)
 })
 
+test('shared reader returns from teacher to review and dismisses both states together', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialogVisible = true
+  page.data.reviewDialog = { questionId: 42, status: 'correct', userAnswer: 'A' }
+  let settle
+  api.post = () => new Promise(resolve => { settle = resolve })
+  const pending = page.run408TeacherFromReview('explain_correct')
+  assert.equal(page.data.teacherSheetVisible, true)
+  assert.equal(page.data.teacherLoading, true)
+  page.close408Teacher()
+  assert.equal(page.data.teacherSheetVisible, false)
+  assert.equal(page.data.reviewDialogVisible, true, 'the explicit return action preserves the review')
+  page.open408TeacherFromReview()
+  assert.equal(page.data.teacherSheetVisible, true, 'the pending request can be revisited')
+  page.closeReviewDialog()
+  assert.equal(page.data.teacherSheetVisible, false)
+  assert.equal(page.data.reviewDialogVisible, false, 'component dismissal must set its show expression false')
+  settle({ title: '正确项讲解', summary: '讲解结论', sections: [] })
+  await pending
+  assert.equal(page.data.teacherSheetVisible, false, 'a late response must not reopen the reader')
+  assert.equal(page.data.reviewDialogVisible, false)
+})
+
+test('review teacher retries after fallback and retains successful result caching', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42, status: 'correct' }
+  let posts = 0
+  api.post = async () => ({ action: 'explain_correct', summary: 'lesson', from_fallback: ++posts === 1 })
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(page.data.teacherResult.fromFallback, true)
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(posts, 2)
+  assert.equal(page.data.teacherResult.fromFallback, false)
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(posts, 2)
+})
+
 test('back navigation preserves page lock and invokes runtime platform callbacks', () => {
   const { page, calls, context } = fixture()
   page._returnTo = '/pages/home/home'

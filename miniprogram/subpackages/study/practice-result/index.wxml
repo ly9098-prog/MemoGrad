@@ -293,7 +293,7 @@
 <text class="wrong-cause-value">{{item.errorDiagnosisLabel || '暂未分类'}}</text>
 <text wx:if="{{item.errorDiagnosis && !item.errorDiagnosis.userConfirmed && item.errorDiagnosis.effectiveSource === 'ai'}}" class="wrong-cause-ai">AI 建议</text>
 </view>
-<text wx:if="{{!batchDiagnosisMode}}" class="wrong-cause-detail">查看详情 ›</text>
+<text wx:if="{{!batchDiagnosisMode}}" class="wrong-cause-detail">查看详情</text>
 <text wx:else class="wrong-cause-detail selected-hint">{{batchSelectedMap[item.wrongQuestionId] ? '已选择' : '点按选择'}}</text>
 </view>
 <view class="answer-summary">
@@ -382,8 +382,9 @@
 <view class="bottom-space"></view>
 </view>
 </scroll-view>
-<motion-sheet show="{{reviewDialogVisible}}" label="题目解析与复盘" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" bind:close="closeReviewDialog">
-<view class="review-dialog-sheet motion-sheet-panel" catchtap="stopPropagation">
+<motion-sheet show="{{reviewDialogVisible || (!guestMode && teacherSheetVisible)}}" label="{{!guestMode && teacherSheetVisible ? '专项 AI 老师' : '题目解析与复盘'}}" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="closeReviewDialog">
+<view class="result-reader-sheet {{!guestMode && teacherSheetVisible ? 'teacher-sheet' : 'review-dialog-sheet'}} motion-sheet-panel" catchtap="stopPropagation">
+<block wx:if="{{guestMode || !teacherSheetVisible}}">
 <view class="review-dialog-head" catchtouchmove="noop">
 <view class="review-dialog-title-wrap">
 <text class="review-dialog-title">{{reviewDialog.title}}</text>
@@ -457,14 +458,11 @@
           bindtap="closeReviewDialog"
         >知道了</view>
 </view>
-</view>
-</motion-sheet>
-</view>
-<motion-sheet show="{{!guestMode && teacherSheetVisible}}" label="专项 AI 老师" background="#FBFFFD" safe-area="{{false}}" content-motion="fade" layer="{{260}}" bind:close="close408Teacher">
-<view class="teacher-sheet motion-sheet-panel" catchtap="stopPropagation">
+</block>
+<block wx:else>
 <view class="teacher-sheet-head">
-<view><text class="teacher-kicker">AI TEACHER</text><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
-<text class="teacher-sheet-close" bindtap="close408Teacher">×</text>
+<view class="teacher-title-wrap"><text class="teacher-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text></view>
+<button class="teacher-review-back" bindtap="close408Teacher">返回解析</button>
 </view>
 <view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
 <text class="teacher-action-title">选择一个固定教学动作</text>
@@ -474,7 +472,7 @@
 <view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">{{teacherErrorText}}</view>
 <scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
 <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
-<text class="teacher-summary-label">先看结论</text>
+<text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
 <text class="teacher-summary">{{teacherResult.summary}}</text>
 </view>
 <view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
@@ -504,18 +502,10 @@
 <view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
 <text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis">{{teacherResult.practiceQuestion.analysis}}</text>
 </view>
-<text class="teacher-footnote">{{teacherResult.fromFallback ? '当前使用题库解析兜底；AI 生成暂不可用。' : '内容由专项 AI 老师生成，仅用于本题复盘。'}}</text>
-<view class="teacher-feedback-row">
-<view class="teacher-feedback-copy">
-<text class="teacher-feedback-label">这次讲解有帮助吗？</text>
-<text class="teacher-feedback-hint">你的反馈会用于改善后续讲解</text>
-</view>
-<view class="teacher-feedback-actions">
-<button class="teacher-feedback-btn {{teacherFeedbackSent === 'helpful' ? 'selected' : ''}}" data-type="helpful" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">有帮助</button>
-<button class="teacher-feedback-btn {{teacherFeedbackSent === 'inaccurate' ? 'selected' : ''}}" data-type="inaccurate" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">不准确</button>
-</view>
-</view>
+<text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析后重试。' : '内容由专项 AI 老师生成，仅用于本题复盘。'}}</text>
 <view class="teacher-scroll-space"></view>
 </scroll-view>
+</block>
 </view>
 </motion-sheet>
+</view>

@@ -179,7 +179,7 @@
     <view wx:elif="{{teacherLoading}}" class="teacher-sheet-loading"><view class="teacher-spinner"></view><text>正在结合本次考试生成…</text></view>
     <view wx:elif="{{teacherErrorText}}" class="teacher-sheet-error">{{teacherErrorText}}</view>
     <scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-      <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card"><text class="teacher-summary-label">先看结论</text><text class="teacher-summary">{{teacherResult.summary}}</text></view>
+      <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card"><text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text><text class="teacher-summary">{{teacherResult.summary}}</text></view>
       <view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
         <view class="teacher-section-head"><view class="teacher-section-rule"></view><text class="teacher-result-heading">{{item.heading}}</text></view>
         <view class="teacher-point-list">
@@ -201,17 +201,7 @@
         <view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
         <text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis">{{teacherResult.practiceQuestion.analysis}}</text>
       </view>
-      <text class="teacher-footnote">{{teacherResult.fromFallback ? '当前使用题库解析兜底；AI 生成暂不可用。' : '内容由专项 AI 老师生成，仅用于本次考试复盘。'}}</text>
-      <view class="teacher-feedback-row">
-        <view class="teacher-feedback-copy">
-          <text class="teacher-feedback-label">这次讲解有帮助吗？</text>
-          <text class="teacher-feedback-hint">你的反馈会用于改善后续讲解</text>
-        </view>
-        <view class="teacher-feedback-actions">
-          <button class="teacher-feedback-btn {{teacherFeedbackSent === 'helpful' ? 'selected' : ''}}" data-type="helpful" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">有帮助</button>
-          <button class="teacher-feedback-btn {{teacherFeedbackSent === 'inaccurate' ? 'selected' : ''}}" data-type="inaccurate" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">不准确</button>
-        </view>
-      </view>
+      <text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可先查看题库解析，稍后重试。' : '内容由专项 AI 老师生成，仅用于本次考试复盘。'}}</text>
       <view class="teacher-scroll-space"></view>
     </scroll-view>
   </view>

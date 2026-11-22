@@ -160,7 +160,7 @@ test('teacher controller stays lazy per page and reads current page fields and m
   assert.equal(calls.filter(item => item[0] === 'post').length, 0)
 })
 
-test('teacher request preserves version diagnosis payload and cached feedback', async () => {
+test('teacher request preserves version diagnosis payload and cached results', async () => {
   const { page, api, calls } = fixture()
   page._alive = true
   page.data.wq = { id: 1, question_id: 7, question_version_id: 9, wrong_answer: 'B' }
@@ -177,12 +177,27 @@ test('teacher request preserves version diagnosis payload and cached feedback', 
     diagnosis_id: 3, user_answer: 'B',
   }, { timeout: 55000 }])
   assert.equal(page.data.teacherResult.summary, 'explanation')
-  assert.equal(page._activeTeacherCacheKey, 'live-key')
   assert.equal(page._teacherInflight['live-key'], undefined)
-  page._teacherFeedbackCache = { 'live-key': 'helpful' }
   await page.run408TeacherAction(event)
   assert.equal(calls.length, 1)
-  assert.equal(page.data.teacherFeedbackSent, 'helpful')
+})
+
+test('teacher retries a fallback instead of keeping it as a successful cached lesson', async () => {
+  const { page, api } = fixture()
+  page._alive = true
+  page.data.wq = { id: 1, question_id: 7 }
+  page._teacherCacheKeyForWrong = () => 'key'
+  let posts = 0
+  api.post = async () => ({ action: 'explain_options', summary: 'lesson', from_fallback: ++posts === 1 })
+  const event = { currentTarget: { dataset: { action: 'explain_options' } } }
+  await page.run408TeacherAction(event)
+  assert.equal(page._teacherCache && page._teacherCache.key, undefined)
+  assert.equal(page.data.teacherResult.fromFallback, true)
+  await page.run408TeacherAction(event)
+  assert.equal(posts, 2)
+  assert.equal(page.data.teacherResult.fromFallback, false)
+  await page.run408TeacherAction(event)
+  assert.equal(posts, 2)
 })
 
 test('late teacher response cannot replace the next question or clear a newer inflight', async () => {

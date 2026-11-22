@@ -17,12 +17,10 @@ async function runImpl(options, action) {
 
   const cacheKey = options.buildCacheKey(dialog, action)
   const cached = options.getCacheEntry(cacheKey)
-  options.setActiveCacheKey(cacheKey)
   if (cached) {
     options.setData({
       teacherLoading: false, teacherResult: cached, teacherErrorText: '',
       teacherSheetVisible: true,
-      teacherFeedbackSent: options.getFeedbackEntry(cacheKey) || '',
     })
     return
   }
@@ -40,19 +38,18 @@ async function performRequest(options, action, dialog, cacheKey) {
   }
   options.setData({
     teacherLoading: true, teacherResult: null, teacherErrorText: '',
-    teacherSheetVisible: true, teacherFeedbackSent: '',
+    teacherSheetVisible: true,
   })
   try {
     const raw = await requestPromise
     const normalized = options.normalizeResult(raw)
     if (!normalized) throw new Error('AI 返回格式异常')
-    options.setCacheEntry(cacheKey, normalized)
+    if (!normalized.fromFallback) options.setCacheEntry(cacheKey, normalized)
     if (requestSeq !== options.getRequestSequence() || !options.isPageAlive()) return
     if (Number((options.getReviewDialog() || {}).questionId) !== questionId) {
       options.setData({ teacherLoading: false })
       return
     }
-    options.setActiveCacheKey(cacheKey)
     options.setData({ teacherLoading: false, teacherResult: normalized })
   } catch (error) {
     if (requestSeq !== options.getRequestSequence() || !options.isPageAlive()) return

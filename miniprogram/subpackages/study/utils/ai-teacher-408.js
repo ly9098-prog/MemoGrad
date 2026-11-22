@@ -161,7 +161,7 @@ const practiceRaw = source.practice_question || source.practiceQuestion
 const practiceQuestion = normalizePracticeQuestion(practiceRaw)
 const action = cleanText(source.action)
 const actionMeta = ACTION_BY_KEY[action] || {}
-return {
+const result = {
 action,
 actionLabel: cleanText(source.action_label || source.actionLabel) || actionMeta.label || 'AI 老师',
 title: cleanText(source.title) || actionMeta.label || 'AI 老师',
@@ -174,6 +174,16 @@ fromFallback: !!(source.from_fallback ?? source.fromFallback),
 personalization: source.personalization || {},
 promptVersion: cleanText(source.prompt_version || source.promptVersion),
 }
+// Older servers put a generic analysis paragraph in the option fallback.
+// Keep it out of the lesson even before the server-side fix is deployed.
+if (result.action === 'explain_options' && result.fromFallback) {
+result.title = '逐项讲解暂不可用'
+if (!result.summary.includes('未生成逐项讲解')) result.summary = '本次未生成逐项讲解，请稍后重试；可返回查看题库解析。'
+result.sections = []
+result.knowledgePoints = []
+result.practiceQuestion = null
+}
+return result
 }
 function errorMessage(error, api) {
 const raw = api && typeof api.getErrorMessage === 'function'
@@ -184,23 +194,6 @@ return '考试进行中不开放答案型 AI 讲解，请交卷后再使用。'
 }
 return raw || 'AI 老师暂不可用，请稍后重试'
 }
-async function submitFeedback(api, options) {
-const opts = options || {}
-if (!api || typeof api.post !== 'function' || !opts.questionId || !opts.feedbackType) return false
-const result = opts.result || {}
-const detail = [
-result.action ? `action=${result.action}` : '',
-result.promptVersion ? `prompt_version=${result.promptVersion}` : '',
-result.fromFallback ? 'fallback=1' : 'fallback=0',
-].filter(Boolean).join(';')
-await api.post('/ai/feedback', {
-source: '408_teacher',
-feedback_type: String(opts.feedbackType),
-question_id: Number(opts.questionId),
-detail,
-})
-return true
-}
 module.exports = {
 ACTIONS,
 PRIMARY_ACTIONS,
@@ -208,5 +201,4 @@ MORE_ACTIONS,
 ACTION_BY_KEY,
 normalizeResult,
 errorMessage,
-submitFeedback,
 }

@@ -43,14 +43,14 @@ const aiRoute = fs.readFileSync(path.join(backendRoot, 'app/api/v1/ai.py'), 'utf
 
 assert(!/\bprompt\s*:/.test(schema), '客户端请求 schema 不得暴露自由 prompt 字段')
 expectedActions.forEach(action => assert(prompt.includes(`"${action}"`), `服务端缺少固定动作 ${action}`))
-assert(prompt.includes('408-teacher-v3'), '专项讲解输出边界变更后必须升级 prompt version')
+assert(prompt.includes('408-teacher-v4-option-grounding'), '逐项讲解校验变更后必须升级 prompt version')
 assert(prompt.includes('不得重新输出通用的'), '专项讲解 prompt 必须禁止重复完整错题复盘')
 assert(service.includes('QuestionVersion'), '408 AI 必须从题目历史版本加载事实')
 assert(service.includes('question_version_id'), '408 AI 必须携带固定 question_version_id')
 assert(service.includes('UserKnowledgeState'), '408 AI 必须接入用户 mastery/confidence')
 assert(service.includes('WrongQuestionErrorDiagnosis'), '408 AI 必须接入近期错因')
 assert(service.includes('KnowledgeEdge'), '408 AI 必须接入知识图谱邻居')
-assert(service.includes('check_token_limit'), '408 AI 必须复用 token budget')
+assert(service.includes('reserve_token_budget'), '408 AI 必须复用 token budget 预留')
 assert(service.includes('record_token_usage'), '408 AI 必须记录 AI usage')
 assert(service.includes('owned_practice_record_id'), '历史 question_version_id 必须校验属于当前用户练习事实')
 assert(service.includes('if action == "connect_knowledge"'), '降级态只允许知识串联动作输出知识点列表')
@@ -86,6 +86,7 @@ const surfaces = [
     wxml: 'subpackages/exam/result/index.wxml',
     handler: 'open408Teacher',
     extra: 'exam_attempt_id',
+    contextSource: 'subpackages/exam/utils/exam-408-teacher-controller.js',
   },
 ]
 
@@ -100,8 +101,8 @@ surfaces.forEach(surface => {
   assert(contextSource.includes(surface.extra), `${surface.js} 未携带 ${surface.extra} 上下文`)
   assert(js.includes(`${surface.handler}(`), `${surface.js} 缺少 ${surface.handler}`)
   assert(wxml.includes(surface.handler), `${surface.wxml} 未绑定 ${surface.handler}`)
-  assert(js.includes('feedback408Teacher('), `${surface.js} 缺少 AI 反馈处理`)
-  assert(wxml.includes('feedback408Teacher'), `${surface.wxml} 未提供 AI 反馈入口`)
+  assert(!js.includes('feedback408Teacher('), `${surface.js} 不应恢复老师反馈处理`)
+  assert(!wxml.includes('feedback408Teacher'), `${surface.wxml} 不应恢复老师反馈入口`)
 })
 
 const wrongDetailJs = fs.readFileSync(path.join(miniRoot, 'subpackages/study/wrong-detail/wrong-detail.js'), 'utf8')
@@ -139,7 +140,7 @@ assert(practiceJs.includes('teacherActions: aiTeacher408.ACTIONS'), '普通练�
 assert(examJs.includes('teacherActions: aiTeacher408.ACTIONS'), '考试结果页必须使用自定义 7 动作面板')
 assert(practiceWxml.includes('select408TeacherAction'), '普通练习结果页缺少自定义动作选择处理')
 assert(examWxml.includes('select408TeacherAction'), '考试结果页缺少自定义动作选择处理')
-assert(typeof helper.submitFeedback === 'function', '408 AI helper 必须复用现有 feedback 能力')
+assert(helper.submitFeedback === undefined, '408 AI helper 不再导出已移除的反馈能力')
 
 const structuredFallback = helper.normalizeResult({
   action: 'explain_correct',

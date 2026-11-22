@@ -81,6 +81,8 @@ test('surface paint stays outside the untransformed rich-text and scroll body', 
   assert.match(markup, /class="motion-sheet-surface"[^>]*style="background:\{\{background\}\}"/)
   assert.match(markup, /class="motion-sheet-body"><slot\s*\/>/)
   const css = read('components/motion-sheet/index.wxss')
+  assert.match(css, /\.motion-sheet-grip\s*\{[^}]*display:\s*flex/,
+    'the grip must contain its button negative margin instead of collapsing it into the body origin')
   assert.match(css, /\.motion-sheet-surface\s*\{[^}]*box-shadow:/)
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.motion-sheet-body\s*\{\s*clip-path:\s*none\s*!important/,
     'reduced-motion keeps its stationary body aligned with the stationary surface')
@@ -90,4 +92,12 @@ test('surface paint stays outside the untransformed rich-text and scroll body', 
     assert.doesNotMatch(rule[1], /(?:background|box-shadow|transform|overflow)\s*:/,
       'fade-mode math ancestors must not introduce paint, transforms or clipping')
   }
+})
+
+test('result review and AI teacher share a single reader surface', () => {
+  const file = 'subpackages/study/practice-result/index.wxml'
+  const hosts = sheetHosts().filter(host => host.file === file)
+  assert.equal(hosts.length, 1, 'half-collapsing AI must never expose a second review sheet')
+  assert.match(hosts[0].markup, /reviewDialogVisible \|\| \(!guestMode && teacherSheetVisible\)/)
+  assert.match(hosts[0].content, /class="result-reader-sheet/)
 })

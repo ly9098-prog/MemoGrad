@@ -102,8 +102,6 @@ test('exam 408 teacher wiring exposes the exact controller port set', () => {
     'setData',
     'getCacheEntry',
     'setCacheEntry',
-    'getFeedbackEntry',
-    'setActiveCacheKey',
     'getInflight',
     'setInflight',
     'deleteInflight',
@@ -127,10 +125,8 @@ test('exam 408 teacher ports are wired to exact page helpers', () => {
   assert.ok(source.includes('aiTeacher408.normalizeResult(raw)'))
   assert.ok(source.includes('aiTeacher408.errorMessage(error, api)'))
   assert.ok(source.includes('this._teacherCache[key]'))
-  assert.ok(source.includes('this._teacherFeedbackCache[key]'))
   assert.ok(source.includes('this._teacherInflight[key]'))
   assert.ok(source.includes('delete this._teacherInflight[key]'))
-  assert.ok(source.includes('this._activeTeacherCacheKey = key'))
   assert.ok(source.includes('++this._teacherRequestSeq'))
 })
 

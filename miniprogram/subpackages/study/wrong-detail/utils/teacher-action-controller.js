@@ -34,9 +34,8 @@ async function runImpl(options, event) {
   }
   const ctx = buildRequestContext(options, wq, diagnosis, action, questionId)
   const cached = options.getCacheEntry(ctx.cacheKey)
-  options.setActiveCacheKey(ctx.cacheKey)
   if (cached) {
-    options.setData(buildCachedPatch(action, ctx.cacheKey, cached, options))
+    options.setData(buildCachedPatch(action, cached))
     return
   }
   await performTeacherRequest(options, action, ctx)
@@ -56,11 +55,10 @@ function buildRequestContext(options, wq, diagnosis, action, questionId) {
   return { cacheKey, payload, sourceWqId: String(wq.id || '') }
 }
 
-function buildCachedPatch(action, cacheKey, cached, options) {
+function buildCachedPatch(action, cached) {
   return {
     teacherLoadingAction: '', teacherLastAction: action, teacherErrorText: '',
     teacherResult: cached, teacherSheetVisible: true,
-    teacherFeedbackSent: options.getFeedbackEntry(cacheKey) || '',
   }
 }
 
@@ -73,20 +71,19 @@ async function performTeacherRequest(options, action, ctx) {
   }
   options.setData({
     teacherLoadingAction: action, teacherLastAction: action, teacherErrorText: '',
-    teacherResult: null, teacherSheetVisible: true, teacherFeedbackSent: '',
+    teacherResult: null, teacherSheetVisible: true,
   })
   try {
     const raw = await requestPromise
     const normalized = options.normalizeResult(raw)
     if (!normalized) throw new Error('AI 返回格式异常')
     const presented = options.presentResult(normalized)
-    options.setCacheEntry(ctx.cacheKey, presented)
+    if (!normalized.fromFallback) options.setCacheEntry(ctx.cacheKey, presented)
     if (requestSeq !== options.getRequestSequence() || !options.isAlive()) return
     if (String((options.getWq() && options.getWq().id) || '') !== ctx.sourceWqId) {
       options.setData({ teacherLoadingAction: '' })
       return
     }
-    options.setActiveCacheKey(ctx.cacheKey)
     options.setData({ teacherLoadingAction: '', teacherResult: presented })
   } catch (error) {
     if (requestSeq !== options.getRequestSequence() || !options.isAlive()) return

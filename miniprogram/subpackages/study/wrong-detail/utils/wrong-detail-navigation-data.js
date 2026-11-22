@@ -45,8 +45,7 @@ function _buildNavigateDataPatch(page, wq, raw, idx, { _isWqMastered, errorDiagn
       nextErrorAction: errorDiagnosis.buildNextAction(wq, errorDiagnosis.normalizeDiagnosis(wq.error_diagnosis)),
       diagnosisSheetVisible: false, diagnosisSaving: false, diagnosisSyncing: false,
       teacherLoadingAction: '', teacherLastAction: '', teacherResult: null,
-      teacherSheetVisible: false, teacherErrorText: '', teacherFeedbackSent: '',
-      teacherActionsExpanded: false,
+      teacherSheetVisible: false, teacherErrorText: '', teacherActionsExpanded: false,
     }
   }
 

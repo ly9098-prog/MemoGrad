@@ -62,7 +62,6 @@ async function _commitNavigation(page, ctx, switchDirection, animMs, navigationS
     page._teacherRequestSeq = Number(page._teacherRequestSeq || 0) + 1
     page._diagnosisRequestSeq = Number(page._diagnosisRequestSeq || 0) + 1
     page._aiGenerationMarker = String(wq.ai_analysis_generated_at || '')
-    page._activeTeacherCacheKey = ''
     page._pendingNavigationWqId = null
     page._armSwitchWatchdog(QUESTION_SWITCH_ANIM_WATCHDOG_MS)
     page.setData(Object.assign({ showSwitchMask: false }, nextData), () => {

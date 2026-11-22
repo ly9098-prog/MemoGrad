@@ -116,14 +116,14 @@ test('state initialization preserves exact private assignments, null prototypes 
     _switching: false, _navigationSeq: 0, _aiSwipeStart: null,
     _contentTransitionStartedAt: 0, _contentTransitionDirection: '',
     _teacherRequestSeq: 0, _diagnosisRequestSeq: 0,
-    _activeTeacherCacheKey: '', _wqCache: {}, _switchMaskTimer: null,
+    _wqCache: {}, _switchMaskTimer: null,
     _contentTransitionTimer: null, _switchWatchdogTimer: null,
     _masterUndoTimer: null, _masterAdvanceTimer: null, _removeBackTimer: null,
     _bottomActionsTimer: null, _bottomActionsLastActiveAt: 0,
     _masterUndoInFlight: false, _pendingMasterUndo: null,
   }
   for (const [key, value] of Object.entries(expected)) assert.deepEqual(plain(f.page[key]), value, key)
-  const cacheNames = ['_teacherCache', '_teacherInflight', '_teacherFeedbackCache']
+  const cacheNames = ['_teacherCache', '_teacherInflight']
   for (const key of cacheNames) {
     assert.equal(Object.getPrototypeOf(f.page[key]), null)
     assert.deepEqual(Object.keys(f.page[key]), [])
@@ -310,10 +310,9 @@ test('unload invalidates sequences before ordered timer hooks and cache/guard cl
   assert.equal(page.onUnload(), undefined)
   assert.deepEqual(f.calls, [['clear', 20], ['clear', 21], ['clear', 22], ['clear', 23], ['bottom'], ['undo']])
   fields.forEach(name => assert.equal(page[name], null))
-  for (const name of ['_wqCache', '_teacherCache', '_teacherInflight', '_teacherFeedbackCache']) {
+  for (const name of ['_wqCache', '_teacherCache', '_teacherInflight']) {
     assert.equal(page[name], null)
   }
-  assert.equal(page._activeTeacherCacheKey, '')
   assert.equal(page._aiGenerationMarker, '')
   assert.deepEqual(f.guardCalls, [['reset']])
   assert.equal(page.data.wq.id, 12)

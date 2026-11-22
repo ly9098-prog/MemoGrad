@@ -262,7 +262,7 @@
 </view>
 <scroll-view wx:elif="{{teacherResult}}" class="teacher-sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
 <view wx:if="{{teacherResult.summary}}" class="teacher-summary-card">
-<text class="teacher-summary-label">先看结论</text>
+<text class="teacher-summary-label">{{teacherResult.fromFallback ? '生成状态' : '先看结论'}}</text>
 <text class="teacher-summary" user-select="true">{{teacherResult.summary}}</text>
 </view>
 <view wx:for="{{teacherResult.sections}}" wx:key="key" class="teacher-result-section">
@@ -299,17 +299,8 @@
 <view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
 <text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis" user-select="true">{{teacherResult.practiceQuestion.analysis}}</text>
 </view>
-<text class="teacher-footnote">{{teacherResult.fromFallback ? '当前使用可靠的已有内容兜底；AI 生成暂不可用。' : '内容由 AI 深入讲解生成，仅用于学习复盘。'}}</text>
-<view class="teacher-feedback-row">
-<view class="teacher-feedback-copy">
-<text class="teacher-feedback-label">这次讲解有帮助吗？</text>
-<text class="teacher-feedback-hint">你的反馈会用于改善后续讲解</text>
-</view>
-<view class="teacher-feedback-actions">
-<button class="teacher-feedback-btn {{teacherFeedbackSent === 'helpful' ? 'selected' : ''}}" data-type="helpful" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">有帮助</button>
-<button class="teacher-feedback-btn {{teacherFeedbackSent === 'inaccurate' ? 'selected' : ''}}" data-type="inaccurate" disabled="{{teacherFeedbackSent}}" bindtap="feedback408Teacher">不准确</button>
-</view>
-</view>
+<text class="teacher-footnote">{{teacherResult.fromFallback ? '本次未生成 AI 讲解，可返回查看题库解析，或重新尝试。' : '内容由 AI 深入讲解生成，仅用于学习复盘。'}}</text>
+<button wx:if="{{teacherResult.fromFallback && teacherLastAction}}" class="teacher-retry" disabled="{{!aiAvailabilityEnabled || teacherLoadingAction}}" data-action="{{teacherLastAction}}" bindtap="run408TeacherAction">重新尝试</button>
 <view class="teacher-scroll-space"></view>
 </scroll-view>
 </view>

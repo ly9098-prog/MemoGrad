@@ -24,7 +24,6 @@ Page({
     teacherResult: null,
     teacherErrorText: '',
     teacherSheetVisible: false,
-    teacherFeedbackSent: '',
     icons: {
       sprout: '/subpackages/exam/result/assets/sprout.png',
       radarGrid: '/subpackages/exam/result/assets/radar-grid.png',
@@ -34,9 +33,7 @@ Page({
   onLoad(options) {
     this._pageAlive = true
     this._teacherRequestSeq = 0
-    this._activeTeacherCacheKey = ''
     this._teacherCache = Object.create(null)
-    this._teacherFeedbackCache = Object.create(null)
     this._teacherInflight = Object.create(null)
     this._loadSeq = 0
     this._loadPromise = null
@@ -257,8 +254,6 @@ Page({
         setData: patch => this.setData(patch),
         getCacheEntry: key => this._teacherCache[key],
         setCacheEntry: (key, value) => { this._teacherCache[key] = value },
-        getFeedbackEntry: key => this._teacherFeedbackCache[key],
-        setActiveCacheKey: key => { this._activeTeacherCacheKey = key },
         getInflight: key => this._teacherInflight[key],
         setInflight: (key, promise) => { this._teacherInflight[key] = promise },
         deleteInflight: key => { delete this._teacherInflight[key] },
@@ -276,26 +271,4 @@ Page({
     this.setData({ teacherSheetVisible: false })
   },
 
-  async feedback408Teacher(e) {
-    if (this.data.teacherFeedbackSent || !this.data.teacherResult || !this.data.attemptId) return
-    const feedbackType = String(e.currentTarget.dataset.type || '')
-    if (!feedbackType) return
-    try {
-      await api.post('/ai/feedback', {
-        source: '408_teacher',
-        feedback_type: feedbackType,
-        exam_attempt_id: Number(this.data.attemptId),
-        detail: [
-          this.data.teacherResult.action ? `action=${this.data.teacherResult.action}` : '',
-          this.data.teacherResult.promptVersion ? `prompt_version=${this.data.teacherResult.promptVersion}` : '',
-          `fallback=${this.data.teacherResult.fromFallback ? 1 : 0}`,
-        ].filter(Boolean).join(';'),
-      })
-      if (this._activeTeacherCacheKey) this._teacherFeedbackCache[this._activeTeacherCacheKey] = feedbackType
-      this.setData({ teacherFeedbackSent: feedbackType })
-      wx.showToast({ title: '反馈已记录', icon: 'success' })
-    } catch (error) {
-      wx.showToast({ title: api.getErrorMessage(error), icon: 'none' })
-    }
-  },
 })

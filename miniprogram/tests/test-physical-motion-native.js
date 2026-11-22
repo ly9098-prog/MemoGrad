@@ -7,6 +7,40 @@ const { test } = require('node:test')
 const root = path.resolve(__dirname, '..')
 const compiler = '/mnt/d/Code/WeixinDev/微信web开发者工具/resources/app.asar.unpacked/node_modules/wcc-exec/wcc.exe'
 
+test('native result template paints one reader for review, teacher and guest states', t => {
+  if (!fs.existsSync(compiler)) return t.skip('WeChat WXML compiler is unavailable')
+  const file = 'subpackages/study/practice-result/index.wxml'
+  const compiled = spawnSync(compiler, [file], { cwd: root, encoding: 'utf8', timeout: 30000, maxBuffer: 4e6 })
+  assert.equal(compiled.status, 0, compiled.stderr)
+  const context = vm.createContext({ window: { __webview_engine_version__: .02 }, console })
+  vm.runInContext(compiled.stdout, context)
+  const render = context.$gwx(file)
+  const flatten = node => node && typeof node === 'object'
+    ? [node, ...(node.children || []).flatMap(flatten)] : []
+  const hasClass = (node, name) => String(node.attr && node.attr.class || '').split(/\s+/).includes(name)
+  const base = { reviewDialogVisible: true, teacherSheetVisible: false, guestMode: false,
+    reviewDialog: { title: '题目复盘', analysisSections: [] } }
+  for (const [patch, visible, content] of [
+    [{}, true, 'review-dialog-head'],
+    [{ teacherSheetVisible: true, teacherLoading: true }, true, 'teacher-sheet-loading'],
+    [{ teacherSheetVisible: true, teacherErrorText: '生成失败' }, true, 'teacher-sheet-error'],
+    [{ teacherSheetVisible: true, teacherResult: { title: '专项讲解', sections: [], knowledgePoints: [] } }, true, 'teacher-sheet-scroll'],
+    [{ teacherSheetVisible: true }, true, 'teacher-action-panel'],
+    [{ guestMode: true, teacherSheetVisible: true }, true, 'review-dialog-head'],
+    [{ reviewDialogVisible: false, teacherSheetVisible: false }, false, 'review-dialog-head'],
+  ]) {
+    context.fixtureJSON = JSON.stringify({ ...base, ...patch })
+    const nodes = flatten(render(vm.runInContext('JSON.parse(fixtureJSON)', context)))
+    const sheets = nodes.filter(node => node.tag === 'wx-motion-sheet')
+    assert.equal(sheets.length, 1)
+    assert.equal(sheets[0].attr.show, visible)
+    assert.equal(nodes.filter(node => hasClass(node, 'motion-sheet-panel')).length, 1)
+    assert.equal(nodes.filter(node => hasClass(node, content)).length, 1)
+    assert.equal(nodes.filter(node => hasClass(node, 'review-dialog-head') || hasClass(node, 'teacher-sheet-head')).length, 1,
+      'only the active reader content is mounted in the slot')
+  }
+})
+
 test('real WXS compiler initialises all physical handlers using its own runtime globals', t => {
   if (!fs.existsSync(compiler)) return t.skip('WeChat WXML compiler is unavailable')
   const paths = ['components/motion-sheet/index.wxml','components/motion-sheet/sheet-motion.wxs',

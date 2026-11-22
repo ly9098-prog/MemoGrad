@@ -158,8 +158,16 @@ test('rich-text bodies keep all ancestors untransformed while the surface and ha
   assert.match(h.node('.motion-sheet-surface').style.transform, /120px/)
   assert.match(h.node('.motion-sheet-grip').style.transform, /120px/)
   assert.ok(h.node('.motion-sheet-body').style.opacity < 1)
-  assert.equal(h.node('.motion-sheet-body').style['clip-path'], 'inset(92px 0 0)',
-    'stationary text above the moving surface is hidden below the 28px grip')
+  assert.equal(h.node('.motion-sheet-body').style['clip-path'], 'inset(120px 0 0)',
+    'stationary text stays below the moving grip band, clear of the rounded edge')
+  h.tick(150); h.motion.end(h.event(null, null), h.owner); h.flush()
+  assert.equal(h.state.y, Math.min(112, model.panel.height * 0.28))
+  assert.equal(h.node('.motion-sheet-body').style['clip-path'], `inset(${h.state.y}px 0 0)`,
+    'the settled half state retains the same reserved grip band')
+  h.motion.expand(h.event(null, null), h.owner); h.flush()
+  assert.equal(h.node('.motion-sheet-body').style['clip-path'], 'none')
+  h.motion.start(h.event(100, 500), h.owner)
+  h.tick(); h.motion.move(h.event(100, 620), h.owner); h.tick()
   h.motion.sync({ ...model, id: 2, resume: true, resetDrag: true, dismissible: false }, model, h.owner)
   h.flush()
   assert.equal(h.state.y, 0, 'a new save lock restores the fully visible body')

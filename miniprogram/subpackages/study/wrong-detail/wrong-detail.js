@@ -124,7 +124,6 @@ teacherLastAction: '',
 teacherResult: null,
 teacherSheetVisible: false,
 teacherErrorText: '',
-teacherFeedbackSent: '',
 bottomActionsVisible: true,
 currentQuestion: null,
 wrongQuestions: [],
@@ -247,9 +246,6 @@ return teacherInteraction._teacherCacheKeyForWrong(wq, diagnosis, action)
   _clearAiAvailabilityState() { return aiAvailability._clearAiAvailabilityState(this) },
 close408TeacherSheet() {
 return teacherInteraction.close408TeacherSheet(this)
-},
-async feedback408Teacher(e) {
-return teacherInteraction.feedback408Teacher(this, e, { requestClient: api, teacher: aiTeacher408, get platform() { return wx } })
 },
 _isCurrentAiRequest(requestId, wqId) {
 return aiRecovery._isCurrentAiRequest(this, requestId, wqId)
