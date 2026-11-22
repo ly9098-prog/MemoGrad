@@ -135,6 +135,7 @@ async def chat_with_db_model(
     extra_body: dict[str, Any] | None = None,
     prefer_direct_answer: bool = False,
     runtime: LLMRuntimeConfig | None = None,
+    deadline: float | None = None,
 ) -> dict[str, Any] | None:
     """Resolve a configured compatible model and invoke it.
 
@@ -162,4 +163,5 @@ async def chat_with_db_model(
         response_format=response_format,
         extra_body=extra_body,
         prefer_direct_answer=prefer_direct_answer,
+        **({"deadline": deadline} if deadline is not None else {}),
     )

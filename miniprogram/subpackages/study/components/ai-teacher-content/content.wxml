@@ -22,7 +22,7 @@
 <text class="teacher-kp-relation-value">{{relation.value}}</text>
 </view>
 </view>
-<text wx:elif="{{item.relationText || item.relation}}" class="teacher-kp-relation">{{item.relationText || item.relation}}</text>
+<text wx:if="{{item.relationText || (!item.relationItems.length && item.relation)}}" class="teacher-kp-relation">{{item.relationText || item.relation}}</text>
 <view wx:if="{{item.masteryText || item.learningHint || item.masteryHint}}" class="teacher-kp-learning">
 <text wx:if="{{item.masteryText}}" class="teacher-kp-mastery">{{item.masteryText}}</text>
 <text wx:if="{{item.learningHint || item.masteryHint}}" class="teacher-kp-hint">{{item.learningHint || item.masteryHint}}</text>
@@ -38,6 +38,6 @@
 <view class="teacher-practice-answer-row"><text class="teacher-practice-answer-label">答案</text><text class="teacher-practice-answer">{{teacherResult.practiceQuestion.answer}}</text></view>
 <text wx:if="{{teacherResult.practiceQuestion.analysis}}" class="teacher-practice-analysis" user-select="true">{{teacherResult.practiceQuestion.analysis}}</text>
 </view>
-<text class="teacher-footnote">{{teacherResult.fromFallback ? fallbackNote : generatedNote}}</text>
+<text wx:if="{{!teacherResult.fromFallback}}" class="teacher-footnote">{{generatedNote}}</text>
 </view>
 </template>

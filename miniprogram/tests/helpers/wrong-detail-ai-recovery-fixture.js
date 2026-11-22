@@ -29,7 +29,7 @@ function fixture(options = {}) {
       if (request === '../utils/ai-math-render') return { buildAiRichText: value => value }
       if (request === '../utils/error-diagnosis') return options.diagnosis || { TAXONOMY: [] }
       if (request === '../utils/ai-teacher-408') return options.teacher || {}
-      if (request === './teacher-presentation') return { presentTeacherResult: value => value }
+      if (request === '../utils/teacher-presentation') return { presentTeacherResult: value => value }
       if (request === './utils/teacher-action-controller') return {
         createTeacherActionController: () => ({}),
       }

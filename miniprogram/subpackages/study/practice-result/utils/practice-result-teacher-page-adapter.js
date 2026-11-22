@@ -2,6 +2,7 @@
 // Assemble live page ports here; the page keeps lazy controller memoisation.
 
 const aiTeacher408 = require('../../utils/ai-teacher-408')
+const { presentTeacherResult } = require('../../utils/teacher-presentation')
 const { requestTeacher } = require('../../../../utils/ai-teacher-request')
 
 function buildReview408TeacherPageCapabilities(page, deps) {
@@ -35,7 +36,7 @@ function buildReview408TeacherPageCapabilities(page, deps) {
           Number((page.data.reviewDialog || {}).questionId) === Number(payload.question_id),
       })
     },
-    normalizeResult: raw => aiTeacher408.normalizeResult(raw),
+    normalizeResult: raw => presentTeacherResult(aiTeacher408.normalizeResult(raw)),
     errorMessage: error => aiTeacher408.errorMessage(error, api),
   }
 }

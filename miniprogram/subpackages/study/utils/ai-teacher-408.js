@@ -43,19 +43,19 @@ return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed :
 return null
 }
 }
-function textPoints(value, limit = 5) {
+function textPoints(value) {
 if (Array.isArray(value)) {
 return value.map(item => {
 if (item && typeof item === 'object') {
 return cleanText(item.text || item.content || item.point || item.description || '')
 }
 return cleanText(item)
-}).filter(Boolean).slice(0, limit)
+}).filter(Boolean)
 }
 if (value && typeof value === 'object') {
 const preferred = value.text || value.content || value.summary || value.description || value.reason
 if (preferred) return [cleanText(preferred)].filter(Boolean)
-return Object.values(value).map(item => cleanText(item)).filter(text => text && text !== '[object Object]').slice(0, limit)
+return Object.values(value).map(item => cleanText(item)).filter(text => text && text !== '[object Object]')
 }
 const text = cleanText(value)
 return text ? [text] : []
@@ -77,7 +77,7 @@ const points = textPoints(picked)
 if (points.length) result.push({ heading: group.heading, points })
 })
 if (!result.length && allowUnknownFields) {
-Object.keys(obj).slice(0, 4).forEach(key => {
+Object.keys(obj).forEach(key => {
 const points = textPoints(obj[key])
 if (points.length) result.push({ heading: cleanText(key).replace(/_/g, ' '), points })
 })
@@ -99,7 +99,7 @@ const text = cleanText(point)
 if (text) points.push(text)
 }
 })
-if (points.length) sections.push({ heading, points: points.slice(0, 5) })
+if (points.length) sections.push({ heading, points })
 })
 return sections
 }
@@ -107,7 +107,7 @@ function dedupeSections(items) {
 const seen = new Set()
 const result = []
 ;(items || []).forEach((item, index) => {
-const points = (item.points || []).map(cleanText).filter(Boolean).slice(0, 5)
+const points = (item.points || []).map(cleanText).filter(Boolean)
 if (!points.length) return
 const heading = cleanText(item.heading) || `要点 ${index + 1}`
 const key = `${heading}|${points.join('|')}`
@@ -115,7 +115,7 @@ if (seen.has(key)) return
 seen.add(key)
 result.push({ key: `${result.length}-${heading}`, heading, points })
 })
-return result.slice(0, 8)
+return result
 }
 function normalizePracticeQuestion(practiceRaw) {
 let practiceQuestion = null
@@ -187,6 +187,8 @@ fromFallback: !!(source.from_fallback ?? source.fromFallback),
 personalization: source.personalization || {},
 promptVersion: cleanText(source.prompt_version || source.promptVersion),
 }
+const fallbackReason = cleanText(source.fallback_reason || source.fallbackReason)
+if (fallbackReason) result.fallbackReason = fallbackReason
 return finalizeResult(result)
 }
 function finalizeResult(result) {
@@ -197,23 +199,41 @@ const hasBody = action === 'similar_question' || action === 'harder_question'
 : hasTeachingBody(sections, knowledgePoints, action)
 if (!hasBody) {
 result.fromFallback = true
+result.fallbackReason = 'missing_body'
 result.title = '讲解未完整生成'
-result.summary = '本次未生成 AI 讲解：返回内容不完整，请重新尝试。'
+result.summary = '未收到可展示的讲解正文，请重新尝试。'
 }
 }
 if (result.fromFallback) {
-if (result.action === 'explain_options') {
-result.title = '逐项讲解暂不可用'
-if (!result.summary.includes('未生成逐项讲解')) result.summary = '本次未生成逐项讲解，请稍后重试；可返回查看题库解析。'
-} else if (!result.summary.includes('未生成 AI 讲解')) {
-result.summary = '本次未生成 AI 讲解，请稍后重试；可返回查看题库解析。'
-}
+result.title = '这次讲解未完成'
+result.summary = fallbackMessage(result.summary, result.fallbackReason)
 result.sections = []
 result.knowledgePoints = []
 result.practiceQuestion = null
 result.nextAction = null
 }
 return result
+}
+const FALLBACK_MESSAGES = {
+budget_exhausted: 'AI 调用额度不足，可先查看题库解析。',
+service_unavailable: 'AI 老师暂不可用，请稍后重试，或返回查看题库解析。',
+output_truncated: 'AI 讲解达到输出长度上限，未能完整生成，请重新尝试。',
+content_filtered: 'AI 输出被服务商安全策略过滤，未获得可展示的讲解。',
+invalid_format: 'AI 返回的格式无法解析，请重新尝试。',
+invalid_options: '逐项讲解未通过完整性或答案一致性校验，请重新尝试。',
+invalid_question: '未收到含完整答案和解析的练习题，请重新尝试。',
+missing_body: '未收到可展示的讲解正文，请重新尝试。',
+}
+function fallbackMessage(summary, reasonCode) {
+if (Object.prototype.hasOwnProperty.call(FALLBACK_MESSAGES, reasonCode)) return FALLBACK_MESSAGES[reasonCode]
+// Older servers append a generic failure sentence. Keep one verified cause;
+// never display their historical copied question analysis as a generated lesson.
+const reason = cleanText(summary).split(/本次未生成(?: AI 讲解|逐项讲解)/)[0].trim().replace(/[。；;]+$/, '')
+if (/^今日(?: AI 调用)?额度已用尽/.test(reason)) return FALLBACK_MESSAGES.budget_exhausted
+if (/^(?:AI (?:返回格式异常|未生成可校验的单选题|老师暂不可用|讲解未完整生成)|今日 AI 调用额度已用尽|未收到可展示的讲解正文)/.test(reason)) return `${reason}。`
+if (/^AI 返回的逐项内容不完整或与标准答案不一致/.test(reason)) return '逐项讲解未通过完整性或答案一致性校验，请重新尝试。'
+if (/^AI 返回的讲解内容不完整/.test(reason)) return FALLBACK_MESSAGES.missing_body
+return '本次未生成 AI 讲解，请重新尝试，或返回查看题库解析。'
 }
 function errorMessage(error, api) {
 const detail = error && error.detail

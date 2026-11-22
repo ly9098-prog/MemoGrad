@@ -173,6 +173,7 @@ teacherLoading: false,
 teacherResult: null,
 teacherErrorText: '',
 teacherSheetVisible: false,
+teacherChoosingAction: false,
 heroTopPaddingPx: 28
 },
 onLoad(options) {
@@ -715,6 +716,7 @@ this.setData({
 reviewDialogVisible: true,
 teacherSheetVisible: false,
 teacherLoading: false,
+teacherChoosingAction: false,
 teacherResult: null,
 teacherErrorText: '',
 reviewDialog: {
@@ -751,21 +753,24 @@ this.run408TeacherFromReview(action);
 },
 select408TeacherAction(e) {
 const action = String(e.currentTarget.dataset.action || '');
-if (action) this.run408TeacherFromReview(action);
+if (action) return this.run408TeacherFromReview(action, { refresh: true });
 },
-  async run408TeacherFromReview(action) {
+  async run408TeacherFromReview(action, options) {
     if (this._guestMode || !aiTeacher408.ACTION_BY_KEY[action]) return
-    if (!this.data.teacherLoading) this.setData({ teacherAction: action })
-    return this._review408TeacherController().run(action)
+    if (!this.data.teacherLoading) this.setData({ teacherAction: action, teacherChoosingAction: false })
+    return this._review408TeacherController().run(action, options)
   },
 
 retry408Teacher() {
 if (this.data.teacherLoading || !(this.data.teacherErrorText || (this.data.teacherResult && this.data.teacherResult.fromFallback))) return;
-return this.run408TeacherFromReview(this.data.teacherAction);
+return this.run408TeacherFromReview(this.data.teacherAction, { refresh: true });
 },
 show408TeacherActions() {
 if (this.data.teacherLoading) return;
-this.setData({ teacherResult: null, teacherErrorText: '' });
+this.setData({ teacherChoosingAction: true, teacherErrorText: '' });
+},
+cancel408TeacherActions() {
+this.setData({ teacherChoosingAction: false });
 },
 
   _review408TeacherController() {

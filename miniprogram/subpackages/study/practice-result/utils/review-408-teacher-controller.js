@@ -7,7 +7,7 @@ function createReview408TeacherController(options) {
   }
 }
 
-async function runImpl(options, action) {
+async function runImpl(options, action, { refresh = false } = {}) {
   if (options.getTeacherLoading()) {
     options.setData({ teacherSheetVisible: true })
     return
@@ -17,7 +17,7 @@ async function runImpl(options, action) {
 
   const cacheKey = options.buildCacheKey(dialog, action)
   const cached = options.getCacheEntry(cacheKey)
-  if (cached) {
+  if (cached && !refresh) {
     options.setData({
       teacherLoading: false, teacherResult: cached, teacherErrorText: '',
       teacherSheetVisible: true,
@@ -32,15 +32,15 @@ async function performRequest(options, action, dialog, cacheKey) {
   const questionId = Number(dialog.questionId)
   const payload = buildPayload(dialog, questionId, action)
   let requestPromise = options.getInflight(cacheKey)
-  if (!requestPromise) {
-    requestPromise = options.postTeacher(payload)
-    options.setInflight(cacheKey, requestPromise)
-  }
   options.setData({
     teacherLoading: true, teacherResult: null, teacherErrorText: '',
     teacherSheetVisible: true,
   })
   try {
+    if (!requestPromise) {
+      requestPromise = options.postTeacher(payload)
+      options.setInflight(cacheKey, requestPromise)
+    }
     const raw = await requestPromise
     const normalized = options.normalizeResult(raw)
     if (!normalized) throw new Error('AI 返回格式异常')

@@ -463,13 +463,13 @@
 <block wx:else>
 <view class="teacher-sheet-head mini-choice-sheet-header">
 <view class="mini-choice-sheet-heading">
-<text class="mini-choice-sheet-title">{{teacherResult ? teacherResult.title : '专项 AI 老师'}}</text>
+<text class="mini-choice-sheet-title">{{teacherChoosingAction ? '选择讲解方式' : (teacherLoading ? '正在生成讲解' : (teacherResult ? teacherResult.title : '专项 AI 老师'))}}</text>
 <text class="mini-choice-sheet-description">围绕本题，弄懂考点与解题思路</text>
 </view>
 </view>
-<fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherResult || teacherErrorText || teacherLoading || 'actions'}}">
+<fit-scroll reader-class="teacher-sheet-scroll" content="{{teacherChoosingAction ? 'actions' : (teacherResult || teacherErrorText || teacherLoading || 'actions')}}">
 <view class="teacher-sheet-content">
-<view wx:if="{{!teacherLoading && !teacherErrorText && !teacherResult}}" class="teacher-action-panel">
+<view wx:if="{{teacherChoosingAction || (!teacherLoading && !teacherErrorText && !teacherResult)}}" class="teacher-action-panel">
 <text class="teacher-action-title">想从哪里继续理解？</text>
 <view class="mini-choice-grid">
 <button wx:for="{{teacherActions}}" wx:key="action" class="mini-choice-option" hover-class="mini-choice-pressed" data-action="{{item.action}}" bindtap="select408TeacherAction">
@@ -488,15 +488,16 @@
 <text class="teacher-state-description" user-select="true">{{teacherErrorText}}</text>
 </view>
 <block wx:elif="{{teacherResult}}">
-<template is="ai-teacher-content" data="{{teacherResult, comfortable: true, fallbackNote: '本次未生成 AI 讲解，可返回查看题库解析后重试。', generatedNote: '内容由专项 AI 老师生成，仅用于本题复盘。'}}" />
+<template is="ai-teacher-content" data="{{teacherResult, comfortable: true, generatedNote: '内容由专项 AI 老师生成，仅用于本题复盘。'}}" />
 </block>
 </view>
 </fit-scroll>
 <view class="teacher-sheet-footer mini-choice-sheet-actions" catchtouchmove="noop">
 <button class="mini-choice-sheet-action mini-choice-sheet-action-secondary" hover-class="mini-choice-sheet-action-pressed" bindtap="close408Teacher">返回解析</button>
-<button wx:if="{{teacherLoading}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" disabled>正在生成…</button>
+<button wx:if="{{teacherChoosingAction && teacherResult}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="cancel408TeacherActions">返回当前讲解</button>
+<button wx:elif="{{teacherLoading}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" disabled>正在生成…</button>
 <button wx:elif="{{teacherErrorText || (teacherResult && teacherResult.fromFallback)}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="retry408Teacher">重新尝试</button>
-<button wx:elif="{{teacherResult}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="show408TeacherActions">换个讲解</button>
+<button wx:elif="{{teacherResult}}" class="mini-choice-sheet-action mini-choice-sheet-action-primary" hover-class="mini-choice-sheet-action-pressed" bindtap="show408TeacherActions">选择讲解方式</button>
 </view>
 </block>
 </view>

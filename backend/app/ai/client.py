@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from app.ai.provider_error_signals import has_quota_error_marker
 from app.core.ai_runtime_guard import AIResourceRejectedError, ai_runtime_guard
 from app.core.config import settings
 from app.core.log_context import get_trace_headers, log_event
-from app.services.safe_remote_fetch import request_remote_bytes
+from app.services.safe_remote_fetch import RemoteResponse, request_remote_bytes
 from app.utils.sentry_utils import capture_exception, set_tag, start_span
 
 _ai_logger = logging.getLogger("app.ai")
@@ -50,6 +51,75 @@ class OpenAICompatibleAPIError(RuntimeError):
         self.retryable = bool(retryable)
         self.error_kind = str(error_kind or "") or None
         super().__init__(f"OpenAI-compatible API error: {self.status_code}")
+
+
+class ChatCompletionCancelled(asyncio.CancelledError):
+    """Cancellation after an in-flight response; callers must settle its usage."""
+
+    def __init__(self, result: dict[str, Any] | None) -> None:
+        super().__init__("chat cancelled after provider response")
+        self.result = result
+
+
+async def _request_remote_joined(
+    url: str, *, deadline: float, **kwargs: Any
+) -> tuple[RemoteResponse, bool]:
+    """Join an already-started blocking transport even if its caller is cancelled.
+
+    The task owns no DB session. Dispatched work is joined before the client
+    releases its slot or propagates cancellation to the billing caller.
+    Compute the remaining network budget inside the worker, after executor wait.
+    """
+
+    dispatch_lock = threading.Lock()
+    started = False
+    abandoned = False
+
+    def request() -> RemoteResponse:
+        nonlocal started
+        with dispatch_lock:
+            remaining = deadline - time.monotonic()
+            if abandoned or remaining <= 0:
+                raise TimeoutError("OpenAI-compatible request budget exhausted")
+            started = True
+        return request_remote_bytes(url, timeout=remaining, **kwargs)
+
+    transport = asyncio.create_task(asyncio.to_thread(request))
+    cancelled = False
+    wait_deadline: float | None = deadline
+    while True:
+        try:
+            # Bound executor queueing too. Once dispatched, the blocking
+            # transport owns the remaining timeout and must finish for billing.
+            async with asyncio.timeout_at(wait_deadline):
+                return await asyncio.shield(transport), cancelled
+        except TimeoutError:
+            with dispatch_lock:
+                if not started:
+                    abandoned = True
+                    transport.cancel()
+                    raise
+            if transport.done():
+                try:
+                    return transport.result(), cancelled
+                except Exception as exc:
+                    if cancelled:
+                        raise ChatCompletionCancelled(None) from exc
+                    raise
+            wait_deadline = None
+        except asyncio.CancelledError:
+            if transport.cancelled():
+                raise
+            with dispatch_lock:
+                if not started:
+                    abandoned = True
+                    transport.cancel()
+                    raise
+            cancelled = True
+        except Exception as exc:
+            if cancelled:
+                raise ChatCompletionCancelled(None) from exc
+            raise
 
 
 @dataclass(frozen=True)
@@ -170,6 +240,28 @@ def _tokens_used(data: dict[str, Any]) -> int:
         return int(prompt) + int(completion)
     except (TypeError, ValueError):
         return 0
+
+
+def _has_known_token_usage(data: dict[str, Any]) -> bool:
+    """A missing usage report is distinct from an explicit zero-token charge."""
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return False
+    total = usage.get("total_tokens")
+    values = (
+        (total,)
+        if isinstance(total, (int, float))
+        else (
+            usage.get("prompt_tokens", usage.get("input_tokens")),
+            usage.get("completion_tokens", usage.get("output_tokens")),
+        )
+    )
+    try:
+        return all(
+            v is not None and not isinstance(v, bool) and int(v) >= 0 for v in values
+        )
+    except (TypeError, ValueError, OverflowError):
+        return False
 
 
 def _profile_cache_key(provider: str, base_url: str, model: str) -> str:
@@ -495,6 +587,7 @@ class OpenAICompatibleClient:
         extra_body: dict[str, Any] | None = None,
         prefer_direct_answer: bool = False,
         connection_probe: bool = False,
+        deadline: float | None = None,
     ) -> dict[str, Any]:
         """Invoke a Chat Completions-compatible endpoint.
 
@@ -538,6 +631,11 @@ class OpenAICompatibleClient:
         request_timeout = float(timeout if timeout is not None else self.timeout)
         if request_timeout <= 0:
             raise ValueError("timeout must be positive")
+        request_deadline = (
+            min(time.monotonic() + request_timeout, float(deadline))
+            if deadline is not None
+            else None
+        )
 
         endpoint_key = f"{effective_provider}:{base_url_host}"
         profile_key = _profile_cache_key(effective_provider, effective_base_url, model)
@@ -545,7 +643,11 @@ class OpenAICompatibleClient:
 
         ai_runtime_guard.validate_prompt(prompt_chars)
         if not connection_probe:
-            await ai_runtime_guard.enforce_rate_limit()
+            if request_deadline is None:
+                await ai_runtime_guard.enforce_rate_limit()
+            else:
+                async with asyncio.timeout_at(request_deadline):
+                    await ai_runtime_guard.enforce_rate_limit()
             ai_runtime_guard.record_request()
 
         # Cap either token-field dialect, including explicit extra_body values.
@@ -597,19 +699,24 @@ class OpenAICompatibleClient:
             provider_outcome_recorded = False
             compatibility_retries = 0
             attempted_profiles: set[_CompatibilityProfile] = set()
+            cancellation_requested = False
             try:
                 url = build_chat_completions_url(effective_base_url)
                 sem = None
                 queue_wait_ms = 0.0
                 if not connection_probe:
-                    sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
+                    if request_deadline is None:
+                        sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
+                    else:
+                        async with asyncio.timeout_at(request_deadline):
+                            sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
                 try:
                     if not connection_probe:
                         ai_runtime_guard.assert_circuit_available(endpoint_key)
-                    # ``timeout`` is a budget for the logical chat call, not for
-                    # each compatibility retry individually. Parameter-rejection
-                    # negotiation therefore shares one monotonic deadline.
-                    request_deadline = time.monotonic() + request_timeout
+                    # Only explicit deadline callers include queueing and
+                    # executor wait. Preserve legacy post-slot timeout semantics.
+                    if request_deadline is None:
+                        request_deadline = time.monotonic() + request_timeout
                     while True:
                         if profile in attempted_profiles:
                             raise RuntimeError(
@@ -637,26 +744,40 @@ class OpenAICompatibleClient:
                             raise TimeoutError(
                                 "OpenAI-compatible request budget exhausted"
                             )
-                        remote = await asyncio.to_thread(
-                            request_remote_bytes,
-                            url,
-                            method="POST",
-                            body=request_body,
-                            max_bytes=10 * 1024 * 1024,
-                            timeout=max(0.05, remaining_timeout),
-                            allow_http=settings.AI_ALLOW_HTTP_BASE_URLS,
-                            follow_redirects=False,
-                            headers={
+                        request_kwargs = {
+                            "method": "POST",
+                            "body": request_body,
+                            "max_bytes": 10 * 1024 * 1024,
+                            "allow_http": settings.AI_ALLOW_HTTP_BASE_URLS,
+                            "follow_redirects": False,
+                            "headers": {
                                 **get_trace_headers(),
                                 "Authorization": f"Bearer {effective_key}",
                                 "Content-Type": "application/json",
                                 "Accept": "application/json",
                             },
-                        )
+                        }
+                        if deadline is not None:
+                            remote, cancelled = await _request_remote_joined(
+                                url, deadline=request_deadline, **request_kwargs
+                            )
+                        else:
+                            # Existing callers retain immediate cancellation;
+                            # joining is opt-in for the teacher billing boundary.
+                            remote = await asyncio.to_thread(
+                                request_remote_bytes,
+                                url,
+                                timeout=max(0.05, remaining_timeout),
+                                **request_kwargs,
+                            )
+                            cancelled = False
+                        cancellation_requested = cancellation_requested or cancelled
                         response_text = remote.data.decode("utf-8", errors="replace")
 
                         if 200 <= remote.status < 300:
                             break
+                        if cancellation_requested:
+                            raise asyncio.CancelledError()
 
                         generic_rejection = _looks_like_parameter_rejection(
                             remote.status, response_text
@@ -781,7 +902,7 @@ class OpenAICompatibleClient:
                     compatibility_profile=compatibility_profile,
                 )
 
-                return {
+                result = {
                     "content": content,
                     "tokens_used": tokens,
                     "model": data.get("model") or model,
@@ -791,6 +912,11 @@ class OpenAICompatibleClient:
                     "compatibility_retries": compatibility_retries,
                     "compatibility_profile": compatibility_profile,
                 }
+                if cancellation_requested:
+                    raise ChatCompletionCancelled(
+                        result if _has_known_token_usage(data) else None
+                    )
+                return result
             except AIResourceRejectedError as exc:
                 log_event(
                     _ai_logger,
@@ -826,6 +952,8 @@ class OpenAICompatibleClient:
                     exc,
                     tags={"ai.model": model, "ai.provider": effective_provider},
                 )
+                if cancellation_requested:
+                    raise ChatCompletionCancelled(None) from exc
                 raise
 
     async def close(self) -> None:

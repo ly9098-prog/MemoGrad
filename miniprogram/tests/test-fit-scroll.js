@@ -135,7 +135,7 @@ test('old summary-only responses become truthful uncached failures', () => {
   for (const action of ['explain_correct', 'core_concept', 'connect_knowledge', 'high_frequency_traps']) {
     const result = teacher.normalizeResult({ action, title: '编码能力', summary: '再由公式', from_fallback: false })
     assert.equal(result.fromFallback, true)
-    assert.match(result.summary, /内容不完整/)
+    assert.match(result.summary, /未收到可展示的讲解正文/)
     assert.deepEqual(result.sections, [])
   }
   const complete = teacher.normalizeResult({ action: 'explain_correct', summary: '结论。',

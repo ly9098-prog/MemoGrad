@@ -6,9 +6,9 @@ const ROOT = path.resolve(__dirname, '../../..')
 const ts = createRequire(path.join(ROOT, 'admin-frontend/package.json'))('typescript')
 
 const PAGE_PATH = 'miniprogram/subpackages/study/practice-result/index.js'
-// +11 lines for the teacher action state and explicit retry/chooser UI handlers.
-// Controller dependencies and all per-module/function budgets stay frozen.
-const PAGE_MAX_LINES = 849
+// +5 lines for an explicit chooser/cancel state; generation stays in its controller.
+// The teacher adapter adds one shared presentation import; function budgets stay frozen.
+const PAGE_MAX_LINES = 854
 const MODULE_DIR = 'miniprogram/subpackages/study/practice-result/utils/'
 // Frozen dependency surface for every governed module in the result page utils
 // directory. Page-adapter modules must receive the api client and any storage
@@ -24,7 +24,7 @@ const MODULES = {
   'practice-result-diagnosis-page-adapter.js': ['../../utils/error-diagnosis'],
   'practice-result-navigation-page-adapter.js': [],
   'practice-result-payload-page-adapter.js': ['./result-counts', './format-helpers', './growth-helpers'],
-  'practice-result-teacher-page-adapter.js': ['../../utils/ai-teacher-408', '../../../../utils/ai-teacher-request'],
+  'practice-result-teacher-page-adapter.js': ['../../utils/ai-teacher-408', '../../utils/teacher-presentation', '../../../../utils/ai-teacher-request'],
   'practice-result-trend-page-adapter.js': ['./format-helpers', './trend-plot-builder'],
   'recovered-payload-builder.js': [],
   'result-counts.js': [],
@@ -48,7 +48,7 @@ const MODULE_BUDGETS = {
   'practice-result-diagnosis-page-adapter.js': 27,
   'practice-result-navigation-page-adapter.js': 23,
   'practice-result-payload-page-adapter.js': 52,
-  'practice-result-teacher-page-adapter.js': 45,
+  'practice-result-teacher-page-adapter.js': 46,
   'practice-result-trend-page-adapter.js': 19,
   'recovered-payload-builder.js': 55,
   'result-counts.js': 49,

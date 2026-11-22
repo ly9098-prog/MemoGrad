@@ -55,7 +55,7 @@ test('summary groups and section traversal preserve aliases, order, deduplicatio
   assert.equal(teacher.normalizeResult({ summary: '{}' }).summary, '')
 })
 
-test('knowledge point projection preserves original indexes, limits and coercion', () => {
+test('knowledge point projection preserves indexes while lesson paragraphs remain complete', () => {
   const items = [null, ...Array.from({ length: 10 }, (_, index) => ({
     name: ` name${index} `, relation: index, mastery_hint: 0, masteryHint: 'fallback',
   }))]
@@ -66,8 +66,9 @@ test('knowledge point projection preserves original indexes, limits and coercion
   })
   const sections = Array.from({ length: 10 }, (_, i) => ({ heading: `h${i}`, points: [1, 2, 3, 4, 5, 6] }))
   const limited = teacher.normalizeResult({ sections }).sections
-  assert.equal(limited.length, 8)
-  assert.deepEqual(limited[0].points, ['1', '2', '3', '4', '5'])
+  assert.equal(limited.length, 10)
+  assert.deepEqual(limited[0].points, ['1', '2', '3', '4', '5', '6'])
+  assert.equal(limited[9].heading, 'h9', 'the concluding section must not disappear')
 })
 
 test('practice projection preserves option enumeration, falsy values and alias precedence', () => {
@@ -178,14 +179,14 @@ test('legacy option fallback never appears as a completed per-option lesson', ()
     title: '逐项讲解 A/B/C/D', summary: '本题属于“总线与 I/O”的典型辨析。',
     sections: [{ heading: '通用提示', points: ['注意边界条件。'] }],
   })
-  assert.equal(result.title, '逐项讲解暂不可用')
-  assert.match(result.summary, /未生成逐项讲解/)
+  assert.equal(result.title, '这次讲解未完成')
+  assert.match(result.summary, /未生成 AI 讲解/)
   assert.doesNotMatch(result.summary, /典型辨析/)
   assert.deepEqual(result.sections, [])
   assert.equal(teacher.normalizeResult({
     action: 'explain_options', from_fallback: true,
     summary: '今日额度已用尽。本次未生成逐项讲解。',
-  }).summary, '今日额度已用尽。本次未生成逐项讲解。')
+  }).summary, 'AI 调用额度不足，可先查看题库解析。')
 })
 
 test('all teacher fallbacks discard legacy copied analysis and generated fields', () => {
@@ -207,13 +208,13 @@ test('all teacher fallbacks discard legacy copied analysis and generated fields'
   }
 })
 
-test('teacher fallback preserves the new explicit failure reason across wrappers', () => {
+test('teacher fallback shows its cause once across legacy wrappers', () => {
   const summary = 'AI 返回格式异常。本次未生成 AI 讲解，请稍后重试。'
   for (const { action } of teacher.ACTIONS.filter(item => item.action !== 'explain_options')) {
     const result = teacher.normalizeResult({ result: {
       action, fromFallback: true, summary,
     } })
-    assert.equal(result.summary, summary)
+    assert.equal(result.summary, 'AI 返回格式异常。')
     assert.equal(result.fromFallback, true)
   }
   const success = teacher.normalizeResult({
@@ -224,6 +225,29 @@ test('teacher fallback preserves the new explicit failure reason across wrappers
   assert.equal(success.sections.length, 1)
 })
 
+test('machine failure reasons distinguish missing text from truncation, filtering and invalid format', () => {
+  for (const [reason, message] of [
+    ['missing_body', '未收到可展示的讲解正文'],
+    ['output_truncated', '输出长度上限'],
+    ['content_filtered', '安全策略过滤'],
+    ['invalid_format', '格式无法解析'],
+    ['invalid_options', '答案一致性校验'],
+    ['invalid_question', '完整答案和解析'],
+    ['budget_exhausted', '额度不足'],
+    ['service_unavailable', '暂不可用'],
+  ]) {
+    const result = teacher.normalizeResult({ action: 'explain_correct', from_fallback: true,
+      fallback_reason: reason, summary: '旧的统一错误提示。本次未生成 AI 讲解，请稍后重试。' })
+    assert.ok(result.summary.includes(message), reason)
+    assert.equal(result.fallbackReason, reason)
+    assert.doesNotMatch(result.summary, /旧的统一错误提示|本次未生成 AI 讲解/)
+    assert.deepEqual(result.sections, [])
+  }
+  const unknown = teacher.normalizeResult({ action: 'explain_correct', from_fallback: true,
+    fallback_reason: 'new_server_reason', summary: '任意内部错误详情' })
+  assert.doesNotMatch(unknown.summary, /任意内部错误详情/)
+})
+
 test('a long summary and a four-character opening fragment do not constitute a lesson', () => {
   for (const action of ['explain_correct', 'core_concept', 'high_frequency_traps', 'connect_knowledge']) {
     const result = teacher.normalizeResult({
@@ -231,7 +255,7 @@ test('a long summary and a four-character opening fragment do not constitute a l
       sections: [{ heading: '第一步：确定适用公式——无噪声→奈奎斯特定理', points: ['题干明确'] }],
     })
     assert.equal(result.fromFallback, true, action)
-    assert.match(result.summary, /不完整/)
+    assert.match(result.summary, /未收到可展示的讲解正文/)
     assert.deepEqual(result.sections, [])
   }
 })

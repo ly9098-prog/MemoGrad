@@ -17,13 +17,17 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.gateway import chat_with_db_model
+from app.ai.client import ChatCompletionCancelled
+from app.ai.gateway import LLMRuntimeConfig, chat_with_db_model
 from app.ai.prompts_408_teacher import (
     ACTION_DEFINITIONS,
+    ACTION_OUTPUT_TOKENS,
+    BODY_REPAIR_OUTPUT_TOKENS,
     PROMPT_VERSION,
     action_items,
     build_408_teacher_prompt,
 )
+from app.core.log_context import log_event
 from app.core.subject_scope import selected_408_subject_ids
 from app.models.admin import QuestionVersion, QuestionVersionKnowledgePoint, Subject
 from app.models.error_diagnosis import WrongQuestionErrorDiagnosis
@@ -47,10 +51,31 @@ from app.services.ai_learning_service import (
     reserve_token_budget,
     settle_token_reservation,
 )
+from app.services.ai_token_budget import TokenReservation
 from app.utils.answer_normalizer import normalize_choice_answer
 
 logger = logging.getLogger(__name__)
 
+_MAX_RESPONSE_CHARS = 32000
+
+_FALLBACK_MESSAGES = {
+    "budget_exhausted": "AI 调用额度不足，可先查看题库解析。",
+    "service_unavailable": "AI 老师暂不可用，可先查看题库解析。",
+    "output_truncated": "AI 讲解达到输出长度上限，内容未完整生成，请重新尝试。",
+    "content_filtered": "AI 输出被服务商安全策略过滤，未获得可展示的讲解。",
+    "invalid_format": "AI 返回格式异常，可先查看题库解析。",
+    "invalid_options": "AI 返回的逐项内容不完整或与标准答案不一致。",
+    "invalid_question": "AI 未生成含答案和解析的可校验单选题，请重新尝试。",
+    "missing_body": "未收到可展示的讲解正文，请重新尝试。",
+}
+
+_UNFINISHED_REASONS = {
+    "length": "output_truncated",
+    "max_tokens": "output_truncated",
+    "content_filter": "content_filtered",
+    "tool_calls": "invalid_format",
+    "function_call": "invalid_format",
+}
 
 _RELATION_LABELS = {
     "prerequisite": "前置知识",
@@ -350,7 +375,10 @@ def _clean_points(
 
 
 def _analysis_text_points(
-    value: object, *, max_items: int = 5, item_limit: int = 800
+    value: object,
+    *,
+    max_items: int | None = None,
+    item_limit: int = _MAX_RESPONSE_CHARS,
 ) -> list[str]:
     if isinstance(value, list):
         result: list[str] = []
@@ -362,34 +390,30 @@ def _analysis_text_points(
                     or raw.get("point")
                     or raw.get("description")
                 )
-                text = _clean_str(preferred, item_limit) if preferred else ""
+                text = (
+                    _clean_str(preferred, item_limit)
+                    if isinstance(preferred, str)
+                    else ""
+                )
             else:
-                text = _clean_str(raw, item_limit)
+                text = _clean_str(raw, item_limit) if isinstance(raw, str) else ""
             if text:
                 result.append(text)
-            if len(result) >= max_items:
+            if max_items is not None and len(result) >= max_items:
                 break
         return result
     if isinstance(value, dict):
         preferred = (
             value.get("text")
             or value.get("content")
-            or value.get("summary")
+            or value.get("point")
             or value.get("description")
             or value.get("reason")
         )
-        if preferred:
+        if isinstance(preferred, str):
             return [_clean_str(preferred, item_limit)]
-        result: list[str] = []
-        for raw in value.values():
-            if isinstance(raw, (str, int, float, bool)):
-                text = _clean_str(raw, item_limit)
-                if text:
-                    result.append(text)
-            if len(result) >= max_items:
-                break
-        return result
-    text = _clean_str(value, item_limit)
+        return []
+    text = _clean_str(value, item_limit) if isinstance(value, str) else ""
     return [text] if text else []
 
 
@@ -488,7 +512,11 @@ def _normalize_generated_question(value: object, action: str) -> dict[str, Any] 
     if answer not in options:
         answer = ""
     stem = _sanitize_user_text(value.get("stem"), 3000)
-    if not stem or len(options) < 2 or not answer:
+    analysis_raw = value.get("analysis")
+    analysis = (
+        _sanitize_user_text(analysis_raw, 3000) if isinstance(analysis_raw, str) else ""
+    )
+    if not stem or len(options) < 2 or not answer or not analysis:
         return None
     try:
         difficulty_delta = int(
@@ -501,7 +529,7 @@ def _normalize_generated_question(value: object, action: str) -> dict[str, Any] 
         "stem": stem,
         "options": options,
         "answer": answer,
-        "analysis": _sanitize_user_text(value.get("analysis"), 3000),
+        "analysis": analysis,
         "difficulty_delta": difficulty_delta,
     }
 
@@ -520,31 +548,32 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
         heading = _sanitize_user_text(raw.get("heading"), 120)
         points: list[str] = []
         raw_points = raw.get("points")
+        if isinstance(raw_points, (str, dict)):
+            raw_points = [raw_points]
         for point in raw_points if isinstance(raw_points, list) else []:
-            nested = _structured_analysis_sections(point)
+            if isinstance(point, str):
+                decoded = _parse_json_object(point)
+                if decoded is not None:
+                    point = decoded
+            nested = _structured_analysis_sections(point, allow_unknown_fields=False)
             if nested:
                 sections.extend(nested)
                 continue
-            text = _sanitize_user_text(point, 500)
-            if text:
-                points.append(text)
-            if len(points) >= 5:
-                break
+            for text in _analysis_text_points(point):
+                text = _sanitize_user_text(text, _MAX_RESPONSE_CHARS)
+                if text:
+                    points.append(text)
         if heading or points:
             if points:
                 sections.append({"heading": heading, "points": points})
-        if len(sections) >= 8:
-            break
 
     deduped_sections: list[dict[str, Any]] = []
     seen: set[tuple[str, tuple[str, ...]]] = set()
     for section in sections:
         heading = _sanitize_user_text(section.get("heading"), 120)
         points = [
-            _sanitize_user_text(point, 500)
-            for point in _analysis_text_points(
-                section.get("points"), max_items=5, item_limit=500
-            )
+            _sanitize_user_text(point, _MAX_RESPONSE_CHARS)
+            for point in _analysis_text_points(section.get("points"))
         ]
         points = [point for point in points if point]
         if not points:
@@ -554,8 +583,6 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
             continue
         seen.add(key)
         deduped_sections.append({"heading": heading, "points": points})
-        if len(deduped_sections) >= 8:
-            break
 
     knowledge_points: list[dict[str, str]] = []
     raw_knowledge = value.get("knowledge_points")
@@ -1097,21 +1124,113 @@ def _fallback_payload(
     *,
     action: str,
     reason: str,
+    message: str | None = None,
 ) -> dict[str, Any]:
     meta = ACTION_DEFINITIONS[action]
+    log_event(
+        logger,
+        "ai.408_teacher.fallback",
+        action=action,
+        reason=reason,
+        prompt_version=PROMPT_VERSION,
+    )
     return {
         "title": "逐项讲解暂不可用" if action == "explain_options" else meta["label"],
-        "summary": _sanitize_user_text(
-            f"{reason} 本次未生成逐项讲解，请稍后重试；可返回查看题库解析。"
-            if action == "explain_options"
-            else f"{reason} 本次未生成 AI 讲解，请稍后重试；可返回查看题库解析。",
-            1200,
-        ),
+        "summary": message or _FALLBACK_MESSAGES[reason],
+        "fallback_reason": reason,
         "sections": [],
         "knowledge_points": [],
         "practice_question": None,
         "next_action": {"type": "none", "label": "", "params": {}},
     }
+
+
+async def _call_teacher_with_usage(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    question_id: int,
+    question_version_id: int,
+    action: str,
+    messages: list[dict[str, str]],
+    runtime: LLMRuntimeConfig,
+    reservation: TokenReservation,
+    timeout: float,
+    max_tokens: int,
+    deadline: float | None = None,
+) -> dict[str, Any] | None:
+    started_at = time.time()
+    cancellation = None
+    if deadline is None:
+        deadline = time.monotonic() + timeout
+    try:
+        result = await chat_with_db_model(
+            db,
+            messages,
+            feature="analysis",
+            temperature=0.2,
+            timeout=timeout,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+            prefer_direct_answer=True,
+            runtime=runtime,
+            deadline=deadline,
+        )
+    except ChatCompletionCancelled as exc:
+        # The client has joined its transport; settle in this request's session
+        # before propagating cancellation. Unknown usage keeps the hold rather
+        # than inventing a zero charge for a possibly billed request.
+        if exc.result is None:
+            raise
+        result = exc.result
+        cancellation = exc
+    except (AnalysisUnavailableError, asyncio.CancelledError):
+        await cancel_token_reservation(reservation)
+        raise
+    except Exception as exc:
+        await cancel_token_reservation(reservation)
+        await note_failure(runtime, exc)
+        logger.warning(
+            "408 teacher call failed uid=%s qid=%s action=%s",
+            user_id,
+            question_id,
+            action,
+            exc_info=True,
+        )
+        return None
+    if result is None:
+        await cancel_token_reservation(reservation)
+        return None
+
+    async def bill_response() -> None:
+        # Protect the whole accounting phase, including commit and settlement.
+        # The parent always joins this task before its request session can close.
+        try:
+            await note_success(runtime, started_at=started_at)
+            await record_token_usage(
+                db,
+                user_id,
+                f"408_teacher:{action}",
+                f"question_id={question_id} question_version_id={question_version_id} action={action}",
+                str(result.get("content") or ""),
+                result,
+            )
+        finally:
+            await settle_token_reservation(reservation, result.get("tokens_used", 0))
+
+    billing = asyncio.create_task(bill_response())
+    while True:
+        try:
+            await asyncio.shield(billing)
+            break
+        except asyncio.CancelledError as exc:
+            if billing.cancelled():
+                raise
+            if cancellation is None:
+                cancellation = exc
+    if cancellation is not None:
+        raise cancellation
+    return result
 
 
 async def run_teacher_action(
@@ -1235,15 +1354,16 @@ async def run_teacher_action(
         "personalization": personalization,
     }
 
+    max_output_tokens = ACTION_OUTPUT_TOKENS[action]
     reservation = await reserve_token_budget(
         db,
         user_id,
-        estimate_chat_token_reservation(messages, max_output_tokens=1400),
+        estimate_chat_token_reservation(messages, max_output_tokens=max_output_tokens),
     )
     if reservation is None:
         fallback = _fallback_payload(
             action=action,
-            reason="今日 AI 调用额度已用尽，可先查看题库解析与知识点。",
+            reason="budget_exhausted",
         )
         return {**base, **fallback, "tokens_used": 0, "from_fallback": True}
 
@@ -1252,89 +1372,95 @@ async def run_teacher_action(
     except (Exception, asyncio.CancelledError):
         await cancel_token_reservation(reservation)
         raise
-    started_at = time.time()
-    try:
-        result = await chat_with_db_model(
+    deadline = time.monotonic() + 45
+    tokens_used = 0
+    for attempt in range(2):
+        result = await _call_teacher_with_usage(
             db,
-            messages,
-            feature="analysis",
-            temperature=0.2,
-            timeout=45,
-            max_tokens=1400,
-            response_format={"type": "json_object"},
-            prefer_direct_answer=True,
+            user_id=user_id,
+            question_id=question_id,
+            question_version_id=int(revision.id),
+            action=action,
+            messages=messages,
             runtime=teacher_runtime,
+            reservation=reservation,
+            timeout=max(0.001, deadline - time.monotonic()),
+            max_tokens=max_output_tokens,
+            deadline=deadline,
         )
-        if result is not None:
-            await note_success(teacher_runtime, started_at=started_at)
-    except AnalysisUnavailableError:
-        raise
-    except Exception as exc:
-        await note_failure(teacher_runtime, exc)
-        logger.warning(
-            "408 teacher call failed uid=%s qid=%s action=%s",
-            user_id,
-            question_id,
-            action,
-            exc_info=True,
-        )
-        result = None
-    else:
         if result is None:
-            await cancel_token_reservation(reservation)
-
-    if result is None:
-        fallback = _fallback_payload(
-            action=action,
-            reason="AI 老师暂不可用，可先查看题库解析。",
+            return {
+                **base,
+                **_fallback_payload(action=action, reason="service_unavailable"),
+                "tokens_used": tokens_used,
+                "from_fallback": True,
+            }
+        tokens_used += int(result.get("tokens_used") or 0)
+        fallback_reason = _UNFINISHED_REASONS.get(result.get("finish_reason"))
+        fallback_message = None
+        if result.get("finish_reason") in {"tool_calls", "function_call"}:
+            fallback_message = "AI 返回了工具调用，未返回本次所需的讲解。"
+        content = str(result.get("content") or "")
+        if fallback_reason is None:
+            if not content.strip():
+                fallback_reason = "missing_body"
+                fallback_message = "AI 未返回讲解内容，请重新尝试。"
+            elif len(content) > _MAX_RESPONSE_CHARS:
+                fallback_reason = "invalid_format"
+                fallback_message = "AI 返回内容超出可处理范围，请重新尝试。"
+        if fallback_reason:
+            return {
+                **base,
+                **_fallback_payload(
+                    action=action, reason=fallback_reason, message=fallback_message
+                ),
+                "tokens_used": tokens_used,
+                "from_fallback": True,
+            }
+        parsed = _parse_json_object(
+            content,
+            allow_option_array=action == "explain_options",
+            allow_single_object_array=True,
         )
-        return {**base, **fallback, "tokens_used": 0, "from_fallback": True}
-
-    # Count every successful provider call, including malformed structured
-    # output. Otherwise repeated JSON failures could consume provider tokens
-    # without ever affecting the user's daily/monthly budget.
-    await record_token_usage(
-        db,
-        user_id,
-        f"408_teacher:{action}",
-        f"question_id={question_id} question_version_id={revision.id} action={action}",
-        str(result.get("content") or ""),
-        result,
-    )
-    await settle_token_reservation(reservation, result.get("tokens_used", 0))
-
-    if result.get("finish_reason") in {
-        "length",
-        "max_tokens",
-        "content_filter",
-        "tool_calls",
-        "function_call",
-    }:
-        return {
-            **base,
-            **_fallback_payload(
-                action=action, reason="AI 讲解未完整生成，请重新尝试。"
+        if parsed is None:
+            return {
+                **base,
+                **_fallback_payload(action=action, reason="invalid_format"),
+                "tokens_used": tokens_used,
+                "from_fallback": True,
+            }
+        # Only the observed title+summary-only defect gets one paid repair.
+        # Never retry truncation, filtering, empty output, arbitrary schemas or fragments.
+        repairable = (
+            action in {"explain_correct", "core_concept", "high_frequency_traps"}
+            and set(parsed).issubset({"title", "summary"})
+            and isinstance(parsed.get("summary"), str)
+            and bool(parsed["summary"].strip())
+            and not parsed["summary"].lstrip().startswith(("{", "["))
+        )
+        if attempt or not repairable or deadline - time.monotonic() < 5:
+            break
+        messages = build_408_teacher_prompt(
+            action=action, context=context, body_only=True
+        )
+        max_output_tokens = BODY_REPAIR_OUTPUT_TOKENS
+        reservation = await reserve_token_budget(
+            db,
+            user_id,
+            estimate_chat_token_reservation(
+                messages, max_output_tokens=max_output_tokens
             ),
-            "tokens_used": int(result.get("tokens_used") or 0),
-            "from_fallback": True,
-        }
-
-    parsed = _parse_json_object(
-        result.get("content"),
-        allow_option_array=action == "explain_options",
-        allow_single_object_array=True,
-    )
-    if parsed is None:
-        fallback = _fallback_payload(
-            action=action,
-            reason="AI 返回格式异常，可先查看题库解析。",
         )
-        return {
-            **base,
-            **fallback,
-            "tokens_used": int(result.get("tokens_used") or 0),
-            "from_fallback": True,
-        }
+        if reservation is None:
+            return {
+                **base,
+                **_fallback_payload(action=action, reason="budget_exhausted"),
+                "tokens_used": tokens_used,
+                "from_fallback": True,
+            }
+        if deadline - time.monotonic() < 5:
+            await cancel_token_reservation(reservation)
+            break
 
     normalized = _normalize_ai_payload(parsed, action)
     if action == "explain_options":
@@ -1344,9 +1470,9 @@ async def run_teacher_action(
                 **base,
                 **_fallback_payload(
                     action=action,
-                    reason="AI 返回的逐项内容不完整或与标准答案不一致。",
+                    reason="invalid_options",
                 ),
-                "tokens_used": int(result.get("tokens_used") or 0),
+                "tokens_used": tokens_used,
                 "from_fallback": True,
             }
         normalized.update(
@@ -1363,28 +1489,26 @@ async def run_teacher_action(
     ):
         fallback = _fallback_payload(
             action=action,
-            reason="AI 未生成可校验的单选题，请稍后重试。",
+            reason="invalid_question",
         )
         return {
             **base,
             **fallback,
-            "tokens_used": int(result.get("tokens_used") or 0),
+            "tokens_used": tokens_used,
             "from_fallback": True,
         }
 
     if not _has_teaching_body(normalized, action):
         return {
             **base,
-            **_fallback_payload(
-                action=action, reason="AI 返回的讲解内容不完整，请重新尝试。"
-            ),
-            "tokens_used": int(result.get("tokens_used") or 0),
+            **_fallback_payload(action=action, reason="missing_body"),
+            "tokens_used": tokens_used,
             "from_fallback": True,
         }
 
     return {
         **base,
         **normalized,
-        "tokens_used": int(result.get("tokens_used") or 0),
+        "tokens_used": tokens_used,
         "from_fallback": False,
     }

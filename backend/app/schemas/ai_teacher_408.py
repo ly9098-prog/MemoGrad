@@ -89,3 +89,11 @@ class AITeacher408Response(BaseModel):
     )
     tokens_used: int = 0
     from_fallback: bool = False
+    # Optional for older success/fallback payloads; clients must tolerate future codes.
+    fallback_reason: str | None = Field(
+        default=None,
+        description=(
+            "降级原因码：output_truncated/content_filtered/invalid_format/missing_body/"
+            "invalid_options/invalid_question/budget_exhausted/service_unavailable"
+        ),
+    )

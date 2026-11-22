@@ -6,6 +6,38 @@ const { test } = require('node:test')
 
 const root = path.resolve(__dirname, '../subpackages/study/practice-result')
 
+if (process.argv[2]) test('native teacher chooser, loading, result and failure retain distinct views', () => {
+  const context = vm.createContext({ window: { __webview_engine_version__: 0.02 }, console })
+  vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), context)
+  const render = context.$gwx('subpackages/study/practice-result/index.wxml')
+  const all = node => [node, ...(node.children || []).flatMap(child => child && typeof child === 'object' ? all(child) : [])]
+  const base = { ...fixture().page.data, teacherSheetVisible: true,
+    teacherResult: { title: '正确项讲解', summary: '依据题设可以判断。', sections: [], knowledgePoints: [] } }
+  const classes = tree => all(tree).map(node => (node.attr || {}).class).filter(Boolean).join(' ')
+  const chooser = render({ ...base, teacherChoosingAction: true })
+  assert.match(classes(chooser), /teacher-action-panel/)
+  assert.doesNotMatch(classes(chooser), /teacher-summary-card/)
+  const choices = all(chooser).filter(node => (node.attr || {}).bindtap === 'select408TeacherAction')
+  assert.equal(choices.length, base.teacherActions.length)
+  assert.deepEqual(choices.map(node => node.attr['data-action']), base.teacherActions.map(item => item.action))
+  assert.equal(all(chooser).find(node => (node.attr || {}).bindtap === 'cancel408TeacherActions').children.join(''), '返回当前讲解')
+  const loading = render({ ...base, teacherResult: null, teacherLoading: true })
+  assert.match(classes(loading), /teacher-sheet-loading/)
+  assert.doesNotMatch(classes(loading), /teacher-action-panel/)
+  const failed = render({ ...base, teacherResult: { ...base.teacherResult, fromFallback: true } })
+  assert.doesNotMatch(classes(failed), /teacher-footnote/)
+  assert.ok(all(failed).some(node => (node.attr || {}).bindtap === 'retry408Teacher'))
+  assert.match(classes(render(base)), /teacher-footnote/)
+  const { presentTeacherResult } = require('../subpackages/study/utils/teacher-presentation')
+  const variables = render({ ...base, teacherResult: presentTeacherResult({ ...base.teacherResult,
+    knowledgePoints: [{ name: 'KMP', relation: 'prerequisite: KMP 使用 next[j] 回退；并查集使用 parent[i]；child = next[j]。' }],
+  }) })
+  const visibleText = all(variables).flatMap(node => (node.children || []).filter(child => typeof child === 'string')).join(' ')
+  assert.ok(visibleText.includes('next[j]'))
+  assert.ok(visibleText.includes('parent[i]'))
+  assert.ok(visibleText.includes('child = next[j]'))
+})
+
 function fixture() {
   let definition
   const calls = []
@@ -231,12 +263,98 @@ test('teacher error retries the same action while loading locks the chooser and 
   resolve({ action: 'explain_correct', title: '正确选项', sections: [{ heading: '推导', points: ['根据题设可得 A'] }] })
   await pending
   assert.equal(page.data.teacherResult.title, '正确选项')
+  const currentResult = page.data.teacherResult
   page.show408TeacherActions()
-  assert.equal(page.data.teacherResult, null)
+  assert.equal(page.data.teacherResult, currentResult, 'the chooser preserves the current lesson for cancel')
+  assert.equal(page.data.teacherChoosingAction, true)
   assert.equal(page.data.teacherErrorText, '')
   assert.equal(page.data.teacherSheetVisible, true)
+  page.cancel408TeacherActions()
+  assert.equal(page.data.teacherChoosingAction, false)
+  assert.equal(page.data.teacherResult, currentResult)
   await page.run408TeacherFromReview('explain_correct')
   assert.equal(sent.length, 1, 'returning to a successful action retains the existing result cache')
+})
+
+test('selecting a lecture style starts a fresh request even when that style was cached', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42, status: 'correct' }
+  let posts = 0, finish
+  api.post = async (_url, payload) => {
+    posts++
+    if (posts === 2) await new Promise(resolve => { finish = resolve })
+    return { action: payload.action, sections: [{ heading: '判断依据', points: [`第${posts}次：由题设条件可得正确答案。`] }] }
+  }
+  await page.run408TeacherFromReview('explain_correct')
+  page.show408TeacherActions()
+  const pending = page.select408TeacherAction({ currentTarget: { dataset: { action: 'explain_correct' } } })
+  assert.equal(page.data.teacherLoading, true)
+  assert.equal(page.data.teacherChoosingAction, false)
+  assert.equal(page.data.teacherResult, null)
+  assert.equal(page.data.teacherSheetVisible, true)
+  await new Promise(done => setImmediate(done))
+  assert.equal(posts, 2)
+  finish()
+  await pending
+  assert.equal(page.data.teacherLoading, false)
+  assert.match(page.data.teacherResult.sections[0].points[0], /第2次/)
+  await page.run408TeacherFromReview('explain_correct')
+  assert.equal(posts, 2, 'reopening the lesson reuses the newly completed result')
+})
+
+test('a failed fresh lecture retries the provider instead of falling back to the old cached success', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42, status: 'correct' }
+  let posts = 0
+  api.post = async (_url, payload) => {
+    posts++
+    return posts === 2 ? { action: payload.action, from_fallback: true } : {
+      action: payload.action, sections: [{ heading: '依据', points: ['题设条件满足公式要求，因此该项正确。'] }],
+    }
+  }
+  await page.run408TeacherFromReview('explain_correct')
+  page.show408TeacherActions()
+  await page.select408TeacherAction({ currentTarget: { dataset: { action: 'explain_correct' } } })
+  assert.equal(page.data.teacherResult.fromFallback, true)
+  await page.retry408Teacher()
+  assert.equal(posts, 3)
+  assert.equal(page.data.teacherResult.fromFallback, false)
+})
+
+test('practice teacher reuses the wrong-detail knowledge presentation', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42 }
+  api.post = async () => ({ action: 'connect_knowledge', knowledge_points: [{
+    name: '中断', relation: 'prerequisite: 指令周期', mastery_hint: 'mastery=0.6;复习响应时机',
+  }] })
+  await page.run408TeacherFromReview('connect_knowledge')
+  const point = page.data.teacherResult.knowledgePoints[0]
+  assert.equal(point.relationItems[0].label, '前置知识')
+  assert.equal(point.relationItems[0].value, '指令周期')
+  assert.match(point.masteryText, /掌握/)
+  assert.doesNotMatch([point.relationText, point.masteryText, point.learningHint].join(' '), /prerequisite|mastery=/)
+})
+
+test('shared teacher presentation preserves algorithm variables in all teaching text', () => {
+  const { presentTeacherResult } = require('../subpackages/study/utils/teacher-presentation')
+  const text = 'KMP 使用 next[j] 回退；并查集使用 parent[i] 表示父节点；child = next[j]。'
+  const result = presentTeacherResult({ title: 'next 数组', summary: text,
+    sections: [{ heading: 'parent[i] 的含义', points: [text] }],
+    knowledgePoints: [{ name: 'KMP 的 next 数组', relation: `prerequisite: ${text}`,
+      masteryHint: `mastery=0.6;${text}` }],
+  })
+  assert.equal(result.title, 'next 数组')
+  assert.equal(result.summary, text)
+  assert.equal(result.sections[0].heading, 'parent[i] 的含义')
+  assert.equal(result.sections[0].points[0], text)
+  assert.equal(result.knowledgePoints[0].name, 'KMP 的 next 数组')
+  assert.equal(result.knowledgePoints[0].relationItems[0].label, '前置知识')
+  const relationText = [result.knowledgePoints[0].relationItems[0].value,
+    result.knowledgePoints[0].relationText].join(' ')
+  assert.ok(relationText.includes('next[j]'))
+  assert.ok(relationText.includes('parent[i]'))
+  assert.ok(relationText.includes('child = next[j]'))
+  assert.equal(result.knowledgePoints[0].learningHint, text)
 })
 
 test('teacher cannot generate after changing the reviewed question during the health query', async () => {

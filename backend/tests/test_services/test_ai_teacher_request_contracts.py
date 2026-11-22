@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -9,6 +10,30 @@ import pytest
 
 from app.services import ai_teacher_408_service as svc
 from app.services.ai import analysis_availability
+
+
+@pytest.fixture
+def real_teacher_gateway(prepared_teacher, monkeypatch):
+    """Keep the gateway/client/slot real; isolate network and billing storage."""
+    from app.ai import client as client_module
+    from app.ai import gateway
+    from app.core.ai_runtime_guard import AIRuntimeGuard
+
+    state = prepared_teacher
+    state.guard = AIRuntimeGuard()
+    monkeypatch.setattr(state.guard, "enforce_rate_limit", state.quota)
+    monkeypatch.setattr(client_module.settings, "AI_MAX_CONCURRENCY", 1)
+    monkeypatch.setattr(client_module.settings, "AI_QUEUE_WAIT_TIMEOUT_SEC", 1)
+    monkeypatch.setattr(client_module, "ai_runtime_guard", state.guard)
+    monkeypatch.setattr(gateway, "llm", client_module.OpenAICompatibleClient())
+    monkeypatch.setattr(svc, "chat_with_db_model", gateway.chat_with_db_model)
+    state.runtime = gateway.LLMRuntimeConfig(
+        api_key="synthetic-test-key",
+        base_url="https://provider.example/v1",
+        model_name="test-model",
+        provider="openai_compatible",
+    )
+    return state
 
 
 @pytest.fixture
@@ -121,6 +146,7 @@ async def test_teacher_uses_server_fact_and_records_usage_before_parsing(
     prepared_teacher, monkeypatch
 ):
     state = prepared_teacher
+    started = svc.time.monotonic()
     original_parse = svc._parse_json_object
 
     def parse(value, **kwargs):
@@ -140,12 +166,16 @@ async def test_teacher_uses_server_fact_and_records_usage_before_parsing(
     assert kwargs == {
         "feature": "analysis",
         "temperature": 0.2,
-        "timeout": 45,
-        "max_tokens": 1400,
+        "timeout": pytest.approx(45, abs=0.05),
+        "max_tokens": 2400,
         "response_format": {"type": "json_object"},
         "prefer_direct_answer": True,
         "runtime": state.runtime,
+        "deadline": pytest.approx(started + 45, abs=0.05),
     }
+    assert state.reserve.await_args.args[2] == svc.estimate_chat_token_reservation(
+        state.provider.await_args.args[1], max_output_tokens=kwargs["max_tokens"]
+    )
     context = state.contexts[0]
     assert context["question"]["question_version_id"] == 11
     assert context["question"]["stem"] == "server stem"
@@ -201,9 +231,9 @@ async def test_teacher_fallbacks_preserve_usage_and_action_boundaries(
     else:
         state.usage.assert_not_awaited()
         assert result["tokens_used"] == 0
-    if scenario == "unavailable":
+    if scenario in {"unavailable", "exception"}:
         state.cancel.assert_awaited_once()
-    elif scenario in {"quota", "exception"}:
+    elif scenario == "quota":
         state.cancel.assert_not_awaited()
     assert svc.note_failure.await_count == (1 if scenario == "exception" else 0)
 
@@ -264,6 +294,9 @@ async def test_teacher_cancellation_and_usage_failure_propagate(
         )
     if failure is asyncio.CancelledError:
         state.usage.assert_not_awaited()
+        state.cancel.assert_awaited_once()
+    else:
+        state.settle.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -349,7 +382,8 @@ async def test_option_fallback_does_not_relabel_generic_analysis_as_option_expla
     assert result["from_fallback"] is True
     assert result["title"] == "逐项讲解暂不可用"
     assert state.revision.analysis not in result["summary"]
-    assert "未生成逐项讲解" in result["summary"]
+    assert result["fallback_reason"] == "service_unavailable"
+    assert result["summary"] == "AI 老师暂不可用，可先查看题库解析。"
     assert result["sections"] == []
 
 
@@ -484,7 +518,7 @@ def test_option_prompt_requests_one_minimal_json_envelope():
     assert set(schema) == {"option_explanations"}
     assert set(schema["option_explanations"][0]) == {"option", "is_correct", "reason"}
     assert "不要直接返回数组" in system
-    assert PROMPT_VERSION == "408-teacher-v8-substantive-action-body"
+    assert PROMPT_VERSION == "408-teacher-v9-compact-action-output"
 
 
 @pytest.mark.asyncio
@@ -546,10 +580,13 @@ async def test_teacher_rejects_summary_without_action_body(prepared_teacher, act
     )
     assert result["from_fallback"] is True
     assert result["sections"] == []
-    assert "不完整" in result["summary"]
+    assert result["fallback_reason"] == "missing_body"
     assert "再由公式" not in result["summary"]
-    state.usage.assert_awaited_once()
-    state.settle.assert_awaited_once()
+    attempts = 1 if action == "connect_knowledge" else 2
+    assert state.provider.await_count == attempts
+    assert state.usage.await_count == attempts
+    assert state.settle.await_count == attempts
+    assert result["tokens_used"] == 21 * attempts
 
 
 @pytest.mark.asyncio
@@ -580,7 +617,7 @@ async def test_teacher_rejects_opening_fragment_despite_long_summary(
     )
     assert result["from_fallback"] is True
     assert result["sections"] == []
-    assert "不完整" in result["summary"]
+    assert result["fallback_reason"] == "missing_body"
     state.provider.assert_awaited_once()
     state.usage.assert_awaited_once()
     state.settle.assert_awaited_once()
@@ -726,7 +763,7 @@ async def test_teacher_rejects_empty_or_echoed_lessons(
         state.db, user_id=3, question_id=7, action=action
     )
     assert result["from_fallback"] is True
-    assert "未生成 AI 讲解" in result["summary"]
+    assert result["fallback_reason"] == "missing_body"
     assert state.revision.analysis not in result["summary"]
     assert not result["sections"]
     assert not result["knowledge_points"]
@@ -748,7 +785,7 @@ async def test_explanation_failure_preserves_reason_instead_of_bank_analysis(
     if scenario == "quota":
         state.reserve.side_effect = None
         state.reserve.return_value = None
-        reason = "今日 AI 调用额度已用尽"
+        reason = "AI 调用额度不足"
     elif scenario == "unavailable":
         state.provider.return_value = None
         reason = "AI 老师暂不可用"
@@ -764,7 +801,10 @@ async def test_explanation_failure_preserves_reason_instead_of_bank_analysis(
     )
     assert result["from_fallback"] is True
     assert reason in result["summary"]
-    assert "未生成 AI 讲解" in result["summary"]
+    assert result["fallback_reason"] == {
+        "quota": "budget_exhausted",
+        "unavailable": "service_unavailable",
+    }.get(scenario, "invalid_format")
     assert state.revision.analysis not in result["summary"]
     assert result["sections"] == []
 
@@ -773,3 +813,677 @@ async def test_explanation_failure_preserves_reason_instead_of_bank_analysis(
 def test_all_teacher_prompts_require_a_single_root_object(action):
     system = svc.build_408_teacher_prompt(action=action, context={})[0]["content"]
     assert "不要直接返回数组" in system
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shape", ["string", "text_object", "content_object"])
+async def test_teacher_preserves_text_body_in_compatible_points_shapes(
+    prepared_teacher, shape
+):
+    state = prepared_teacher
+    body = "无噪声信道使用奈奎斯特公式，代入带宽和电平数可得传输速率。"
+    points = body if shape == "string" else [{shape.removesuffix("_object"): body}]
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"sections": [{"heading": "推导", "points": points}]}),
+        "finish_reason": "stop",
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is False
+    assert result["sections"] == [{"heading": "推导", "points": [body]}]
+
+
+@pytest.mark.asyncio
+async def test_teacher_does_not_silently_cut_long_points_or_final_steps(
+    prepared_teacher,
+):
+    state = prepared_teacher
+    points = ["具体推导过程。" * 80 + "最终结论为选项 A。"]
+    points.extend(f"第 {i} 步：核对必要条件。" for i in range(1, 7))
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"sections": [{"heading": "推导", "points": points}]}),
+        "finish_reason": "stop",
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is False
+    assert result["sections"] == [{"heading": "推导", "points": points}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("finish_reason", "code", "message"),
+    [
+        ("length", "output_truncated", "输出长度上限"),
+        ("max_tokens", "output_truncated", "输出长度上限"),
+        ("content_filter", "content_filtered", "安全策略"),
+        ("tool_calls", "invalid_format", "工具调用"),
+        ("function_call", "invalid_format", "工具调用"),
+    ],
+)
+async def test_teacher_fallback_reports_actual_provider_stop_reason(
+    prepared_teacher, finish_reason, code, message
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": "{",
+        "finish_reason": finish_reason,
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["fallback_reason"] == code
+    assert message in result["summary"]
+    assert result["summary"].count("请稍后重试") <= 1
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("summary_only", [False, True])
+async def test_teacher_does_not_promote_nested_metadata_to_body(
+    prepared_teacher, summary_only
+):
+    state = prepared_teacher
+    metadata = {"title": "看似完整的标题", "summary": "仅有概括而没有独立推导依据。"}
+    if not summary_only:
+        metadata = {"unexpected": "任意元数据字段不应被当成讲解。"}
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(
+            {"sections": [{"heading": "推导", "points": [metadata]}]}
+        ),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("analysis", [None, "", "   ", {}, ["摘要"]])
+async def test_teacher_generated_question_requires_explanation(
+    prepared_teacher, analysis
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(
+            {
+                "practice_question": {
+                    "stem": "问题？",
+                    "options": {"A": "一", "B": "二"},
+                    "answer": "A",
+                    "analysis": analysis,
+                }
+            }
+        ),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="similar_question"
+    )
+    assert result["from_fallback"] is True
+    assert result["practice_question"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", ["", "  \n  ", " " * 32001])
+async def test_teacher_rejects_empty_response_even_after_normal_stop(
+    prepared_teacher, content
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": content,
+        "finish_reason": "stop",
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["fallback_reason"] == "missing_body"
+    assert result["summary"] == "AI 未返回讲解内容，请重新尝试。"
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_teacher_rejects_oversized_output_without_showing_partial_body(
+    prepared_teacher,
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps({"sections": [{"points": ["x" * 32001]}]}),
+        "finish_reason": "stop",
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["fallback_reason"] == "invalid_format"
+    assert result["sections"] == []
+    assert "超出可处理范围" in result["summary"]
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+
+
+@pytest.mark.parametrize("action", list(svc.ACTION_DEFINITIONS))
+def test_teacher_prompt_only_requests_fields_used_by_selected_action(action):
+    system = svc.build_408_teacher_prompt(action=action, context={})[0]["content"]
+    schema, _ = json.JSONDecoder().raw_decode(system[system.index("{") :])
+    if action == "explain_options":
+        expected = {"option_explanations"}
+    elif action in {"similar_question", "harder_question"}:
+        expected = {"title", "practice_question"}
+    elif action == "connect_knowledge":
+        expected = {"title", "knowledge_points"}
+    else:
+        expected = {"title", "summary", "sections"}
+    assert set(schema) == expected
+
+
+@pytest.mark.asyncio
+async def test_teacher_repairs_summary_only_once_and_bills_each_response(
+    prepared_teacher,
+):
+    state = prepared_teacher
+    state.provider.side_effect = [
+        {
+            "content": '{"title":"编码能力","summary":"先求最小距离。"}',
+            "tokens_used": 21,
+        },
+        {
+            "content": json.dumps(
+                {
+                    "sections": [
+                        {
+                            "heading": "推导",
+                            "points": ["最小距离为四，能检出三位错误。"],
+                        }
+                    ]
+                }
+            ),
+            "tokens_used": 34,
+        },
+    ]
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is False
+    assert result["tokens_used"] == 55
+    assert (
+        state.provider.await_count
+        == state.usage.await_count
+        == state.settle.await_count
+        == 2
+    )
+    assert [call.args[0].reserved_tokens for call in state.settle.await_args_list] == [
+        1,
+        1,
+    ]
+    assert [call.args[1] for call in state.settle.await_args_list] == [21, 34]
+    assert [call.kwargs["max_tokens"] for call in state.provider.await_args_list] == [
+        2400,
+        1200,
+    ]
+    first, second = state.provider.await_args_list
+    assert 0 < second.kwargs["timeout"] <= first.kwargs["timeout"] <= 45
+    system = second.args[1][0]["content"]
+    schema, _ = json.JSONDecoder().raw_decode(system[system.index("{") :])
+    assert set(schema) == {"sections"}
+    assert "server stem" in second.args[1][1]["content"]
+    for reserve_call, provider_call in zip(
+        state.reserve.await_args_list, state.provider.await_args_list
+    ):
+        assert reserve_call.args[2] == svc.estimate_chat_token_reservation(
+            provider_call.args[1], max_output_tokens=provider_call.kwargs["max_tokens"]
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stop", ["time", "budget", "time_after_reserve"])
+async def test_teacher_skips_repair_when_time_or_budget_is_insufficient(
+    prepared_teacher, monkeypatch, stop
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": '{"title":"标题","summary":"只有摘要。"}',
+        "tokens_used": 21,
+    }
+    if stop == "budget":
+        reservation = await state.reserve()
+        state.reserve.reset_mock()
+        state.reserve.side_effect = [reservation, None]
+    else:
+        clock = iter([0, 0, 41] if stop == "time" else [0, 0, 0, 44])
+        monkeypatch.setattr(
+            svc, "time", SimpleNamespace(time=lambda: 0, monotonic=lambda: next(clock))
+        )
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_correct"
+    )
+    assert result["from_fallback"] is True
+    assert result["fallback_reason"] == (
+        "budget_exhausted" if stop == "budget" else "missing_body"
+    )
+    assert result["tokens_used"] == 21
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+    assert state.reserve.await_count == (1 if stop == "time" else 2)
+    assert state.cancel.await_count == (1 if stop == "time_after_reserve" else 0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("second", ["failure", "invalid", "filtered"])
+async def test_teacher_repair_failure_keeps_first_attempt_usage(
+    prepared_teacher, second
+):
+    state = prepared_teacher
+    response = {
+        "failure": RuntimeError("synthetic provider failure"),
+        "invalid": {"content": "invalid", "tokens_used": 12},
+        "filtered": {
+            "content": "",
+            "finish_reason": "content_filter",
+            "tokens_used": 12,
+        },
+    }[second]
+    state.provider.side_effect = [
+        {"content": '{"summary":"只有摘要。"}', "tokens_used": 21},
+        response,
+    ]
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="core_concept"
+    )
+    assert result["from_fallback"] is True
+    assert (
+        result["fallback_reason"]
+        == {
+            "failure": "service_unavailable",
+            "invalid": "invalid_format",
+            "filtered": "content_filtered",
+        }[second]
+    )
+    assert result["tokens_used"] == (21 if second == "failure" else 33)
+    assert (
+        state.usage.await_count
+        == state.settle.await_count
+        == (1 if second == "failure" else 2)
+    )
+    assert state.provider.await_count == state.reserve.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_teacher_deadline_expires_in_queue_without_dispatch_and_releases_hold(
+    real_teacher_gateway,
+    monkeypatch,
+):
+    from unittest.mock import Mock
+
+    from app.ai import client as client_module
+
+    state = real_teacher_gateway
+    transport = Mock(side_effect=AssertionError("queued request must not dispatch"))
+    monkeypatch.setattr(client_module, "request_remote_bytes", transport)
+    sem, _ = await state.guard.acquire_slot()
+    try:
+        result = await svc._call_teacher_with_usage(
+            state.db,
+            user_id=3,
+            question_id=7,
+            question_version_id=11,
+            action="core_concept",
+            messages=[],
+            runtime=state.runtime,
+            reservation=object(),
+            timeout=0.01,
+            max_tokens=1200,
+        )
+    finally:
+        state.guard.release_slot(sem)
+    assert result is None
+    transport.assert_not_called()
+    state.cancel.assert_awaited_once()
+    state.usage.assert_not_awaited()
+    state.settle.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_teacher_repair_cancellation_preserves_first_charge(prepared_teacher):
+    state = prepared_teacher
+    state.provider.side_effect = [
+        {"content": '{"summary":"只有摘要。"}', "tokens_used": 21},
+        asyncio.CancelledError(),
+    ]
+    with pytest.raises(asyncio.CancelledError):
+        await svc.run_teacher_action(
+            state.db, user_id=3, question_id=7, action="explain_correct"
+        )
+    assert state.provider.await_count == state.reserve.await_count == 2
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+    assert state.settle.await_args.args[1] == 21
+    state.cancel.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_inflight_teacher_cancellation_joins_transport_and_bills_real_usage(
+    real_teacher_gateway, monkeypatch, tmp_path
+):
+    from sqlalchemy import select
+
+    from app.ai import client as client_module
+    from app.models.ai_chat import AiChat
+    from app.models.user import User
+    from app.services import ai_token_budget
+    from app.services.safe_remote_fetch import RemoteResponse
+    from tests.test_services.test_exam_attempt_semantics import _make_database
+
+    state = real_teacher_gateway
+    loop = asyncio.get_running_loop()
+    started = asyncio.Event()
+    release = threading.Event()
+    requests = []
+
+    def transport(*_args, **_kwargs):
+        requests.append(1)
+        loop.call_soon_threadsafe(started.set)
+        assert release.wait(2)
+        return RemoteResponse(
+            status=200,
+            data=json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"title":"标题","summary":"只有摘要。"}'
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"total_tokens": 37},
+                }
+            ).encode(),
+            content_type="application/json",
+            final_url="https://provider.example/v1",
+        )
+
+    monkeypatch.setattr(client_module, "request_remote_bytes", transport)
+    engine, factory = await _make_database(tmp_path)
+    reservation = ai_token_budget.TokenReservation(3, 100, "test-day", "test-month")
+    state.reserve.side_effect = None
+    state.reserve.return_value = reservation
+    monkeypatch.setattr(
+        svc, "require_available_runtime", AsyncMock(return_value=state.runtime)
+    )
+    state.usage.side_effect = ai_token_budget.record_token_usage
+    state.settle.side_effect = ai_token_budget.settle_token_reservation
+    release_budget = AsyncMock()
+    monkeypatch.setattr(
+        ai_token_budget.cache, "release_token_budget_strict", release_budget
+    )
+    try:
+        async with factory() as db:
+            db.add(User(id=3, openid="cancelled-teacher-test"))
+            await db.commit()
+            task = asyncio.create_task(
+                svc.run_teacher_action(
+                    db, user_id=3, question_id=7, action="explain_correct"
+                )
+            )
+            try:
+                await asyncio.wait_for(started.wait(), 1)
+                for _ in range(2):
+                    task.cancel()
+                    await asyncio.sleep(0)
+                    await asyncio.sleep(0)
+                refunded_before_response = state.cancel.await_count
+                completed_before_response = task.done()
+                slot_free_before_response = state.guard._semaphore().locked() is False
+            finally:
+                release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        async with factory() as db:
+            rows = (await db.scalars(select(AiChat))).all()
+            assert len(rows) == 1
+            assert rows[0].user_id == 3
+            assert rows[0].tokens_used == 37
+            assert rows[0].session_type == "408_teacher:explain_correct"
+    finally:
+        release.set()
+        await engine.dispose()
+    assert refunded_before_response == 0
+    assert completed_before_response is False
+    assert slot_free_before_response is False
+    assert len(requests) == 1
+    state.reserve.assert_awaited_once()
+    state.cancel.assert_not_awaited()
+    state.usage.assert_awaited_once()
+    assert state.usage.await_args.args[-1]["tokens_used"] == 37
+    state.settle.assert_awaited_once()
+    assert state.settle.await_args.args[1] == 37
+    assert reservation.active is False
+    release_budget.assert_awaited_once_with(
+        day_key="test-day", month_key="test-month", tokens=100, actual_tokens=37
+    )
+    assert state.guard._semaphore().locked() is False
+
+
+@pytest.mark.asyncio
+async def test_teacher_queue_wait_consumes_same_transport_deadline(
+    real_teacher_gateway, monkeypatch
+):
+    from app.ai import client as client_module
+    from app.services.safe_remote_fetch import RemoteResponse
+
+    state = real_teacher_gateway
+    sem, _ = await state.guard.acquire_slot()
+    timeouts = []
+
+    def transport(*_args, **kwargs):
+        timeouts.append(kwargs["timeout"])
+        return RemoteResponse(
+            status=200,
+            data=b'{"choices":[{"message":{"content":"ok"}}],"usage":{"total_tokens":37}}',
+            content_type="application/json",
+            final_url="https://provider.example/v1",
+        )
+
+    monkeypatch.setattr(client_module, "request_remote_bytes", transport)
+    release = asyncio.get_running_loop().call_later(0.04, state.guard.release_slot, sem)
+    try:
+        result = await svc._call_teacher_with_usage(
+            state.db,
+            user_id=3,
+            question_id=7,
+            question_version_id=11,
+            action="explain_correct",
+            messages=[],
+            runtime=state.runtime,
+            reservation=object(),
+            timeout=0.15,
+            max_tokens=1200,
+        )
+    finally:
+        release.cancel()
+    assert result["tokens_used"] == 37
+    assert 0 < timeouts[0] < 0.13
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["usage", "settle"])
+async def test_teacher_billing_joins_repeated_cancellation_until_commit_and_settle(
+    prepared_teacher, monkeypatch, tmp_path, phase
+):
+    from sqlalchemy import select
+
+    from app.ai.client import ChatCompletionCancelled
+    from app.models.ai_chat import AiChat
+    from app.models.user import User
+    from app.services import ai_token_budget
+    from tests.test_services.test_exam_attempt_semantics import _make_database
+
+    state = prepared_teacher
+    result = {"content": "received response", "tokens_used": 37}
+    state.provider.side_effect = ChatCompletionCancelled(result)
+    state.usage.side_effect = ai_token_budget.record_token_usage
+    state.settle.side_effect = ai_token_budget.settle_token_reservation
+    reservation = ai_token_budget.TokenReservation(3, 100, "test-day", "test-month")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    settled = asyncio.Event()
+
+    async def release_budget(**_kwargs):
+        if phase == "settle":
+            entered.set()
+            await release.wait()
+        settled.set()
+
+    ledger = AsyncMock(side_effect=release_budget)
+    monkeypatch.setattr(ai_token_budget.cache, "release_token_budget_strict", ledger)
+    engine, factory = await _make_database(tmp_path)
+    try:
+        async with factory() as db:
+            db.add(User(id=3, openid="billing-cancellation-test"))
+            await db.commit()
+            commit = db.commit
+
+            async def delayed_commit():
+                if phase == "usage":
+                    entered.set()
+                    await release.wait()
+                await commit()
+
+            monkeypatch.setattr(db, "commit", delayed_commit)
+            task = asyncio.create_task(
+                svc._call_teacher_with_usage(
+                    db,
+                    user_id=3,
+                    question_id=7,
+                    question_version_id=11,
+                    action="explain_correct",
+                    messages=[],
+                    runtime=state.runtime,
+                    reservation=reservation,
+                    timeout=0.5,
+                    max_tokens=1200,
+                )
+            )
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+                for _ in range(2):
+                    task.cancel()
+                    await asyncio.sleep(0)
+                    await asyncio.sleep(0)
+                finished_before_release = task.done()
+            finally:
+                release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert not finished_before_release
+        async with factory() as db:
+            rows = (await db.scalars(select(AiChat))).all()
+            assert len(rows) == 1
+            assert rows[0].tokens_used == 37
+        assert settled.is_set()
+        ledger.assert_awaited_once_with(
+            day_key="test-day", month_key="test-month", tokens=100, actual_tokens=37
+        )
+        state.cancel.assert_not_awaited()
+        state.usage.assert_awaited_once()
+        state.settle.assert_awaited_once()
+    finally:
+        release.set()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "usage",
+    [None, {}, {"total_tokens": 0}, {"prompt_tokens": 0, "completion_tokens": 0}],
+)
+async def test_cancelled_teacher_distinguishes_missing_usage_from_known_zero(
+    real_teacher_gateway, monkeypatch, usage
+):
+    from app.ai import client as client_module
+    from app.services import ai_token_budget
+    from app.services.safe_remote_fetch import RemoteResponse
+
+    state = real_teacher_gateway
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    reservation = ai_token_budget.TokenReservation(3, 100, "test-day", "test-month")
+    state.settle.side_effect = ai_token_budget.settle_token_reservation
+    ledger = AsyncMock()
+    monkeypatch.setattr(ai_token_budget.cache, "release_token_budget_strict", ledger)
+
+    def transport(*_args, **_kwargs):
+        loop.call_soon_threadsafe(entered.set)
+        assert release.wait(2)
+        body = {"choices": [{"message": {"content": "received response"}}]}
+        if usage is not None:
+            body["usage"] = usage
+        return RemoteResponse(
+            status=200,
+            data=json.dumps(body).encode(),
+            content_type="application/json",
+            final_url="https://provider.example/v1",
+        )
+
+    monkeypatch.setattr(client_module, "request_remote_bytes", transport)
+    task = asyncio.create_task(
+        svc._call_teacher_with_usage(
+            state.db,
+            user_id=3,
+            question_id=7,
+            question_version_id=11,
+            action="explain_correct",
+            messages=[],
+            runtime=state.runtime,
+            reservation=reservation,
+            timeout=0.5,
+            max_tokens=1200,
+        )
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        task.cancel()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    finally:
+        release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    state.cancel.assert_not_awaited()
+    if not usage:
+        assert reservation.active is True
+        state.usage.assert_not_awaited()
+        state.settle.assert_not_awaited()
+        ledger.assert_not_awaited()
+    else:
+        state.usage.assert_awaited_once()
+        assert state.usage.await_args.args[-1]["tokens_used"] == 0
+        ledger.assert_awaited_once_with(
+            day_key="test-day", month_key="test-month", tokens=100, actual_tokens=0
+        )
+        assert reservation.active is False

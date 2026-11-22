@@ -263,7 +263,7 @@
 <button class="teacher-retry" wx:if="{{teacherLastAction}}" disabled="{{!aiAvailabilityEnabled || teacherLoadingAction}}" data-action="{{teacherLastAction}}" bindtap="run408TeacherAction">重新尝试</button>
 </view>
 <block wx:elif="{{teacherResult}}">
-<template is="ai-teacher-content" data="{{teacherResult, fallbackNote: '本次未生成 AI 讲解，可返回查看题库解析，或重新尝试。', generatedNote: '内容由 AI 深入讲解生成，仅用于学习复盘。'}}" />
+<template is="ai-teacher-content" data="{{teacherResult, generatedNote: '内容由 AI 深入讲解生成，仅用于学习复盘。'}}" />
 <button wx:if="{{teacherResult.fromFallback && teacherLastAction}}" class="teacher-retry" disabled="{{!aiAvailabilityEnabled || teacherLoadingAction}}" data-action="{{teacherLastAction}}" bindtap="run408TeacherAction">重新尝试</button>
 <view class="teacher-scroll-space"></view>
 </block>

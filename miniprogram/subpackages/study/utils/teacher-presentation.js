@@ -16,7 +16,6 @@ related_nodes: '相关知识',
 sibling: '同层知识',
 }
 
-const RAW_BACKEND_TOKEN_RE = /\b(?:prerequisites?|prereq|parent(?:_node|_topic)?|next(?:_nodes?)?|children?|related(?:_nodes?)?|sibling|mastery|confidence)\b/i
 const METRIC_RE = /\b(mastery|confidence)\s*[:=]\s*(-?\d+(?:\.\d+)?%?)/ig
 
 function cleanText(value) {
@@ -65,7 +64,7 @@ return RELATION_LABELS[key] || ''
 function pushRelationItem(items, label, value) {
 const cleanValue = cleanText(value)
 if (!label || !cleanValue) return
-const safeValue = stripBackendTokens(cleanValue)
+const safeValue = stripMetricFragments(cleanValue)
 if (!safeValue) return
 const duplicate = items.some(item => item.label === label && item.value === safeValue)
 if (duplicate) return
@@ -87,7 +86,7 @@ chunks.forEach(chunk => {
 const match = chunk.match(/^([A-Za-z][A-Za-z0-9_-]*)\s*(?:→|->|=>|:|=)\s*(.+)$/)
 if (match) {
 const label = relationLabel(match[1])
-if (label) {
+if (label && !/^[A-Za-z_$][\w$]*\s*[\[(]/.test(match[2])) {
 pushRelationItem(items, label, match[2])
 return
 }
@@ -98,44 +97,17 @@ const pairRe = /(?:^|[,，]\s*)([A-Za-z][A-Za-z0-9_-]*)\s*(?:→|->|=>|:|=)\s*([
 let pair
 while ((pair = pairRe.exec(chunk))) {
 const label = relationLabel(pair[1])
-if (!label) continue
+if (!label || /^[A-Za-z_$][\w$]*\s*[\[(]/.test(pair[2])) continue
 pushRelationItem(items, label, pair[2])
 consumed = true
 }
-if (!consumed) leftovers.push(stripBackendTokens(chunk))
+if (!consumed) leftovers.push(relationLabel(chunk) || stripMetricFragments(chunk))
 })
 
 return {
 items: items.slice(0, 6),
 text: leftovers.filter(Boolean).join(' · '),
 }
-}
-
-function stripBackendTokens(rawText) {
-let text = cleanText(rawText)
-if (!text) return ''
-text = text.replace(/\bconfidence\s*[:=]\s*-?\d+(?:\.\d+)?%?/ig, '')
-text = text.replace(/\bmastery\s*[:=]\s*(-?\d+(?:\.\d+)?%?)/ig, (_, value) => {
-const percent = masteryPercent(value)
-return Number.isFinite(percent) ? `掌握度 ${percent}%` : ''
-})
-Object.keys(RELATION_LABELS).forEach(key => {
-const label = RELATION_LABELS[key]
-const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const re = new RegExp(`\\b${escaped}\\b\\s*(?:→|->|=>|:|=)\\s*`, 'ig')
-text = text.replace(re, `${label}：`)
-})
-Object.keys(RELATION_LABELS).forEach(key => {
-const label = RELATION_LABELS[key]
-const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-text = text.replace(new RegExp(`\\b${escaped}\\b`, 'ig'), label)
-})
-text = text.replace(/\bmastery\b/ig, '掌握度').replace(/\bconfidence\b/ig, 'AI判断可信度')
-return text
-.replace(/^[\s,，;；|·:：-]+/, '')
-.replace(/[\s,，;；|·:：-]+$/, '')
-.replace(/\s*([，；：])\s*/g, '$1')
-.trim()
 }
 
 function formatKnowledgePoint(item, index) {
@@ -153,24 +125,24 @@ const learningHint = stripMetricFragments(hintSource)
 
 return {
 key: cleanText(source.key) || `${index}-${cleanText(source.name)}`,
-name: stripBackendTokens(source.name),
+name: cleanText(source.name),
 relationItems: relation.items,
 relationText: relation.text,
 masteryText: masteryLabel(mastery),
-learningHint: stripBackendTokens(learningHint),
+learningHint,
 }
 }
 
 function presentTeacherResult(rawResult) {
 if (!rawResult || typeof rawResult !== 'object') return rawResult
 const result = Object.assign({}, rawResult)
-result.title = stripBackendTokens(result.title)
-result.summary = stripBackendTokens(result.summary)
+result.title = cleanText(result.title)
+result.summary = cleanText(result.summary)
 result.sections = (Array.isArray(result.sections) ? result.sections : []).map((section, sectionIndex) => ({
 key: cleanText(section && section.key) || `${sectionIndex}`,
-heading: stripBackendTokens(section && section.heading),
+heading: cleanText(section && section.heading),
 points: (Array.isArray(section && section.points) ? section.points : [])
-.map(stripBackendTokens)
+.map(cleanText)
 .filter(Boolean),
 })).filter(section => section.heading || section.points.length)
 result.knowledgePoints = (Array.isArray(result.knowledgePoints) ? result.knowledgePoints : [])
@@ -179,13 +151,8 @@ result.knowledgePoints = (Array.isArray(result.knowledgePoints) ? result.knowled
 return result
 }
 
-function containsRawBackendToken(value) {
-return RAW_BACKEND_TOKEN_RE.test(cleanText(value))
-}
-
 module.exports = {
 presentTeacherResult,
 parseRelation,
 formatKnowledgePoint,
-containsRawBackendToken,
 }

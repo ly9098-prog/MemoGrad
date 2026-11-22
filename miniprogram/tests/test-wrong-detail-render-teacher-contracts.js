@@ -39,7 +39,7 @@ if (process.argv[2]) test('compiled AI states retain recovery controls and accur
     })
     if (checking) {
       assert.equal(byClass(idle, 'ai-loading-state').length, 1)
-      assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), false)
+      assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), pending)
     } else {
       assert.equal(Boolean(byClass(idle, 'ai-generate-btn')[0].attr.disabled), pending || !enabled)
     }

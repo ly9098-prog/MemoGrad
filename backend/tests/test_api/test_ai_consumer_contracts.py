@@ -202,8 +202,8 @@ async def test_teacher_fixed_version_requires_owned_history(ai_client, monkeypat
     assert body["question_version_id"] == 1 and body["question_id"] == 1
     assert body["from_fallback"] is True and body["tokens_used"] == 0
     assert contexts[0]["question"]["official_analysis"] == "frozen explanation"
-    assert "今日 AI 调用额度已用尽" in body["summary"]
-    assert "未生成 AI 讲解" in body["summary"]
+    assert body["fallback_reason"] == "budget_exhausted"
+    assert body["summary"] == "AI 调用额度不足，可先查看题库解析。"
     assert "frozen explanation" not in body["summary"]
     assert body["sections"] == [] and body["practice_question"] is None
 
@@ -568,6 +568,39 @@ async def test_teacher_unavailable_returns_structured_503(ai_client, monkeypatch
         "code": "ai_service_unavailable",
         **state,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason", list(ai_teacher_408_service._FALLBACK_MESSAGES))
+async def test_teacher_fallback_reason_survives_response_schema_projection(
+    ai_client, monkeypatch, reason
+):
+    payload = {
+        "question_id": 1,
+        "question_version_id": 3,
+        "action": "core_concept",
+        "action_label": "这道题真正考什么？",
+        "prompt_version": "test-version",
+        "from_fallback": True,
+        **ai_teacher_408_service._fallback_payload(
+            action="core_concept", reason=reason
+        ),
+    }
+
+    async def fallback(*_args, **_kwargs):
+        return payload
+
+    monkeypatch.setattr(ai_teacher_408_service, "run_teacher_action", fallback)
+    response = await ai_client.client.post(
+        "/api/v1/ai/408-teacher",
+        json={"question_id": 1, "action": "core_concept"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["fallback_reason"] == reason
+    assert body["summary"] == ai_teacher_408_service._FALLBACK_MESSAGES[reason]
+    assert body["sections"] == []
+    assert body["from_fallback"] is True
 
 
 @pytest.mark.asyncio
