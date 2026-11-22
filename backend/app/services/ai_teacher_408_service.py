@@ -285,7 +285,9 @@ def _bounded(value: object, limit: int) -> object:
     return raw[:limit]
 
 
-def _parse_json_object(content: object) -> dict[str, Any] | None:
+def _parse_json_object(
+    content: object, *, allow_option_array: bool = False
+) -> dict[str, Any] | None:
     text = str(content or "").strip()
     if not text:
         return None
@@ -295,14 +297,25 @@ def _parse_json_object(content: object) -> dict[str, Any] | None:
             text = text[first_newline + 1 :]
         if text.endswith("```"):
             text = text[:-3].rstrip()
-    left = text.find("{")
-    right = text.rfind("}")
-    if left >= 0 and right > left:
-        text = text[left : right + 1]
     try:
         value = json.loads(text)
     except (TypeError, ValueError, json.JSONDecodeError):
-        return None
+        # Parse the complete value first: slicing at braces destroys valid
+        # arrays, and can incorrectly salvage one row from a truncated array.
+        if text.startswith(("{", "[")):
+            return None
+        left = text.find("{")
+        right = text.rfind("}")
+        if left < 0 or right <= left:
+            return None
+        try:
+            value = json.loads(text[left : right + 1])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+    if allow_option_array and isinstance(value, list):
+        # Compatible providers may return the option rows directly. The same
+        # complete-option and authoritative-answer validation still applies.
+        return {"option_explanations": value}
     return value if isinstance(value, dict) else None
 
 
@@ -1274,7 +1287,9 @@ async def run_teacher_action(
     )
     await settle_token_reservation(reservation, result.get("tokens_used", 0))
 
-    parsed = _parse_json_object(result.get("content"))
+    parsed = _parse_json_object(
+        result.get("content"), allow_option_array=action == "explain_options"
+    )
     if parsed is None:
         fallback = _fallback_payload(
             action=action,

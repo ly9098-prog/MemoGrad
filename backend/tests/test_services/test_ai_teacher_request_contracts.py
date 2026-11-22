@@ -117,9 +117,9 @@ async def test_teacher_uses_server_fact_and_records_usage_before_parsing(
     state = prepared_teacher
     original_parse = svc._parse_json_object
 
-    def parse(value):
+    def parse(value, **kwargs):
         state.trace.append("parse")
-        return original_parse(value)
+        return original_parse(value, **kwargs)
 
     monkeypatch.setattr(svc, "_parse_json_object", parse)
     result = await svc.run_teacher_action(
@@ -365,26 +365,26 @@ async def test_option_action_rejects_incomplete_or_answer_conflicting_output(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("answer", ["A", "A,B"])
+@pytest.mark.parametrize("shape", ["object", "array", "fenced_array"])
 async def test_option_action_projects_validated_rows_in_question_order(
-    prepared_teacher, answer
+    prepared_teacher, answer, shape
 ):
     state = prepared_teacher
     state.revision.answer = answer
+    rows = [
+        {"option": "B", "is_correct": "B" in answer, "reason": "B 项判断依据。"},
+        {"option": "A", "is_correct": True, "reason": "A 项判断依据。"},
+    ]
+    content = json.dumps(
+        {"summary": "untrusted generic conclusion", "option_explanations": rows}
+        if shape == "object"
+        else rows
+    )
+    if shape == "fenced_array":
+        content = f"```json\n{content}\n```"
     state.provider.side_effect = None
     state.provider.return_value = {
-        "content": json.dumps(
-            {
-                "summary": "untrusted generic conclusion",
-                "option_explanations": [
-                    {
-                        "option": "B",
-                        "is_correct": "B" in answer,
-                        "reason": "B 项判断依据。",
-                    },
-                    {"option": "A", "is_correct": True, "reason": "A 项判断依据。"},
-                ],
-            }
-        ),
+        "content": content,
         "tokens_used": 21,
     }
     result = await svc.run_teacher_action(
@@ -395,3 +395,68 @@ async def test_option_action_projects_validated_rows_in_question_order(
     assert [section["heading"][0] for section in result["sections"]] == ["A", "B"]
     assert result["sections"][0]["points"] == ["A 项判断依据。"]
     assert result["sections"][1]["points"] == ["B 项判断依据。"]
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "missing",
+        "duplicate",
+        "wrong_verdict",
+        "string_verdict",
+        "empty",
+        "legacy",
+        "truncated",
+    ],
+)
+async def test_option_array_still_requires_complete_authoritative_rows(
+    prepared_teacher, defect
+):
+    state = prepared_teacher
+    rows = [
+        {"option": "A", "is_correct": True, "reason": "符合题干条件。"},
+        {"option": "B", "is_correct": False, "reason": "遗漏必要条件。"},
+    ]
+    if defect == "missing":
+        rows.pop()
+    elif defect == "duplicate":
+        rows[1]["option"] = "A"
+    elif defect == "wrong_verdict":
+        rows[0]["is_correct"] = False
+    elif defect == "string_verdict":
+        rows[0]["is_correct"] = "true"
+    elif defect == "empty":
+        rows[1]["reason"] = ""
+    elif defect == "legacy":
+        rows = [{"heading": "A 项分析", "points": ["旧版自由段落"]}]
+    content = json.dumps(rows)
+    if defect == "truncated":
+        # Even a complete first row must not be salvaged from a partial array.
+        content = content[: content.index("},") + 1]
+    state.provider.side_effect = None
+    state.provider.return_value = {"content": content, "tokens_used": 21}
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="explain_options"
+    )
+    assert result["from_fallback"] is True
+    assert result["sections"] == []
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+def test_option_prompt_requests_one_minimal_json_envelope():
+    from app.ai.prompts_408_teacher import PROMPT_VERSION, build_408_teacher_prompt
+
+    system = build_408_teacher_prompt(action="explain_options", context={})[0][
+        "content"
+    ]
+    schema, _ = json.JSONDecoder().raw_decode(system[system.index("{") :])
+    assert set(schema) == {"option_explanations"}
+    assert set(schema["option_explanations"][0]) == {"option", "is_correct", "reason"}
+    assert "不要直接返回数组" in system
+    assert PROMPT_VERSION == "408-teacher-v5-option-json-shapes"

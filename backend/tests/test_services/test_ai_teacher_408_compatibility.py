@@ -77,6 +77,12 @@ class TestCleanPoints:
 
 
 class TestParseJsonObject:
+    @pytest.mark.parametrize(
+        "content", ['[{"option":"A"}]', '[{"option":"A"}', '{"option":"A"']
+    )
+    def test_does_not_salvage_inner_objects_from_arrays_or_partial_json(self, content):
+        assert _parse_json_object(content) is None
+
     def test_empty_returns_none(self):
         assert _parse_json_object("") is None
         assert _parse_json_object(None) is None

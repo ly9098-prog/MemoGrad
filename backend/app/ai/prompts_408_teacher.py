@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "408-teacher-v4-option-grounding"
+PROMPT_VERSION = "408-teacher-v5-option-json-shapes"
 
 ACTION_DEFINITIONS: dict[str, dict[str, str]] = {
     "explain_correct": {
@@ -80,29 +80,36 @@ def build_408_teacher_prompt(
         "知识关系必须改写成自然中文，例如‘前置知识’‘所属主题’‘相关知识’‘后续知识’；"
         "学习状态使用自然中文描述，不展示置信度原始数值。"
         "本能力是完整错题复盘之后的按需深入讲解，不得重新输出通用的‘错因诊断、知识补漏、复练建议’三段式报告。"
-        "只完成本次 fixed action：讲解类动作的 sections 标题必须紧扣所选动作；"
-        "similar_question/harder_question 只生成题目和必要说明；connect_knowledge 重点填写 knowledge_points；"
-        "除生成题动作外 practice_question 必须为 null。"
-        "输出严格 JSON，不要 markdown，不要额外字段。schema："
-        '{"title":"","summary":"","sections":[{"heading":"","points":[""]}],'
-        '"knowledge_points":[{"name":"","relation":"","mastery_hint":""}],'
-        '"practice_question":null,"option_explanations":[],'
-        '"next_action":{"type":"none","label":"","params":{}}}'
-        "。similar_question/harder_question 时 practice_question 必须为："
-        '{"stem":"","options":{"A":"","B":"","C":"","D":""},"answer":"A",'
-        '"analysis":"","difficulty_delta":0或1}；其他动作应为 null。'
-        "sections 最多 4 组，每组 points 最多 5 条；语言简洁、面向考研专业课复盘。"
+        "只完成本次 fixed action。"
     )
     if action == "explain_options":
         system += (
-            "本次必须填写 option_explanations，每个实际选项恰好一项："
-            '[{"option":"A","is_correct":true,"reason":"结合该选项原文、题干条件的具体判断依据"}]。'
+            "本次只输出一个 JSON 对象，不要 markdown，不要其他字段。完整输出格式为："
+            '{"option_explanations":[{"option":"A","is_correct":true,'
+            '"reason":"结合该选项原文、题干条件的具体判断依据"}]}。'
+            "顶层必须是包含 option_explanations 的对象，不要直接返回数组。"
+            "数组中每个实际选项恰好一项；"
             "option 必须逐字对应 question.options 中的键，不得遗漏、重复或虚构选项；"
             "is_correct 只能是布尔值，表示该选项是否属于题库 correct_answer，"
             "不得根据用户选择改写标准答案。每项 reason 直接解释该选项，控制在 150 字内；"
             "选择不正确说法的题目，也须按标准答案确定是否应选，并解释题干的否定条件。"
-            "summary 和 sections 留空，由服务端按标准答案组织逐项结果。"
+            "标题、标准答案摘要和展示段落均由服务端组织，不要生成。"
             "不能用通用考点、注意审题或知识补漏替代逐项解释；证据不足时不得编造理由。"
+        )
+    else:
+        system += (
+            "讲解类动作的 sections 标题必须紧扣所选动作；"
+            "similar_question/harder_question 只生成题目和必要说明；connect_knowledge 重点填写 knowledge_points；"
+            "除生成题动作外 practice_question 必须为 null。"
+            "输出严格 JSON，不要 markdown，不要额外字段。schema："
+            '{"title":"","summary":"","sections":[{"heading":"","points":[""]}],'
+            '"knowledge_points":[{"name":"","relation":"","mastery_hint":""}],'
+            '"practice_question":null,"option_explanations":[],'
+            '"next_action":{"type":"none","label":"","params":{}}}'
+            "。similar_question/harder_question 时 practice_question 必须为："
+            '{"stem":"","options":{"A":"","B":"","C":"","D":""},"answer":"A",'
+            '"analysis":"","difficulty_delta":0或1}；其他动作应为 null。'
+            "sections 最多 4 组，每组 points 最多 5 条；语言简洁、面向考研专业课复盘。"
         )
     user = (
         f"固定动作={action}\n动作说明={meta['instruction']}\n"
