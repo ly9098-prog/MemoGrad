@@ -8,7 +8,7 @@ import { OcrImportSessionProvider } from "./ocr-import-session-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import { isLearnerPath } from "@/lib/routes";
+import { adminRoutes, getActiveAdminRoute, isLearnerPath } from "@/lib/routes";
 import styles from "./navigation.module.css";
 
 function SidebarSkeleton() {
@@ -66,6 +66,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const accessMode = useAuthStore((state) => state.accessMode);
+  const adminRole = useAuthStore((state) => state.role);
   const learnerUser = useAuthStore((state) => state.learnerUser);
   const adminId = useAuthStore(({ user }) => user && ("id" in user ? user.id : user.user.id));
   const mustChangepassword = useAuthStore(({ user }) =>
@@ -92,6 +93,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const isDesktopNavigationExpanded = isNavigationHovered || isNavigationFocused;
   const isLearnerRoute = isLearnerPath(pathname);
   const isLearnerAllowed = accessMode !== "user" || isLearnerRoute;
+  const activeAdminRoute = getActiveAdminRoute(pathname, adminRoutes);
+  const isAdminRouteAllowed =
+    accessMode !== "admin" || !activeAdminRoute?.superAdminOnly || adminRole?.name === "super_admin";
   const sessionUserId = adminId ?? learnerUser?.id ?? "anonymous";
 
   useEffect(() => {
@@ -102,6 +106,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     }
     if (!isBootstrapping && accessMode === "user" && !isLearnerRoute) {
       router.replace("/questions");
+      return;
+    }
+    if (!isBootstrapping && accessMode === "admin" && !isAdminRouteAllowed) {
+      router.replace("/dashboard");
       return;
     }
     if (
@@ -121,6 +129,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     mustChangepassword,
     accessMode,
     pathname,
+    isAdminRouteAllowed,
+    adminRole?.name,
     router,
     redirectPath,
   ]);
@@ -139,6 +149,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) return null;
   if (!isLearnerAllowed) return null;
+  if (!isAdminRouteAllowed) return null;
 
   return (
     <div className={styles.shell} data-navigation-expanded={isDesktopNavigationExpanded ? "true" : undefined}>

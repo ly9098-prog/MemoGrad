@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.admin_security import require_permissions
+from app.core.admin_security import require_roles
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
 from app.core.time_utils import normalize_to_naive_utc
@@ -26,6 +26,7 @@ from app.services.admin_user_service import (
 )
 
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/admin-users", tags=["admin-users"])
+require_super_admin = require_roles("super_admin")
 
 
 def _status_for_error(exc: Exception) -> int:
@@ -43,7 +44,7 @@ async def list_users(
     role_id: int | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
-    _=Depends(require_permissions("admin-user:read")),
+    _=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     normalized_from = normalize_to_naive_utc(created_from) if created_from else None
@@ -69,7 +70,7 @@ async def list_users(
 @router.get("/{admin_user_id}", response_model=AdminUserDetail)
 async def get_user(
     admin_user_id: int,
-    _=Depends(require_permissions("admin-user:read")),
+    _=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -82,7 +83,7 @@ async def get_user(
 async def create_user(
     data: AdminUserCreateRequest,
     request: Request,
-    current_admin=Depends(require_permissions("admin-user:create")),
+    current_admin=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -100,7 +101,7 @@ async def patch_user(
     admin_user_id: int,
     data: AdminUserPatchRequest,
     request: Request,
-    current_admin=Depends(require_permissions("admin-user:update")),
+    current_admin=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -125,7 +126,7 @@ async def patch_user(
 async def delete_user(
     admin_user_id: int,
     request: Request,
-    current_admin=Depends(require_permissions("admin-user:delete")),
+    current_admin=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -148,7 +149,7 @@ async def delete_user(
 async def force_logout_user(
     admin_user_id: int,
     request: Request,
-    current_admin=Depends(require_permissions("admin-user:force-logout")),
+    current_admin=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -172,7 +173,7 @@ async def reset_password(
     admin_user_id: int,
     data: AdminUserResetPasswordRequest,
     request: Request,
-    current_admin=Depends(require_permissions("admin-user:reset-password")),
+    current_admin=Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:

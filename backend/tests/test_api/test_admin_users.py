@@ -1,10 +1,12 @@
 from datetime import datetime
 from unittest.mock import AsyncMock
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.v1 import admin_users
-from app.core.admin_security import AdminPrincipal, get_current_admin
+from app.core.admin_security import AdminPrincipal
 from app.core.database import get_db
 from app.main import app
 from app.models.admin import AdminUser, Role
@@ -34,6 +36,9 @@ class _Db:
             def scalars(self):
                 return _Scalars()
 
+            def scalar_one_or_none(self):
+                return "operator"
+
         return _Result()
 
 
@@ -48,6 +53,11 @@ def _principal():
 
 async def _allow():
     return _principal()
+
+
+async def _operator():
+    user = AdminUser(id=2, username="operator", password_hash="hash", is_active=True, role_id=2)
+    return AdminPrincipal(user, {"jti": "token-id", "exp": 4102444800})
 
 
 def _role(role_id=2, name="operator"):
@@ -71,9 +81,17 @@ def _admin_user(user_id=2, role=None):
     return user
 
 
+@pytest.mark.asyncio
+async def test_admin_users_dependency_rejects_non_super_admin():
+    with pytest.raises(HTTPException) as exc_info:
+        await admin_users.require_super_admin(await _operator(), _Db())
+
+    assert exc_info.value.status_code == 403
+
+
 def test_list_admin_users(monkeypatch):
     monkeypatch.setattr(admin_users, "list_admin_users", AsyncMock(return_value=([_admin_user()], 1)))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/admin-users")
@@ -87,7 +105,7 @@ def test_list_admin_users(monkeypatch):
 
 def test_get_admin_user_detail(monkeypatch):
     monkeypatch.setattr(admin_users, "get_admin_user_detail", AsyncMock(return_value=_admin_user()))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.get("/api/admin/v1/admin-users/2")
@@ -100,7 +118,7 @@ def test_get_admin_user_detail(monkeypatch):
 
 def test_create_admin_user_rejects_super_admin(monkeypatch):
     monkeypatch.setattr(admin_users, "create_admin_user", AsyncMock(side_effect=PermissionError("禁止分配超级管理员角色")))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.post(
@@ -115,7 +133,7 @@ def test_create_admin_user_rejects_super_admin(monkeypatch):
 
 def test_patch_admin_user_rejects_self_role_change(monkeypatch):
     monkeypatch.setattr(admin_users, "update_admin_user", AsyncMock(side_effect=ValueError("禁止修改自己的角色")))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.patch("/api/admin/v1/admin-users/1", json={"role_id": 2})
@@ -127,7 +145,7 @@ def test_patch_admin_user_rejects_self_role_change(monkeypatch):
 
 def test_delete_admin_user_rejects_self(monkeypatch):
     monkeypatch.setattr(admin_users, "deactivate_admin_user", AsyncMock(side_effect=ValueError("禁止删除自己")))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.delete("/api/admin/v1/admin-users/1")
@@ -139,7 +157,7 @@ def test_delete_admin_user_rejects_self(monkeypatch):
 
 def test_force_logout_rejects_super_admin(monkeypatch):
     monkeypatch.setattr(admin_users, "force_logout_admin_user", AsyncMock(side_effect=PermissionError("禁止操作超级管理员")))
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.post("/api/admin/v1/admin-users/2/force-logout")
@@ -152,7 +170,7 @@ def test_force_logout_rejects_super_admin(monkeypatch):
 def test_reset_password_success(monkeypatch):
     reset_password = AsyncMock()
     monkeypatch.setattr(admin_users, "reset_admin_user_password", reset_password)
-    app.dependency_overrides[get_current_admin] = _allow
+    app.dependency_overrides[admin_users.require_super_admin] = _allow
     app.dependency_overrides[get_db] = _override_db
     try:
         resp = client.post("/api/admin/v1/admin-users/2/reset-password", json={"new_password": "new-password"})

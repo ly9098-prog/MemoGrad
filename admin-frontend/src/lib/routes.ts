@@ -115,6 +115,7 @@ const adminUsersRoute: AdminRoute = {
   label: "管理员",
   description: "账号与角色",
   permission: "admin-user:read",
+  superAdminOnly: true,
   icon: UserCog,
 };
 
