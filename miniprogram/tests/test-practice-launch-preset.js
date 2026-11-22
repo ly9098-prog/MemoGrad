@@ -26,7 +26,7 @@ test('parses and normalizes route launch options', () => {
     subject_name: '%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84',
     include_children: '1',
     include_descendants: '1',
-    return_to: '/subpackages/study/knowledge-detail/index?id=1',
+    return_to: '/subpackages/knowledge/knowledge-detail/index?id=1',
   }, decode)
   assert.deepEqual(preset, {
     subjectId: 12,
@@ -43,7 +43,7 @@ test('parses and normalizes route launch options', () => {
     includeChildren: true,
     includeDescendants: true,
     subjectCode: 'data_structure',
-    returnTo: '/subpackages/study/knowledge-detail/index?id=1',
+    returnTo: '/subpackages/knowledge/knowledge-detail/index?id=1',
   })
 
   assert.equal(parseLaunchPreset({ return_to: '/pages/home/home' }, decode).returnTo, '')

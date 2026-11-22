@@ -39,7 +39,7 @@ function parseLaunchPreset(options, safeDecode) {
 function normalizePracticeReturnRoute(value, safeDecode) {
   const route = safeDecode(value, '').trim().slice(0, 512)
   if (!route) return ''
-  if (!/^\/subpackages\/study\/knowledge-(?:detail|subject)\/index(?:\?.*)?$/.test(route)) return ''
+  if (!/^\/subpackages\/knowledge\/knowledge-(?:detail|subject)\/index(?:\?.*)?$/.test(route)) return ''
   return route
 }
 

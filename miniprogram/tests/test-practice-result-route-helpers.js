@@ -6,8 +6,26 @@ test('normalizePracticeReturnRoute: accepts valid knowledge detail route', () =>
   assert.equal(normalizePracticeReturnRoute('/subpackages/knowledge/knowledge-detail/index?id=1'), '/subpackages/knowledge/knowledge-detail/index?id=1')
 })
 
-test('normalizePracticeReturnRoute: accepts valid study knowledge subject route', () => {
-  assert.equal(normalizePracticeReturnRoute('/subpackages/study/knowledge-subject/index'), '/subpackages/study/knowledge-subject/index')
+test('normalizePracticeReturnRoute: accepts valid knowledge subject route', () => {
+  assert.equal(normalizePracticeReturnRoute('/subpackages/knowledge/knowledge-subject/index'), '/subpackages/knowledge/knowledge-subject/index')
+})
+
+test('launch and result validators preserve registered knowledge return targets and reject retired routes', () => {
+  const { parseLaunchPreset } = require('../subpackages/study/practice/utils/launch-preset')
+  const app = require('../app.json')
+  const registered = new Set((app.subpackages || app.subPackages).flatMap(pkg =>
+    pkg.pages.map(page => `/${pkg.root}/${page}`)))
+  for (const type of ['detail', 'subject']) {
+    const route = `/subpackages/knowledge/knowledge-${type}/index`
+    assert.ok(registered.has(route), 'return targets must exist in app.json')
+    const target = `${route}?id=7&source=practice-result`
+    const preset = parseLaunchPreset({ return_to: encodeURIComponent(target) }, decodeURIComponent)
+    assert.equal(preset.returnTo, target)
+    assert.equal(normalizePracticeReturnRoute(preset.returnTo), target)
+    const retired = `/subpackages/study/knowledge-${type}/index?id=7`
+    assert.equal(parseLaunchPreset({ return_to: retired }, decodeURIComponent).returnTo, '')
+    assert.equal(normalizePracticeReturnRoute(retired), '')
+  }
 })
 
 test('normalizePracticeReturnRoute: rejects invalid route', () => {

@@ -10,7 +10,7 @@
 function normalizePracticeReturnRoute(value) {
   var route = String(value || '').trim().slice(0, 512)
   if (!route) return ''
-  if (!/^\/subpackages\/(?:knowledge\/knowledge-(?:detail|subject)|study\/knowledge-(?:detail|subject))\/index(?:\?.*)?$/.test(route)) return ''
+  if (!/^\/subpackages\/knowledge\/knowledge-(?:detail|subject)\/index(?:\?.*)?$/.test(route)) return ''
   return route
 }
 
