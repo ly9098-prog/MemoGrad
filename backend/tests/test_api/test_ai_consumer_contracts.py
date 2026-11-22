@@ -167,8 +167,18 @@ async def ai_client(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_teacher_fixed_version_requires_owned_history(ai_client):
+async def test_teacher_fixed_version_requires_owned_history(ai_client, monkeypatch):
     state = ai_client
+    contexts = []
+    original_prompt = ai_teacher_408_service.build_408_teacher_prompt
+
+    def capture_prompt(**kwargs):
+        contexts.append(kwargs["context"])
+        return original_prompt(**kwargs)
+
+    monkeypatch.setattr(
+        ai_teacher_408_service, "build_408_teacher_prompt", capture_prompt
+    )
     payload = {"question_id": 1, "question_version_id": 1, "action": "explain_correct"}
     refused = await state.client.post("/api/v1/ai/408-teacher", json=payload)
     assert refused.status_code == 400 and "不属于当前用户" in refused.json()["detail"]
@@ -191,7 +201,10 @@ async def test_teacher_fixed_version_requires_owned_history(ai_client):
     body = accepted.json()
     assert body["question_version_id"] == 1 and body["question_id"] == 1
     assert body["from_fallback"] is True and body["tokens_used"] == 0
-    assert body["summary"] == "frozen explanation"
+    assert contexts[0]["question"]["official_analysis"] == "frozen explanation"
+    assert "今日 AI 调用额度已用尽" in body["summary"]
+    assert "未生成 AI 讲解" in body["summary"]
+    assert "frozen explanation" not in body["summary"]
     assert body["sections"] == [] and body["practice_question"] is None
 
 
@@ -458,11 +471,7 @@ async def test_provider_failures_return_typed_http_response_through_real_analysi
     monkeypatch.setattr(
         ai_service,
         "reserve_token_budget",
-        AsyncMock(
-            return_value=TokenReservation(
-                1, 1, "day-key", "month-key"
-            )
-        ),
+        AsyncMock(return_value=TokenReservation(1, 1, "day-key", "month-key")),
     )
     monkeypatch.setattr(ai_service, "settle_token_reservation", AsyncMock())
     monkeypatch.setattr(ai_service, "_generating", set())

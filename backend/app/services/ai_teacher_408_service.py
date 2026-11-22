@@ -286,7 +286,10 @@ def _bounded(value: object, limit: int) -> object:
 
 
 def _parse_json_object(
-    content: object, *, allow_option_array: bool = False
+    content: object,
+    *,
+    allow_option_array: bool = False,
+    allow_single_object_array: bool = False,
 ) -> dict[str, Any] | None:
     text = str(content or "").strip()
     if not text:
@@ -312,6 +315,13 @@ def _parse_json_object(
             value = json.loads(text[left : right + 1])
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
+    if (
+        allow_single_object_array
+        and isinstance(value, list)
+        and len(value) == 1
+        and isinstance(value[0], dict)
+    ):
+        return value[0]
     if allow_option_array and isinstance(value, list):
         # Compatible providers may return the option rows directly. The same
         # complete-option and authoritative-answer validation still applies.
@@ -498,12 +508,14 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
     summary_sections = _structured_analysis_sections(value.get("summary"))
     sections.extend(summary_sections)
 
-    for raw in value.get("sections") or []:
+    raw_sections = value.get("sections")
+    for raw in raw_sections if isinstance(raw_sections, list) else []:
         if not isinstance(raw, dict):
             continue
         heading = _sanitize_user_text(raw.get("heading"), 120)
         points: list[str] = []
-        for point in raw.get("points") or []:
+        raw_points = raw.get("points")
+        for point in raw_points if isinstance(raw_points, list) else []:
             nested = _structured_analysis_sections(point)
             if nested:
                 sections.extend(nested)
@@ -541,7 +553,8 @@ def _normalize_ai_payload(value: dict[str, Any], action: str) -> dict[str, Any]:
             break
 
     knowledge_points: list[dict[str, str]] = []
-    for raw in value.get("knowledge_points") or []:
+    raw_knowledge = value.get("knowledge_points")
+    for raw in raw_knowledge if isinstance(raw_knowledge, list) else []:
         if not isinstance(raw, dict):
             continue
         name = _sanitize_user_text(raw.get("name"), 128)
@@ -1052,47 +1065,19 @@ def _validated_option_sections(
 def _fallback_payload(
     *,
     action: str,
-    revision: QuestionVersion,
-    knowledge_context: dict[str, Any],
     reason: str,
 ) -> dict[str, Any]:
     meta = ACTION_DEFINITIONS[action]
-    kp_names = [
-        str(item.get("name"))
-        for item in knowledge_context.get("knowledge_points", [])
-        if item.get("name")
-    ]
-    # 降级内容也必须遵守动作边界：不能因为专项动作失败，就把完整的
-    # “错因/补漏/复练”报告再次塞回弹层。只有讲解类动作可引用一段题库
-    # 解析；生成题与陷阱总结在没有可靠生成结果时明确告知不可用。
-    explanation_actions = {"explain_correct", "core_concept"}
-    summary = reason
-    if action in explanation_actions and revision.analysis:
-        structured = _structured_analysis_sections(revision.analysis)
-        preferred = next(
-            (item for item in structured if item.get("heading") == "题目解析"), None
-        )
-        if preferred is None and structured:
-            preferred = structured[0]
-        if preferred and preferred.get("points"):
-            summary = _clean_str(preferred["points"][0], 1200)
-        else:
-            summary = _clean_str(revision.analysis, 1200) or reason
     return {
         "title": "逐项讲解暂不可用" if action == "explain_options" else meta["label"],
         "summary": _sanitize_user_text(
             f"{reason} 本次未生成逐项讲解，请稍后重试；可返回查看题库解析。"
             if action == "explain_options"
-            else summary,
+            else f"{reason} 本次未生成 AI 讲解，请稍后重试；可返回查看题库解析。",
             1200,
         ),
         "sections": [],
-        "knowledge_points": [
-            {"name": name, "relation": "本题知识点", "mastery_hint": ""}
-            for name in kp_names[:6]
-        ]
-        if action == "connect_knowledge"
-        else [],
+        "knowledge_points": [],
         "practice_question": None,
         "next_action": {"type": "none", "label": "", "params": {}},
     }
@@ -1227,8 +1212,6 @@ async def run_teacher_action(
     if reservation is None:
         fallback = _fallback_payload(
             action=action,
-            revision=revision,
-            knowledge_context=knowledge_context,
             reason="今日 AI 调用额度已用尽，可先查看题库解析与知识点。",
         )
         return {**base, **fallback, "tokens_used": 0, "from_fallback": True}
@@ -1268,8 +1251,6 @@ async def run_teacher_action(
     if result is None:
         fallback = _fallback_payload(
             action=action,
-            revision=revision,
-            knowledge_context=knowledge_context,
             reason="AI 老师暂不可用，可先查看题库解析。",
         )
         return {**base, **fallback, "tokens_used": 0, "from_fallback": True}
@@ -1288,13 +1269,13 @@ async def run_teacher_action(
     await settle_token_reservation(reservation, result.get("tokens_used", 0))
 
     parsed = _parse_json_object(
-        result.get("content"), allow_option_array=action == "explain_options"
+        result.get("content"),
+        allow_option_array=action == "explain_options",
+        allow_single_object_array=True,
     )
     if parsed is None:
         fallback = _fallback_payload(
             action=action,
-            revision=revision,
-            knowledge_context=knowledge_context,
             reason="AI 返回格式异常，可先查看题库解析。",
         )
         return {
@@ -1312,8 +1293,6 @@ async def run_teacher_action(
                 **base,
                 **_fallback_payload(
                     action=action,
-                    revision=revision,
-                    knowledge_context=knowledge_context,
                     reason="AI 返回的逐项内容不完整或与标准答案不一致。",
                 ),
                 "tokens_used": int(result.get("tokens_used") or 0),
@@ -1333,13 +1312,30 @@ async def run_teacher_action(
     ):
         fallback = _fallback_payload(
             action=action,
-            revision=revision,
-            knowledge_context=knowledge_context,
             reason="AI 未生成可校验的单选题，请稍后重试。",
         )
         return {
             **base,
             **fallback,
+            "tokens_used": int(result.get("tokens_used") or 0),
+            "from_fallback": True,
+        }
+
+    if not (
+        normalized["summary"]
+        or normalized["sections"]
+        or normalized["practice_question"]
+        or (
+            action == "connect_knowledge"
+            and any(
+                item["relation"] or item["mastery_hint"]
+                for item in normalized["knowledge_points"]
+            )
+        )
+    ):
+        return {
+            **base,
+            **_fallback_payload(action=action, reason="AI 未返回有效的专项讲解内容。"),
             "tokens_used": int(result.get("tokens_used") or 0),
             "from_fallback": True,
         }

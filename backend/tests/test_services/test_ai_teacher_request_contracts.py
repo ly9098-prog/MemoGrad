@@ -459,4 +459,121 @@ def test_option_prompt_requests_one_minimal_json_envelope():
     assert set(schema) == {"option_explanations"}
     assert set(schema["option_explanations"][0]) == {"option", "is_correct", "reason"}
     assert "不要直接返回数组" in system
-    assert PROMPT_VERSION == "408-teacher-v5-option-json-shapes"
+    assert PROMPT_VERSION == "408-teacher-v6-single-lesson-envelope"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", list(svc.ACTION_DEFINITIONS))
+@pytest.mark.parametrize("shape", ["object", "singleton", "fenced_singleton"])
+async def test_teacher_accepts_complete_single_lesson_envelopes(
+    prepared_teacher, action, shape
+):
+    state = prepared_teacher
+    payload = {
+        "title": "专项讲解",
+        "summary": "结合题干条件说明判断依据。",
+        "sections": [{"heading": "判断依据", "points": ["首先检查必要条件。"]}],
+        "knowledge_points": [{"name": "同步", "relation": "前置知识"}],
+        "practice_question": {
+            "stem": "下列说法哪项正确？",
+            "options": {"A": "满足条件", "B": "缺少条件"},
+            "answer": "A",
+            "analysis": "A 满足条件。",
+        },
+        "option_explanations": [
+            {"option": "A", "is_correct": True, "reason": "满足题干条件。"},
+            {"option": "B", "is_correct": False, "reason": "缺少必要条件。"},
+        ],
+    }
+    content = json.dumps(payload if shape == "object" else [payload])
+    if shape == "fenced_singleton":
+        content = f"```json\n{content}\n```"
+    state.provider.side_effect = None
+    state.provider.return_value = {"content": content, "tokens_used": 21}
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action=action
+    )
+    assert result["from_fallback"] is False
+    assert result["sections"]
+    assert result["tokens_used"] == 21
+    state.provider.assert_awaited_once()
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("shape", ["object", "singleton"])
+@pytest.mark.parametrize(
+    "action",
+    ["explain_correct", "core_concept", "connect_knowledge", "high_frequency_traps"],
+)
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"title": "只有标题"},
+        {"stem": "题干", "correct_answer": "A", "official_analysis": "原解析"},
+        {"sections": 1, "knowledge_points": True},
+        {"sections": [{"heading": "无内容", "points": 1}]},
+    ],
+)
+async def test_teacher_rejects_empty_or_echoed_lessons(
+    prepared_teacher, action, payload, shape
+):
+    state = prepared_teacher
+    state.provider.side_effect = None
+    state.provider.return_value = {
+        "content": json.dumps(payload if shape == "object" else [payload]),
+        "tokens_used": 21,
+    }
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action=action
+    )
+    assert result["from_fallback"] is True
+    assert "未生成 AI 讲解" in result["summary"]
+    assert state.revision.analysis not in result["summary"]
+    assert not result["sections"]
+    assert not result["knowledge_points"]
+    state.usage.assert_awaited_once()
+    state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["explain_correct", "core_concept"])
+@pytest.mark.parametrize(
+    "scenario", ["quota", "unavailable", "malformed", "multiple", "truncated"]
+)
+async def test_explanation_failure_preserves_reason_instead_of_bank_analysis(
+    prepared_teacher, action, scenario
+):
+    state = prepared_teacher
+    reason = "AI 返回格式异常"
+    state.provider.side_effect = None
+    if scenario == "quota":
+        state.reserve.side_effect = None
+        state.reserve.return_value = None
+        reason = "今日 AI 调用额度已用尽"
+    elif scenario == "unavailable":
+        state.provider.return_value = None
+        reason = "AI 老师暂不可用"
+    else:
+        content = {
+            "malformed": "invalid",
+            "multiple": '[{"summary":"one"},{"summary":"two"}]',
+            "truncated": '[{"summary":"complete inner object"}',
+        }[scenario]
+        state.provider.return_value = {"content": content, "tokens_used": 21}
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action=action
+    )
+    assert result["from_fallback"] is True
+    assert reason in result["summary"]
+    assert "未生成 AI 讲解" in result["summary"]
+    assert state.revision.analysis not in result["summary"]
+    assert result["sections"] == []
+
+
+@pytest.mark.parametrize("action", list(svc.ACTION_DEFINITIONS))
+def test_all_teacher_prompts_require_a_single_root_object(action):
+    system = svc.build_408_teacher_prompt(action=action, context={})[0]["content"]
+    assert "不要直接返回数组" in system

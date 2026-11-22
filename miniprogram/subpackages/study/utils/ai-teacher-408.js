@@ -174,14 +174,17 @@ fromFallback: !!(source.from_fallback ?? source.fromFallback),
 personalization: source.personalization || {},
 promptVersion: cleanText(source.prompt_version || source.promptVersion),
 }
-// Older servers put a generic analysis paragraph in the option fallback.
-// Keep it out of the lesson even before the server-side fix is deployed.
-if (result.action === 'explain_options' && result.fromFallback) {
+if (result.fromFallback) {
+if (result.action === 'explain_options') {
 result.title = '逐项讲解暂不可用'
 if (!result.summary.includes('未生成逐项讲解')) result.summary = '本次未生成逐项讲解，请稍后重试；可返回查看题库解析。'
+} else if (!result.summary.includes('未生成 AI 讲解')) {
+result.summary = '本次未生成 AI 讲解，请稍后重试；可返回查看题库解析。'
+}
 result.sections = []
 result.knowledgePoints = []
 result.practiceQuestion = null
+result.nextAction = null
 }
 return result
 }

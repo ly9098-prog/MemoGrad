@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "408-teacher-v5-option-json-shapes"
+PROMPT_VERSION = "408-teacher-v6-single-lesson-envelope"
 
 ACTION_DEFINITIONS: dict[str, dict[str, str]] = {
     "explain_correct": {
@@ -101,7 +101,8 @@ def build_408_teacher_prompt(
             "讲解类动作的 sections 标题必须紧扣所选动作；"
             "similar_question/harder_question 只生成题目和必要说明；connect_knowledge 重点填写 knowledge_points；"
             "除生成题动作外 practice_question 必须为 null。"
-            "输出严格 JSON，不要 markdown，不要额外字段。schema："
+            "本次只输出一个完整 JSON 对象，顶层不要直接返回数组，不要包装为单对象数组。"
+            "不要复述上下文对象来代替讲解。不要 markdown，不要额外字段。schema："
             '{"title":"","summary":"","sections":[{"heading":"","points":[""]}],'
             '"knowledge_points":[{"name":"","relation":"","mastery_hint":""}],'
             '"practice_question":null,"option_explanations":[],'

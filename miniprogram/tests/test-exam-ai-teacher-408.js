@@ -184,3 +184,39 @@ test('legacy option fallback never appears as a completed per-option lesson', ()
     summary: '今日额度已用尽。本次未生成逐项讲解。',
   }).summary, '今日额度已用尽。本次未生成逐项讲解。')
 })
+
+test('all teacher fallbacks discard legacy copied analysis and generated fields', () => {
+  for (const { action } of teacher.ACTIONS) {
+    const result = teacher.normalizeResult({
+      action, from_fallback: true,
+      summary: '生产者与消费者是经典同步问题。',
+      sections: [{ heading: '旧内容', points: ['原题解析'] }],
+      knowledge_points: [{ name: '原题知识点' }],
+      practice_question: { stem: '旧题' },
+      next_action: { type: 'practice', params: { id: 1 } },
+    })
+    assert.match(result.summary, /未生成/)
+    assert.doesNotMatch(result.summary, /经典同步问题/)
+    assert.deepEqual(result.sections, [])
+    assert.deepEqual(result.knowledgePoints, [])
+    assert.equal(result.practiceQuestion, null)
+    assert.equal(result.nextAction, null)
+  }
+})
+
+test('teacher fallback preserves the new explicit failure reason across wrappers', () => {
+  const summary = 'AI 返回格式异常。本次未生成 AI 讲解，请稍后重试。'
+  for (const { action } of teacher.ACTIONS.filter(item => item.action !== 'explain_options')) {
+    const result = teacher.normalizeResult({ result: {
+      action, fromFallback: true, summary,
+    } })
+    assert.equal(result.summary, summary)
+    assert.equal(result.fromFallback, true)
+  }
+  const success = teacher.normalizeResult({
+    action: 'explain_correct', summary: '有效讲解',
+    sections: [{ heading: '条件', points: ['有效内容'] }],
+  })
+  assert.equal(success.summary, '有效讲解')
+  assert.equal(success.sections.length, 1)
+})
