@@ -272,10 +272,10 @@ export function CustomSelect({
         aria-controls={open ? listboxId : undefined}
         aria-keyshortcuts={clearable && value ? "Delete Backspace" : undefined}
         className={cn(
-          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-[9px] border bg-muted pl-3 pr-2 text-sm outline-none transition-all duration-150",
+          "inline-flex h-11 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-[9px] border bg-muted pl-3 pr-2 text-sm outline-none transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15 motion-reduce:transition-none",
           "cursor-pointer disabled:cursor-default disabled:opacity-50",
           open
-            ? "border-primary bg-card ring-4 ring-primary/15"
+            ? "border-primary bg-card ring-2 ring-primary/15"
             : "border-border hover:border-primary",
           className,
         )}
@@ -495,7 +495,7 @@ function PortalDropdown({
       id={id}
       data-focus-passthrough
       className={cn(
-        "admin-content-theme rounded-xl border border-border/80 bg-card shadow-lg transition-all duration-150",
+        "admin-content-theme rounded-xl border border-border/80 bg-card shadow-lg transition-[transform,opacity] duration-150 motion-reduce:transition-none motion-reduce:transform-none",
         mounted ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
         className,
       )}
@@ -545,12 +545,11 @@ function PortalDropdown({
       )}
       <div
         ref={listRef}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+        className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-contain p-1"
         style={{
           maxHeight: searchable ? "280px" : "320px",
           overscrollBehavior: "contain",
           touchAction: "pan-y",
-          scrollbarGutter: "stable",
         }}
         onWheelCapture={(event) => event.stopPropagation()}
         onTouchMove={(event) => event.stopPropagation()}
@@ -572,7 +571,7 @@ function PortalDropdown({
                 disabled={opt.disabled}
                 onClick={() => onChange(opt.value)}
                 className={cn(
-                  "flex w-full min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap px-4 py-2.5 text-left text-sm transition-colors duration-100",
+                  "flex min-h-9 w-full min-w-0 items-center gap-2.5 overflow-hidden whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
                   isSelected
                     ? "bg-accent font-medium text-foreground"
                     : "text-muted-foreground",

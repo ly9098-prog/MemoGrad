@@ -469,7 +469,7 @@ export function QuestionVersionPicker({
                 ) : null}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [scrollbar-gutter:stable]">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
                 {currentMatchesSearch ? (
                   <div className="mb-1">
                     <p className="px-2 py-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground/70">

@@ -489,7 +489,7 @@ export default function AppUsersPage() {
       ) {
         return;
       }
-      if (document.querySelector('[data-slot="dialog-content"]')) return;
+      if (document.querySelector('[data-slot="dialog-content"], [role="listbox"], [data-slot="popover-content"]')) return;
       event.preventDefault();
       searchInputRef.current?.focus();
     };
@@ -841,7 +841,7 @@ export default function AppUsersPage() {
                 }}
                 options={STATUS_OPTIONS}
                 clearable={false}
-                className="w-full sm:w-36"
+                className="h-10 w-full bg-card text-xs sm:w-36"
               />
 
               <DateRangePicker
@@ -899,6 +899,15 @@ export default function AppUsersPage() {
                   label={`状态：${STATUS_LABELS[status]}`}
                   onRemove={() => {
                     setStatus("all");
+                    setPage(1);
+                  }}
+                />
+              ) : null}
+              {userType !== "all" ? (
+                <FilterChip
+                  label={`类型：${typeTabs.find((tab) => tab.value === userType)?.label ?? userType}`}
+                  onRemove={() => {
+                    setUserType("all");
                     setPage(1);
                   }}
                 />
@@ -1188,6 +1197,7 @@ export default function AppUsersPage() {
                 {pageRange.start}–{pageRange.end}
               </span>
               <CustomSelect
+                aria-label="每页显示条数"
                 value={String(pageSize)}
                 onChange={(value) => {
                   setPageSize(Number(value));
@@ -1195,7 +1205,7 @@ export default function AppUsersPage() {
                 }}
                 options={PAGE_SIZE_OPTIONS}
                 clearable={false}
-                className="w-28"
+                className="h-8 w-28 bg-card text-xs"
               />
             </div>
 
