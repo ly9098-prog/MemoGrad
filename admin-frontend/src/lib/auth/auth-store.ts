@@ -12,6 +12,7 @@ import {
   setOnAuthExpired,
 } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { resolveAuthHostMode } from "@/lib/auth/auth-host";
 import { syncSessionCache } from "@/lib/auth/session-cache";
 import type {
   AuthUser,
@@ -143,10 +144,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (bootstrapFlight?.revision === revision) return bootstrapFlight.promise;
     const isCurrent = () => authRevision === revision;
     const promise = (async () => {
-      const token = get().accessToken;
+      const hostMode = typeof window === "undefined" ? null : resolveAuthHostMode(
+        window.location.origin,
+        process.env.NEXT_PUBLIC_ADMIN_WEB_BASE_URL,
+        process.env.NEXT_PUBLIC_USER_WEB_BASE_URL,
+      );
+      const storedMode = readStoredApiAuthMode();
+      const token = !hostMode || hostMode === storedMode ? get().accessToken : null;
+      if (!token) {
+        setApiAccessToken(null);
+        set({ accessToken: null });
+      }
       if (token) {
         setApiAccessToken(token);
-        const storedMode = readStoredApiAuthMode();
         setApiAuthMode(storedMode);
         try {
           if (storedMode === "user") {
@@ -190,18 +200,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
-      setApiAuthMode("admin");
-      try {
-        const refresh = await apiRequest<LoginResponse>("/auth/refresh", {
-          method: "POST",
-          scope: "admin",
-          skipRefresh: true,
-        });
-        if (!isCurrent()) return;
-        get().acceptLogin(refresh);
-        return;
-      } catch {
-        if (!isCurrent()) return;
+      if (hostMode !== "user") {
+        setApiAuthMode("admin");
+        try {
+          const refresh = await apiRequest<LoginResponse>("/auth/refresh", {
+            method: "POST",
+            scope: "admin",
+            skipRefresh: true,
+          });
+          if (!isCurrent()) return;
+          get().acceptLogin(refresh);
+          return;
+        } catch {
+          if (!isCurrent()) return;
+          if (hostMode === "admin") {
+            get().clear();
+            return;
+          }
+        }
       }
 
       setApiAuthMode("user");

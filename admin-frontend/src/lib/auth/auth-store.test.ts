@@ -50,6 +50,7 @@ afterEach(() => {
   resetSessionCacheTracking();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 function adminSession(id: number) {
@@ -82,6 +83,65 @@ function mockSuccessfulRotation() {
 }
 
 describe("auth store — API token synchronization", () => {
+  it.each([
+    ["https://admin.example.com", "admin", "/api/admin/v1/auth/refresh"],
+    ["https://example.com", "user", "/api/v1/auth/web/refresh"],
+  ] as const)("restores the matching cookie session on %s", async (origin, mode, expectedUrl) => {
+    vi.stubEnv("NEXT_PUBLIC_ADMIN_WEB_BASE_URL", "https://admin.example.com");
+    vi.stubEnv("NEXT_PUBLIC_USER_WEB_BASE_URL", "https://example.com");
+    vi.stubGlobal("window", { location: { origin } });
+    useAuthStore.getState().clear();
+    const session = mode === "admin" ? adminSession(1) : learnerSession();
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(session));
+
+    await useAuthStore.getState().bootstrap();
+
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([expectedUrl]);
+    expect(useAuthStore.getState().accessMode).toBe(mode);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().isBootstrapping).toBe(false);
+    expect(getApiAccessToken()).toBe(session.access_token);
+  });
+
+  it.each([
+    ["https://admin.example.com", "/api/admin/v1/auth/refresh"],
+    ["https://example.com", "/api/v1/auth/web/refresh"],
+  ])("only refreshes the identity domain for %s", async (origin, expectedUrl) => {
+    vi.stubEnv("NEXT_PUBLIC_ADMIN_WEB_BASE_URL", "https://admin.example.com");
+    vi.stubEnv("NEXT_PUBLIC_USER_WEB_BASE_URL", "https://example.com");
+    vi.stubGlobal("window", { location: { origin } });
+    useAuthStore.getState().clear();
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ detail: "Unauthorized" }, { status: 401 }),
+    );
+
+    await useAuthStore.getState().bootstrap();
+
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([expectedUrl]);
+    expect(useAuthStore.getState().isBootstrapping).toBe(false);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it.each([
+    ["https://admin.example.com", "user", "/api/admin/v1/auth/refresh"],
+    ["https://example.com", "admin", "/api/v1/auth/web/refresh"],
+  ] as const)("does not send a stored %s token to another identity domain", async (origin, mode, expectedUrl) => {
+    vi.stubEnv("NEXT_PUBLIC_ADMIN_WEB_BASE_URL", "https://admin.example.com");
+    vi.stubEnv("NEXT_PUBLIC_USER_WEB_BASE_URL", "https://example.com");
+    vi.stubGlobal("window", { location: { origin } });
+    setApiAuthMode(mode);
+    useAuthStore.setState({ isAuthenticated: false, isBootstrapping: true });
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ detail: "Unauthorized" }, { status: 401 }),
+    );
+
+    await useAuthStore.getState().bootstrap();
+
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([expectedUrl]);
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).has("Authorization")).toBe(false);
+    expect(getApiAccessToken()).toBeNull();
+  });
+
   it("clears cached queries before replacing an authenticated admin", () => {
     const clearCache = vi.fn();
     resetSessionCacheTracking();

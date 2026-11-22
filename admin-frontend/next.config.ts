@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   output: "standalone",
 };
 
+if (process.env.NODE_ENV === "production") {
+  nextConfig.env = {
+    NEXT_PUBLIC_ADMIN_API_BASE_URL: "/api/admin/v1",
+    NEXT_PUBLIC_USER_API_BASE_URL: "/api/v1",
+    NEXT_PUBLIC_API_BASE: "",
+  };
+}
+
 // In development, proxy /api/* and /static/* to the backend (default localhost:8000).
 // Production uses nginx reverse proxy so this is not needed there.
 if (process.env.NODE_ENV === "development") {
