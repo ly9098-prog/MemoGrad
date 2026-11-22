@@ -91,12 +91,14 @@ export function DirectoryPagination({
   items,
   onPageChange,
   label,
+  disabled = false,
 }: {
   page: number;
   totalPages: number;
   items: (number | string)[];
   onPageChange: (page: number) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <nav className="flex items-center gap-1" aria-label={label}>
@@ -106,7 +108,7 @@ export function DirectoryPagination({
       <button
         type="button"
         aria-label="上一页"
-        disabled={page <= 1}
+        disabled={disabled || page <= 1}
         onClick={() => onPageChange(Math.max(1, page - 1))}
         className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
       >
@@ -118,9 +120,10 @@ export function DirectoryPagination({
           key={item}
           aria-label={`第 ${item} 页`}
           aria-current={page === item ? "page" : undefined}
+          disabled={disabled}
           onClick={() => onPageChange(item)}
           className={cn(
-            "grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold tabular-nums transition",
+            "grid h-8 min-w-8 place-items-center rounded-lg border px-2 text-xs font-semibold tabular-nums transition disabled:pointer-events-none disabled:opacity-30",
             page === item
               ? "border-primary bg-primary text-primary-foreground"
               : "border-transparent text-muted-foreground hover:border-border hover:bg-accent",
@@ -134,7 +137,7 @@ export function DirectoryPagination({
       <button
         type="button"
         aria-label="下一页"
-        disabled={page >= totalPages}
+        disabled={disabled || page >= totalPages}
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
         className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent disabled:pointer-events-none disabled:opacity-30"
       >

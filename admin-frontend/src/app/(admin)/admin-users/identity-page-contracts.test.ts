@@ -350,13 +350,13 @@ describe("role and audit page contracts", () => {
     expect(h.invalidate).toHaveBeenCalledWith({ queryKey: ["roles"] });
   });
 
-  it("uses audit aliases and committed keyword rather than input draft", async () => {
+  it.each([20, 50])("uses audit aliases, page size %s and committed keyword rather than input draft", async (pageSize) => {
     h.states = [{ keyword: "draft", debouncedKeyword: "committed", severity: "critical",
-      status: "failed", action: "role.update_permissions", resourceType: "role", dateFrom: "", dateTo: "" }, 3, null];
+      status: "failed", action: "role.update_permissions", resourceType: "role", dateFrom: "", dateTo: "" }, 3, pageSize, null];
     AuditLogsPage();
     await h.queries[0].queryFn();
     expect(h.toQuery).toHaveBeenCalledWith({
-      page: 3, pageSize: 20, severity: "critical", status: "failed",
+      page: 3, pageSize, severity: "critical", status: "failed",
       action: "role.update_permissions", resourceType: "role", keyword: "committed",
     });
     expect(h.request).toHaveBeenCalledWith("/audit-logs?fixture");

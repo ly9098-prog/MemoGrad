@@ -1,83 +1,67 @@
 "use client";
 
 import { memo } from "react";
-import { ChevronRight } from "lucide-react";
+import { Eye } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
-import {
-  TONE_MAP,
-  actionLabel,
-  operatorLabel,
-  severityLabel,
-  statusLabel,
-} from "./action-labels";
+import { Button } from "@/components/ui/button";
+import { RESOURCE_TYPE_LABELS, TONE_MAP, actionLabel, operatorLabel, severityLabel, statusLabel } from "./action-labels";
 import { formatLocalDateTime, truncate } from "./date-utils";
 import type { AuditLogListItem } from "@/lib/api/types";
 
-type AuditLogItemProps = {
-  log: AuditLogListItem;
-  onOpen: (id: number) => void;
-};
+type AuditLogItemProps = { log: AuditLogListItem; onOpen: (id: number) => void };
 
 export const AuditLogItem = memo(function AuditLogItem({ log, onOpen }: AuditLogItemProps) {
+  const operatorName = log.operator_name?.trim();
+  const isSystem = log.operator_id == null && !operatorName;
   const summary = log.detail_summary;
+  const preview = summary ? [summary.subject_name, summary.question_type,
+    typeof summary.content_preview === "string" ? summary.content_preview : null].filter(Boolean).join(" · ") : "";
 
   return (
-    <button
-      className="group w-full border-b border-border/70 px-4 py-3.5 text-left transition-colors duration-150 last:border-b-0 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
-      onClick={() => onOpen(log.id)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(log.id); } }}
-      aria-label={`${actionLabel(log.action)} 日志详情`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <span className="text-[13px] font-semibold text-foreground">{actionLabel(log.action)}</span>
-            <StatusBadge tone={log.status === "failed" ? "danger" : "success"}>
-              {statusLabel(log.status)}
-            </StatusBadge>
-            <StatusBadge tone={TONE_MAP[log.severity] ?? "neutral"}>
-              {severityLabel(log.severity)}
-            </StatusBadge>
-          </div>
-
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-            {log.resource_type ? (
-              <span>
-                {log.resource_type}
-                {log.resource_id ? <span className="font-mono"> #{log.resource_id}</span> : null}
-              </span>
-            ) : null}
-            <span>by {operatorLabel(log.operator_name, log.operator_id)}</span>
-            {log.ip ? <span className="font-mono text-[10px] text-muted-foreground/75">{log.ip}</span> : null}
-          </div>
-
-          {summary ? (
-            <div className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-muted-foreground/75">
-              {[
-                summary.subject_name,
-                summary.question_type,
-                truncate(
-                  typeof summary.content_preview === "string" ? summary.content_preview : null,
-                  80,
-                ),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
-          ) : null}
-
-          {log.error_message ? (
-            <div className="mt-2 rounded-lg border border-destructive/25 bg-destructive-light px-2.5 py-1.5 text-[11px] text-destructive">
-              {truncate(log.error_message, 150)}
-            </div>
-          ) : null}
+    <tr className="group border-b border-border/60 transition-colors last:border-b-0 hover:bg-accent/30">
+      <td className="max-w-[320px] px-5 py-4">
+        <button type="button" onClick={() => onOpen(log.id)} aria-label={`${actionLabel(log.action)} · 日志 #${log.id} 详情`}
+          className="rounded text-left text-sm font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {actionLabel(log.action)}
+        </button>
+        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="font-mono tabular-nums">#{log.id}</span>
+          <span className="truncate" title={log.action}>{log.action}</span>
         </div>
-
-        <div className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground/75 sm:flex-col sm:items-end">
-          <span title={log.created_at}>{formatLocalDateTime(log.created_at)}</span>
-          <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        {preview && <p title={preview} className="mt-1.5 line-clamp-2 break-words text-xs leading-5 text-muted-foreground">{truncate(preview, 120)}</p>}
+        {log.error_message && <p title={log.error_message} className="mt-1.5 line-clamp-2 break-words text-xs leading-5 text-destructive">{truncate(log.error_message, 150)}</p>}
+      </td>
+      <td className="px-4 py-4">
+        <div className="max-w-[160px] truncate text-sm" title={operatorName || undefined}>
+          {isSystem ? "系统" : operatorLabel(operatorName, log.operator_id)}
         </div>
-      </div>
-    </button>
+        <div className="mt-1 text-xs text-muted-foreground">{isSystem ? "系统操作" : log.operator_id == null ? "未记录 ID" : `ID ${log.operator_id}`}</div>
+      </td>
+      <td className="px-4 py-4">
+        <div className="max-w-[160px] truncate text-sm" title={log.resource_type || undefined}>
+          {log.resource_type ? RESOURCE_TYPE_LABELS[log.resource_type] || log.resource_type : "—"}
+        </div>
+        <div className="mt-1 max-w-[160px] truncate font-mono text-xs tabular-nums text-muted-foreground" title={log.resource_id || undefined}>
+          {log.resource_id ? `#${log.resource_id}` : "—"}
+        </div>
+      </td>
+      <td className="whitespace-nowrap px-4 py-4">
+        <StatusBadge tone={TONE_MAP[log.severity] ?? "neutral"}>{severityLabel(log.severity)}</StatusBadge>
+      </td>
+      <td className="whitespace-nowrap px-4 py-4">
+        <StatusBadge tone={log.status === "failed" ? "danger" : "success"}>{statusLabel(log.status)}</StatusBadge>
+      </td>
+      <td className="px-4 py-4">
+        <time dateTime={log.created_at} className="whitespace-nowrap text-xs tabular-nums" title={log.created_at}>{formatLocalDateTime(log.created_at)}</time>
+        <div className="mt-1 max-w-[200px] truncate font-mono text-[11px] text-muted-foreground" title={log.ip || undefined}>
+          {log.ip || "未记录 IP"}
+        </div>
+      </td>
+      <td className="px-4 py-4 text-right">
+        <Button variant="ghost" size="sm" onClick={() => onOpen(log.id)} aria-label={`查看日志 #${log.id} 详情`} className="h-8 gap-1.5 whitespace-nowrap text-xs">
+          <Eye className="h-3.5 w-3.5" />详情
+        </Button>
+      </td>
+    </tr>
   );
 });

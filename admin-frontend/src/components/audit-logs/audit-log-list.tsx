@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { AlertCircle, FileSearch, RefreshCw } from "lucide-react";
 import { AuditLogItem } from "./audit-log-item";
+import { DirectoryPagination } from "@/components/admin/directory-controls";
 import { useStaggeredEntrance } from "@/components/motion/staggered-entrance";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertCircle, FileSearch } from "lucide-react";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { ApiError } from "@/lib/api/errors";
+import { buildPagination } from "@/lib/app-user-utils";
 import type { AuditLogListItem, PaginatedResponse } from "@/lib/api/types";
 
 type AuditLogListProps = {
@@ -14,151 +17,86 @@ type AuditLogListProps = {
   isFetching: boolean;
   error: Error | null;
   page: number;
+  pageSize: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onOpenDetail: (id: number) => void;
   onRefresh: () => void;
   onReset: () => void;
   hasFilters: boolean;
 };
 
-export function AuditLogList({
-  data,
-  isLoading,
-  isError,
-  isFetching,
-  error,
-  page,
-  totalPages,
-  onPageChange,
-  onOpenDetail,
-  onRefresh,
-  onReset,
-  hasFilters,
-}: AuditLogListProps) {
-  const paginationInfo = useMemo(() => {
-    if (!data) return null;
-    const { total } = data;
-    if (total === 0) return "共 0 条";
-    return `共 ${total} 条 · 第 ${Math.min(page, totalPages)}/${totalPages} 页`;
-  }, [data, page, totalPages]);
-  const listEntranceRef = useStaggeredEntrance<HTMLDivElement>({
-    ready: Boolean(data?.items.length),
-    itemCount: data?.items.length ?? 0,
-    animationKey: page,
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100].map((size) => ({ value: String(size), label: `${size} 条/页` }));
+const COLUMNS = ["操作记录", "操作人", "关联资源", "级别", "结果", "时间 / IP", "操作"];
+
+export function AuditLogList({ data, isLoading, isError, isFetching, error, page, pageSize, totalPages,
+  onPageChange, onPageSizeChange, onOpenDetail, onRefresh, onReset, hasFilters }: AuditLogListProps) {
+  const listRef = useStaggeredEntrance<HTMLTableSectionElement>({
+    ready: Boolean(data?.items.length), itemCount: data?.items.length ?? 0, animationKey: page,
   });
+  const pages = Math.max(1, totalPages);
+  const total = data?.total ?? 0;
+  const start = data?.items.length ? (page - 1) * pageSize + 1 : 0;
+  const end = data?.items.length ? Math.min(start + data.items.length - 1, total) : 0;
+  const errorStatus = error instanceof ApiError ? error.status : null;
+  const errorMessage = errorStatus === 403 ? "权限不足，需要审计日志查看权限"
+    : errorStatus === 401 ? "登录已过期，请重新登录"
+    : error?.message.slice(0, 200) || "日志加载失败，请稍后重试";
 
-  // Only show skeleton on initial load (no cached data at all)
-  const showInitialLoading = isLoading && !data;
-
-  // ── Loading skeleton (first load only) ──
-  if (showInitialLoading) {
-    return (
-      <div className="overflow-hidden rounded-[16px] border border-border bg-card">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="animate-pulse border-b border-border/70 px-4 py-4 last:border-b-0 motion-reduce:animate-none"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="h-5 w-16 rounded-full bg-border" />
-              <div className="h-5 w-14 rounded-full bg-border" />
-              <div className="h-4 w-36 rounded bg-border" />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-4">
-              <div className="h-3 w-32 rounded bg-border" />
-              <div className="h-3 w-20 rounded bg-border" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // ── Error state ──
-  if (isError) {
-    const errorMsg = error instanceof Error ? error.message : "";
-    let displayMsg = "请求失败，请稍后重试";
-    if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
-      displayMsg = "权限不足，需要 audit:read 权限";
-    } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
-      displayMsg = "登录已过期，请重新登录";
-    } else if (errorMsg.length > 0) {
-      displayMsg = errorMsg.slice(0, 200);
-    }
-
-    return (
-      <div className="flex flex-col items-center gap-4 rounded-[16px] border border-destructive/40 bg-destructive-light px-6 py-10">
-        <AlertCircle className="h-8 w-8 text-destructive" />
-        <p className="text-sm text-destructive">{displayMsg}</p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onRefresh}>重试</Button>
-          <Button variant="secondary" onClick={onReset}>重置筛选</Button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Empty state ──
-  if (!data || data.items.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-[16px] border border-border bg-card px-6 py-12">
-        <FileSearch className="h-10 w-10 text-muted-foreground/70" />
-        <p className="text-sm font-medium text-muted-foreground">暂无审计日志</p>
-        {hasFilters && (
-          <>
-            <p className="text-xs text-muted-foreground/70">当前筛选条件下没有匹配记录</p>
-            <Button variant="secondary" onClick={onReset}>重置筛选</Button>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  // ── List ──
   return (
-    <div className="overflow-hidden rounded-[16px] border border-border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-        <div>
-          <p className="text-[13px] font-semibold text-foreground">日志明细</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground/75">{paginationInfo ?? "—"}</p>
-        </div>
-        <div className="h-4 text-[10px] text-muted-foreground/75">
-          {isFetching && !isLoading ? (
-            <span className="flex items-center gap-1.5">
-              <RefreshCw className="h-3 w-3 animate-spin" />
-              刷新中
-            </span>
-          ) : null}
-        </div>
+    <div aria-busy={isFetching}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 lg:px-5">
+        <h2 className="text-sm font-semibold">操作记录 <span className="ml-1 text-xs font-normal tabular-nums text-muted-foreground">{data ? `${total.toLocaleString("zh-CN")} 条` : ""}</span></h2>
+        <span role="status" className="inline-flex min-h-4 items-center gap-1.5 text-xs text-muted-foreground">
+          {isFetching && <><RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />更新中</>}
+        </span>
       </div>
-
-      <div ref={listEntranceRef}>
-        {data.items.map((log) => (
-          <AuditLogItem key={log.id} log={log} onOpen={onOpenDetail} />
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-secondary/25 px-4 py-2.5 text-[11px] text-muted-foreground">
-        <span>{paginationInfo}</span>
-        <div className="flex gap-1.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page <= 1 || isFetching}
-            onClick={() => onPageChange(Math.max(1, page - 1))}
-          >
-            上一页
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page >= totalPages || isFetching}
-            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          >
-            下一页
-          </Button>
+      {isError ? (
+        <div role="alert" className="flex flex-col items-center gap-3 border-t border-border/60 px-5 py-14 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" /><p className="max-w-lg break-words text-sm text-destructive">{errorMessage}</p>
+          <div className="flex gap-2"><Button variant="secondary" size="sm" onClick={onRefresh}>重新加载</Button>{hasFilters && <Button variant="ghost" size="sm" onClick={onReset}>重置筛选</Button>}</div>
         </div>
+      ) : !isLoading && !data?.items.length ? (
+        <div className="flex flex-col items-center gap-3 border-t border-border/60 px-5 py-16 text-center">
+          <FileSearch className="h-9 w-9 text-muted-foreground" />
+          <p className="text-sm font-medium">{hasFilters ? "未找到匹配的操作记录" : "暂无审计日志"}</p>
+          <p className="text-xs text-muted-foreground">{hasFilters ? "调整关键词或日期范围后重试" : "后台操作发生后，可在此查看记录"}</p>
+          {hasFilters && <Button variant="secondary" size="sm" onClick={onReset}>清除筛选</Button>}
+        </div>
+      ) : (
+        <div className="overflow-x-auto border-t border-border/60" role="region" aria-label="审计日志表格，可横向滚动" tabIndex={0}>
+          <table className="w-full min-w-[1040px] text-left">
+            <caption className="sr-only">后台审计日志，点击操作名称或详情查看完整记录</caption>
+            <thead className="border-b border-border bg-secondary/25 text-xs text-muted-foreground">
+              <tr>
+                {COLUMNS.map((column, index) => (
+                  <th key={column} scope="col" className={index === 0 ? "min-w-[260px] px-5 py-3 font-medium" : `whitespace-nowrap px-4 py-3 font-medium${index === COLUMNS.length - 1 ? " text-right" : ""}`}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody ref={listRef}>
+              {isLoading && !data ? Array.from({ length: 6 }, (_, index) => (
+                <tr key={index} aria-hidden="true" className="border-b border-border/60">
+                  {COLUMNS.map((column) => (
+                    <td key={column} className="px-5 py-6"><div className="h-4 w-16 animate-pulse rounded bg-border/70 motion-reduce:animate-none" /></td>
+                  ))}
+                </tr>
+              )) : data?.items.map((log) => (
+                <AuditLogItem key={log.id} log={log} onOpen={onOpenDetail} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="flex flex-col gap-3 border-t border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="tabular-nums">共 {data ? total.toLocaleString("zh-CN") : "—"} 条</span><span className="tabular-nums">{start}–{end}</span>
+          <CustomSelect aria-label="每页显示条数" value={String(pageSize)} onChange={(value) => onPageSizeChange(Number(value))} options={PAGE_SIZE_OPTIONS} clearable={false} className="h-8 w-28 bg-card text-xs" />
+        </div>
+        <DirectoryPagination page={page} totalPages={pages} items={buildPagination(page, pages)} onPageChange={onPageChange} label="审计日志分页" disabled={isFetching} />
       </div>
     </div>
   );

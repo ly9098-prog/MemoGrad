@@ -48,6 +48,7 @@ export function AuditLogDrawer({ detailId, onClose }: AuditLogDrawerProps) {
       open={detailId !== null}
       onClose={onClose}
       ariaLabel="审计日志详情"
+      title="审计日志详情"
       className="w-full max-w-[760px] sm:max-w-[640px] lg:max-w-[760px]"
     >
       {/* Loading */}

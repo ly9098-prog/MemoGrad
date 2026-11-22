@@ -55,6 +55,13 @@ describe("shared directory controls", () => {
     expect(change.mock.calls).toEqual([[7], [1]]);
   });
 
+  it("disables every navigation button while cached pages are being refreshed", () => {
+    const tree = DirectoryPagination({ page: 2, totalPages: 3, items: [1, 2, 3], onPageChange: vi.fn(), label: "审计日志分页", disabled: true });
+    for (const label of ["上一页", "下一页", "第 1 页", "第 2 页", "第 3 页"]) {
+      expect(findByLabel(tree, label)!.props.disabled).toBe(true);
+    }
+  });
+
   it("lets Admin reuse the calendar without calling creation a registration", () => {
     const html = renderToStaticMarkup(createElement(DateRangePicker, { from: "", to: "", dateLabel: "创建日期", onChange: vi.fn() }));
     expect(html).toContain('aria-label="选择创建日期"');

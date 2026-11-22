@@ -2,13 +2,15 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ClipboardList } from "lucide-react";
+import { CheckCircle2, ClipboardList, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import {
   ManagementPage,
   ManagementPageHeader,
-  ManagementPanel,
 } from "@/components/admin/management-ui";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { AuditLogFilters } from "@/components/audit-logs/audit-log-filters";
 import { AuditLogList } from "@/components/audit-logs/audit-log-list";
 import { AuditLogDrawer } from "@/components/audit-logs/audit-log-drawer";
@@ -29,6 +31,7 @@ export default function AuditLogsPage() {
     dateTo: "",
   });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [detailId, setDetailId] = useState<number | null>(null);
 
   const handleFilterChange = useCallback((patch: Partial<AuditLogFiltersState>) => {
@@ -65,7 +68,7 @@ export default function AuditLogsPage() {
   const queryParams = useMemo(() => {
     const params: Record<string, string | number | boolean | undefined | null> = {
       page,
-      pageSize: 20,
+      pageSize,
       severity: filters.severity,
       status: filters.status,
       action: filters.action,
@@ -79,7 +82,7 @@ export default function AuditLogsPage() {
       params["to"] = localDateToUtcIsoNext(filters.dateTo);
     }
     return params;
-  }, [page, filters.severity, filters.status, filters.action, filters.resourceType, filters.debouncedKeyword, filters.dateFrom, filters.dateTo]);
+  }, [page, pageSize, filters.severity, filters.status, filters.action, filters.resourceType, filters.debouncedKeyword, filters.dateFrom, filters.dateTo]);
 
   // ── Queries ──
   const logs = useQuery({
@@ -93,7 +96,7 @@ export default function AuditLogsPage() {
 
   const hasFilters = Boolean(
     filters.severity || filters.status || filters.action || filters.resourceType ||
-    filters.debouncedKeyword || filters.dateFrom || filters.dateTo,
+    filters.keyword || filters.dateFrom || filters.dateTo,
   );
 
   // ── Render ──
@@ -102,36 +105,70 @@ export default function AuditLogsPage() {
       <ManagementPageHeader
         icon={<ClipboardList className="h-5 w-5" />}
         title="审计日志"
-        description="检索后台关键操作、资源变更与失败记录，并查看结构化审计详情。"
-        meta={<span>只读页面；筛选、分页与详情字段保持现有 Admin API 契约。</span>}
+        description="追溯后台操作与资源变更，定位失败原因并查看完整记录。"
+        actions={
+          <Button variant="secondary" size="sm" disabled={logs.isFetching} onClick={() => logs.refetch()}>
+            <RefreshCw className={cn("h-4 w-4", logs.isFetching && "animate-spin motion-reduce:animate-none")} />刷新日志
+          </Button>
+        }
       />
 
       {/* ── Filters ── */}
-      <ManagementPanel variant="quiet" contentClassName="p-4">
-        <AuditLogFilters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onReset={handleReset}
-          onRefresh={() => logs.refetch()}
-          isRefreshing={logs.isFetching}
-        />
-      </ManagementPanel>
+      <Card className="overflow-hidden rounded-[18px]">
+        <div className="flex flex-col gap-3 border-b border-border/70 bg-secondary/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
+          <div role="group" aria-label="按操作结果筛选" className="flex max-w-full items-center gap-1 self-start overflow-x-auto rounded-xl border border-border/70 bg-secondary/35 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              { value: "", label: "全部记录", icon: ClipboardList },
+              { value: "success", label: "操作成功", icon: CheckCircle2 },
+              { value: "failed", label: "操作失败", icon: XCircle },
+            ].map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filters.status === value}
+                onClick={() => handleFilterChange({ status: value })}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-2 sm:px-3",
+                  filters.status === value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" />只读追溯 · 默认近 183 天
+          </span>
+        </div>
+        <div className="border-b border-border/70 px-4 py-3.5 lg:px-5">
+          <AuditLogFilters
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onReset={handleReset}
+          />
+        </div>
 
-      {/* ── List ── */}
-      <AuditLogList
-        data={logs.data}
-        isLoading={logs.isLoading}
-        isError={logs.isError}
-        isFetching={logs.isFetching}
-        error={logs.error}
-        page={page}
-        totalPages={logs.data?.total_pages ?? 1}
-        onPageChange={setPage}
-        onOpenDetail={openDetail}
-        onRefresh={() => logs.refetch()}
-        onReset={handleReset}
-        hasFilters={hasFilters}
-      />
+        <AuditLogList
+          data={logs.data}
+          isLoading={logs.isLoading}
+          isError={logs.isError}
+          isFetching={logs.isFetching}
+          error={logs.error}
+          page={page}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          totalPages={logs.data?.total_pages ?? 1}
+          onPageChange={setPage}
+          onOpenDetail={openDetail}
+          onRefresh={() => logs.refetch()}
+          onReset={handleReset}
+          hasFilters={hasFilters}
+        />
+      </Card>
 
       {/* ── Detail Drawer ── */}
       <AuditLogDrawer detailId={detailId} onClose={closeDetail} />

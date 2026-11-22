@@ -1,38 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, X, RefreshCw, RotateCcw } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useEffect, useRef } from "react";
+import { ListFilter, RotateCcw } from "lucide-react";
+import { DirectorySearch, FilterChip, useDirectorySearchShortcut } from "@/components/admin/directory-controls";
 import { Button } from "@/components/ui/button";
-import { CustomSelect } from "@/components/ui/custom-select";
-import {
-  ACTION_LABELS,
-  SEVERITY_LABELS,
-  STATUS_LABELS,
-  RESOURCE_TYPE_LABELS,
-} from "./action-labels";
-import type { SelectOption } from "@/components/ui/custom-select";
+import { CustomSelect, type SelectOption } from "@/components/ui/custom-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { ACTION_LABELS, SEVERITY_LABELS, STATUS_LABELS, RESOURCE_TYPE_LABELS } from "./action-labels";
 
-const DEBOUNCE_MS = 300;
-const KEYWORD_MAX_LENGTH = 200;
-
-// Build select options
 const SEVERITY_OPTIONS: SelectOption[] = [
   { value: "", label: "全部级别" },
   ...Object.entries(SEVERITY_LABELS).map(([value, label]) => ({ value, label })),
 ];
-
-const STATUS_OPTIONS: SelectOption[] = [
-  { value: "", label: "全部状态" },
-  ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
-];
-
 const ACTION_OPTIONS: SelectOption[] = [
   { value: "", label: "全部操作" },
   ...Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label, suffix: value })),
 ];
-
-const RESOURCE_TYPE_OPTIONS: SelectOption[] = [
+const RESOURCE_OPTIONS: SelectOption[] = [
   { value: "", label: "全部资源" },
   ...Object.entries(RESOURCE_TYPE_LABELS).map(([value, label]) => ({ value, label, suffix: value })),
 ];
@@ -52,165 +36,58 @@ export type AuditLogFiltersProps = {
   filters: AuditLogFiltersState;
   onFilterChange: (patch: Partial<AuditLogFiltersState>) => void;
   onReset: () => void;
-  onRefresh: () => void;
-  isRefreshing: boolean;
 };
 
-export function AuditLogFilters({
-  filters,
-  onFilterChange,
-  onReset,
-  onRefresh,
-  isRefreshing,
-}: AuditLogFiltersProps) {
-  const { keyword, severity, status, action, resourceType, dateFrom, dateTo } = filters;
-
-  // Keyword debounce
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [localKeyword, setLocalKeyword] = useState(keyword);
+export function AuditLogFilters({ filters, onFilterChange, onReset }: AuditLogFiltersProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useDirectorySearchShortcut(searchRef);
+  const { keyword, debouncedKeyword, action, resourceType, severity, status, dateFrom, dateTo } = filters;
 
   useEffect(() => {
-    setLocalKeyword(keyword);
-  }, [keyword]);
+    if (keyword === debouncedKeyword) return;
+    const timer = setTimeout(() => onFilterChange({ debouncedKeyword: keyword }), 300);
+    return () => clearTimeout(timer);
+  }, [keyword, debouncedKeyword, onFilterChange]);
 
-  const handleKeywordChange = useCallback(
-    (value: string) => {
-      setLocalKeyword(value);
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      if (value === "") {
-        onFilterChange({ keyword: "", debouncedKeyword: "" });
-        return;
-      }
-      debounceTimer.current = setTimeout(() => {
-        onFilterChange({ keyword: value, debouncedKeyword: value });
-      }, DEBOUNCE_MS);
-    },
-    [onFilterChange],
-  );
-
-  const clearKeyword = useCallback(() => {
-    setLocalKeyword("");
-    onFilterChange({ keyword: "", debouncedKeyword: "" });
-  }, [onFilterChange]);
-
-  // Cleanup debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, []);
-
-  // Count active filters
-  const activeFilterCount = [severity, status, action, resourceType, dateFrom, dateTo].filter(Boolean).length;
+  const clearKeyword = () => onFilterChange({ keyword: "", debouncedKeyword: "" });
+  const chips = [
+    keyword && { label: `关键词：${keyword}`, remove: clearKeyword },
+    action && { label: `操作：${ACTION_LABELS[action] || action}`, remove: () => onFilterChange({ action: "" }) },
+    resourceType && { label: `资源：${RESOURCE_TYPE_LABELS[resourceType] || resourceType}`, remove: () => onFilterChange({ resourceType: "" }) },
+    severity && { label: `级别：${SEVERITY_LABELS[severity] || severity}`, remove: () => onFilterChange({ severity: "" }) },
+    status && { label: `结果：${STATUS_LABELS[status] || status}`, remove: () => onFilterChange({ status: "" }) },
+    (dateFrom || dateTo) && { label: `日期：${dateFrom || "不限"} — ${dateTo || "不限"}`, remove: () => onFilterChange({ dateFrom: "", dateTo: "" }) },
+  ].filter((chip): chip is { label: string; remove: () => void } => Boolean(chip));
 
   return (
     <div className="space-y-3">
-      {/* Row 1: keyword + action + resource type + severity + status */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        {/* Search */}
-        <div className="relative xl:col-span-2">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-          <Input
-            className="pl-9 pr-8"
-            placeholder="搜索操作、资源、操作人或资源 ID"
-            value={localKeyword}
-            maxLength={KEYWORD_MAX_LENGTH}
-            onChange={(e) => handleKeywordChange(e.target.value)}
-          />
-          {localKeyword && (
-            <button
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/70 transition-colors hover:text-foreground"
-              onClick={clearKeyword}
-              aria-label="清除搜索"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="min-w-0 flex-1 xl:max-w-[400px]">
+          <DirectorySearch inputRef={searchRef} label="搜索审计日志" placeholder="输入操作、资源、操作人或资源 ID" value={keyword}
+            onChange={(value) => value ? onFilterChange({ keyword: value.slice(0, 200) }) : clearKeyword()} onClear={clearKeyword} />
         </div>
-
-        {/* Action type (searchable) */}
-        <CustomSelect
-          value={action}
-          onChange={(v) => onFilterChange({ action: v })}
-          options={ACTION_OPTIONS}
-          placeholder="全部操作"
-          searchable
-          searchPlaceholder="搜索操作名称..."
-        />
-
-        {/* Resource type (searchable) */}
-        <CustomSelect
-          value={resourceType}
-          onChange={(v) => onFilterChange({ resourceType: v })}
-          options={RESOURCE_TYPE_OPTIONS}
-          placeholder="全部资源"
-          searchable
-          searchPlaceholder="搜索资源类型..."
-        />
-
-        {/* Severity */}
-        <CustomSelect
-          value={severity}
-          onChange={(v) => onFilterChange({ severity: v })}
-          options={SEVERITY_OPTIONS}
-          placeholder="全部级别"
-        />
-
-        {/* Status */}
-        <CustomSelect
-          value={status}
-          onChange={(v) => onFilterChange({ status: v })}
-          options={STATUS_OPTIONS}
-          placeholder="全部状态"
-        />
-      </div>
-
-      {/* Row 2: date range + actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground">日期范围</span>
-        <Input
-          className="h-11 w-auto min-w-[140px] flex-1 sm:flex-none sm:w-40"
-          type="date"
-          value={dateFrom}
-          onChange={(e) => onFilterChange({ dateFrom: e.target.value })}
-          aria-label="开始日期"
-        />
-        <span className="text-muted-foreground/70">—</span>
-        <Input
-          className="h-11 w-auto min-w-[140px] flex-1 sm:flex-none sm:w-40"
-          type="date"
-          value={dateTo}
-          onChange={(e) => onFilterChange({ dateTo: e.target.value })}
-          aria-label="结束日期"
-        />
-        {(dateFrom || dateTo) && (
-          <span className="text-xs text-muted-foreground/70">默认查询近 183 天</span>
-        )}
-
-        <div className="ml-auto flex gap-2">
-          <Button variant="secondary" onClick={onReset} size="sm">
-            <RotateCcw className="h-4 w-4" />
-            重置
-          </Button>
-          <Button variant="secondary" onClick={onRefresh} disabled={isRefreshing} size="sm">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-3 xl:ml-auto xl:max-w-[600px]">
+          <div className="col-span-2 min-w-0 sm:col-span-1">
+            <CustomSelect aria-label="筛选操作类型" value={action} onChange={(value) => onFilterChange({ action: value })}
+              options={ACTION_OPTIONS} searchable searchPlaceholder="输入操作名称或标识" className="h-10 w-full bg-card text-xs" />
+          </div>
+          <CustomSelect aria-label="筛选资源类型" value={resourceType} onChange={(value) => onFilterChange({ resourceType: value })}
+            options={RESOURCE_OPTIONS} searchable searchPlaceholder="输入资源名称或标识" className="h-10 w-full bg-card text-xs" />
+          <CustomSelect aria-label="筛选日志级别" value={severity} onChange={(value) => onFilterChange({ severity: value })}
+            options={SEVERITY_OPTIONS} className="h-10 w-full bg-card text-xs" />
         </div>
       </div>
-
-      {/* Active filter indicator */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground/70">
-            已启用 {activeFilterCount} 个筛选条件
-          </span>
-          <button
-            onClick={onReset}
-            className="text-xs text-primary underline-offset-2 hover:underline"
-          >
-            清除全部
-          </button>
+      <div className="flex items-center justify-between gap-2.5">
+        <DateRangePicker from={dateFrom} to={dateTo} dateLabel="操作日期" placeholder="选择操作日期范围" className="min-w-0 flex-1 sm:flex-none"
+          onChange={({ from, to }) => onFilterChange({ dateFrom: from, dateTo: to })} />
+        <Button variant="ghost" size="sm" disabled={!chips.length} onClick={onReset} className="h-10 self-end px-3 text-xs">
+          <RotateCcw className="h-3.5 w-3.5" />重置筛选
+        </Button>
+      </div>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground"><ListFilter className="h-3.5 w-3.5" />筛选条件</span>
+          {chips.map((chip) => <FilterChip key={chip.label} label={chip.label} onRemove={chip.remove} />)}
         </div>
       )}
     </div>
