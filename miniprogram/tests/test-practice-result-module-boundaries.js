@@ -32,9 +32,9 @@ test('scans every governed practice-result module and the real page', () => {
   assert.equal(result.controllers, 4)
   assert.equal(result.modules, 22)
   assert.equal(Object.keys(MODULES).length, Object.keys(MODULE_BUDGETS).length)
-  assert.equal(result.adapterLines, 159)
+  assert.equal(result.adapterLines, 166)
   assert.equal(result.moduleLines, Object.values(MODULE_BUDGETS).reduce((sum, lines) => sum + lines, 0))
-  assert.equal(result.requires, 12)
+  assert.equal(result.requires, 13)
   assert.equal(ADAPTERS.length, 5)
 })
 

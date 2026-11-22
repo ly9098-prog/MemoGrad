@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -1216,7 +1217,11 @@ async def run_teacher_action(
         )
         return {**base, **fallback, "tokens_used": 0, "from_fallback": True}
 
-    teacher_runtime = await require_available_runtime(db)
+    try:
+        teacher_runtime = await require_available_runtime(db)
+    except (Exception, asyncio.CancelledError):
+        await cancel_token_reservation(reservation)
+        raise
     started_at = time.time()
     try:
         result = await chat_with_db_model(

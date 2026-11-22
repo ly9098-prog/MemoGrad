@@ -199,6 +199,8 @@ result.nextAction = null
 return result
 }
 function errorMessage(error, api) {
+const detail = error && error.detail
+if (detail && detail.code === 'ai_service_unavailable' && detail.message) return cleanText(detail.message)
 const raw = api && typeof api.getErrorMessage === 'function'
 ? api.getErrorMessage(error)
 : cleanText(error && error.message)

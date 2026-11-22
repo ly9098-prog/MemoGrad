@@ -2,6 +2,7 @@
 // Assemble live page ports here; the page keeps lazy controller memoisation.
 
 const aiTeacher408 = require('../../utils/ai-teacher-408')
+const { requestTeacher } = require('../../../../utils/ai-teacher-request')
 
 function buildReview408TeacherPageCapabilities(page, deps) {
   const { api } = deps
@@ -27,7 +28,13 @@ function buildReview408TeacherPageCapabilities(page, deps) {
     nextRequestSequence: () => ++page._teacherRequestSeq,
     getRequestSequence: () => page._teacherRequestSeq,
     isPageAlive: () => page._pageAlive,
-    postTeacher: payload => api.post('/ai/408-teacher', payload, { timeout: 55000 }),
+    postTeacher: payload => {
+      const sequence = page._teacherRequestSeq
+      return requestTeacher(api, payload, {
+        isCurrent: () => page._pageAlive && page._resultVisible && page._teacherRequestSeq === sequence &&
+          Number((page.data.reviewDialog || {}).questionId) === Number(payload.question_id),
+      })
+    },
     normalizeResult: raw => aiTeacher408.normalizeResult(raw),
     errorMessage: error => aiTeacher408.errorMessage(error, api),
   }

@@ -10,7 +10,11 @@ function fixture() {
   let definition
   const calls = []
   const api = {
-    get: (...args) => { calls.push(['get', ...args]); return Promise.resolve({}) },
+    get: (...args) => {
+      calls.push(['get', ...args])
+      return Promise.resolve(args[0] === '/ai/error-analysis/availability'
+        ? { status: 'available', enabled: true } : {})
+    },
     put: (...args) => { calls.push(['put', ...args]); return Promise.resolve({}) },
     post: (...args) => { calls.push(['post', ...args]); return Promise.resolve({}) },
   }
@@ -166,11 +170,13 @@ test('teacher ports preserve request contract, inflight identity and live caches
   assert.equal(ports.nextRequestSequence(), 1)
   assert.equal(ports.getRequestSequence(), 1)
   const payload = { question_id: 4, action: 'core_concept' }
+  page.data.reviewDialog = { questionId: 4 }
   await ports.postTeacher(payload)
-  assert.equal(calls[0][0], 'post')
-  assert.equal(calls[0][1], '/ai/408-teacher')
-  assert.equal(calls[0][2], payload)
-  assert.equal(calls[0][3].timeout, 55000)
+  const request = calls.find(call => call[0] === 'post')
+  assert.equal(calls[0][1], '/ai/error-analysis/availability')
+  assert.equal(request[1], '/ai/408-teacher')
+  assert.equal(request[2], payload)
+  assert.equal(request[3].timeout, 55000)
 })
 
 test('shared reader returns from teacher to review and dismisses both states together', async () => {
@@ -182,6 +188,8 @@ test('shared reader returns from teacher to review and dismisses both states tog
   const pending = page.run408TeacherFromReview('explain_correct')
   assert.equal(page.data.teacherSheetVisible, true)
   assert.equal(page.data.teacherLoading, true)
+  await Promise.resolve()
+  await Promise.resolve()
   page.close408Teacher()
   assert.equal(page.data.teacherSheetVisible, false)
   assert.equal(page.data.reviewDialogVisible, true, 'the explicit return action preserves the review')
@@ -194,6 +202,21 @@ test('shared reader returns from teacher to review and dismisses both states tog
   await pending
   assert.equal(page.data.teacherSheetVisible, false, 'a late response must not reopen the reader')
   assert.equal(page.data.reviewDialogVisible, false)
+})
+
+test('teacher cannot generate after changing the reviewed question during the health query', async () => {
+  const { page, api } = fixture()
+  page.data.reviewDialog = { questionId: 42 }
+  let finishStatus, posts = 0
+  api.get = () => new Promise(resolve => { finishStatus = resolve })
+  api.post = async () => { posts++; return {} }
+  const pending = page.run408TeacherFromReview('explain_correct')
+  assert.equal(page.data.teacherLoading, true)
+  page.data.reviewDialog = { questionId: 43 }
+  finishStatus({ status: 'available', enabled: true })
+  await pending
+  assert.equal(posts, 0)
+  assert.equal(page.data.teacherResult, null)
 })
 
 test('review teacher retries after fallback and retains successful result caching', async () => {

@@ -53,7 +53,10 @@ test('silent refresh retains a confirmed disabled state until the response arriv
 function fixture() {
   let definition
   const calls = []
-  const api = { post: (...args) => { calls.push(['post', ...args]); return Promise.resolve({}) } }
+  const api = {
+    get: async () => ({ status: 'available', enabled: true }),
+    post: (...args) => { calls.push(['post', ...args]); return Promise.resolve({}) },
+  }
   const config = { DEV: true }
   const stem = { buildRenderModel: (...args) => { calls.push(['render', ...args]); return { mode: 'PLAIN' } } }
   const cache = new Map()
@@ -212,6 +215,8 @@ test('late teacher response cannot replace the next question or clear a newer in
   const pending = page.run408TeacherAction({
     currentTarget: { dataset: { action: 'explain_correct' } },
   })
+  await Promise.resolve()
+  await Promise.resolve()
   const newer = Promise.resolve('newer request')
   page._teacherInflight.key = newer
   page.data.wq = { id: 2, question_id: 8 }
@@ -233,6 +238,8 @@ test('teacher error cannot write view state after unload', async () => {
   const pending = page.run408TeacherAction({
     currentTarget: { dataset: { action: 'explain_correct' } },
   })
+  await Promise.resolve()
+  await Promise.resolve()
   page._alive = false
   let writes = 0
   page.setData = () => { writes++ }

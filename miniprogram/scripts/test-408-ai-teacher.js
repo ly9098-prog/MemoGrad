@@ -92,6 +92,9 @@ const surfaces = [
   },
 ]
 
+const teacherRequest = fs.readFileSync(path.join(miniRoot, 'utils/ai-teacher-request.js'), 'utf8')
+assert(teacherRequest.includes("api.get('/ai/error-analysis/availability'"), '老师请求必须先等待共享健康门禁')
+assert(teacherRequest.includes("api.post('/ai/408-teacher'"), '共享老师请求必须调用固定 API')
 surfaces.forEach(surface => {
   const js = fs.readFileSync(path.join(miniRoot, surface.js), 'utf8')
   const wxml = fs.readFileSync(path.join(miniRoot, surface.wxml), 'utf8')
@@ -99,7 +102,7 @@ surfaces.forEach(surface => {
     ? fs.readFileSync(path.join(miniRoot, surface.apiSource), 'utf8') : js
   const contextSource = surface.contextSource
     ? fs.readFileSync(path.join(miniRoot, surface.contextSource), 'utf8') : js
-  assert(apiSource.includes("api.post('/ai/408-teacher'"), `${surface.js} 未调用 408 teacher API`)
+  assert(apiSource.includes('requestTeacher(api, payload, {'), `${surface.js} 未调用共享老师请求流程`)
   assert(contextSource.includes(surface.extra), `${surface.js} 未携带 ${surface.extra} 上下文`)
   assert(js.includes(`${surface.handler}(`), `${surface.js} 缺少 ${surface.handler}`)
   assert(wxml.includes(surface.handler), `${surface.wxml} 未绑定 ${surface.handler}`)

@@ -121,7 +121,9 @@ test('exam 408 teacher wiring exposes the exact controller port set', () => {
 
 test('exam 408 teacher ports are wired to exact page helpers', () => {
   const source = method('exam408TeacherController')
-  assert.ok(source.includes("api.post('/ai/408-teacher', payload, { timeout: 55000 })"))
+  assert.ok(source.includes('requestTeacher(api, payload, {'))
+  assert.ok(source.includes('this._teacherRequestSeq === sequence'))
+  assert.ok(source.includes('Number(this.data.attemptId) === Number(payload.exam_attempt_id)'))
   assert.ok(source.includes('aiTeacher408.normalizeResult(raw)'))
   assert.ok(source.includes('aiTeacher408.errorMessage(error, api)'))
   assert.ok(source.includes('this._teacherCache[key]'))

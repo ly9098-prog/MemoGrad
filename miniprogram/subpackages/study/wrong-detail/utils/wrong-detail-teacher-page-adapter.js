@@ -1,3 +1,5 @@
+const { requestTeacher } = require('../../../../utils/ai-teacher-request')
+
 function buildTeacherActionPageCapabilities(page, { api, aiTeacher408, presentTeacherResult, AI_REQUEST_TIMEOUT_MS }) {
 return {
         getAiLoading: () => page.data.aiLoading,
@@ -27,7 +29,15 @@ return {
         nextRequestSequence: () => ++page._teacherRequestSeq,
         getRequestSequence: () => page._teacherRequestSeq,
         isAlive: () => page._alive,
-        postTeacher: payload => api.post('/ai/408-teacher', payload, { timeout: AI_REQUEST_TIMEOUT_MS }),
+        postTeacher: payload => {
+          const sequence = page._teacherRequestSeq
+          const wrongId = (page.data.wq || {}).id
+          return requestTeacher(api, payload, {
+            timeout: AI_REQUEST_TIMEOUT_MS,
+            isCurrent: () => page._alive && !page._aiAvailabilityPaused &&
+              page._teacherRequestSeq === sequence && (page.data.wq || {}).id === wrongId,
+          })
+        },
         normalizeResult: raw => aiTeacher408.normalizeResult(raw),
         presentResult: normalized => presentTeacherResult(normalized),
         errorMessage: error => aiTeacher408.errorMessage(error, api),

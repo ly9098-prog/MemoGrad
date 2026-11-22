@@ -196,7 +196,15 @@ const TEACHER_PORTS = {
   "nextRequestSequence": "nextRequestSequence: () => ++page._teacherRequestSeq",
   "getRequestSequence": "getRequestSequence: () => page._teacherRequestSeq",
   "isAlive": "isAlive: () => page._alive",
-  "postTeacher": "postTeacher: payload => api.post('/ai/408-teacher', payload, { timeout: AI_REQUEST_TIMEOUT_MS })",
+  "postTeacher": `postTeacher: payload => {
+          const sequence = page._teacherRequestSeq
+          const wrongId = (page.data.wq || {}).id
+          return requestTeacher(api, payload, {
+            timeout: AI_REQUEST_TIMEOUT_MS,
+            isCurrent: () => page._alive && !page._aiAvailabilityPaused &&
+              page._teacherRequestSeq === sequence && (page.data.wq || {}).id === wrongId,
+          })
+        }`,
   "normalizeResult": "normalizeResult: raw => aiTeacher408.normalizeResult(raw)",
   "presentResult": "presentResult: normalized => presentTeacherResult(normalized)",
   "errorMessage": "errorMessage: error => aiTeacher408.errorMessage(error, api)",
@@ -276,7 +284,11 @@ function moduleViolations(name, source) {
       ((ts.isCallExpression(node) || ts.isNewExpression(node)) &&
         (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
           ['require', 'eval', 'Function'].includes(node.expression.getText(parsed))))) {
-      errors.push(name + ': forbidden dependency or dynamic execution')
+      const teacherRequestDependency = name === 'wrong-detail-teacher-page-adapter.js' &&
+        node.getText(parsed) === "require('../../../../utils/ai-teacher-request')"
+      if (!teacherRequestDependency) {
+        errors.push(name + ': forbidden dependency or dynamic execution')
+      }
     }
     if (ts.isIdentifier(node) && ['storage', 'getApp', 'Page'].includes(node.text)) {
       errors.push(name + ': forbidden platform port')

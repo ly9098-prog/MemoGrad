@@ -50,7 +50,7 @@ test('moved AI helpers must stay imported and cannot return inline', () => {
 test('teacher port gate rejects missing and stale capability wiring', () => {
   const source = modules['wrong-detail-teacher-page-adapter.js']
   assert.deepEqual(teacherPortViolations(source), [])
-  assert.ok(teacherPortViolations(source.replace('page._alive', 'true'))
+  assert.ok(teacherPortViolations(source.replace('isAlive: () => page._alive', 'isAlive: () => true'))
     .includes('teacher port drift: isAlive'))
   assert.ok(teacherPortViolations(source.replace('getWq:', 'getOldWq:'))
     .includes('teacher port keys drift'))

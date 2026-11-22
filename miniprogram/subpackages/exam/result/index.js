@@ -1,4 +1,5 @@
 const api = require('../../../utils/api')
+const { requestTeacher } = require('../../../utils/ai-teacher-request')
 const aiTeacher408 = require('../../study/utils/ai-teacher-408')
 const { createExamResultLoadController } = require('../utils/exam-result-load-controller')
 const { createExam408TeacherController } = require('../utils/exam-408-teacher-controller')
@@ -259,7 +260,13 @@ Page({
         deleteInflight: key => { delete this._teacherInflight[key] },
         nextRequestSequence: () => ++this._teacherRequestSeq,
         getRequestSequence: () => this._teacherRequestSeq,
-        postTeacher: payload => api.post('/ai/408-teacher', payload, { timeout: 55000 }),
+        postTeacher: payload => {
+          const sequence = this._teacherRequestSeq
+          return requestTeacher(api, payload, {
+            isCurrent: () => this._pageAlive && this._teacherRequestSeq === sequence &&
+              Number(this.data.attemptId) === Number(payload.exam_attempt_id),
+          })
+        },
         normalizeResult: raw => aiTeacher408.normalizeResult(raw),
         errorMessage: error => aiTeacher408.errorMessage(error, api),
       })

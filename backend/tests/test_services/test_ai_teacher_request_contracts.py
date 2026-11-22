@@ -209,12 +209,15 @@ async def test_teacher_fallbacks_preserve_usage_and_action_boundaries(
 
 
 @pytest.mark.asyncio
-async def test_teacher_unavailable_blocks_before_provider_call(prepared_teacher):
+@pytest.mark.parametrize("reason", ["checking", "quota", "configuration"])
+async def test_teacher_unavailable_blocks_before_provider_call(
+    prepared_teacher, reason
+):
     state = prepared_teacher
     unavailable = {
         "status": "unavailable",
         "enabled": False,
-        "reason": "quota",
+        "reason": reason,
         "message": "AI service quota exhausted",
         "retry_after_ms": 300000,
     }
@@ -229,6 +232,22 @@ async def test_teacher_unavailable_blocks_before_provider_call(prepared_teacher)
 
     state.provider.assert_not_awaited()
     state.usage.assert_not_awaited()
+    state.cancel.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_teacher_releases_reservation_if_health_lookup_is_cancelled(
+    prepared_teacher,
+):
+    state = prepared_teacher
+    svc.require_available_runtime.side_effect = asyncio.CancelledError
+    with pytest.raises(asyncio.CancelledError):
+        await svc.run_teacher_action(
+            state.db, user_id=3, question_id=7, action="core_concept"
+        )
+    state.provider.assert_not_awaited()
+    state.cancel.assert_awaited_once()
+    state.settle.assert_not_awaited()
 
 
 @pytest.mark.asyncio
