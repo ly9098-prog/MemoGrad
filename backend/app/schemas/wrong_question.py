@@ -32,6 +32,11 @@ class WrongQuestionUpdate(BaseModel):
 # ── 响应 ──
 
 
+class WrongQuestionReference(BaseModel):
+    question_id: int
+    wrong_question_id: int | None = None
+
+
 class WrongQuestionResponse(BaseModel):
     id: int
     question_id: int

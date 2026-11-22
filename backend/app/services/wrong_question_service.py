@@ -20,6 +20,19 @@ from app.services.subject_resolution import resolve_subject_ids
 logger = logging.getLogger(__name__)
 
 
+async def get_active_wrong_question_id(
+    db: AsyncSession, user_id: int, question_id: int
+) -> int | None:
+    """Resolve an owned, active wrong-book identity without exposing question answers."""
+    return await db.scalar(
+        select(WrongQuestion.id).where(
+            WrongQuestion.user_id == user_id,
+            WrongQuestion.question_id == question_id,
+            WrongQuestion.is_active.is_(True),
+        )
+    )
+
+
 async def _load_wrong_question(
     db: AsyncSession, user_id: int, question_id: int
 ) -> WrongQuestion | None:

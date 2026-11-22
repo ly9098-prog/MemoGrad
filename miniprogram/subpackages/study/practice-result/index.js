@@ -29,6 +29,7 @@ const { buildBatchDiagnosisPageCapabilities } = require('./utils/practice-result
 const { buildTrendLoadPageCapabilities } = require('./utils/practice-result-trend-page-adapter');
 const { buildReview408TeacherPageCapabilities } = require('./utils/practice-result-teacher-page-adapter');
 const { buildBackNavigationPageCapabilities } = require('./utils/practice-result-navigation-page-adapter');
+const { openResultWrongDetail } = require('./utils/practice-result-wrong-detail-page-adapter');
 const { readGuestResult } = require('../../../utils/launch-session-store');
 const ERROR_COLORS = ['#7ED8B5', '#55C89B', '#3DA880', '#2F8066', '#8BCDB8', '#B7EBD9'];
 const RESULT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -508,7 +509,7 @@ return dialog.showOptions(opts || {});
 },
 onWrongRowTap(e) {
 if (this.data.batchDiagnosisMode) this.toggleBatchWrong(e);
-else this.openWrongDetail(e);
+else return this.openWrongDetail(e);
 },
 toggleBatchDiagnosisMode() {
 if (this.data.batchDiagnosisSaving) return;
@@ -696,12 +697,7 @@ const id = e.currentTarget.dataset.id;
 const target = this.data.reviewItems.find(item => String(item.questionId) === String(id));
 if (!target) return;
 if (!this._guestMode && target.status === 'wrong') {
-if (target.wrongQuestionId) {
-this.navigateToWrongDetail(target.wrongQuestionId);
-} else {
-this.setData({ activeTab: 'wrong' });
-wx.showToast({ title: '该题暂无错题详情', icon: 'none' });
-}
+return openResultWrongDetail(this, { api }, target);
 } else {
 const statusLabel = target.statusLabel === '参考自查' ? '参考自查'
 : (target.status === 'partial' ? '未完成'
@@ -827,15 +823,9 @@ wx.showToast({ title: '暂时无法打开题目详情', icon: 'none' });
 });
 },
 openWrongDetail(e) {
-const wrongQuestionId = e.currentTarget.dataset.wqid;
-if (!wrongQuestionId) {
-wx.showToast({
-title: '该题暂无错题详情',
-icon: 'none'
-});
-return;
-}
-this.navigateToWrongDetail(wrongQuestionId);
+const { id, wqid } = e.currentTarget.dataset;
+const target = this.data.reviewItems.find(item => String(item.questionId) === String(id));
+return openResultWrongDetail(this, { api }, target || { wrongQuestionId: wqid });
 },
   handleBack() {
     return this._backNavigationController().back()

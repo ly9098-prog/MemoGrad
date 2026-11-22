@@ -275,6 +275,7 @@
             hover-class="result-row-pressed"
             hover-stay-time="80"
             data-wqid="{{item.wrongQuestionId}}"
+            data-id="{{item.questionId}}"
             bindtap="onWrongRowTap"
           >
 <view class="wrong-row-top">

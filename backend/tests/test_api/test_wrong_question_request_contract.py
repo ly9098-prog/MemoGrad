@@ -546,3 +546,76 @@ async def test_batch_cache_failure_keeps_completed_service_result_but_stops_resp
     operation.assert_awaited_once()
     assert api.cache.delete.await_count == 2
     ports.db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_wrong_reference_http_is_owned_active_and_answer_free():
+    """Real SQL and response serialization protect the result-page recovery path."""
+    import httpx
+    from fastapi import FastAPI
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.models.wrong_question import WrongQuestion
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with engine.begin() as connection:
+        await connection.run_sync(WrongQuestion.__table__.create)
+    async with sessions() as db:
+        db.add_all(
+            [
+                WrongQuestion(
+                    id=71,
+                    user_id=7,
+                    question_id=12,
+                    question_version_id=22,
+                    wrong_answer="private answer",
+                    is_active=True,
+                ),
+                WrongQuestion(
+                    id=72,
+                    user_id=8,
+                    question_id=13,
+                    question_version_id=23,
+                    is_active=True,
+                ),
+                WrongQuestion(
+                    id=73,
+                    user_id=7,
+                    question_id=14,
+                    question_version_id=24,
+                    is_active=False,
+                ),
+            ]
+        )
+        await db.commit()
+
+    test_app = FastAPI()
+    test_app.include_router(api.router)
+
+    async def database():
+        async with sessions() as session:
+            yield session
+
+    test_app.dependency_overrides[api.get_db] = database
+    test_app.dependency_overrides[api.get_current_user] = lambda: SimpleNamespace(id=7)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=test_app), base_url="http://test"
+        ) as client:
+            for question_id, expected_id in [
+                (12, 71),
+                (13, None),
+                (14, None),
+                (99, None),
+            ]:
+                response = await client.get(
+                    f"/api/v1/wrong-questions/by-question/{question_id}"
+                )
+                assert response.status_code == 200
+                assert response.json() == {
+                    "question_id": question_id,
+                    "wrong_question_id": expected_id,
+                }
+    finally:
+        await engine.dispose()

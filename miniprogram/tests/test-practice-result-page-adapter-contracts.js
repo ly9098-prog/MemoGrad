@@ -36,6 +36,10 @@ if (process.argv[2]) test('native teacher chooser, loading, result and failure r
   assert.ok(visibleText.includes('next[j]'))
   assert.ok(visibleText.includes('parent[i]'))
   assert.ok(visibleText.includes('child = next[j]'))
+  const wrongTree = render({ ...base, activeTab: 'wrong',
+    wrongReviewItems: [{ questionId: 12, wrongQuestionId: null, status: 'wrong' }] })
+  const wrongRow = all(wrongTree).find(node => (node.attr || {}).bindtap === 'onWrongRowTap')
+  assert.equal(wrongRow.attr['data-id'], 12, 'native wrong row must retain question identity even without a cached wrong ID')
 })
 
 function fixture() {
@@ -420,4 +424,96 @@ test('back navigation preserves page lock and invokes runtime platform callbacks
   context.wx.navigateBack = value => calls.push(['replacement', value])
   page.handleBack()
   assert.equal(calls[1][0], 'replacement')
+})
+
+test('review result missing a cached wrong ID resolves it before navigating from either list', async () => {
+  for (const entry of ['overview', 'wrong']) {
+    const { page, calls, api, context } = fixture()
+    const item = { questionId: 12, status: 'wrong', wrongQuestionId: null }
+    page.data.reviewItems = [item]
+    page.data.filteredReviewItems = [item]
+    page.data.wrongReviewItems = [item]
+    api.get = async url => {
+      calls.push(['lookup', url])
+      return { question_id: 12, wrong_question_id: 71 }
+    }
+    context.wx.setStorageSync = () => {}
+    context.wx.navigateTo = value => calls.push(['navigate', value.url])
+    const event = { currentTarget: { dataset: entry === 'overview' ? { id: 12 } : { id: 12, wqid: null } } }
+    await (entry === 'overview' ? page.openQuestionDetail(event) : page.onWrongRowTap(event))
+    assert.equal(calls.filter(call => call[0] === 'lookup').length, 1)
+    assert.ok(calls.some(call => call[0] === 'navigate' && call[1].includes('?id=71&')))
+    for (const list of ['reviewItems', 'filteredReviewItems', 'wrongReviewItems']) {
+      assert.equal(page.data[list][0].wrongQuestionId, 71)
+    }
+    assert.equal(calls.some(call => call[0] === 'toast'), false)
+  }
+})
+
+test('wrong detail lookup failures are retryable and distinct from an absent wrong row', async () => {
+  const { page, calls, api, context } = fixture()
+  page.data.reviewItems = [{ questionId: 12, status: 'wrong' }]
+  api.get = async () => { throw new Error('offline') }
+  const event = { currentTarget: { dataset: { id: 12 } } }
+  await page.openQuestionDetail(event)
+  assert.equal(calls.at(-1)[1].title, '错题详情加载失败，请重试')
+  api.get = async () => ({ question_id: 12, wrong_question_id: null })
+  await page.openQuestionDetail(event)
+  assert.equal(calls.at(-1)[1].title, '该题暂无错题详情')
+  context.wx.navigateTo = value => calls.push(['navigate', value.url])
+  context.wx.setStorageSync = () => {}
+  api.get = async () => ({ question_id: 12, wrong_question_id: 71 })
+  await page.openQuestionDetail(event)
+  assert.ok(calls.some(call => call[0] === 'navigate'))
+})
+
+test('wrong detail lookup deduplicates taps and ignores completion after leaving the result page', async () => {
+  const { page, calls, api, context } = fixture()
+  page.data.reviewItems = [{ questionId: 12, status: 'wrong' }]
+  let finish, requests = 0
+  api.get = () => { requests++; return new Promise(resolve => { finish = resolve }) }
+  context.wx.navigateTo = value => calls.push(['navigate', value.url])
+  const event = { currentTarget: { dataset: { id: 12 } } }
+  const first = page.openQuestionDetail(event)
+  await page.openQuestionDetail(event)
+  assert.equal(requests, 1)
+  page.onHide()
+  finish({ question_id: 12, wrong_question_id: 71 })
+  await first
+  assert.equal(calls.some(call => call[0] === 'navigate' || call[0] === 'toast'), false)
+})
+
+test('today review grading through result mapping opens the matching wrong detail without a lookup', async () => {
+  const { buildGroupResults } = require('../subpackages/study/review-today/utils/submit-request-state')
+  const { buildReviewResultPayload } = require('../subpackages/study/review-today/utils/review-result-payload-builder')
+  const question = { question_id: 12, schedule_id: 8, question_version_id: 22,
+    occurrence_seq: 3, content: { text: '复习题目' } }
+  const groupResults = buildGroupResults({ groupQuestions: [question], answers: { 8: 'A' },
+    isQuestionAnswered: () => true, enrichForResult: q => q, failureNeedsRefresh: () => false,
+  }, [{ schedule_id: 8 }], [{ ...question, is_correct: false, success: true,
+    correct_answer: 'B', wrong_question_id: 71 }])
+  const { page, calls, api, context } = fixture()
+  page._resultVisible = false
+  page.applyPracticePayload(buildReviewResultPayload({ groupResults, groupQuestions: [question] }))
+  page._resultVisible = true
+  api.get = async () => { throw new Error('No identity lookup needed') }
+  context.wx.setStorageSync = () => {}
+  context.wx.navigateTo = value => calls.push(['navigate', value.url])
+  await page.openQuestionDetail({ currentTarget: { dataset: { id: 12 } } })
+  assert.equal(page.data.wrongReviewItems[0].wrongQuestionId, 71)
+  assert.ok(calls.some(call => call[0] === 'navigate' && call[1].includes('?id=71&')))
+  assert.equal(calls.some(call => call[0] === 'toast'), false)
+})
+
+test('wrong detail recovery rejects mismatched lookup identities and never queries for a guest', async () => {
+  const { page, calls, api } = fixture()
+  page.data.reviewItems = [{ questionId: 12, status: 'wrong' }]
+  const event = { currentTarget: { dataset: { id: 12 } } }
+  let queries = 0
+  api.get = async () => { queries++; return { question_id: 13, wrong_question_id: 71 } }
+  await page.openQuestionDetail(event)
+  assert.equal(calls.at(-1)[1].title, '错题详情加载失败，请重试')
+  page._guestMode = true
+  await page.onWrongRowTap(event)
+  assert.equal(queries, 1)
 })

@@ -45,6 +45,7 @@ from app.schemas.wrong_question import (
     TaskFlowResponse,
     WrongQuestionBatchRequest,
     WrongQuestionBatchResponse,
+    WrongQuestionReference,
     WrongQuestionResponse,
     WrongQuestionStats,
     WrongQuestionUpdate,
@@ -344,6 +345,21 @@ async def get_error_diagnosis_stats(
         subject_id=subject_id,
         knowledge_point_id=knowledge_point_id,
         allowed_subject_ids=allowed_subject_ids,
+    )
+
+
+@router.get("/by-question/{question_id}", response_model=WrongQuestionReference)
+async def find_wrong_question(
+    question_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Recover the current user's active wrong-book ID for a result-page question."""
+    return WrongQuestionReference(
+        question_id=question_id,
+        wrong_question_id=await svc.get_active_wrong_question_id(
+            db, current_user.id, question_id
+        ),
     )
 
 

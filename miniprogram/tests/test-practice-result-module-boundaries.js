@@ -28,14 +28,14 @@ test('scans every governed practice-result module and the real page', () => {
   const result = scanPracticeResult()
   assert.deepEqual(result.violations, [])
   assert.equal(result.pageLines, PAGE_MAX_LINES)
-  assert.equal(result.pageLines, 854)
+  assert.equal(result.pageLines, 844)
   assert.equal(result.controllers, 4)
-  assert.equal(result.modules, 22)
+  assert.equal(result.modules, 23)
   assert.equal(Object.keys(MODULES).length, Object.keys(MODULE_BUDGETS).length)
-  assert.equal(result.adapterLines, 167)
+  assert.equal(result.adapterLines, 208)
   assert.equal(result.moduleLines, Object.values(MODULE_BUDGETS).reduce((sum, lines) => sum + lines, 0))
   assert.equal(result.requires, 14)
-  assert.equal(ADAPTERS.length, 5)
+  assert.equal(ADAPTERS.length, 6)
 })
 
 test('page must lazily delegate all four result controllers', () => {
