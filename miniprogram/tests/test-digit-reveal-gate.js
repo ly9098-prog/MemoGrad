@@ -22,8 +22,9 @@ function fixture() {
       Object.assign(this.data, patch)
       if (callback) commits.push(callback)
     },
-    createIntersectionObserver() {
+    createIntersectionObserver(options) {
       const observer = {
+        options,
         disconnected: false,
         relativeToViewport() { return this },
         observe(selector, callback) { this.selector = selector; this.notify = callback },
@@ -44,6 +45,30 @@ const fields = [{ name: 'count', segmentsKey: 'digits' }]
 function start(page, target) {
   return numbers.start(page, { fields, to: { count: target }, selector: '.metrics' })
 }
+
+test('page and platform observers use native viewport observation and retain the entrance gate', () => {
+  for (const platformFallback of [false, true]) {
+    const h = fixture()
+    if (platformFallback) {
+      const create = h.page.createIntersectionObserver.bind(h.page)
+      delete h.page.createIntersectionObserver
+      global.wx.createIntersectionObserver = (page, options) => {
+        assert.equal(page, h.page)
+        return create(options)
+      }
+    }
+    gate.resume(h.page, true)
+    let started = 0
+    gate.arm(h.page, 'native', '.metric', () => { started++ })
+    h.frame()
+    assert.deepEqual(h.observers[0].options, { thresholds: [0], initialRatio: 0, nativeMode: true })
+    h.observers[0].notify({ intersectionRatio: 0 })
+    assert.equal(started, 0)
+    h.enter()
+    assert.equal(started, 1)
+    assert.equal(h.observers[0].disconnected, true)
+  }
+})
 
 test('slow first render waits for commit, ready, next tick and viewport before starting its clock', () => {
   const h = fixture()

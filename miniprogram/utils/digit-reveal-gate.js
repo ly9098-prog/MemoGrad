@@ -29,9 +29,9 @@ function watch(page, key, job) {
       job.start()
     }
     const create = page.createIntersectionObserver
-      ? () => page.createIntersectionObserver({ thresholds: [0], initialRatio: 0 })
+      ? () => page.createIntersectionObserver({ thresholds: [0], initialRatio: 0, nativeMode: true })
       : platform.createIntersectionObserver
-        ? () => platform.createIntersectionObserver(page, { thresholds: [0], initialRatio: 0 })
+        ? () => platform.createIntersectionObserver(page, { thresholds: [0], initialRatio: 0, nativeMode: true })
         : null
     // Older runtimes still wait for ready + the rendered setData callback.
     if (!create) return release()
