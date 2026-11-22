@@ -1290,10 +1290,10 @@ export default function AppUsersPage() {
       </ConfirmDialog>
 
       <Dialog open={detailState !== null} onOpenChange={(open) => !open && setDetailState(null)}>
-        <DialogContent className="max-w-3xl overflow-hidden p-0">
+        <DialogContent className="flex max-w-3xl flex-col overflow-hidden p-0">
           {detailUser ? (
             <>
-              <div className="border-b border-border/70 bg-secondary/35 px-6 py-6 pr-14">
+              <div className="shrink-0 border-b border-border/70 bg-secondary/35 px-6 py-6 pr-14">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   <UserAvatar user={detailUser} size="lg" />
                   <div className="min-w-0 flex-1">
@@ -1331,7 +1331,7 @@ export default function AppUsersPage() {
                 </div>
               </div>
 
-              <div className="max-h-[calc(100dvh-16rem)] overflow-y-auto p-6">
+              <div className="min-h-0 overflow-y-auto p-6">
                 {detailQuery.isError ? (
                   <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive-light px-4 py-3 text-xs text-destructive">
                     <span>详情加载失败，当前显示列表摘要，统计数据暂不可用。</span>
