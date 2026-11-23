@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
-from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.time_utils import shanghai_date_utc_range, shanghai_today
 from app.models.ai_chat import AiChat
 from app.services.user_ai_policy_service import (
@@ -64,16 +64,6 @@ async def reserve_token_budget(
     daily_limit = int(policy.daily_token_limit)
     monthly_limit = int(policy.monthly_token_limit)
     day_key, month_key = _token_period_keys(user_id)
-    if daily_limit <= 0 and monthly_limit <= 0:
-        return TokenReservation(
-            user_id,
-            0,
-            day_key,
-            month_key,
-            rpm_limit=policy.rpm_limit,
-            policy=policy,
-        )
-
     today_date = shanghai_today()
     today = shanghai_date_utc_range(today_date)[0]
     first_of_month = shanghai_date_utc_range(today_date.replace(day=1))[0]

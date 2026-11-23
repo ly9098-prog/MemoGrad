@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -73,11 +74,88 @@ async def test_unlimited_policy_bypasses_token_limits_but_keeps_reservation_cont
         return policy
 
     monkeypatch.setattr(budget, "get_effective_user_ai_policy", effective_policy)
+    client = CacheClient()
+    client._enabled = False
+    monkeypatch.setattr(budget, "cache", client)
+    monkeypatch.setattr(budget, "_load_token_usage", AsyncMock(return_value=(0, 0)))
     reservation = await service.reserve_token_budget(object(), 41, 600)
     assert reservation is not None
-    assert reservation.reserved_tokens == 0
+    assert reservation.reserved_tokens == 600
+    assert client._local_get(reservation.day_key) == 600
+    assert client._local_get(reservation.month_key) == 600
     assert reservation.rpm_limit == -1
     assert reservation.policy is policy
+
+
+async def _assert_switch_preserves_pending_tokens(client, dimension, *, settle, user_id):
+    policy = SimpleNamespace(daily_token_limit=5000, monthly_token_limit=5000, rpm_limit=12)
+    setattr(policy, dimension, 1000)
+    with (
+        patch.object(budget, "cache", client),
+        patch.object(budget, "get_effective_user_ai_policy", AsyncMock(return_value=policy)),
+        patch.object(budget, "_load_token_usage", AsyncMock(return_value=(0, 0))),
+    ):
+        first = await budget.reserve_token_budget(object(), user_id, 600)
+        assert first is not None
+        setattr(policy, dimension, -1)
+        second = await budget.reserve_token_budget(object(), user_id, 600)
+        assert second is not None
+        if settle:
+            await budget.settle_token_reservation(second, 100)
+        else:
+            await budget.cancel_token_reservation(second)
+        expected = 700 if settle else 600
+        assert int(await client.get_strict(first.day_key)) == expected
+        assert int(await client.get_strict(first.month_key)) == expected
+        assert first.active is True
+        setattr(policy, dimension, 1000)
+        assert await budget.reserve_token_budget(object(), user_id, 1001 - expected) is None
+        assert await budget.reserve_token_budget(object(), user_id, 1000 - expected) is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dimension", ["daily_token_limit", "monthly_token_limit"])
+@pytest.mark.parametrize("settle", [False, True])
+async def test_policy_switch_cannot_refund_another_pending_hold(dimension, settle):
+    client = CacheClient()
+    client._enabled = False
+    await _assert_switch_preserves_pending_tokens(client, dimension, settle=settle, user_id=91)
+
+
+@pytest.mark.asyncio
+async def test_restoring_finite_token_policy_keeps_unlimited_pending_and_settled_usage():
+    client = CacheClient()
+    client._enabled = False
+    policy = SimpleNamespace(daily_token_limit=-1, monthly_token_limit=-1, rpm_limit=-1)
+    with (
+        patch.object(budget, "cache", client),
+        patch.object(budget, "get_effective_user_ai_policy", AsyncMock(return_value=policy)),
+        patch.object(budget, "_load_token_usage", AsyncMock(return_value=(0, 0))),
+    ):
+        pending = await budget.reserve_token_budget(object(), 41, 600)
+        assert pending is not None
+        policy.daily_token_limit = policy.monthly_token_limit = 500
+        assert await budget.reserve_token_budget(object(), 41, 1) is None
+        await budget.settle_token_reservation(pending, 200)
+        assert await budget.reserve_token_budget(object(), 41, 301) is None
+        assert await budget.reserve_token_budget(object(), 41, 300) is not None
+
+
+@pytest.mark.asyncio
+async def test_local_token_capacity_never_silently_drops_a_hold(monkeypatch):
+    client = CacheClient()
+    client._enabled = False
+    client._local_max_size = 2
+    monkeypatch.setattr(budget, "cache", client)
+    monkeypatch.setattr(budget, "_load_token_usage", AsyncMock(return_value=(0, 0)))
+    first = await budget.reserve_token_budget(None, 41, 1)
+    assert first is not None
+    assert await budget.reserve_token_budget(None, 42, 1) is None
+    second = await budget.reserve_token_budget(None, 41, 1)
+    assert second is not None
+    await budget.cancel_token_reservation(second)
+    assert await client.get_strict(first.day_key) == 1
+    assert await client.get_strict(first.month_key) == 1
 
 
 @pytest.mark.asyncio
@@ -251,6 +329,14 @@ async def test_redis_ledger_preserves_settled_charge_and_expiry(tmp_path):
             assert second is not None
             await service.cancel_token_reservation(second)
             assert int(await redis.get(first.day_key)) == 500
+        for index, (dimension, settle) in enumerate(
+            (dimension, settle)
+            for dimension in ("daily_token_limit", "monthly_token_limit")
+            for settle in (False, True)
+        ):
+            await _assert_switch_preserves_pending_tokens(
+                client, dimension, settle=settle, user_id=91 + index
+            )
         from types import SimpleNamespace
 
         from app.services.ai.analysis_regeneration import admit_regeneration

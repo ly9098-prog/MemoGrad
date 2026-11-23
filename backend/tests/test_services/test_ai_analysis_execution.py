@@ -476,3 +476,132 @@ async def test_regeneration_admission_uses_unlimited_user_policy(monkeypatch):
             )
             is None
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("initial_question_limit", [3, -1])
+async def test_other_questions_cannot_evict_live_per_question_history(
+    monkeypatch, initial_question_limit
+):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.core.config import settings
+    from app.services.ai import analysis_regeneration as module
+
+    client = CacheClient()
+    client._enabled = False
+    clock = [100_000.0]
+    monkeypatch.setattr(module, "time", lambda: clock[0])
+    policy = SimpleNamespace(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=initial_question_limit,
+        regeneration_account_24h_limit=-1,
+    )
+
+    async def attempt(question_id):
+        return await module.admit_regeneration(
+            cache=client,
+            user_id=51,
+            wrong_question=SimpleNamespace(question_id=question_id, ai_analysis=None),
+            policy=policy,
+        )
+
+    for _ in range(3):
+        assert await attempt(4) is None
+    for index in range(1_005):
+        clock[0] += 1
+        assert await attempt(100 + index // 3) is None
+
+    prefix = f"memograd:{settings.APP_ENV}:ai:regeneration:user:51"
+    assert len(await client.get_strict(f"{prefix}:rolling-day")) == 1_000
+    assert len(await client.get_strict(f"{prefix}:question:4:rolling-day")) == 3
+    policy.regeneration_question_24h_limit = 3
+    denied = await attempt(4)
+    assert denied["limit_dimension"] == "question"
+    assert denied["retry_after_seconds"] == 86_400 - 1_005
+    clock[0] = 100_000 + 86_400
+    assert await attempt(4) is None
+    assert len(await client.get_strict(f"{prefix}:question:4:rolling-day")) == 1
+
+
+@pytest.mark.asyncio
+async def test_per_question_ledger_seeds_legacy_shared_history(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.core.config import settings
+    from app.services.ai import analysis_regeneration as module
+
+    client = CacheClient()
+    client._enabled = False
+    monkeypatch.setattr(module, "time", lambda: 100_000.0)
+    prefix = f"memograd:{settings.APP_ENV}:ai:regeneration:user:51"
+    await client.set(f"{prefix}:rolling-day", [(99_000, 4), (99_500, 4)], ttl=86_400)
+    policy = SimpleNamespace(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=3,
+        regeneration_account_24h_limit=-1,
+    )
+    wrong = SimpleNamespace(question_id=4, ai_analysis=None)
+    assert await module.admit_regeneration(
+        cache=client, user_id=51, wrong_question=wrong, policy=policy
+    ) is None
+    denied = await module.admit_regeneration(
+        cache=client, user_id=51, wrong_question=wrong, policy=policy
+    )
+    assert denied["limit_dimension"] == "question"
+    assert len(await client.get_strict(f"{prefix}:question:4:rolling-day")) == 3
+
+
+@pytest.mark.asyncio
+async def test_legacy_question_history_survives_eviction_before_first_new_request(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.core.config import settings
+    from app.services.ai import analysis_regeneration as module
+
+    client = CacheClient()
+    client._enabled = False
+    monkeypatch.setattr(module, "time", lambda: 100_000.0)
+    prefix = f"memograd:{settings.APP_ENV}:ai:regeneration:user:51"
+    legacy_events = [(98_000, 4)] * 3 + [(99_000, 100 + i // 3) for i in range(997)]
+    await client.set(f"{prefix}:rolling-day", legacy_events, ttl=86_400)
+    policy = SimpleNamespace(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=3,
+        regeneration_account_24h_limit=-1,
+    )
+    for _ in range(3):
+        assert await module.admit_regeneration(
+            cache=client, user_id=51,
+            wrong_question=SimpleNamespace(question_id=9999, ai_analysis=None), policy=policy,
+        ) is None
+    denied = await module.admit_regeneration(
+        cache=client, user_id=51,
+        wrong_question=SimpleNamespace(question_id=4, ai_analysis=None), policy=policy,
+    )
+    assert denied["limit_dimension"] == "question"
+    assert len(await client.get_strict(f"{prefix}:question:4:rolling-day")) == 3
+
+
+@pytest.mark.asyncio
+async def test_local_capacity_rejects_regeneration_without_partial_charge():
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.core.config import settings
+    from app.services.ai import analysis_regeneration as module
+
+    client = CacheClient()
+    client._enabled = False
+    client._local_max_size = 2  # Admission lock + shared ledger leave no question slot.
+    result = await module.admit_regeneration(
+        cache=client, user_id=51,
+        wrong_question=SimpleNamespace(question_id=4, ai_analysis=None),
+    )
+    assert result["error_code"] == "ai_regeneration_unavailable"
+    prefix = f"memograd:{settings.APP_ENV}:ai:regeneration:user:51"
+    assert await client.get_strict(f"{prefix}:rolling-day") is None
+    assert await client.get_strict(f"{prefix}:question:4:rolling-day") is None

@@ -142,16 +142,28 @@ async def _reserve_rolling_attempt(
 ) -> RegenerationLimit | None:
     now = time()
     key = f"{prefix}:rolling-day"
+    question_id = int(wrong_question.question_id)
+    question_key = f"{prefix}:question:{question_id}:rolling-day"
     stored = await cache.get_strict(key)
+    stored_question = await cache.get_strict(question_key)
     try:
         events = sorted([
             (float(at), int(qid))
             for at, qid in (stored or [])
             if float(at) > now - 86400
         ], key=lambda event: event[0])
+        # Seed a new per-question ledger from the previous shared format.
+        question_events = sorted(
+            float(at)
+            for at in (
+                stored_question
+                if stored_question is not None
+                else [at for at, qid in events if qid == question_id]
+            )
+            if float(at) > now - 86400
+        )
     except (TypeError, ValueError) as exc:
         raise CacheUnavailableError("Invalid regeneration ledger") from exc
-    question_id = int(wrong_question.question_id)
     cooldown = policy.regeneration_cooldown_seconds
     if cooldown != -1 and events and events[-1][0] > now - cooldown:
         return RegenerationLimit(
@@ -166,26 +178,33 @@ async def _reserve_rolling_attempt(
             "account", max(1, ceil(reset_at - now)), account_limit
         )
     question_limit = policy.regeneration_question_24h_limit
-    question_events = [at for at, qid in events if qid == question_id]
     if question_limit != -1 and len(question_events) >= question_limit:
         reset_at = question_events[len(question_events) - question_limit] + 86400
         return RegenerationLimit(
             "question", max(1, ceil(reset_at - now)), question_limit
         )
     events.append((now, question_id))
-    retention = max(
-        POLICY_FIELD_MAX["regeneration_account_24h_limit"]
-        if account_limit == -1
-        else account_limit,
-        POLICY_FIELD_MAX["regeneration_question_24h_limit"]
-        if question_limit == -1
-        else question_limit,
-    )
-    events = events[-retention:] if retention > 0 else events[-1:]
+    question_events.append(now)
+    retention = POLICY_FIELD_MAX["regeneration_account_24h_limit"]
+    migrated_values = []
+    # Preserve still-live legacy history before it leaves the shared ledger,
+    # including questions not requested since this format was introduced.
+    for evicted_id in {qid for _, qid in events[:-retention]} - {question_id}:
+        evicted_key = f"{prefix}:question:{evicted_id}:rolling-day"
+        if await cache.get_strict(evicted_key) is None:
+            migrated_values.append((
+                evicted_key,
+                [at for at, qid in events if qid == evicted_id],
+                86400,
+            ))
+    # The most recent maximum-limit events suffice for any supported future
+    # limit. Other questions must never evict this question's live history.
+    events = events[-retention:]
+    question_events = question_events[-POLICY_FIELD_MAX["regeneration_question_24h_limit"]:]
     committed = await cache.commit_guarded_strict(
         locks=[(lock, owner)],
         expected={},
-        values=[(key, events, 86400)],
+        values=[(key, events, 86400), (question_key, question_events, 86400), *migrated_values],
     )
     if not committed:
         raise CacheUnavailableError("Regeneration admission lease expired")

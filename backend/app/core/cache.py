@@ -79,12 +79,8 @@ end
 if monthly_limit > 0 and charged_monthly + requested > monthly_limit then
     return 0
 end
-if daily_limit > 0 then
-    redis.call("SET", KEYS[1], charged_daily + requested, "EX", daily_ttl)
-end
-if monthly_limit > 0 then
-    redis.call("SET", KEYS[2], charged_monthly + requested, "EX", monthly_ttl)
-end
+redis.call("SET", KEYS[1], charged_daily + requested, "EX", daily_ttl)
+redis.call("SET", KEYS[2], charged_monthly + requested, "EX", monthly_ttl)
 return 1
 """
 
@@ -150,7 +146,7 @@ class CacheClient:
 
     def _local_set(self, key: str, value: Any, ttl: int | None = 300) -> None:
         self.purge_expired_local()
-        if len(self._local) >= self._local_max_size:
+        if key not in self._local and len(self._local) >= self._local_max_size:
             # 简单清理：清空过期条目
             now = __import__("time").time()
             stale = [
@@ -350,6 +346,10 @@ class CacheClient:
                 return False
             if any(self._local_get(key) != value for key, value in expected.items()):
                 return False
+            self.purge_expired_local()
+            mutation_keys = {key for key, _, _ in values} | {key for key, _ in increments}
+            if len(set(self._local) | mutation_keys) > self._local_max_size:
+                raise CacheUnavailableError("Local guarded ledger capacity exhausted")
             for key, ttl in increments:
                 current = int(self._local_get(key) or 0)
                 expiry = (
@@ -443,15 +443,18 @@ class CacheClient:
         A concurrent SQL read may predate another caller's settlement. Keeping
         actual charges here prevents that stale read from reusing spent budget.
         SQL totals seed a missing ledger and never add the same usage twice.
+        Both periods are charged even when unlimited, so policy changes cannot
+        lose in-flight usage or refund another request's hold.
         """
         tokens = max(1, int(tokens))
         used_daily = max(0, int(used_daily))
         used_monthly = max(0, int(used_monthly))
         daily_limit = max(0, int(daily_limit))
         monthly_limit = max(0, int(monthly_limit))
-        if daily_limit <= 0 and monthly_limit <= 0:
-            return True
         if not self._enabled:
+            self.purge_expired_local()
+            if len(set(self._local) | {day_key, month_key}) > self._local_max_size:
+                raise CacheUnavailableError("Local token ledger capacity exhausted")
             charged_daily = max(int(self._local_get(day_key) or 0), used_daily)
             charged_monthly = max(int(self._local_get(month_key) or 0), used_monthly)
             if (
@@ -464,10 +467,8 @@ class CacheClient:
                 and charged_monthly + tokens > monthly_limit
             ):
                 return False
-            if daily_limit > 0:
-                self._local_set(day_key, charged_daily + tokens, daily_ttl)
-            if monthly_limit > 0:
-                self._local_set(month_key, charged_monthly + tokens, monthly_ttl)
+            self._local_set(day_key, charged_daily + tokens, daily_ttl)
+            self._local_set(month_key, charged_monthly + tokens, monthly_ttl)
             return True
         client = await self._ensure_client()
         if client is None:

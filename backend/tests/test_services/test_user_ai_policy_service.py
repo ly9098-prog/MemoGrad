@@ -114,7 +114,7 @@ async def test_unlimited_and_reset_preserve_optimistic_versioning(sessions, monk
         )
         await db.commit()
     assert reset.unlimited is False
-    assert reset.version == 0
+    assert reset.version == 2
     assert set(reset.overrides.values()) == {None}
     assert [call[0][2] for call in audits] == [
         "app_user.ai_policy.unlimited",
@@ -122,6 +122,70 @@ async def test_unlimited_and_reset_preserve_optimistic_versioning(sessions, monk
     ]
     assert audits[0][1]["detail"]["scope"] == "ordinary_user"
     assert audits[1][1]["detail"]["scope"] == "ordinary_user"
+
+
+@pytest.mark.asyncio
+async def test_reset_and_recreate_cannot_revalidate_stale_policy_versions(sessions, monkeypatch):
+    await _seed_user(sessions)
+
+    async def write_audit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(service, "_write_policy_audit", write_audit)
+    operator = SimpleNamespace(id=7)
+    async with sessions() as db:
+        initial = await service.set_user_policy_unlimited(
+            db, 41, AdminUserAIPolicyUnlimitedRequest(version=0, reason="初次配置"), operator
+        )
+        await db.commit()
+    async with sessions() as db:
+        reset = await service.reset_user_policy(
+            db, 41, AdminUserAIPolicyResetRequest(version=initial.version, reason="恢复默认"), operator
+        )
+        await db.commit()
+    async with sessions() as db:
+        updated = await service.update_user_policy(
+            db,
+            41,
+            AdminUserAIPolicyUpdateRequest(
+                version=reset.version,
+                values=UserAIPolicyOverrides(daily_token_limit=123),
+                reason="重新配置有限额度",
+            ),
+            operator,
+        )
+        await db.commit()
+    assert updated.version > reset.version > initial.version
+    for stale_version in (0, initial.version, reset.version):
+        async with sessions() as db:
+            with pytest.raises(service.UserAIPolicyConflictError):
+                await service.set_user_policy_unlimited(
+                    db,
+                    41,
+                    AdminUserAIPolicyUnlimitedRequest(version=stale_version, reason="过期页面提交"),
+                    operator,
+                )
+    async with sessions() as db:
+        detail = await service.get_user_policy(db, 41)
+    assert detail.effective.daily_token_limit == 123
+
+
+@pytest.mark.asyncio
+async def test_reset_without_override_also_preserves_a_revision(sessions, monkeypatch):
+    await _seed_user(sessions)
+
+    async def write_audit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(service, "_write_policy_audit", write_audit)
+    async with sessions() as db:
+        reset = await service.reset_user_policy(
+            db, 41, AdminUserAIPolicyResetRequest(version=0, reason="恢复默认"), SimpleNamespace(id=7)
+        )
+        await db.commit()
+    assert reset.version == 1
+    assert set(reset.overrides.values()) == {None}
+    assert set(reset.sources.model_dump().values()) == {"default"}
 
 
 @pytest.mark.asyncio

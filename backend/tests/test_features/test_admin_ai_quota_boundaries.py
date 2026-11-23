@@ -6,8 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.core.ai_runtime_guard import AIResourceRejectedError
-from app.features import ai_repair
-from app.features import llm_text_structurer
+from app.features import ai_repair, llm_text_structurer
 from app.features.pipeline_stages import code_structure_stage
 
 
@@ -137,3 +136,45 @@ async def test_ai_admission_rejection_propagates_from_import_stages(monkeypatch)
             admin_quota_admin_id=9,
         )
     assert text_error.value is rejected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["standard", "roman"])
+@pytest.mark.parametrize("reason", ["ai_admin_quota_exhausted", "ai_parse_disabled", "ai_rate_limited"])
+async def test_repair_aggregation_propagates_admission_rejection(monkeypatch, phase, reason):
+    rejected = AIResourceRejectedError(reason)
+    monkeypatch.setattr(
+        "app.ai.gateway.resolve_llm_runtime_config", AsyncMock(return_value=object())
+    )
+    monkeypatch.setattr(ai_repair, "_should_repair", lambda *args, **kwargs: (True, "low_confidence"))
+    call = AsyncMock(side_effect=rejected)
+    monkeypatch.setattr(
+        ai_repair,
+        "_call_ai_for_roman_decision" if phase == "roman" else "_call_ai_for_repair",
+        call,
+    )
+    with pytest.raises(AIResourceRejectedError) as exc:
+        await ai_repair.repair_questions(
+            [{"stem": "题干", "raw_text": "原始题干"}],
+            db=object(),
+            roman_diagnostics=[{"index": 0}] if phase == "roman" else [],
+            admin_quota_admin_id=7,
+        )
+    assert exc.value is rejected
+    call.assert_awaited_once()
+    assert call.await_args.kwargs["admin_quota_admin_id"] == 7
+
+
+@pytest.mark.asyncio
+async def test_ordinary_single_repair_failure_still_degrades(monkeypatch):
+    monkeypatch.setattr(
+        "app.ai.gateway.resolve_llm_runtime_config", AsyncMock(return_value=object())
+    )
+    monkeypatch.setattr(ai_repair, "_should_repair", lambda *args, **kwargs: (True, "low_confidence"))
+    monkeypatch.setattr(
+        ai_repair, "_call_ai_for_repair", AsyncMock(side_effect=RuntimeError("provider unavailable"))
+    )
+    result = await ai_repair.repair_questions(
+        [{"stem": "题干", "raw_text": "原始题干"}], db=object(), admin_quota_admin_id=7
+    )
+    assert result["unrepaired"] == [{"question_index": 0, "reason": "ai_failed"}]

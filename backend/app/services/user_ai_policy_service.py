@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fastapi import Request
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -388,41 +388,16 @@ async def reset_user_policy(
     operator: AdminPrincipal,
     request: Request | None = None,
 ) -> AdminUserAIPolicyDetailResponse:
-    user = await db.scalar(select(User).where(User.id == user_id).with_for_update())
-    if user is None or user.deleted_at is not None:
-        raise ValueError("用户不存在")
-    row = await db.get(UserAIPolicyOverride, user_id)
-    current_version = row.version if row else 0
-    if data.version != current_version:
-        raise UserAIPolicyConflictError("用户额度已被其他管理员更新，请刷新后重试")
-    before = _values_from_row(row) if row else None
-    if row is not None:
-        result = await db.execute(
-            delete(UserAIPolicyOverride)
-            .where(
-                UserAIPolicyOverride.user_id == user_id,
-                UserAIPolicyOverride.version == data.version,
-            )
-            .execution_options(synchronize_session="fetch")
-        )
-        if result.rowcount != 1:
-            raise UserAIPolicyConflictError(
-                "用户额度已被其他管理员更新，请刷新后重试"
-            )
-    await _write_policy_audit(
+    # Retain the row's revision when clearing overrides: deleting it would let
+    # an old version become valid again after the next insert (ABA).
+    return await _replace_user_policy(
         db,
+        user_id,
+        data.version,
+        {name: None for name in POLICY_FIELDS},
+        data.reason,
         operator,
-        "app_user.ai_policy.reset",
-        "app_user",
-        str(user_id),
+        request,
+        action="app_user.ai_policy.reset",
         severity="important",
-        detail={
-            "before": before,
-            "after": None,
-            "reason": data.reason,
-            "scope": "ordinary_user",
-        },
-        request=request,
     )
-    await db.flush()
-    return await get_user_policy(db, user_id)

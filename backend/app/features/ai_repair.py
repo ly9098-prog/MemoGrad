@@ -1028,6 +1028,8 @@ async def _run_roman_repair_phase(
     )
 
     for result in gathered:
+        if isinstance(result, AIResourceRejectedError):
+            raise result
         if isinstance(result, dict):
             results.append(result)
         elif isinstance(result, BaseException):
@@ -1269,6 +1271,8 @@ async def repair_questions(
 
         results: list[tuple[int, dict | None]] = []
         for (i, _q, _rt), result in zip(candidates, gathered):
+            if isinstance(result, AIResourceRejectedError):
+                raise result
             if isinstance(result, BaseException):
                 results.append((i, None))
             else:

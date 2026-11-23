@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.models.question import Question
+from app.services.ai_token_budget import TokenReservation
 
 _SENTINEL = object()
 
@@ -639,7 +640,7 @@ class TestFaultInjection:
         missing_embedding = MagicMock()
         missing_embedding.first.return_value = None
         db.execute.return_value = missing_embedding
-        reservation = object()
+        reservation = TokenReservation(7, 600, "day", "month", rpm_limit=17)
         with _vector_enabled_config(model_config_id=17), patch.object(
             vector_retrieval_service,
             "upsert_question_embedding",
@@ -656,6 +657,7 @@ class TestFaultInjection:
                 )
             ) is None
         provider.assert_awaited_once()
+        assert provider.await_args.kwargs["rate_limit"] == 17
         cancel.assert_not_awaited()
 
     @pytest.mark.parametrize("status", ["created", "updated", "skipped"])
@@ -682,7 +684,7 @@ class TestFaultInjection:
             None, ("[0.1,0.2,0.3]", content_hash, 3, question.question_type)
         ]
         tokens = max(1, estimate_tokens(content))
-        reservation = object()
+        reservation = TokenReservation(7, tokens, "day", "month", rpm_limit=17)
         trace = MagicMock()
         reserve = AsyncMock(return_value=reservation)
         provider = AsyncMock(return_value={"status": status})
@@ -705,6 +707,7 @@ class TestFaultInjection:
                 db, question, user_id=7
             ))
         reserve.assert_awaited_once_with(db, 7, tokens)
+        assert provider.await_args.kwargs["rate_limit"] == 17
         assert result == [0.1, 0.2, 0.3]
         if status == "skipped":
             assert [call[0] for call in trace.mock_calls] == ["reserve", "provider", "cancel"]
@@ -728,7 +731,7 @@ class TestFaultInjection:
         db.execute.return_value = _make_execute_result(rows=[])
         query = "导数定义"
         tokens = max(1, estimate_tokens(query))
-        reservation = object()
+        reservation = TokenReservation(7, tokens, "day", "month", rpm_limit=17)
         reserve = AsyncMock(return_value=None if outcome == "rejected" else reservation)
         embedding = None if outcome == "unconfigured" else [0.1, 0.2, 0.3]
         if outcome == "invalid":
@@ -752,6 +755,8 @@ class TestFaultInjection:
         ):
             assert _run(vector_retrieval_service.vector_recall_by_text(db, 7, "math", query)) == []
         reserve.assert_awaited_once_with(db, 7, tokens)
+        if outcome != "rejected":
+            assert provider.await_args.kwargs["rate_limit"] == 17
         expected = ["reserve"]
         if outcome == "unconfigured":
             expected += ["provider", "cancel"]
