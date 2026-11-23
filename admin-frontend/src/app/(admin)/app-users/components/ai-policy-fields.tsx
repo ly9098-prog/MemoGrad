@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { cn } from "@/lib/utils";
 import type { UserAIPolicyValues } from "@/lib/api/types";
 
@@ -119,31 +120,48 @@ export function FinitePolicyFields({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {USER_AI_POLICY_FIELDS.map((field) => (
-        <label
+        <div
           key={field.key}
           className="rounded-xl border border-border/70 bg-card/70 p-3"
         >
-          <span className="text-xs font-semibold text-foreground">{field.label}</span>
+          <span className="text-xs font-semibold text-foreground">
+            {field.label}
+          </span>
           <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
             {field.hint}
           </span>
-          <span className="mt-2 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <CustomSelect
+              aria-label={`${field.label}默认配置方式`}
+              value={values[field.key] === "-1" ? "unlimited" : "finite"}
+              options={[
+                { value: "finite", label: "限定额度" },
+                { value: "unlimited", label: "不限" },
+              ]}
+              clearable={false}
+              disabled={disabled}
+              className="h-9 w-32 text-xs"
+              onChange={(mode) =>
+                onChange(field.key, mode === "unlimited" ? "-1" : "1")
+              }
+            />
             <Input
               aria-label={`${field.label}（${field.unit}）`}
               type="number"
-              min={-1}
+              min={1}
               max={USER_AI_POLICY_FIELD_MAX[field.key]}
               step={1}
-              value={values[field.key]}
-              disabled={disabled}
+              value={values[field.key] === "-1" ? "" : values[field.key]}
+              placeholder={values[field.key] === "-1" ? "不限" : undefined}
+              disabled={disabled || values[field.key] === "-1"}
               onChange={(event) => onChange(field.key, event.target.value)}
-              className="h-9 bg-background/70 tabular-nums"
+              className="h-9 min-w-0 flex-1 bg-background/70 tabular-nums"
             />
             <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
               {field.unit}
             </span>
-          </span>
-        </label>
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -183,7 +201,10 @@ export function UserPolicyRows({
               ? "个人不限"
               : "个人覆盖";
         return (
-          <div key={field.key} className="grid gap-3 p-3.5 sm:grid-cols-[1fr_auto]">
+          <div
+            key={field.key}
+            className="grid gap-3 p-3.5 sm:grid-cols-[1fr_auto]"
+          >
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-foreground">
@@ -208,20 +229,22 @@ export function UserPolicyRows({
                 )}
               </p>
             </div>
-            <div className="flex min-w-[210px] items-center justify-end gap-2">
-              <select
+            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+              <CustomSelect
                 aria-label={`${field.label}配置方式`}
                 value={mode}
                 disabled={disabled}
-                onChange={(event) =>
-                  onModeChange(field.key, event.target.value as UserAIPolicyMode)
+                onChange={(value) =>
+                  onModeChange(field.key, value as UserAIPolicyMode)
                 }
-                className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus:ring-3 focus:ring-ring/15 disabled:opacity-50"
-              >
-                <option value="inherit">继承默认</option>
-                <option value="finite">自定义</option>
-                <option value="unlimited">不限</option>
-              </select>
+                clearable={false}
+                options={[
+                  { value: "inherit", label: "继承默认" },
+                  { value: "finite", label: "自定义" },
+                  { value: "unlimited", label: "不限" },
+                ]}
+                className="h-9 w-32 text-xs"
+              />
               <Input
                 aria-label={`${field.label}自定义值`}
                 type="number"
@@ -230,7 +253,9 @@ export function UserPolicyRows({
                 step={1}
                 value={values[field.key]}
                 disabled={disabled || mode !== "finite"}
-                onChange={(event) => onValueChange(field.key, event.target.value)}
+                onChange={(event) =>
+                  onValueChange(field.key, event.target.value)
+                }
                 className={cn(
                   "h-9 w-28 bg-background/70 text-right tabular-nums",
                   mode !== "finite" && "text-muted-foreground",

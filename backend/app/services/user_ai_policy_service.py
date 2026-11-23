@@ -19,6 +19,7 @@ from app.models.user_ai_policy import (
     UserAIPolicyOverride,
 )
 from app.schemas.user_ai_policy import (
+    AdminUserAIPolicyBatchRequest,
     AdminUserAIPolicyDefaultResponse,
     AdminUserAIPolicyDefaultUpdateRequest,
     AdminUserAIPolicyDetailResponse,
@@ -34,6 +35,41 @@ if TYPE_CHECKING:
     from app.core.admin_security import AdminPrincipal
 
 DEFAULT_POLICY_ID = 1
+
+
+async def batch_update_user_policies(
+    db: AsyncSession,
+    data: AdminUserAIPolicyBatchRequest,
+    current_admin: AdminPrincipal,
+    request: Request | None = None,
+) -> list[AdminUserAIPolicyDetailResponse]:
+    """Apply in stable lock order; the caller owns the all-or-nothing transaction."""
+    results = []
+    for target in sorted(data.targets, key=lambda item: item.user_id):
+        common = {"version": target.version, "reason": data.reason}
+        try:
+            if data.action == "reset":
+                result = await reset_user_policy(
+                    db, target.user_id, AdminUserAIPolicyResetRequest(**common),
+                    current_admin, request,
+                )
+            elif data.action == "unlimited":
+                result = await set_user_policy_unlimited(
+                    db, target.user_id, AdminUserAIPolicyUnlimitedRequest(**common),
+                    current_admin, request,
+                )
+            else:
+                result = await update_user_policy(
+                    db, target.user_id,
+                    AdminUserAIPolicyUpdateRequest(**common, values=data.values),
+                    current_admin, request,
+                )
+        except UserAIPolicyConflictError as exc:
+            raise UserAIPolicyConflictError(
+                f"用户 #{target.user_id} 的额度已更新，本批次未保存，请重新读取"
+            ) from exc
+        results.append(result)
+    return results
 
 
 class UserAIPolicyConflictError(ValueError):

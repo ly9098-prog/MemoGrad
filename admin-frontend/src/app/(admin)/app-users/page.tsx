@@ -73,6 +73,8 @@ import {
   UserAIPolicyDialog,
   type UserAIPolicyTarget,
 } from "./components/user-ai-policy-dialog";
+import { BatchAIPolicyDialog } from "./components/batch-ai-policy-dialog";
+import { DefaultAIPolicySummary } from "./components/default-ai-policy-summary";
 
 type ConfirmState = {
   action: UserAction;
@@ -260,6 +262,7 @@ export default function AppUsersPage() {
   const [exporting, setExporting] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [policyTarget, setPolicyTarget] = useState<UserAIPolicyTarget | null>(null);
+  const [batchPolicyIds, setBatchPolicyIds] = useState<number[] | null>(null);
   const canManageAIPolicy =
     role?.name === "super_admin" &&
     permissions.includes("ai_setting:read") &&
@@ -597,6 +600,7 @@ export default function AppUsersPage() {
         queryClient.invalidateQueries({ queryKey: ["app-users"] }),
         queryClient.invalidateQueries({ queryKey: ["app-users-summary"] }),
         queryClient.invalidateQueries({ queryKey: ["app-user-detail"] }),
+        queryClient.invalidateQueries({ queryKey: ["app-users-ai-policy"] }),
       ]);
     } finally {
       setManualRefreshing(false);
@@ -701,6 +705,8 @@ export default function AppUsersPage() {
           loading={todayUsers.isLoading}
         />
       </MetricStrip>
+
+      {canManageAIPolicy ? <DefaultAIPolicySummary onEdit={() => setPolicyTarget({ scope: "default" })} /> : null}
 
       {notice ? (
         <div
@@ -912,6 +918,12 @@ export default function AppUsersPage() {
               仅操作当前页选中用户
             </span>
             <div className="ml-auto flex flex-wrap items-center gap-2">
+              {canManageAIPolicy ? <Button variant="secondary" size="sm"
+                disabled={actionMutation.isPending}
+                onClick={() => setBatchPolicyIds([...selectedIds])}>
+                <Gauge className="h-3.5 w-3.5" />
+                批量 AI 额度
+              </Button> : null}
               <Button
                 variant="dangerOutline"
                 size="sm"
@@ -1017,7 +1029,12 @@ export default function AppUsersPage() {
                     <tr
                       key={user.id}
                       data-selected={selectedIds.has(user.id)}
-                      className="border-b border-border/70 transition-colors last:border-b-0 hover:bg-accent/35 data-[selected=true]:bg-accent/25"
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("button, input, a, [role='checkbox'], [role='combobox']")) return;
+                        if (window.getSelection()?.toString()) return;
+                        setDetailState({ user });
+                      }}
+                      className="cursor-pointer border-b border-border/70 transition-colors last:border-b-0 hover:bg-accent/35 data-[selected=true]:bg-accent/25"
                     >
                       <td className="px-4 py-3.5 lg:px-5">
                         <CustomCheckbox
@@ -1095,6 +1112,7 @@ export default function AppUsersPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setDetailState({ user })}
+                            aria-label={`查看用户 ${user.nickname || user.id} 详情`}
                             className="h-8 rounded-lg px-2.5 text-xs shadow-none"
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -1447,12 +1465,14 @@ export default function AppUsersPage() {
       </Dialog>
 
       <UserAIPolicyDialog
+        key={policyTarget?.scope === "user" ? `user:${policyTarget.user.id}` : "default"}
         target={policyTarget}
         open={policyTarget !== null}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPolicyTarget(null);
         }}
       />
+      {batchPolicyIds ? <BatchAIPolicyDialog userIds={batchPolicyIds} onClose={() => setBatchPolicyIds(null)} /> : null}
     </ManagementPage>
   );
 }

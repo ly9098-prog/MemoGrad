@@ -263,6 +263,16 @@ export function UserAIPolicyDialog({
     },
   });
 
+  const presetMutation = useMutation({
+    mutationFn: () => apiRequest<UserAIPolicyValues>("/app-users/ai-policy/preset"),
+    onSuccess: (preset) => {
+      setValues(createPolicyForm(preset));
+      setNotice("已填入服务端初始默认值，保存后才会生效；个人覆盖不会改变。");
+      setSaveError("");
+    },
+    onError: (error) => setSaveError(getErrorMessage(error)),
+  });
+
   const valid =
     (target?.scope === "default"
       ? policyFormIsValid(values)
@@ -285,6 +295,10 @@ export function UserAIPolicyDialog({
   const updateMode = (key: UserAIPolicyField, mode: UserAIPolicyMode) =>
     setModes((current) => ({ ...current, [key]: mode }));
   const handleOpenChange = (nextOpen: boolean) => {
+    if (
+      !nextOpen &&
+      (mutation.isPending || presetMutation.isPending)
+    ) return;
     if (
       !nextOpen &&
       hasChanges &&
@@ -341,7 +355,7 @@ export function UserAIPolicyDialog({
                   <FinitePolicyFields
                     values={values}
                     onChange={updateValue}
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || presetMutation.isPending}
                   />
                 ) : (
                   <UserPolicyRows
@@ -351,7 +365,7 @@ export function UserAIPolicyDialog({
                     modes={modes}
                     onModeChange={updateMode}
                     onValueChange={updateValue}
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || presetMutation.isPending}
                   />
                 )}
                 <label className="block">
@@ -367,7 +381,7 @@ export function UserAIPolicyDialog({
                 </label>
                 <p className="flex items-start gap-2 rounded-xl border border-border/70 bg-secondary/30 px-3.5 py-3 text-[11px] leading-5 text-muted-foreground">
                   <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  值为 -1 表示该维度不限。全局默认只影响继承项，不会覆盖已经设置的个人配置。
+                  选择“不限”可解除该维度的额度限制。全局默认只影响继承项，不会覆盖已经设置的个人配置。
                 </p>
                 {notice ? (
                   <p
@@ -390,6 +404,14 @@ export function UserAIPolicyDialog({
             ) : null}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border/70 bg-card/95 px-6 py-4">
+            {target?.scope === "default" ? (
+              <Button variant="secondary" size="sm"
+                disabled={!policy.data || mutation.isPending || presetMutation.isPending}
+                onClick={() => presetMutation.mutate()}>
+                <RotateCcw className="h-3.5 w-3.5" />
+                {presetMutation.isPending ? "读取中…" : "填入初始默认值"}
+              </Button>
+            ) : null}
             {target?.scope === "user" ? (
               <>
                 <Button
@@ -423,7 +445,7 @@ export function UserAIPolicyDialog({
             <Button
               variant="primary"
               size="sm"
-              disabled={!valid || !policy.data || mutation.isPending}
+              disabled={!valid || !policy.data || mutation.isPending || presetMutation.isPending}
               onClick={() => setPendingAction("save")}
             >
               <Save className="h-3.5 w-3.5" />

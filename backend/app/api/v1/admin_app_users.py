@@ -19,12 +19,14 @@ from app.schemas.admin_app_users import (
 )
 from app.schemas.common import PaginatedResponse, paginated_response
 from app.schemas.user_ai_policy import (
+    AdminUserAIPolicyBatchRequest,
     AdminUserAIPolicyDefaultResponse,
     AdminUserAIPolicyDefaultUpdateRequest,
     AdminUserAIPolicyDetailResponse,
     AdminUserAIPolicyResetRequest,
     AdminUserAIPolicyUnlimitedRequest,
     AdminUserAIPolicyUpdateRequest,
+    UserAIPolicyValues,
 )
 from app.services.admin_app_user_service import (
     ban_app_user,
@@ -41,9 +43,11 @@ from app.services.admin_app_user_service import (
 )
 from app.services.user_ai_policy_service import (
     UserAIPolicyConflictError,
+    batch_update_user_policies,
     get_default_policy,
     get_user_policy,
     reset_user_policy,
+    runtime_default_values,
     set_user_policy_unlimited,
     update_default_policy,
     update_user_policy,
@@ -118,6 +122,34 @@ async def patch_user_ai_policy_defaults(
     except UserAIPolicyConflictError as exc:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+@router.get("/ai-policy/preset", response_model=UserAIPolicyValues)
+async def read_user_ai_policy_preset(
+    _=Depends(require_permissions("ai_setting:read")),
+    __=Depends(require_roles("super_admin")),
+):
+    return runtime_default_values()
+
+
+@router.patch("/ai-policy/batch", response_model=list[AdminUserAIPolicyDetailResponse])
+async def patch_user_ai_policy_batch(
+    data: AdminUserAIPolicyBatchRequest,
+    request: Request,
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("app-user:read", "ai_setting:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await batch_update_user_policies(db, data, current_admin, request)
+        await db.commit()
+        return result
+    except UserAIPolicyConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
 @router.get("/{user_id}", response_model=AdminAppUserDetail)

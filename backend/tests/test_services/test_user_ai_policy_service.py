@@ -12,6 +12,7 @@ from app.core.orm_base import Base
 from app.models.user import User
 from app.models.user_ai_policy import UserAIPolicyDefault, UserAIPolicyOverride
 from app.schemas.user_ai_policy import (
+    AdminUserAIPolicyBatchRequest,
     AdminUserAIPolicyResetRequest,
     AdminUserAIPolicyUnlimitedRequest,
     AdminUserAIPolicyUpdateRequest,
@@ -19,6 +20,75 @@ from app.schemas.user_ai_policy import (
     UserAIPolicyValues,
 )
 from app.services import user_ai_policy_service as service
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["update", "unlimited", "reset"])
+async def test_batch_applies_policies_and_audits_each_user(sessions, monkeypatch, action):
+    from unittest.mock import AsyncMock
+
+    await _seed_user(sessions, 41)
+    await _seed_user(sessions, 42)
+    audit = AsyncMock()
+    monkeypatch.setattr(service, "_write_policy_audit", audit)
+    payload = {
+        "targets": [{"user_id": 42, "version": 0}, {"user_id": 41, "version": 0}],
+        "action": action,
+        "reason": "批量额度验收",
+    }
+    if action == "update":
+        payload["values"] = {"rpm_limit": 30, "daily_token_limit": -1}
+    async with sessions() as db:
+        result = await service.batch_update_user_policies(
+            db, AdminUserAIPolicyBatchRequest.model_validate(payload), SimpleNamespace(id=7)
+        )
+        await db.commit()
+    assert [item.user_id for item in result] == [41, 42]
+    assert [item.version for item in result] == [1, 1]
+    assert audit.await_count == 2
+    if action == "update":
+        assert all(item.effective.rpm_limit == 30 for item in result)
+        assert all(item.sources.monthly_token_limit == "default" for item in result)
+    elif action == "unlimited":
+        assert all(item.unlimited for item in result)
+    else:
+        assert all(set(item.overrides.values()) == {None} for item in result)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_target", [{"user_id": 42, "version": 1}, {"user_id": 99, "version": 0}])
+async def test_batch_rollback_keeps_earlier_users_unchanged(sessions, monkeypatch, bad_target):
+    from unittest.mock import AsyncMock
+
+    await _seed_user(sessions, 41)
+    await _seed_user(sessions, 42)
+    monkeypatch.setattr(service, "_write_policy_audit", AsyncMock())
+    async with sessions() as db:
+        with pytest.raises(ValueError):
+            await service.batch_update_user_policies(
+                db,
+                AdminUserAIPolicyBatchRequest(
+                    targets=[{"user_id": 41, "version": 0}, bad_target],
+                    action="unlimited", reason="回滚测试",
+                ),
+                SimpleNamespace(id=7),
+            )
+        await db.rollback()
+    async with sessions() as db:
+        assert await db.get(UserAIPolicyOverride, 41) is None
+
+
+@pytest.mark.parametrize("overrides", [
+    {"targets": []},
+    {"targets": [{"user_id": 1, "version": 0}] * 2},
+    {"targets": [{"user_id": i, "version": 0} for i in range(1, 102)]},
+    {"action": "update"},
+    {"values": {"rpm_limit": 30}},
+])
+def test_batch_rejects_invalid_input(overrides):
+    payload = {"targets": [{"user_id": 1, "version": 0}], "action": "reset", "reason": "验证输入"}
+    with pytest.raises(ValidationError):
+        AdminUserAIPolicyBatchRequest.model_validate(payload | overrides)
 
 
 @pytest_asyncio.fixture

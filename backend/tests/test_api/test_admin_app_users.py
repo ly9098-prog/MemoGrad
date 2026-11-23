@@ -1,6 +1,7 @@
 from datetime import datetime
 from unittest.mock import AsyncMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1 import admin_app_users
@@ -13,6 +14,99 @@ from app.models.user import User
 from app.models.user_auth import UserAuthIdentity
 
 client = TestClient(app)
+
+
+def test_policy_preset_returns_runtime_values_and_requires_permissions(monkeypatch):
+    monkeypatch.setattr(
+        admin_security, "_get_permission_names",
+        AsyncMock(return_value={"ai_setting:read"}),
+    )
+    app.dependency_overrides[get_current_admin] = _allow_read
+    app.dependency_overrides[get_db] = _policy_db
+    try:
+        response = client.get("/api/admin/v1/app-users/ai-policy/preset")
+        assert response.status_code == 200
+        assert response.json() == admin_app_users.runtime_default_values().model_dump()
+        monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value=set()))
+        assert client.get("/api/admin/v1/app-users/ai-policy/preset").status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize("failure,status_code", [
+    (None, 200),
+    (admin_app_users.UserAIPolicyConflictError("版本冲突"), 409),
+    (ValueError("用户不存在"), 404),
+])
+def test_batch_policy_commits_only_on_success(monkeypatch, failure, status_code):
+    db = _PolicyDb()
+
+    async def override():
+        yield db
+
+    write = AsyncMock(return_value=[], side_effect=failure)
+    monkeypatch.setattr(admin_app_users, "batch_update_user_policies", write)
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(
+        return_value={"app-user:read", "ai_setting:write"}
+    ))
+    app.dependency_overrides[get_current_admin] = _allow_read
+    app.dependency_overrides[get_db] = override
+    try:
+        response = client.patch("/api/admin/v1/app-users/ai-policy/batch", json={
+            "targets": [{"user_id": 1, "version": 0}], "action": "reset", "reason": "批量测试",
+        })
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == status_code
+    assert db.commit.await_count == (1 if failure is None else 0)
+    assert db.rollback.await_count == (0 if failure is None else 1)
+
+
+@pytest.mark.parametrize("permissions", [{"app-user:read"}, {"ai_setting:write"}, set()])
+def test_batch_policy_requires_both_permissions(monkeypatch, permissions):
+    write = AsyncMock()
+    monkeypatch.setattr(admin_app_users, "batch_update_user_policies", write)
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(return_value=permissions))
+    app.dependency_overrides[get_current_admin] = _allow_read
+    app.dependency_overrides[get_db] = _policy_db
+    try:
+        response = client.patch("/api/admin/v1/app-users/ai-policy/batch", json={
+            "targets": [{"user_id": 1, "version": 0}], "action": "unlimited", "reason": "权限验证",
+        })
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    write.assert_not_awaited()
+
+
+def test_new_policy_endpoints_reject_non_super_admin_even_with_permissions(monkeypatch):
+    db = _PolicyDb()
+
+    async def execute(_statement):
+        class Result:
+            def scalar_one_or_none(self):
+                return "admin"
+        return Result()
+
+    db.execute = execute
+
+    async def override():
+        yield db
+
+    monkeypatch.setattr(admin_security, "_get_permission_names", AsyncMock(
+        return_value={"app-user:read", "ai_setting:read", "ai_setting:write"}
+    ))
+    app.dependency_overrides[get_current_admin] = _allow_read
+    app.dependency_overrides[get_db] = override
+    try:
+        assert client.get("/api/admin/v1/app-users/ai-policy/preset").status_code == 403
+        response = client.patch("/api/admin/v1/app-users/ai-policy/batch", json={
+            "targets": [{"user_id": 1, "version": 0}], "action": "reset", "reason": "角色验证",
+        })
+        assert response.status_code == 403
+        db.commit.assert_not_awaited()
+    finally:
+        app.dependency_overrides.clear()
 
 
 class _Db:

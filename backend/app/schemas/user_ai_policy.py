@@ -122,3 +122,25 @@ class AdminUserAIPolicyUnlimitedRequest(BaseModel):
 class AdminUserAIPolicyResetRequest(BaseModel):
     version: int = Field(ge=0)
     reason: PolicyReason
+
+
+class UserAIPolicyBatchTarget(BaseModel):
+    user_id: int = Field(gt=0)
+    version: int = Field(ge=0)
+
+
+class AdminUserAIPolicyBatchRequest(BaseModel):
+    targets: list[UserAIPolicyBatchTarget] = Field(min_length=1, max_length=100)
+    action: Literal["update", "unlimited", "reset"]
+    values: UserAIPolicyOverrides | None = None
+    reason: PolicyReason
+
+    @model_validator(mode="after")
+    def validate_batch(self):
+        if len({target.user_id for target in self.targets}) != len(self.targets):
+            raise ValueError("批量用户不能重复")
+        if self.action == "update" and self.values is None:
+            raise ValueError("自定义额度必须提供配置值")
+        if self.action != "update" and self.values is not None:
+            raise ValueError("不限或恢复默认操作不接受自定义配置值")
+        return self

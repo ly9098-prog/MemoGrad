@@ -1,6 +1,6 @@
 "use client";
 
-import { Save } from "lucide-react";
+import { ArrowUpRight, Save } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
@@ -70,15 +70,15 @@ export function SystemSettingsSection({
     >
       {error ? <p className={styles.noticeError}>{error}</p> : null}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
-        <span className="text-xs leading-5 text-muted-foreground">
-          普通用户的学习 AI 额度由普通用户目录单独管理。
-        </span>
+      <div className="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <p className="text-xs leading-5 text-muted-foreground">
+          学习 AI 的默认额度与个人特权在普通用户页面设置
+        </p>
         <Link
-          className="text-xs font-semibold text-primary hover:underline"
+          className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           href="/app-users"
         >
-          前往普通用户管理
+          管理用户额度 <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       </div>
 
@@ -161,10 +161,10 @@ export function SystemSettingsSection({
                 受控范围：后台导题与补全模型调用，以及现有 AI 富化准入。
               </p>
               <p className={styles.impactText}>
-                月度额度只限制非 super_admin；调用仍会计入本月用量。
+                月度额度仅限制普通管理员；超级管理员可继续调用，所有调用均计入本月用量。
               </p>
               <p className={styles.impactText}>
-                普通用户错题复盘、学习问答等额度不在此处分流。
+                普通用户的错题复盘、学习问答额度在普通用户页面管理。
               </p>
               <p className={styles.impactText}>
                 月度计数从该计数链路启用后开始累计，启用前的历史调用未补账。
@@ -191,7 +191,7 @@ export function SystemSettingsSection({
               </div>
             </div>
             <p className={styles.limitHint}>
-              0 = 不限制次数；只限制非 super_admin。
+              填写 0 表示不限次数；该上限仅约束普通管理员，超级管理员不受限制。
             </p>
 
             <div className={styles.auditBlock}>

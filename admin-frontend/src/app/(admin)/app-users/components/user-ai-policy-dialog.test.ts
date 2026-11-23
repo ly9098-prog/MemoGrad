@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api/errors";
 type Mutation = {
   mutationFn: (action: string) => Promise<unknown>;
   onError: (error: unknown) => Promise<void> | void;
+  onSuccess?: (data: typeof values) => void;
 };
 
 const values = {
@@ -92,6 +93,19 @@ beforeEach(() => {
 });
 
 describe("UserAIPolicyDialog conflict recovery", () => {
+  it("loads server presets into a draft without saving them", async () => {
+    renderDialog();
+    const preset = h.mutations[1];
+    h.request.mockResolvedValue(values);
+    await preset.mutationFn("");
+    expect(h.request).toHaveBeenCalledExactlyOnceWith("/app-users/ai-policy/preset");
+    preset.onSuccess?.(values);
+    expect(h.setters[0]).toHaveBeenCalledWith(
+      Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])),
+    );
+    expect(h.request).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps retained policy data visible when refresh fails", () => {
     expect(resolvePolicyView(true, false, true)).toBe("data");
     expect(resolvePolicyView(false, false, true)).toBe("error");
