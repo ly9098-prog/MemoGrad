@@ -61,8 +61,15 @@ async def vector_database(monkeypatch):
         "cancel_token_reservation",
     ):
         monkeypatch.setattr(
-            ai_token_budget, method, AsyncMock(return_value="reservation")
+            ai_token_budget, method, AsyncMock(return_value=None)
         )
+    monkeypatch.setattr(
+        ai_token_budget,
+        "reserve_token_budget",
+        AsyncMock(side_effect=lambda _db, user_id, tokens: ai_token_budget.TokenReservation(
+            user_id, tokens, "test:day", "test:month", rpm_limit=12,
+        )),
+    )
     provider = AsyncMock(return_value=[1.0, 0.0, 0.0])
     monkeypatch.setattr(embedding_service, "get_embedding", provider)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
@@ -131,7 +138,7 @@ async def vector_database(monkeypatch):
 async def test_all_recall_sql_branches_reject_stale_identity(
     vector_database, method, exclude, days
 ):
-    sessions, _, _ = vector_database
+    sessions, provider, _ = vector_database
     async with sessions() as db:
         if method == "similar":
             result = await service.search_similar_questions(
@@ -149,6 +156,7 @@ async def test_all_recall_sql_branches_reject_stale_identity(
                 no_repeat_days=days,
             )
             assert {item["question_id"] for item in result} == {1, 2}
+            assert provider.await_args.kwargs["rate_limit"] == 12
 
 
 async def test_existing_stale_source_is_not_reused_when_budget_denies_rebuild(
@@ -185,6 +193,7 @@ async def test_source_changed_during_provider_call_uses_rule_fallback(vector_dat
 
 async def test_source_completed_by_another_writer_cancels_unused_reservation(vector_database, monkeypatch):
     sessions, provider, _ = vector_database
+    reservation = ai_token_budget.TokenReservation(1, 1, "test:day", "test:month", rpm_limit=12)
 
     async def another_writer(_db, _user_id, _tokens):
         async with sessions() as writer:
@@ -192,14 +201,14 @@ async def test_source_completed_by_another_writer_cancels_unused_reservation(vec
             await writer.execute(text("UPDATE question_embeddings SET content_hash=:hash WHERE question_id=3"),
                                  {"hash": identity["hash"]})
             await writer.commit()
-        return "reservation"
+        return reservation
 
     monkeypatch.setattr(ai_token_budget, "reserve_token_budget", AsyncMock(side_effect=another_writer))
     async with sessions() as db:
         source = await db.get(Question, 3)
         assert await service._ensure_source_embedding(db, source, user_id=1) == [1., 0., 0.]
         provider.assert_not_awaited()
-        ai_token_budget.cancel_token_reservation.assert_awaited_once_with("reservation")
+        ai_token_budget.cancel_token_reservation.assert_awaited_once_with(reservation)
         ai_token_budget.record_token_usage.assert_not_awaited()
 
 

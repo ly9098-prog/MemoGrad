@@ -272,11 +272,9 @@ async openBatchMore() {
 return batchFlow.openBatchMore(this, { getPlatform: () => wx })
 },
 closeBatchMore() {},
-noop() {},
   async onBatchAction(e) {
 return batchFlow.onBatchAction(this, e, { requestClient: api, getPlatform: () => wx })
 },
-
   _resolveBatchIds() {
 return batchFlow._resolveBatchIds(this)
 },

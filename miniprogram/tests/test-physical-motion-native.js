@@ -116,9 +116,8 @@ test('both teacher pages render shared lessons without losing raw or presented k
     assert.ok(body)
     assert.ok(text(body).includes('生成状态请稍后重试'))
     assert.equal(flatten(body).filter(node => hasClass(node, 'teacher-result-section')).length, 0)
-    assert.ok(text(body).includes(file.includes('practice-result')
-      ? '本次未生成 AI 讲解，可返回查看题库解析后重试。'
-      : '本次未生成 AI 讲解，可返回查看题库解析，或重新尝试。'))
+    assert.equal(flatten(body).filter(node => hasClass(node, 'teacher-footnote')).length, 0,
+      'fallback shows its status and retry control without a redundant footnote')
     assert.ok(nodes.some(node => node.attr && node.attr.bindtap ===
       (file.includes('practice-result') ? 'retry408Teacher' : 'run408TeacherAction')))
   }

@@ -15,7 +15,7 @@ const modules = Object.fromEntries(MODULES.map(name =>
 test('wrong-book page and fifteen modules stay bounded', () => {
   const result = scanWrongBook()
   assert.deepEqual(result.errors, [])
-  assert.equal(result.pageLines, PAGE_CEILING)
+  assert.ok(result.pageLines <= PAGE_CEILING)
   assert.equal(result.modules, 15)
   assert.equal(result.delegates, 112)
   assert.equal(result.pageMethods, 114)

@@ -216,8 +216,7 @@ function pageViolations(source) {
   }
   for (const name of Object.keys(PAGE_METHODS)) {
     if (!methods.has(name)) errors.push('delegate drift: ' + name)
-    // The original page declares noop twice; retain that shape without allowing new overrides.
-    if (counts.get(name) !== (name === 'noop' ? 2 : 1)) errors.push('page method count: ' + name)
+    if (counts.get(name) !== 1) errors.push('page method count: ' + name)
   }
   for (const module of MODULES) {
     const request = "require('./utils/" + module.replace(/\.js$/, '') + "')"
