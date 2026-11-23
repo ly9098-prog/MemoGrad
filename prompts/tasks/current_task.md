@@ -321,3 +321,15 @@
 - 最终77f38c05：GitHub CI 45226342565通过，固定回归9418 passed/40 skipped，readiness69、cloud OCR30通过；Reliability45226342772、CodeQL45226343730通过。Release v5.2.1已正式发布为latest，tag精确指向77f38c05aa0c3fd84bea1128375d201f656ea60d；镜像发布45229099052运行中。无生产部署/迁移。
 
 - 镜像发布45229099052已成功：后端与Admin均构建并推送完成；三项请求全部完成。https://github.com/ly9098-prog/MemoGrad/actions/runs/45229099052
+
+## 2026-11-24 v5.2.1 生产部署（已完成）
+
+- [x] Release `v5.2.1` 对应运行代码提交 `77f38c05`；本地任务记录随后提交为 `b2f7d5f7`，该提交仅更新 `prompts/tasks/current_task.md`，部署同步按 `.deployignore` 排除 `prompts/`。
+- [x] 部署前确认工作区仅保留无关未跟踪文件 `clean-wsl-memory.sh`；rsync 预演与实际同步都只包含本轮四个后端文件，并显式排除该未跟踪文件。
+- [x] 为 app／worker／scheduler 当前镜像建立回滚标签，并完成发布前 PostgreSQL 与 Redis 备份；受保护 `.env`、Compose、部署、备份与 Nginx 模板哈希在部署后保持逐项一致。
+- [x] 执行 `update-all`，未执行数据库迁移。app／worker／scheduler 替换为 `sha256:a77fda2d…`、`sha256:085f1111…`、`sha256:a2302d82…`；本轮前端源码未变，admin／web 保持原容器 `sha256:5381b5cd…`、`sha256:2069167…`，两域 BUILD_ID 均为 `Ux-AMDoUu0_wbz5bhOPQE`。
+- [x] 七个业务容器均 running、重启计数均为 0，app／PostgreSQL／Redis healthy。四个修正源文件在 app／worker／scheduler 三层哈希一致；错误码 403／404／409／422／429／503／504 投影、AI 诊断空值拒绝及 5 条薄弱点／3 条强项／5 条建议／240 字符上限的生产镜像烟测通过。
+- [x] 公网 `api.xzshub.top/health`、`/health/live`、用户与 Admin `/dashboard` 均返回 200；内部 readiness 200 且 `degraded=false`。数据库 current／heads 均为 `v27_user_ai_policy (head)`；六个入口／替换服务近 15 分钟日志的 traceback／critical／fatal／unhandled／exception 为 0。
+- [x] PostgreSQL 备份 23,537,306 字节，SHA256 `2cb44d7597d266ae5eef559517d11a95f8d9aa6e0b605916b4ab112adcac361f`；Redis 备份 `redis_20261124_014551.rdb`，SHA256 `e6f3ae29d3b933bfdd3dae1e8eb33d34f842d34eed02020f1fc2c289ab5c09b6`。
+- [x] 证据目录 `/data/backups/v5.2.1-77f38c05-20261124-014514`；生产 `.deploy-revision` 已更新为 `77f38c05`。回滚脚本只覆盖本轮实际替换的 app／worker／scheduler，标签为 `deploy-{app,worker,scheduler}:before-v5.2.1-77f38c05-20261124-014514`。
+- 未调用真实 LLM、未迁移数据库、未上传或发布小程序客户端。
