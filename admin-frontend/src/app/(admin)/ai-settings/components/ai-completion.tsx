@@ -91,11 +91,13 @@ export function AiCompletionPreview({
   loading,
   modelName,
   error,
+  className,
 }: {
   configs?: Configs | null;
   loading?: boolean;
   modelName?: string | null;
   error?: string | null;
+  className?: string;
 }) {
   const queryClient = useQueryClient();
   const data = configs ?? {};
@@ -198,6 +200,7 @@ export function AiCompletionPreview({
         title="补全校准台"
         lead="让缺失的题干、选项与答案回到同一条逻辑链。"
         aside={aside}
+        className={className}
       >
         <p className={styles.noticeError}>
           {error || "补全配置尚未加载，暂时不能编辑。"}
@@ -212,6 +215,7 @@ export function AiCompletionPreview({
       title="补全校准台"
       lead="让缺失的题干、选项与答案回到同一条逻辑链。"
       aside={aside}
+      className={className}
     >
       {error ? <p className={styles.noticeError}>{error}</p> : null}
 

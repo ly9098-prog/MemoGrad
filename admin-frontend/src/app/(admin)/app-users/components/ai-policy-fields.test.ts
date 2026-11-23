@@ -20,6 +20,14 @@ const values = {
 describe("ordinary user AI policy fields", () => {
   it("round-trips every backend policy field", () => {
     expect(USER_AI_POLICY_FIELDS).toHaveLength(6);
+    expect(USER_AI_POLICY_FIELDS.map(({ key }) => key)).toEqual([
+      "regeneration_cooldown_seconds",
+      "regeneration_question_24h_limit",
+      "regeneration_account_24h_limit",
+      "daily_token_limit",
+      "monthly_token_limit",
+      "rpm_limit",
+    ]);
     expect(parsePolicyForm(createPolicyForm(values))).toEqual(values);
   });
 

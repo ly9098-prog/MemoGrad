@@ -127,11 +127,13 @@ export function OcrAccordion({
   loading,
   modelName,
   error,
+  className,
 }: {
   configs?: Configs | null;
   loading?: boolean;
   modelName?: string | null;
   error?: string | null;
+  className?: string;
 }) {
   const queryClient = useQueryClient();
   const savedDraft = useMemo(() => readDraft(configs ?? {}), [configs]);
@@ -239,6 +241,7 @@ export function OcrAccordion({
         title="纠错配置"
         lead="先还原公式与结构，再让题目进入题库。"
         aside={aside}
+        className={className}
       >
         <p className={styles.noticeError}>
           {error || "OCR 配置尚未加载，暂时不能编辑。"}
@@ -253,6 +256,7 @@ export function OcrAccordion({
       title="纠错配置"
       lead="先还原公式与结构，再让题目进入题库。"
       aside={aside}
+      className={className}
     >
       {error ? <p className={styles.noticeError}>{error}</p> : null}
 

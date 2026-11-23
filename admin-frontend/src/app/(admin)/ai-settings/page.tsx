@@ -213,7 +213,7 @@ function AISettingsContent() {
   }
 
   return (
-    <ManagementPage className="space-y-4 pb-0">
+    <ManagementPage className="flex min-h-[calc(100dvh-5.5rem)] flex-col space-y-4 pb-0 lg:min-h-[calc(100dvh-4rem)]">
       <ManagementPageHeader
         title="AI 解析设置"
         description="管理模型目录、能力绑定，以及后台导题与补全的 AI 运行边界。"
@@ -290,13 +290,18 @@ function AISettingsContent() {
         <div
           hidden={activeTab !== "ocr"}
           inert={activeTab !== "ocr" ? true : undefined}
-          className={activeTab === "ocr" ? "animate-rise-in" : undefined}
+          className={
+            activeTab === "ocr"
+              ? "flex min-h-0 flex-1 animate-rise-in"
+              : undefined
+          }
         >
           <OcrAccordion
             configs={configs.data}
             loading={configs.isLoading}
             modelName={resolvedModels.ocr}
             error={configs.isError ? getErrorMessage(configs.error) : null}
+            className="flex min-h-0 flex-1"
           />
         </div>
       )}
@@ -305,13 +310,18 @@ function AISettingsContent() {
         <div
           hidden={activeTab !== "completion"}
           inert={activeTab !== "completion" ? true : undefined}
-          className={activeTab === "completion" ? "animate-rise-in" : undefined}
+          className={
+            activeTab === "completion"
+              ? "flex min-h-0 flex-1 animate-rise-in"
+              : undefined
+          }
         >
           <AiCompletionPreview
             configs={configs.data}
             loading={configs.isLoading}
             modelName={resolvedModels.completion}
             error={configs.isError ? getErrorMessage(configs.error) : null}
+            className="flex min-h-0 flex-1"
           />
         </div>
       )}

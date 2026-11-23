@@ -40,6 +40,17 @@ type DraftAction = "save" | "unlimited" | "reset";
 type FormRecord = Record<UserAIPolicyField, string>;
 const DEFAULT_REASON = "管理员调整普通用户 AI 额度";
 
+export function resolvePolicyView(
+  hasData: boolean,
+  isLoading: boolean,
+  isError: boolean,
+) {
+  if (hasData) return "data" as const;
+  if (isLoading) return "loading" as const;
+  if (isError) return "error" as const;
+  return "empty" as const;
+}
+
 const emptyValues: UserAIPolicyValues = {
   regeneration_cooldown_seconds: 60,
   regeneration_question_24h_limit: 3,
@@ -93,6 +104,7 @@ export function UserAIPolicyDialog({
   const [baselineSnapshot, setBaselineSnapshot] = useState("");
   const [conflictPending, setConflictPending] = useState(false);
   const [notice, setNotice] = useState("");
+  const [saveError, setSaveError] = useState("");
   const loadedVersion = useRef<string | null>(null);
   const remoteVersion = useRef(0);
   const draftDirty = useRef(false);
@@ -116,6 +128,27 @@ export function UserAIPolicyDialog({
   });
   const targetUserId =
     target?.scope === "user" ? target.user.id : null;
+  const policyView = resolvePolicyView(
+    Boolean(policy.data),
+    policy.isLoading,
+    policy.isError,
+  );
+  const recoverLatestPolicy = async () => {
+    const refreshed = await policy.refetch();
+    if (refreshed.error || !refreshed.data) {
+      setNotice("服务器上的额度版本刷新失败；当前草稿已保留。");
+      setSaveError(
+        refreshed.error
+          ? getErrorMessage(refreshed.error)
+          : "无法读取最新额度版本，请稍后重试",
+      );
+      return false;
+    }
+    remoteVersion.current = refreshed.data.version;
+    setNotice("已载入最新版本，当前草稿仍保留；请再次保存。");
+    setSaveError("");
+    return true;
+  };
 
   useEffect(() => {
     if (!open) {
@@ -154,6 +187,7 @@ export function UserAIPolicyDialog({
     setReason(DEFAULT_REASON);
     draftDirty.current = false;
     setConflictPending(false);
+    setSaveError("");
   }, [open, policy.data, target?.scope, targetUserId]);
 
   const currentSnapshot = draftSnapshot(values, modes, reason);
@@ -208,8 +242,8 @@ export function UserAIPolicyDialog({
     },
     onSuccess: (data) => {
       draftDirty.current = false;
-      setBaselineSnapshot(currentSnapshot);
       setConflictPending(false);
+      setSaveError("");
       setNotice("额度设置已保存，新配置已作用于后续请求。");
       queryClient.setQueryData(queryKey, data);
       queryClient.invalidateQueries({ queryKey: ["app-users-ai-policy"] });
@@ -221,8 +255,11 @@ export function UserAIPolicyDialog({
       if (error instanceof ApiError && error.status === 409) {
         setConflictPending(true);
         setNotice("额度已被其他管理员更新，正在刷新版本；当前草稿不会丢失。");
-        await policy.refetch();
+        setSaveError("");
+        await recoverLatestPolicy();
+        return;
       }
+      setSaveError(getErrorMessage(error));
     },
   });
 
@@ -258,6 +295,7 @@ export function UserAIPolicyDialog({
     if (!nextOpen) {
       setPendingAction(null);
       setNotice("");
+      setSaveError("");
     }
     onOpenChange(nextOpen);
   };
@@ -273,16 +311,32 @@ export function UserAIPolicyDialog({
             </DialogDescription>
           </div>
           <div className="min-h-0 overflow-y-auto px-6 py-5">
-            {policy.isLoading ? (
+            {policyView === "loading" ? (
               <p role="status" className="text-sm text-muted-foreground">
                 正在读取额度策略…
               </p>
-            ) : policy.isError ? (
+            ) : policyView === "error" ? (
               <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive-light px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(policy.error)}
               </div>
             ) : policy.data ? (
               <div className="space-y-4">
+                {policy.isError ? (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-destructive/25 bg-destructive-light px-4 py-3 text-sm text-destructive"
+                  >
+                    {getErrorMessage(policy.error)}
+                    <button
+                      type="button"
+                      className="ml-3 font-semibold underline underline-offset-2"
+                      disabled={policy.isFetching}
+                      onClick={() => void recoverLatestPolicy()}
+                    >
+                      {policy.isFetching ? "重试中…" : "重新读取"}
+                    </button>
+                  </div>
+                ) : null}
                 {policy.data.scope === "default" ? (
                   <FinitePolicyFields
                     values={values}
@@ -327,9 +381,9 @@ export function UserAIPolicyDialog({
                     {notice}
                   </p>
                 ) : null}
-                {mutation.isError ? (
+                {saveError ? (
                   <p role="alert" className="text-xs text-destructive">
-                    {getErrorMessage(mutation.error)}
+                    {saveError}
                   </p>
                 ) : null}
               </div>

@@ -18,6 +18,12 @@
   color: var(--ais-ink);
 }
 
+.section[class*="flex"] {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .header {
   display: flex;
   align-items: flex-start;
@@ -219,6 +225,59 @@
 
 .splitCompletion {
   grid-template-columns: minmax(0, 0.58fr) minmax(0, 1.42fr);
+}
+
+.section[class*="flex"] .split {
+  flex: 1 1 auto;
+}
+
+.section[class*="flex"] .splitCompletion .pane {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.section[class*="flex"] .splitCompletion .pane:first-child > .editor {
+  flex: 1 1 auto;
+}
+
+.section[class*="flex"] .splitCompletion .editorInput {
+  height: 100%;
+}
+
+.section[class*="flex"] .splitCompletion .pane:last-child > .diff {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.section[class*="flex"] .splitCompletion .diffGrid {
+  flex: 1 1 auto;
+}
+
+.section[class*="flex"] .splitOcr .pane {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.section[class*="flex"] .splitOcr .pane:first-child > .editor {
+  flex: 1 1 auto;
+  min-height: 330px;
+}
+
+.section[class*="flex"] .splitOcr .editorInput {
+  height: 100%;
+}
+
+.section[class*="flex"] .splitOcr .pane:last-child > .paneHeader,
+.section[class*="flex"] .splitOcr .pane:last-child > .toggleList,
+.section[class*="flex"] .splitOcr .pane:last-child > .subSection {
+  flex: 0 0 auto;
+}
+
+.section[class*="flex"] .splitOcr .pane:last-child > .subSection:last-child {
+  margin-top: auto;
 }
 
 .splitVector {
