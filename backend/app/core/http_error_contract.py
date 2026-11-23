@@ -96,8 +96,8 @@ def _public_error_content(
     return {"error": error}
 
 
-def _api_error_status(code: ErrorCode) -> int:
-    codes_503 = {
+_API_ERROR_STATUS_GROUPS: dict[int, set[ErrorCode]] = {
+    503: {
         ErrorCode.QUEUE_UNAVAILABLE,
         ErrorCode.DB_UNAVAILABLE,
         ErrorCode.STAGING_UNAVAILABLE,
@@ -106,8 +106,8 @@ def _api_error_status(code: ErrorCode) -> int:
         ErrorCode.AI_USER_POLICY_UNAVAILABLE,
         ErrorCode.RESOURCE_MEMORY_LOW,
         ErrorCode.RESOURCE_DISK_LOW,
-    }
-    codes_429 = {
+    },
+    429: {
         ErrorCode.QUEUE_FULL,
         ErrorCode.RESOURCE_QUEUE_FULL,
         ErrorCode.OCR_RATE_LIMIT,
@@ -115,41 +115,34 @@ def _api_error_status(code: ErrorCode) -> int:
         ErrorCode.AI_OVERLOADED,
         ErrorCode.AI_ADMIN_QUOTA_EXHAUSTED,
         ErrorCode.RESOURCE_DB_POOL_BUSY,
-    }
-    codes_409 = {
+    },
+    409: {
         ErrorCode.DB_CONFLICT,
         ErrorCode.TASK_FENCING_REJECTED,
         ErrorCode.TASK_LEASE_LOST,
         ErrorCode.TASK_CANCELLED,
-    }
-    codes_404 = {
+    },
+    404: {
         ErrorCode.TASK_NOT_FOUND,
         ErrorCode.STAGING_OBJECT_MISSING,
-    }
-    codes_422 = {
+    },
+    422: {
         ErrorCode.REVIEW_REQUIRED,
         ErrorCode.VALIDATION_ERROR,
-    }
-    codes_403 = {
-        ErrorCode.AI_PARSE_DISABLED,
-    }
-    codes_504 = {
+    },
+    504: {
         ErrorCode.OCR_TIMEOUT,
         ErrorCode.AI_TIMEOUT,
         ErrorCode.PIPELINE_TIMEOUT,
-    }
-    if code in codes_503:
-        return 503
-    if code in codes_429:
-        return 429
-    if code in codes_409:
-        return 409
-    if code in codes_404:
-        return 404
-    if code in codes_422:
-        return 422
-    if code in codes_504:
-        return 504
-    if code in codes_403:
-        return 403
+    },
+    403: {
+        ErrorCode.AI_PARSE_DISABLED,
+    },
+}
+
+
+def _api_error_status(code: ErrorCode) -> int:
+    for status_code, codes in _API_ERROR_STATUS_GROUPS.items():
+        if code in codes:
+            return status_code
     return 500

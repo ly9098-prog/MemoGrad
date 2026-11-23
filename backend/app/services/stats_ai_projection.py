@@ -135,6 +135,26 @@ def build_knowledge_point_stats(subject_rows: list) -> list[dict]:
     return stats
 
 
+def build_ai_diagnosis_response(parsed: dict, subject_count: int) -> dict | None:
+    """Normalize a parsed provider diagnosis; reject content with no useful fields."""
+    weak_points = normalize_knowledge_points(parsed.get("weak_points"), limit=5)
+    strong_points = normalize_knowledge_points(parsed.get("strong_points"), limit=3)
+    suggestions = normalize_text_list(
+        parsed.get("learning_suggestions"),
+        limit=5,
+        max_chars=240,
+    )
+    if not weak_points and not strong_points and not suggestions:
+        return None
+    return {
+        "weak_points": weak_points,
+        "strong_points": strong_points,
+        "learning_suggestions": suggestions,
+        "summary": f"基于最近60天{subject_count}个科目的真实错题数据进行AI诊断。",
+        "generated": True,
+    }
+
+
 def build_local_ai_diagnosis(
     *,
     knowledge_point_stats: list[dict],

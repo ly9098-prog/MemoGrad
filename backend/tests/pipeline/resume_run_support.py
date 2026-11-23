@@ -167,6 +167,7 @@ def make_harness(monkeypatch):
         suppress={},
         queries=[],
         row=SimpleNamespace(
+            created_by=None,
             total_pages=95,
             watermark_snapshot=[{"pattern": "frozen"}],
             source_type="pdf",

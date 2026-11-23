@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from functools import partial
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,7 @@ from app.services.stats_ai_projection import (
     build_ai_diagnosis_messages as _build_ai_diagnosis_messages,
 )
 from app.services.stats_ai_projection import (
+    build_ai_diagnosis_response,
     build_dashboard_ai_payload,
     build_dashboard_ai_prompt,
     build_dashboard_ai_response,
@@ -32,7 +34,7 @@ from app.services.stats_ai_projection import (
     build_rule_based_dashboard_analysis,
     extract_json_object,
     normalize_dashboard_actions,
-    normalize_knowledge_points,
+    normalize_knowledge_points,  # noqa: F401 - compatibility export
     normalize_text_list,
 )
 from app.services.stats_dashboard_projection import (
@@ -373,8 +375,7 @@ async def get_ai_diagnosis(db: AsyncSession, user_id: int) -> dict:
     """AI 错题诊断：优先使用后台模型，超时/异常时快速降级为数据诊断。"""
     if not await stats_ai_billing.lock_active_user(db, user_id):
         return stats_ai_billing.unavailable_diagnosis()
-    today = shanghai_today()
-    since = _date_utc_range(today - timedelta(days=60))[0]
+    since = _date_utc_range(shanghai_today() - timedelta(days=60))[0]
     subject_rows = await stats_query_service.load_ai_diagnosis_subject_rows(
         db, user_id, since
     )
@@ -385,19 +386,13 @@ async def get_ai_diagnosis(db: AsyncSession, user_id: int) -> dict:
 
     overview = await get_overview(db, user_id)
     total_q = overview["total_questions"]
-    accuracy = overview["accuracy"]
     knowledge_point_stats = build_knowledge_point_stats(subject_rows)
     local = _local_ai_diagnosis(knowledge_point_stats, len(subject_rows), total_q)
     runtime, runtime_failed = await _load_ai_diagnosis_runtime(db, user_id)
-    if runtime_failed:
-        return local(provider_failed=True)
-    if runtime is None:
-        return local()
+    if runtime_failed or runtime is None:
+        return local(provider_failed=runtime_failed)
     diagnosis_messages = _build_ai_diagnosis_messages(
-        subject_rows,
-        total_q,
-        accuracy,
-        knowledge_point_stats,
+        subject_rows, total_q, overview["accuracy"], knowledge_point_stats
     )
     try:
         ai_resp = await stats_ai_billing.call_metered_stats_ai(
@@ -446,15 +441,12 @@ def _local_ai_diagnosis(
     subject_count: int,
     total_questions: int,
 ):
-    def local(*, provider_failed: bool = False) -> dict:
-        return build_local_ai_diagnosis(
-            knowledge_point_stats=knowledge_point_stats,
-            subject_count=subject_count,
-            total_questions=total_questions,
-            provider_failed=provider_failed,
-        )
-
-    return local
+    return partial(
+        build_local_ai_diagnosis,
+        knowledge_point_stats=knowledge_point_stats,
+        subject_count=subject_count,
+        total_questions=total_questions,
+    )
 
 
 async def _call_ai_diagnosis_provider(
@@ -499,22 +491,8 @@ def _parse_ai_diagnosis_or_local(
         )
         return local(provider_failed=True)
 
-    weak_points = normalize_knowledge_points(parsed.get("weak_points"), limit=5)
-    strong_points = normalize_knowledge_points(parsed.get("strong_points"), limit=3)
-    suggestions = _normalize_text_list(
-        parsed.get("learning_suggestions"),
-        limit=5,
-        max_chars=240,
-    )
-    if not weak_points and not strong_points and not suggestions:
-        return local(provider_failed=True)
-    return {
-        "weak_points": weak_points,
-        "strong_points": strong_points,
-        "learning_suggestions": suggestions,
-        "summary": f"基于最近60天{subject_count}个科目的真实错题数据进行AI诊断。",
-        "generated": True,
-    }
+    response = build_ai_diagnosis_response(parsed, subject_count)
+    return response if response is not None else local(provider_failed=True)
 
 
 # ──────────────────────────────────────────────

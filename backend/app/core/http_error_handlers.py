@@ -49,35 +49,41 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     )
 
 
-async def ai_resource_rejected_handler(
-    request: Request, exc: AIResourceRejectedError
-) -> JSONResponse:
-    """Translate AI admission failures into the same safe public error contract."""
+def _ai_rejection_error(reason: str) -> tuple[ErrorCode, int, str | None]:
     message: str | None = None
-    if exc.reason == "ai_parse_disabled":
+    if reason == "ai_parse_disabled":
         code = ErrorCode.AI_PARSE_DISABLED
         status_code = 403
         message = "后台 AI 解析已全局关闭"
-    elif exc.reason == "ai_admin_quota_exhausted":
+    elif reason == "ai_admin_quota_exhausted":
         code = ErrorCode.AI_ADMIN_QUOTA_EXHAUSTED
         status_code = 429
         message = "后台 AI 解析月度额度已用尽"
-    elif exc.reason == "ai_user_policy_unavailable":
+    elif reason == "ai_user_policy_unavailable":
         code = ErrorCode.AI_USER_POLICY_UNAVAILABLE
         status_code = 503
         message = "AI 额度策略暂不可用，请稍后重试"
-    elif exc.reason == "ai_rate_limited":
+    elif reason == "ai_rate_limited":
         code = ErrorCode.AI_RATE_LIMIT
         status_code = 429
-    elif exc.reason == "ai_overloaded":
+    elif reason == "ai_overloaded":
         code = ErrorCode.AI_OVERLOADED
         status_code = 429
-    elif exc.reason == "ai_prompt_too_large":
+    elif reason == "ai_prompt_too_large":
         code = ErrorCode.VALIDATION_ERROR
         status_code = 422
     else:
         code = ErrorCode.AI_PROVIDER_UNAVAILABLE
         status_code = 503
+
+    return code, status_code, message
+
+
+async def ai_resource_rejected_handler(
+    request: Request, exc: AIResourceRejectedError
+) -> JSONResponse:
+    """Translate AI admission failures into the same safe public error contract."""
+    code, status_code, message = _ai_rejection_error(exc.reason)
 
     try:
         from app.core.log_context import log_event

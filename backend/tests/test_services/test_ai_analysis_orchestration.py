@@ -178,5 +178,6 @@ async def test_regeneration_denial_after_lease_releases_without_provider_call(mo
     monkeypatch.setattr(module, "admit_regeneration", admit)
     assert await module.execute_locked_analysis(h.request) is denied
     assert [name for name, *_ in h.events] == ["begin", "cache", "inputs", "finish"]
-    admit.assert_awaited_once_with(cache=h.request.cache, user_id=8,
-                                  wrong_question=h.request.wrong_question)
+    admit.assert_awaited_once_with(cache=h.request.cache, db=h.request.db, user_id=8,
+                                  wrong_question=h.request.wrong_question,
+                                  policy=h.request.user_ai_policy)

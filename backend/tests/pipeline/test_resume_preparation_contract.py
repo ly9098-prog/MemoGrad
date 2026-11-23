@@ -34,6 +34,15 @@ async def test_session_order_and_input_copy(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_resume_preserves_admin_quota_owner(monkeypatch):
+    h = make_harness(monkeypatch)
+    h.row.created_by = "admin:17"
+    await execute(h)
+    assert h.pipeline.created_by == "admin:17"
+    assert all(call["shared"]["admin_quota_admin_id"] == 17 for call in h.calls)
+
+
+@pytest.mark.asyncio
 async def test_complete_chunk_payload_retains_shared_references(monkeypatch):
     h = make_harness(monkeypatch)
     patterns_ref, patterns_before = h.patterns, list(h.patterns)

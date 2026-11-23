@@ -29,9 +29,33 @@ from app.models.review_scheduler import ReviewSchedule
 from app.models.user import User
 from app.models.wrong_question import WrongQuestion
 from app.services import stats_service
+from app.services.stats_ai_projection import build_ai_diagnosis_response
 
 TODAY = date(2026, 10, 22)
 NOW = datetime(2026, 10, 22, 10, 0, 0)
+
+
+@pytest.mark.parametrize("parsed", [{}, {"weak_points": [None]}, {"learning_suggestions": [7, " "]}])
+def test_ai_diagnosis_projection_rejects_empty_normalized_content(parsed):
+    assert build_ai_diagnosis_response(parsed, 2) is None
+
+
+def test_ai_diagnosis_projection_normalizes_and_bounds_provider_content():
+    result = build_ai_diagnosis_response(
+        {
+            "weak_points": [{"knowledge_point": " 链表 ", "accuracy": 25}] * 8,
+            "strong_points": [{"knowledge_point": "树", "accuracy": 110}] * 6,
+            "learning_suggestions": [None, " "] + ["x" * 300] * 8,
+        },
+        2,
+    )
+    assert result == {
+        "weak_points": [{"knowledge_point": "链表", "accuracy": 0.25, "suggestion": ""}] * 5,
+        "strong_points": [{"knowledge_point": "树", "accuracy": 1.0, "suggestion": ""}] * 3,
+        "learning_suggestions": ["x" * 240] * 5,
+        "summary": "基于最近60天2个科目的真实错题数据进行AI诊断。",
+        "generated": True,
+    }
 
 
 async def _make_database(tmp_path):

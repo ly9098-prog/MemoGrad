@@ -48,7 +48,17 @@ def test_user_token_budget_is_shared_without_learning_vector_back_edges():
     assert budget in graph[learning] and budget in graph[vector]
     assert learning not in graph[vector]
     assert vector in graph[learning]
-    assert not any(name.startswith("app.services") for name in graph[budget])
+    assert {name for name in graph[budget] if name.startswith("app.services")} == {
+        "app.services.user_ai_policy_service",
+    }
+    pending, visited = [budget], set()
+    while pending:
+        dependency = pending.pop()
+        if dependency in visited:
+            continue
+        assert dependency not in {learning, vector}
+        visited.add(dependency)
+        pending.extend(graph.get(dependency, ()))
     source = (APP / "services" / "ai_token_budget.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     assert len(source.splitlines()) <= 300
