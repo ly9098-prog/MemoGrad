@@ -178,6 +178,7 @@ async def run_image_pipeline_stage(stage: ImagePipelineStage) -> dict:
             db=db,
             page_images={1: stage.image_bytes},
             pre_extracted_blocks=stage.pre_extracted_blocks,
+            created_by=stage.created_by,
         )
 
 

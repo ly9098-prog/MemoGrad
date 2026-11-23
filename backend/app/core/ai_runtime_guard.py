@@ -178,10 +178,9 @@ class AIRuntimeGuard:
             return f"a:{admin_id}"
         return None
 
-    def _local_rate_allowed(self, subject: str, now: float) -> tuple[bool, int]:
-        limit = max(0, int(settings.AI_USER_RPM_LIMIT))
-        if limit <= 0:
-            return True, 0
+    def _local_rate_allowed(
+        self, subject: str, now: float, limit: int
+    ) -> tuple[bool, int]:
         window = int(now // 60)
         key = (subject, window)
         with self._state_lock:
@@ -190,13 +189,21 @@ class AIRuntimeGuard:
                 self._local_rate.pop(old_key, None)
             count = self._local_rate.get(key, 0) + 1
             self._local_rate[key] = count
+        if limit <= 0:
+            return True, 0
         retry_after = max(1, 60 - int(now % 60))
         return count <= limit, retry_after
 
-    async def enforce_rate_limit(self) -> None:
+    async def enforce_rate_limit(self, limit_override: int | None = None) -> None:
         subject = self._subject()
-        limit = max(0, int(settings.AI_USER_RPM_LIMIT))
-        if subject is None or limit <= 0:
+        raw_limit = (
+            int(settings.AI_USER_RPM_LIMIT)
+            if limit_override is None
+            else int(limit_override)
+        )
+        unlimited = raw_limit == -1
+        limit = 1 if unlimited else max(0, raw_limit)
+        if subject is None or limit == 0:
             return
 
         now = time.time()
@@ -220,7 +227,7 @@ class AIRuntimeGuard:
                 pipe.expire(key, 70)
                 result = await pipe.execute()
                 count = int(result[0])
-                if count <= limit:
+                if unlimited or count <= limit:
                     return
                 retry_after = max(1, 60 - int(now % 60))
                 with self._state_lock:
@@ -245,7 +252,9 @@ class AIRuntimeGuard:
                     "AI Redis rate limiter unavailable; using local fallback: %s", exc
                 )
 
-        allowed, retry_after = self._local_rate_allowed(subject, now)
+        allowed, retry_after = self._local_rate_allowed(
+            subject, now, -1 if unlimited else limit
+        )
         if not allowed:
             with self._state_lock:
                 self._metrics["rejected_rate_limit"] = (

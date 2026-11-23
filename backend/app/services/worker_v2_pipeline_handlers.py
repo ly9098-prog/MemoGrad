@@ -118,6 +118,7 @@ async def _run_document_resume_handler(state: WorkerTaskState) -> None:
     subject = state.payload.get("subject")
     subject_id = state.payload.get("subject_id")
     opts = state.payload.get("options", {})
+    created_by = state.payload.get("created_by")
     ckpt = await _get_stage_checkpoint(state.pipeline_id)
     if state.fence_record_id:
         await state.namespace["_verify_fencing_or_cancel"](
@@ -133,6 +134,7 @@ async def _run_document_resume_handler(state: WorkerTaskState) -> None:
             options=opts,
             db=resume_db,
             pipeline_id=state.pipeline_id,
+            created_by=created_by,
             resume_from_checkpoint=ckpt,
         )
     try:

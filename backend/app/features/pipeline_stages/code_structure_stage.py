@@ -19,6 +19,7 @@ import json
 import logging
 from typing import Any
 
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.features.candidate_evaluator import CandidateDecision, CandidateEvaluator
 from app.features.code_integrity import contains_code, detect_code_block_integrity
 from app.features.pipeline_stages._helpers import _count_risk_flags
@@ -85,6 +86,8 @@ async def _call_llm_for_structure_reconstruct(
     stem: str,
     config: dict,
     db: Any = None,
+    *,
+    admin_quota_admin_id: int | None = None,
 ) -> dict | None:
     """Call LLM to reconstruct code structure in the stem.
 
@@ -111,9 +114,19 @@ async def _call_llm_for_structure_reconstruct(
             messages,
             capability=AICapability.TEXT_STRUCTURING,
             temperature=0.2,
+            **(
+                {
+                    "admin_quota_scope": "admin_import_ai",
+                    "admin_quota_admin_id": admin_quota_admin_id,
+                }
+                if admin_quota_admin_id is not None
+                else {}
+            ),
         )
         if result is None:
             return None
+    except AIResourceRejectedError:
+        raise
     except Exception as e:
         logger.warning("Code structure LLM call failed: %s", e)
         return None
@@ -170,6 +183,7 @@ async def run_code_structure_stage(
     options: dict | None = None,
     *,
     db: Any = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict:
     """Run code structure reconstruction for questions with code integrity issues.
 
@@ -227,7 +241,12 @@ async def run_code_structure_stage(
         _pre_flags = set(_pre_integrity.get("flags", []))
         _pre_score = _pre_integrity.get("score", 0)
 
-        result = await _call_llm_for_structure_reconstruct(stem, config, db)
+        result = await _call_llm_for_structure_reconstruct(
+            stem,
+            config,
+            db,
+            admin_quota_admin_id=admin_quota_admin_id,
+        )
 
         if result is None:
             failed_count += 1

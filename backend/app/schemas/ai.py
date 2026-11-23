@@ -39,6 +39,9 @@ class AiResponse(BaseModel):
     generated_at: str | None = None
     availability: AiModelAvailabilityResponse | None = None
     message: str | None = None
+    limit_dimension: str | None = None
+    limit_value: int | None = None
+    retry_after_seconds: int | None = None
 
 
 class AiRecoveryRequest(BaseModel):

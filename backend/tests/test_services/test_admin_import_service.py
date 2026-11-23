@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.core.admin_security import AdminPrincipal
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.models.admin import AdminUser
 from app.models.question_import import QuestionImport
-from app.services import admin_import_service
+from app.services import admin_import_service, ai_import_service
 from app.services.admin_import_service import (
     complete_import_question,
     create_enrich_task,
@@ -179,6 +180,21 @@ async def test_complete_import_question_requires_pending():
 
     with pytest.raises(ValueError, match="仅支持对 pending 记录使用 AI 补全"):
         await complete_import_question(db, 1, _principal())
+
+
+@pytest.mark.asyncio
+async def test_admin_quota_rejection_is_not_silently_converted_to_fallback(
+    monkeypatch,
+):
+    async def reject(*_args, **_kwargs):
+        raise AIResourceRejectedError("ai_admin_quota_exhausted")
+
+    monkeypatch.setattr(ai_import_service, "chat_with_db_model", reject)
+    with pytest.raises(AIResourceRejectedError) as exc:
+        await ai_import_service._call_or_fallback(
+            object(), [], {"answer": "A"}, admin_id=9
+        )
+    assert exc.value.reason == "ai_admin_quota_exhausted"
 
 
 @pytest.mark.asyncio

@@ -43,6 +43,7 @@ async def invoke_and_review_analysis(
             resolve_runtime=request.resolve_runtime,
             quarantine_runtime=request.quarantine_runtime,
             cached_response=request.cached_response,
+            user_rpm_limit=request.user_rpm_limit,
         )
     )
     # Provider failures and preserved caches are already complete API responses.

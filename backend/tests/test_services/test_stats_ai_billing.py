@@ -39,10 +39,16 @@ async def billing_db(monkeypatch):
 @pytest.mark.asyncio
 async def test_stats_success_records_charge_and_retains_it_in_the_ledger(billing_db):
     db, cache = billing_db
-    provider = AsyncMock(return_value={"content": "{}", "tokens_used": 25, "model": "test"})
+    provider = AsyncMock(
+        return_value={"content": "{}", "tokens_used": 25, "model": "test"}
+    )
     result = await stats_ai_billing.call_metered_stats_ai(
-        db, 17, [{"role": "user", "content": "diagnose"}], provider,
-        max_tokens=50, session_type="stats_ai_diagnosis",
+        db,
+        17,
+        [{"role": "user", "content": "diagnose"}],
+        lambda _rate_limit: provider(),
+        max_tokens=50,
+        session_type="stats_ai_diagnosis",
     )
     assert result["tokens_used"] == 25
     assert await db.scalar(select(func.sum(AiChat.tokens_used))) == 25
@@ -60,8 +66,12 @@ async def test_stats_exhausted_budget_never_invokes_provider(billing_db):
     await db.commit()
     provider = AsyncMock()
     assert await stats_ai_billing.call_metered_stats_ai(
-        db, 17, [{"role": "user", "content": "diagnose"}], provider,
-        max_tokens=50, session_type="stats_ai_diagnosis",
+        db,
+        17,
+        [{"role": "user", "content": "diagnose"}],
+        lambda _rate_limit: provider(),
+        max_tokens=50,
+        session_type="stats_ai_diagnosis",
     ) is None
     provider.assert_not_awaited()
 
@@ -72,8 +82,12 @@ async def test_stats_provider_failure_keeps_hold_and_does_not_write_chat(billing
     provider = AsyncMock(side_effect=RuntimeError("response lost"))
     with pytest.raises(RuntimeError, match="response lost"):
         await stats_ai_billing.call_metered_stats_ai(
-            db, 17, [{"role": "user", "content": "diagnose"}], provider,
-            max_tokens=50, session_type="stats_ai_diagnosis",
+            db,
+            17,
+            [{"role": "user", "content": "diagnose"}],
+            lambda _rate_limit: provider(),
+            max_tokens=50,
+            session_type="stats_ai_diagnosis",
         )
     assert await db.scalar(select(func.count(AiChat.id))) == 0
     day_key, _month_key = ai_token_budget._token_period_keys(17)

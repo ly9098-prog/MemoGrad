@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.client import ChatCompletionCancelled
+from app.ai.client import AITransportTimeout, ChatCompletionCancelled
 from app.ai.gateway import LLMRuntimeConfig, chat_with_db_model
 from app.ai.prompts_408_teacher import (
     ACTION_DEFINITIONS,
@@ -27,6 +27,7 @@ from app.ai.prompts_408_teacher import (
     action_items,
     build_408_teacher_prompt,
 )
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.log_context import log_event
 from app.core.subject_scope import selected_408_subject_ids
 from app.models.admin import QuestionVersion, QuestionVersionKnowledgePoint, Subject
@@ -1175,6 +1176,7 @@ async def _call_teacher_with_usage(
             prefer_direct_answer=True,
             runtime=runtime,
             deadline=deadline,
+            rate_limit=reservation.rpm_limit,
         )
     except ChatCompletionCancelled as exc:
         # The client has joined its transport; settle in this request's session
@@ -1187,8 +1189,29 @@ async def _call_teacher_with_usage(
     except (AnalysisUnavailableError, asyncio.CancelledError):
         await cancel_token_reservation(reservation)
         raise
-    except Exception as exc:
+    except AITransportTimeout as exc:
+        if not exc.dispatched:
+            await cancel_token_reservation(reservation)
+        else:
+            await note_failure(runtime, exc)
+        logger.warning(
+            "408 teacher transport timeout uid=%s qid=%s action=%s dispatched=%s",
+            user_id,
+            question_id,
+            action,
+            exc.dispatched,
+        )
+        return None
+    except AIResourceRejectedError:
+        # Admission rejected before provider transport, so the hold is known
+        # to be zero-cost even though this is not a TimeoutError.
         await cancel_token_reservation(reservation)
+        raise
+    except Exception as exc:
+        # Exceptions after transport may represent a billed request. Keep the
+        # reservation unless the client explicitly proves no dispatch occurred.
+        if getattr(exc, "dispatched", None) is False:
+            await cancel_token_reservation(reservation)
         await note_failure(runtime, exc)
         logger.warning(
             "408 teacher call failed uid=%s qid=%s action=%s",

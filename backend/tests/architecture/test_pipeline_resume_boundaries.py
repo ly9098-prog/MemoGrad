@@ -37,6 +37,9 @@ def check_import(node, role, parents):
     if node.module == "app.services.watermark_service":
         assert role == "context" and owner(node, parents) == "resolve_resume_watermarks"
         allowed[node.module] = {"load_rules", "get_default_patterns"}
+    if node.module == "app.services.admin_ai_usage_service":
+        assert role == "context" and owner(node, parents) == "resolve_resume_watermarks"
+        allowed[node.module] = {"parse_admin_id_from_created_by"}
     assert node.module in allowed
     assert all(n.asname is None and n.name in allowed[node.module] for n in node.names)
 
@@ -123,6 +126,7 @@ def inspect_helper(source, role):
                 assert (owner(node, parents), node.func.id) in {
                     ("resolve_resume_watermarks", "load_rules"),
                     ("resolve_resume_watermarks", "get_default_patterns"),
+                    ("resolve_resume_watermarks", "parse_admin_id_from_created_by"),
                     ("execute_resume_replay", "start_resume_replay"),
                 }
     return parsed

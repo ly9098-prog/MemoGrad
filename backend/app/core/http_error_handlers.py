@@ -53,7 +53,20 @@ async def ai_resource_rejected_handler(
     request: Request, exc: AIResourceRejectedError
 ) -> JSONResponse:
     """Translate AI admission failures into the same safe public error contract."""
-    if exc.reason == "ai_rate_limited":
+    message: str | None = None
+    if exc.reason == "ai_parse_disabled":
+        code = ErrorCode.AI_PARSE_DISABLED
+        status_code = 403
+        message = "后台 AI 解析已全局关闭"
+    elif exc.reason == "ai_admin_quota_exhausted":
+        code = ErrorCode.AI_ADMIN_QUOTA_EXHAUSTED
+        status_code = 429
+        message = "后台 AI 解析月度额度已用尽"
+    elif exc.reason == "ai_user_policy_unavailable":
+        code = ErrorCode.AI_USER_POLICY_UNAVAILABLE
+        status_code = 503
+        message = "AI 额度策略暂不可用，请稍后重试"
+    elif exc.reason == "ai_rate_limited":
         code = ErrorCode.AI_RATE_LIMIT
         status_code = 429
     elif exc.reason == "ai_overloaded":
@@ -92,7 +105,13 @@ async def ai_resource_rejected_handler(
             request,
             status_code=status_code,
             code=code.value,
-            retryable=status_code in {429, 503},
+            retryable=status_code in {429, 502, 503, 504},
+            message=message,
+            details=(
+                {"retry_after_seconds": exc.retry_after_sec}
+                if exc.retry_after_sec is not None
+                else None
+            ),
         ),
         headers=headers,
     )

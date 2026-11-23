@@ -87,6 +87,7 @@ async def run_repair_stage(
     *,
     db=None,
     batch_validation_diagnostics: dict | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict:
     """AI repair for low-confidence questions.
 
@@ -121,6 +122,7 @@ async def run_repair_stage(
         repair_config,
         db=db,
         roman_diagnostics=roman_anomalies,
+        admin_quota_admin_id=admin_quota_admin_id,
     )
 
     repaired = result.get("repaired", [])

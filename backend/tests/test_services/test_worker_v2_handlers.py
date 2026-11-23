@@ -153,7 +153,7 @@ def assert_pipeline_arguments(state, kind, payload, kwargs):
             expected["source_file"] = payload.get("source_file", "")
         if kind in {"import_pipeline", "admin_resume"}:
             expected["source_type"] = payload.get("source_type", "pdf")
-        if kind in {"import_pipeline", "image_pipeline"}:
+        if kind in {"import_pipeline", "image_pipeline", "admin_resume"}:
             expected["created_by"] = payload.get("created_by")
         if kind == "import_pipeline":
             expected["source_sha256"] = payload.get("source_sha256")
@@ -175,6 +175,7 @@ def assert_batch_arguments(state, payload, kwargs):
         subject_id=payload.get("subject_id"),
         options=payload.get("options", {}),
         concurrency=payload.get("concurrency", 2),
+        created_by=payload.get("created_by"),
         execution_fence=("task-test", "owner-test", 7),
     )
 
@@ -250,10 +251,12 @@ async def test_batch_retry_preserves_original_sequence_and_filename(harness):
             "source_seqs": [3],
             "source_files": ["original-third.png"],
             "options": {"batch_fast_mode": False},
+            "created_by": "admin:1",
         },
     )
     kwargs = harness.call("handler.batch_image")[1]
     assert kwargs["job_id"] == "same-job"
+    assert kwargs["created_by"] == "admin:1"
     assert [(item.seq, item.source_file) for item in kwargs["sources"]] == [
         (3, "original-third.png")
     ]

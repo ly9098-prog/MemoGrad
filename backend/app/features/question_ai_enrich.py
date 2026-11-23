@@ -16,6 +16,7 @@ from app.ai import fallback
 from app.ai.client import llm
 from app.ai.gateway import resolve_llm_runtime_config
 from app.ai.prompts import build_enrich_question
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.features.question_ai_complete import _has_complete_answer_risk
 from app.features.question_pipeline import (
     SUBJECT_VALUES,
@@ -97,7 +98,12 @@ async def enrich_import(db: AsyncSession, user_id: int, import_id: int) -> dict:
 
     messages = build_enrich_question(_qi_to_dict(qi))
     prompt_text = json.dumps(messages, ensure_ascii=False)
-    resp, raw, _ = await _call_or_fallback(messages, fallback.get_fallback_enrich(), db)
+    resp, raw, _ = await _call_or_fallback(
+        messages,
+        fallback.get_fallback_enrich(),
+        db,
+        admin_id=user_id,
+    )
 
     if raw is None:
         parsed = resp["fallback_value"]
@@ -278,9 +284,20 @@ async def enrich_batch(
                     api_key=runtime.api_key,
                     base_url=runtime.base_url,
                     provider=runtime.provider,
+                    admin_quota_scope="admin_import_ai",
+                    admin_quota_admin_id=user_id,
                 )
                 item["resp"] = resp
                 item["raw"] = resp["content"]
+            except AIResourceRejectedError as e:
+                item["error_code"] = e.reason
+                item["error"] = (
+                    "后台 AI 解析已全局关闭"
+                    if e.reason == "ai_parse_disabled"
+                    else "后台 AI 解析月度额度已用尽"
+                    if e.reason == "ai_admin_quota_exhausted"
+                    else "AI 服务准入失败，请稍后重试"
+                )
             except Exception as e:
                 item["error"] = str(e)
             return item

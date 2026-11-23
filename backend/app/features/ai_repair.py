@@ -11,7 +11,7 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+from app.core.ai_runtime_guard import AIResourceRejectedError
 
 logger = logging.getLogger(__name__)
 
@@ -551,6 +551,7 @@ async def _call_ai_for_repair(
     model_name: str | None = None,
     provider: str | None = None,
     call_stats: dict[str, int] | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict | None:
     """调用 OpenAI-compatible 模型修复单题。返回修复结果或 None（降级）。
 
@@ -601,7 +602,17 @@ async def _call_ai_for_repair(
             api_key=api_key,
             base_url=base_url,
             provider=provider,
+            **(
+                {
+                    "admin_quota_scope": "admin_import_ai",
+                    "admin_quota_admin_id": admin_quota_admin_id,
+                }
+                if admin_quota_admin_id is not None
+                else {}
+            ),
         )
+    except AIResourceRejectedError:
+        raise
     except Exception:
         return None
 
@@ -625,6 +636,7 @@ async def _call_ai_for_batch_repair(
     config: dict,
     db: AsyncSession | None = None,
     call_stats: dict[str, int] | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> list[tuple[int, dict | None]]:
     """批量调用 OpenAI-compatible 模型修复多题。自动分批（每批最多 _BATCH_LIMIT 题）。"""
     from app.ai.client import llm
@@ -682,7 +694,17 @@ async def _call_ai_for_batch_repair(
                 api_key=api_key,
                 base_url=base_url,
                 provider=provider,
+                **(
+                    {
+                        "admin_quota_scope": "admin_import_ai",
+                        "admin_quota_admin_id": admin_quota_admin_id,
+                    }
+                    if admin_quota_admin_id is not None
+                    else {}
+                ),
             )
+        except AIResourceRejectedError:
+            raise
         except Exception:
             for idx, _q, _rt in batch:
                 all_results.append((idx, None))
@@ -730,6 +752,7 @@ async def _call_ai_for_batch_repair(
                     model_name=model_name,
                     provider=provider,
                     call_stats=call_stats,
+                    admin_quota_admin_id=admin_quota_admin_id,
                 )
                 if single:
                     single["_batch_fallback"] = True  # L2: mark degradation source
@@ -770,6 +793,7 @@ async def _call_ai_for_roman_decision(
     config: dict,
     db: AsyncSession | None = None,
     call_stats: dict[str, int] | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict | None:
     """Call the configured OpenAI-compatible model for constrained Roman numeral repair decisions.
 
@@ -808,7 +832,17 @@ async def _call_ai_for_roman_decision(
             api_key=api_key,
             base_url=base_url,
             provider=provider,
+            **(
+                {
+                    "admin_quota_scope": "admin_import_ai",
+                    "admin_quota_admin_id": admin_quota_admin_id,
+                }
+                if admin_quota_admin_id is not None
+                else {}
+            ),
         )
+    except AIResourceRejectedError:
+        raise
     except Exception:
         return None
 
@@ -946,6 +980,7 @@ async def _run_roman_repair_phase(
     config: dict,
     db: AsyncSession | None = None,
     call_stats: dict[str, int] | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> list[dict]:
     """Run the constrained Roman numeral decision phase.
 
@@ -977,6 +1012,7 @@ async def _run_roman_repair_phase(
                 config,
                 db,
                 call_stats=call_stats,
+                admin_quota_admin_id=admin_quota_admin_id,
             )
             if ai_result:
                 return {
@@ -1005,6 +1041,7 @@ async def repair_questions(
     config: dict | None = None,
     db: AsyncSession | None = None,
     roman_diagnostics: list[dict] | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict:
     """对低置信度题目进行 AI 修复（两阶段：Roman 决策 + 通用修复）。
 
@@ -1107,6 +1144,7 @@ async def repair_questions(
             config,
             db,
             call_stats=call_stats,
+            admin_quota_admin_id=admin_quota_admin_id,
         )
         for r in phase1_results:
             idx = r["index"]
@@ -1207,6 +1245,7 @@ async def repair_questions(
             config,
             db,
             call_stats=call_stats,
+            admin_quota_admin_id=admin_quota_admin_id,
         )
     else:
         # 单题修复（并发 3 路）
@@ -1220,6 +1259,7 @@ async def repair_questions(
                     config,
                     db,
                     call_stats=call_stats,
+                    admin_quota_admin_id=admin_quota_admin_id,
                 )
 
         gathered = await asyncio.gather(

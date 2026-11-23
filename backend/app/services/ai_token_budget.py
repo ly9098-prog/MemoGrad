@@ -12,8 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import CacheUnavailableError, cache
 from app.core.config import settings
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.time_utils import shanghai_date_utc_range, shanghai_today
 from app.models.ai_chat import AiChat
+from app.services.user_ai_policy_service import (
+    EffectiveUserAIPolicy,
+    UserAIPolicyUnavailableError,
+    get_effective_user_ai_policy,
+    runtime_default_values,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +32,8 @@ class TokenReservation:
     day_key: str
     month_key: str
     active: bool = True
+    rpm_limit: int | None = None
+    policy: EffectiveUserAIPolicy | None = None
 
 
 def _token_period_keys(user_id: int) -> tuple[str, str]:
@@ -43,11 +52,27 @@ async def reserve_token_budget(
 ) -> TokenReservation | None:
     """Atomically reserve estimated tokens before invoking a paid provider."""
     tokens = max(1, int(tokens_needed))
-    daily_limit = int(settings.AI_DAILY_TOKEN_LIMIT)
-    monthly_limit = int(settings.AI_MONTHLY_TOKEN_LIMIT)
+    if db is None:
+        policy = EffectiveUserAIPolicy(**runtime_default_values().model_dump())
+    else:
+        try:
+            policy = await get_effective_user_ai_policy(db, user_id)
+        except UserAIPolicyUnavailableError as exc:
+            raise AIResourceRejectedError(
+                "ai_user_policy_unavailable", retry_after_sec=5
+            ) from exc
+    daily_limit = int(policy.daily_token_limit)
+    monthly_limit = int(policy.monthly_token_limit)
     day_key, month_key = _token_period_keys(user_id)
     if daily_limit <= 0 and monthly_limit <= 0:
-        return TokenReservation(user_id, 0, day_key, month_key)
+        return TokenReservation(
+            user_id,
+            0,
+            day_key,
+            month_key,
+            rpm_limit=policy.rpm_limit,
+            policy=policy,
+        )
 
     today_date = shanghai_today()
     today = shanghai_date_utc_range(today_date)[0]
@@ -74,7 +99,14 @@ async def reserve_token_budget(
         return None
     if not reserved:
         return None
-    return TokenReservation(user_id, tokens, day_key, month_key)
+    return TokenReservation(
+        user_id,
+        tokens,
+        day_key,
+        month_key,
+        rpm_limit=policy.rpm_limit,
+        policy=policy,
+    )
 
 
 async def settle_token_reservation(

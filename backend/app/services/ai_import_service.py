@@ -19,6 +19,7 @@ from app.ai.prompts import (
     build_enrich_question,
     build_generate_questions,
 )
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.models.ai_generation_log import AiGenerationLog
 from app.models.question_import import QuestionImport
 from app.services.ai_import_helpers import (
@@ -71,13 +72,23 @@ async def _call_or_fallback(
     db: AsyncSession,
     messages: list,
     fallback_value: dict,
+    *,
+    admin_id: int,
 ) -> tuple[dict, str | None, dict | None]:
     """调用后台配置的 OpenAI-compatible 补全模型，失败则返回 fallback。"""
     try:
-        resp = await chat_with_db_model(db, messages, feature="completion")
+        resp = await chat_with_db_model(
+            db,
+            messages,
+            feature="completion",
+            admin_quota_scope="admin_import_ai",
+            admin_quota_admin_id=admin_id,
+        )
         if resp is None:
             raise RuntimeError("AI补全模型未配置")
         return (resp, resp["content"], resp)
+    except AIResourceRejectedError:
+        raise
     except (OSError, ValueError, RuntimeError, TimeoutError) as e:
         return (
             {
@@ -106,7 +117,9 @@ async def enrich_import(db: AsyncSession, user_id: int, import_id: int) -> dict:
 
     messages = build_enrich_question(qi_to_dict(qi))
     prompt_text = json.dumps(messages, ensure_ascii=False)
-    resp, raw, _ = await _call_or_fallback(db, messages, fallback.get_fallback_enrich())
+    resp, raw, _ = await _call_or_fallback(
+        db, messages, fallback.get_fallback_enrich(), admin_id=user_id
+    )
 
     if raw is None:
         parsed = resp["fallback_value"]
@@ -309,7 +322,10 @@ async def generate_drafts(
     prompt_text = json.dumps(messages, ensure_ascii=False)
 
     resp, raw, _ = await _call_or_fallback(
-        db, messages, fallback.get_fallback_generation(count)
+        db,
+        messages,
+        fallback.get_fallback_generation(count),
+        admin_id=user_id,
     )
     if raw is None:
         return await _log_generation_fallback(
@@ -453,7 +469,10 @@ async def complete_import(db: AsyncSession, user_id: int, import_id: int) -> dic
     messages = build_complete_question(qi_to_dict(qi), missing)
     prompt_text = json.dumps(messages, ensure_ascii=False)
     resp, raw, _ = await _call_or_fallback(
-        db, messages, fallback.get_fallback_complete(missing)
+        db,
+        messages,
+        fallback.get_fallback_complete(missing),
+        admin_id=user_id,
     )
 
     if raw is None:

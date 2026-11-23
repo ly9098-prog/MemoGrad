@@ -81,6 +81,7 @@ async def test_success_passes_analysis_contract_to_selected_model():
         "timeout": 150,
         "max_tokens": 1200,
         "prefer_direct_answer": True,
+        "rate_limit": None,
     }
     item.quarantine_runtime.assert_not_awaited()
     provider_invocation.note_success.assert_awaited_once()
@@ -196,6 +197,23 @@ async def test_timeout_and_fallback_timeout_return_retryable_response():
         "failure_model": "timeout",
     }
     second.quarantine_runtime.assert_awaited_once_with(second.runtime)
+
+
+@pytest.mark.asyncio
+async def test_pretransport_rejection_propagates_for_token_hold_release():
+    from app.core.ai_runtime_guard import AIResourceRejectedError
+
+    item = payload(
+        chat=AsyncMock(
+            side_effect=AIResourceRejectedError("ai_rate_limited", retry_after_sec=2)
+        )
+    )
+
+    with pytest.raises(AIResourceRejectedError):
+        await invoke_analysis_provider(item)
+
+    item.quarantine_runtime.assert_not_awaited()
+    item.resolve_runtime.assert_not_awaited()
 
 
 @pytest.mark.asyncio

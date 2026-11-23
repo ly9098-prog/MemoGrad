@@ -94,6 +94,7 @@ STATE_FIELDS = {
         "shared",
         "import_mode",
         "strategy",
+        "pipeline_row",
     },
     "load_resume_hash_index": {
         "hash_index",
@@ -104,6 +105,7 @@ STATE_FIELDS = {
     "start_resume_replay": {
         "session_factory",
         "pipeline",
+        "pipeline_row",
         "started_at",
         "chunk_results",
         "any_chunk_failed",

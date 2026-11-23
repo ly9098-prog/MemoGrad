@@ -32,6 +32,7 @@ from app.ai.prompts import (
     build_study_advice,
     build_visual_evidence_probe,
 )
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.config import settings
 from app.core.runtime_paths import STATIC_PREFIX
 from app.models.admin import QuestionVersion
@@ -161,6 +162,9 @@ async def _analyze_error_with_lease(
     db: AsyncSession,
     user_id: int,
     preparation: Any,
+    *,
+    rpm_limit: int | None = None,
+    user_ai_policy: Any = None,
 ) -> dict:
     from app.core.cache import cache
     from app.services.ai.analysis_availability import resolve_available_runtime
@@ -174,7 +178,14 @@ async def _analyze_error_with_lease(
         model_signature=_analysis_model_signature(runtime),
     )
     return await execute_locked_analysis(
-        _analysis_orchestration_request(db, user_id, prepared, cache)
+        _analysis_orchestration_request(
+            db,
+            user_id,
+            prepared,
+            cache,
+            rpm_limit=rpm_limit,
+            user_ai_policy=user_ai_policy,
+        )
     )
 
 
@@ -196,7 +207,14 @@ def _analysis_orchestration_request(
     user_id: int,
     prepared: Any,
     cache: Any,
+    *,
+    rpm_limit: int | None = None,
+    user_ai_policy: Any = None,
 ) -> AnalysisOrchestrationRequest:
+    async def governed_chat(*args: Any, **kwargs: Any) -> dict:
+        kwargs.setdefault("rate_limit", rpm_limit)
+        return await llm.chat(*args, **kwargs)
+
     return AnalysisOrchestrationRequest(
         db=db,
         user_id=user_id,
@@ -215,11 +233,13 @@ def _analysis_orchestration_request(
         generating=_generating,
         cache=cache,
         logger=logger,
-        **_analysis_orchestration_ports(),
+        **_analysis_orchestration_ports(governed_chat),
+        user_rpm_limit=rpm_limit,
+        user_ai_policy=user_ai_policy,
     )
 
 
-def _analysis_orchestration_ports() -> dict[str, Any]:
+def _analysis_orchestration_ports(governed_chat: Any) -> dict[str, Any]:
     return {
         "prepare_visual_inputs": _prepare_visual_inputs,
         "build_context": build_error_context,
@@ -228,7 +248,7 @@ def _analysis_orchestration_ports() -> dict[str, Any]:
         "input_signature_builder": _analysis_input_signature,
         "cached_response": build_cached_error_analysis_response,
         "cache_age": _analysis_cache_age_ms,
-        "chat": llm.chat,
+        "chat": governed_chat,
         "resolve_runtime": _resolve_healthy_analysis_runtime,
         "quarantine_runtime": _quarantine_analysis_runtime_auth,
         "parse_content": parse_error_analysis_content,
@@ -697,7 +717,17 @@ async def analyze_error(
     if reservation is None:
         return quota_exceeded_response()
 
-    response = await _analyze_error_with_lease(db, user_id, preparation)
+    try:
+        response = await _analyze_error_with_lease(
+            db,
+            user_id,
+            preparation,
+            rpm_limit=reservation.rpm_limit,
+            user_ai_policy=reservation.policy,
+        )
+    except AIResourceRejectedError:
+        await cancel_token_reservation(reservation)
+        raise
     actual_tokens = int(response.get("tokens_used") or 0)
     await settle_token_reservation(reservation, actual_tokens)
     return response
@@ -780,7 +810,15 @@ async def generate_advice(
         return advice_fallback_response(get_fallback_advice())
 
     try:
-        result = await chat_with_db_model(db, messages, feature="analysis")
+        result = await chat_with_db_model(
+            db,
+            messages,
+            feature="analysis",
+            rate_limit=reservation.rpm_limit,
+        )
+    except AIResourceRejectedError:
+        await cancel_token_reservation(reservation)
+        raise
     except Exception:
         # A failed response can still be billed; keep the reservation.
         return advice_fallback_response(get_fallback_advice())

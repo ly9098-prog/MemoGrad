@@ -8,10 +8,16 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.client import llm
+from app.core.ai_runtime_guard import AIResourceRejectedError
+from app.core.log_context import get_log_context
 from app.services.model_config_resolver import (
     AICapability,
     AIModelConfigResolver,
     resolve_active_model,
+)
+from app.services.user_ai_policy_service import (
+    UserAIPolicyUnavailableError,
+    get_effective_user_ai_policy,
 )
 
 
@@ -136,6 +142,9 @@ async def chat_with_db_model(
     prefer_direct_answer: bool = False,
     runtime: LLMRuntimeConfig | None = None,
     deadline: float | None = None,
+    rate_limit: int | None = None,
+    admin_quota_scope: str | None = None,
+    admin_quota_admin_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Resolve a configured compatible model and invoke it.
 
@@ -151,6 +160,9 @@ async def chat_with_db_model(
         )
     if runtime is None:
         return None
+    effective_rate_limit = (
+        rate_limit if rate_limit is not None else await resolve_user_rpm_limit(db)
+    )
     return await llm.chat(
         messages,
         temperature=temperature,
@@ -163,5 +175,23 @@ async def chat_with_db_model(
         response_format=response_format,
         extra_body=extra_body,
         prefer_direct_answer=prefer_direct_answer,
+        rate_limit=effective_rate_limit,
+        admin_quota_scope=admin_quota_scope,
+        admin_quota_admin_id=admin_quota_admin_id,
         **({"deadline": deadline} if deadline is not None else {}),
     )
+
+
+async def resolve_user_rpm_limit(db: AsyncSession) -> int | None:
+    context = get_log_context()
+    raw_user_id = context.get("user_id")
+    if raw_user_id in (None, "", "-"):
+        return None
+    try:
+        user_id = int(raw_user_id)
+        policy = await get_effective_user_ai_policy(db, user_id)
+    except (TypeError, ValueError, UserAIPolicyUnavailableError) as exc:
+        raise AIResourceRejectedError(
+            "ai_user_policy_unavailable", retry_after_sec=5
+        ) from exc
+    return policy.rpm_limit

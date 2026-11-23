@@ -17,9 +17,11 @@ from app.core.error_codes import ApiError, ErrorCode
 
 STATUS_CODES = {
     503: "QUEUE_UNAVAILABLE DB_UNAVAILABLE STAGING_UNAVAILABLE OCR_PROVIDER_ERROR "
-         "AI_PROVIDER_UNAVAILABLE RESOURCE_MEMORY_LOW RESOURCE_DISK_LOW",
+         "AI_PROVIDER_UNAVAILABLE AI_USER_POLICY_UNAVAILABLE "
+         "RESOURCE_MEMORY_LOW RESOURCE_DISK_LOW",
     429: "QUEUE_FULL RESOURCE_QUEUE_FULL OCR_RATE_LIMIT AI_RATE_LIMIT AI_OVERLOADED "
-         "RESOURCE_DB_POOL_BUSY",
+         "AI_ADMIN_QUOTA_EXHAUSTED RESOURCE_DB_POOL_BUSY",
+    403: "AI_PARSE_DISABLED",
     409: "DB_CONFLICT TASK_FENCING_REJECTED TASK_LEASE_LOST TASK_CANCELLED",
     404: "TASK_NOT_FOUND STAGING_OBJECT_MISSING",
     422: "REVIEW_REQUIRED VALIDATION_ERROR",
@@ -164,6 +166,9 @@ def error_client():
     ("/http-error", 409, "REVISION_CONFLICT", False),
     ("/ai-error/ai_rate_limited", 429, "AI_RATE_LIMIT", True),
     ("/ai-error/ai_overloaded", 429, "AI_OVERLOADED", True),
+    ("/ai-error/ai_admin_quota_exhausted", 429, "AI_ADMIN_QUOTA_EXHAUSTED", True),
+    ("/ai-error/ai_parse_disabled", 403, "AI_PARSE_DISABLED", False),
+    ("/ai-error/ai_user_policy_unavailable", 503, "AI_USER_POLICY_UNAVAILABLE", True),
     ("/ai-error/ai_prompt_too_large", 422, "VALIDATION_ERROR", False),
     ("/ai-error/unknown_reason", 503, "AI_PROVIDER_UNAVAILABLE", True),
     ("/validate/synthetic-private", 422, "VALIDATION_ERROR", False),
@@ -182,9 +187,11 @@ def test_registered_handlers_keep_public_envelope(error_client, path, status, co
     assert error["trace_id"] == "synthetic-trace"
     assert "synthetic-private" not in response.text
     assert "private-id" not in response.text
-    assert "details" not in error
     if path.startswith("/ai-error"):
         assert response.headers["Retry-After"] == "4"
+        assert error["details"] == {"retry_after_seconds": 4}
+    else:
+        assert "details" not in error
     if path == "/http-error":
         assert response.headers["Retry-After"] == "7"
     if path == "/unhandled":

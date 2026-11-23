@@ -172,6 +172,7 @@ async def test_teacher_uses_server_fact_and_records_usage_before_parsing(
         "prefer_direct_answer": True,
         "runtime": state.runtime,
         "deadline": pytest.approx(started + 45, abs=0.05),
+        "rate_limit": None,
     }
     assert state.reserve.await_args.args[2] == svc.estimate_chat_token_reservation(
         state.provider.await_args.args[1], max_output_tokens=kwargs["max_tokens"]
@@ -231,8 +232,12 @@ async def test_teacher_fallbacks_preserve_usage_and_action_boundaries(
     else:
         state.usage.assert_not_awaited()
         assert result["tokens_used"] == 0
-    if scenario in {"unavailable", "exception"}:
+    if scenario == "unavailable":
         state.cancel.assert_awaited_once()
+    elif scenario == "exception":
+        # A generic provider exception can occur after dispatch, so the hold is
+        # retained unless the exception carries explicit pre-dispatch proof.
+        state.cancel.assert_not_awaited()
     elif scenario == "quota":
         state.cancel.assert_not_awaited()
     assert svc.note_failure.await_count == (1 if scenario == "exception" else 0)
@@ -297,6 +302,50 @@ async def test_teacher_cancellation_and_usage_failure_propagate(
         state.cancel.assert_awaited_once()
     else:
         state.settle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("dispatched", "cancel_count", "failure_count"),
+    [(False, 1, 0), (True, 0, 1)],
+)
+async def test_teacher_timeout_refunds_only_before_transport(
+    prepared_teacher, dispatched, cancel_count, failure_count
+):
+    from app.ai.client import AITransportTimeout
+
+    state = prepared_teacher
+    state.provider.side_effect = AITransportTimeout(dispatched=dispatched)
+
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="core_concept"
+    )
+
+    assert result["from_fallback"] is True
+    assert state.cancel.await_count == cancel_count
+    assert svc.note_failure.await_count == failure_count
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("dispatched", "cancel_count"),
+    [(False, 1), (True, 0), (None, 0)],
+)
+async def test_teacher_unknown_transport_error_only_refunds_with_explicit_pre_dispatch(
+    prepared_teacher, dispatched, cancel_count
+):
+    state = prepared_teacher
+    error = RuntimeError("synthetic transport failure")
+    if dispatched is not None:
+        error.dispatched = dispatched
+    state.provider.side_effect = error
+
+    result = await svc.run_teacher_action(
+        state.db, user_id=3, question_id=7, action="core_concept"
+    )
+
+    assert result["from_fallback"] is True
+    assert state.cancel.await_count == cancel_count
 
 
 @pytest.mark.asyncio
@@ -1145,21 +1194,23 @@ async def test_teacher_deadline_expires_in_queue_without_dispatch_and_releases_h
     monkeypatch.setattr(client_module, "request_remote_bytes", transport)
     sem, _ = await state.guard.acquire_slot()
     try:
-        result = await svc._call_teacher_with_usage(
-            state.db,
-            user_id=3,
-            question_id=7,
-            question_version_id=11,
-            action="core_concept",
-            messages=[],
-            runtime=state.runtime,
-            reservation=object(),
-            timeout=0.01,
-            max_tokens=1200,
-        )
+        with pytest.raises(
+            svc.AIResourceRejectedError, match="ai_overloaded"
+        ):
+            await svc._call_teacher_with_usage(
+                state.db,
+                user_id=3,
+                question_id=7,
+                question_version_id=11,
+                action="core_concept",
+                messages=[],
+                runtime=state.runtime,
+                reservation=SimpleNamespace(rpm_limit=None),
+                timeout=0.01,
+                max_tokens=1200,
+            )
     finally:
         state.guard.release_slot(sem)
-    assert result is None
     transport.assert_not_called()
     state.cancel.assert_awaited_once()
     state.usage.assert_not_awaited()
@@ -1319,7 +1370,7 @@ async def test_teacher_queue_wait_consumes_same_transport_deadline(
             action="explain_correct",
             messages=[],
             runtime=state.runtime,
-            reservation=object(),
+            reservation=SimpleNamespace(rpm_limit=None),
             timeout=0.15,
             max_tokens=1200,
         )

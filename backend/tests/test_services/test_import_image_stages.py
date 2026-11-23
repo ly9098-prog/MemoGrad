@@ -326,6 +326,7 @@ async def test_image_pipeline_stage_rechecks_record_and_runs_pipeline_in_session
         db=db,
         page_images={1: b"image-bytes"},
         pre_extracted_blocks=[{"boxes": []}],
+        created_by="admin",
     )
 
 

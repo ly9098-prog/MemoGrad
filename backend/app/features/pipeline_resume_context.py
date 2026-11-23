@@ -50,6 +50,14 @@ async def resolve_resume_watermarks(state: ResumeRunState) -> None:
         "strategy": state.strategy,
         "watermark_patterns": state.watermark_patterns,
     }
+    if state.pipeline_row.created_by:
+        from app.services.admin_ai_usage_service import (
+            parse_admin_id_from_created_by,
+        )
+
+        state.shared["admin_quota_admin_id"] = parse_admin_id_from_created_by(
+            state.pipeline_row.created_by
+        )
 
 
 async def load_resume_hash_index(state: ResumeRunState) -> None:

@@ -78,7 +78,7 @@ def ports(monkeypatch):
     async def fake_cancel_token_reservation(reservation):
         ports.calls.append(("cancel_token_reservation", reservation.user_id))
 
-    async def fake_call_ai(messages, db=None):
+    async def fake_call_ai(messages, db=None, *, rate_limit=None):
         ports.calls.append(("_call_ai", messages))
         return ports.ai_result
 

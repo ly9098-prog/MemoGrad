@@ -14,6 +14,7 @@ async def start_resume_replay(state: ResumeRunState) -> None:
     await state.values["ckpt"].invalidate_progress_cache(state.values["pipeline_id"])
     state.pipeline = state.port("ImportPipeline")(options=state.opts)
     state.pipeline.pipeline_id = state.values["pipeline_id"]
+    state.pipeline.created_by = state.pipeline_row.created_by
     state.started_at = state.port("serialize_utc_datetime")(state.port("utcnow")())
     state.chunk_results = []
     state.any_chunk_failed = False

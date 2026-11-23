@@ -8,22 +8,20 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ManagementPage, ManagementPageHeader } from "@/components/admin/management-ui";
 import { cn } from "@/lib/utils";
-import { apiRequest, toQuery } from "@/lib/api/client";
+import { apiRequest } from "@/lib/api/client";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useAuthStore } from "@/lib/auth/auth-store";
-import type { AISettings, AISettingsPatchRequest, AIStatsResponse, AdminAiConfigsResponse, AdminAiModelConfig } from "@/lib/api/types";
+import type { AISettings, AISettingsPatchRequest, AdminAiConfigsResponse, AdminAiModelConfig } from "@/lib/api/types";
 import { ModelWorkbench } from "./components/model-workbench";
-import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overview";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
 import { VectorConfigSection } from "./components/vector-config-section";
 import { SystemSettingsSection } from "./components/system-settings";
 import { resolveAiModels, computeUsageRate } from "@/lib/ai-model-resolver";
 
-type Tab = "overview" | "models" | "ocr" | "completion" | "vector" | "system";
+type Tab = "models" | "ocr" | "completion" | "vector" | "system";
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "overview", label: "总览" },
   { key: "models", label: "模型" },
   { key: "ocr", label: "OCR" },
   { key: "completion", label: "补全" },
@@ -41,9 +39,12 @@ export default function AISettingsPage() {
 
 function AISettingsContent() {
   const searchParams = useSearchParams();
-  const activeTab = TABS.find((tab) => tab.key === searchParams.get("tab"))?.key ?? "overview";
+  const activeTab = TABS.find((tab) => tab.key === searchParams.get("tab"))?.key ?? "models";
   const role = useAuthStore((s) => s.role);
+  const permissions = useAuthStore((s) => s.permissions);
   const isSuperAdmin = role?.name === "super_admin";
+  const canRead = isSuperAdmin && permissions.includes("ai_setting:read");
+  const canWrite = isSuperAdmin && permissions.includes("ai_setting:write");
   const queryClient = useQueryClient();
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [enabled, setEnabled] = useState(true);
@@ -82,7 +83,7 @@ function AISettingsContent() {
 
   const settings = useQuery({
     queryKey: ["ai-settings"],
-    enabled: isSuperAdmin,
+    enabled: canRead,
     queryFn: () => apiRequest<AISettings>("/ai-settings"),
   });
 
@@ -93,22 +94,27 @@ function AISettingsContent() {
     setMonthlyLimit(String(data.monthly_call_limit));
   }, [settings.data]);
 
-  const stats = useQuery({
-    queryKey: ["ai-settings", "stats"],
-    enabled: isSuperAdmin,
-    queryFn: () => apiRequest<AIStatsResponse>(`/ai-settings/stats${toQuery({ days: 30 })}`),
-  });
+  useEffect(() => {
+    const data = settings.data;
+    if (!data) return;
+    if (
+      enabled === data.ai_parse_enabled &&
+      monthlyLimit === String(data.monthly_call_limit)
+    ) {
+      settingsEditedRef.current = false;
+    }
+  }, [enabled, monthlyLimit, settings.data]);
 
   const configs = useQuery({
     queryKey: ["ai-configs"],
-    enabled: isSuperAdmin,
+    enabled: canRead,
     queryFn: () => apiRequest<AdminAiConfigsResponse>("/ai-configs"),
     select: (data) => data.configs,
   });
 
   const models = useQuery({
     queryKey: ["ai-models"],
-    enabled: isSuperAdmin,
+    enabled: canRead,
     queryFn: () => apiRequest<AdminAiModelConfig[]>("/ai-models"),
   });
 
@@ -142,25 +148,66 @@ function AISettingsContent() {
     ? enabled !== current.ai_parse_enabled || parsedLimit !== current.monthly_call_limit
     : false;
   const canSave =
+    canWrite &&
     hasChanges &&
     monthlyLimit.trim() !== "" &&
     Number.isInteger(parsedLimit) &&
     parsedLimit >= 0 &&
+    parsedLimit <= 1_000_000_000 &&
     !updateMutation.isPending;
+
+  useEffect(() => {
+    if (!hasChanges) return;
+    const warnBeforeLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const guardInternalNavigation = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        !(event.target instanceof Element)
+      ) {
+        return;
+      }
+      const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor || anchor.hasAttribute("download") || anchor.target === "_blank") {
+        return;
+      }
+      const target = new URL(anchor.href, window.location.href);
+      if (target.href === window.location.href) return;
+      if (!window.confirm("当前设置尚未保存，确定离开此页面？")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", warnBeforeLeave);
+    document.addEventListener("click", guardInternalNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeLeave);
+      document.removeEventListener("click", guardInternalNavigation, true);
+    };
+  }, [hasChanges]);
 
   const save = () => {
     if (!current || !canSave) return;
     updateMutation.mutate({ ai_parse_enabled: enabled, monthly_call_limit: parsedLimit });
   };
 
-  if (!isSuperAdmin) {
+  if (!canRead) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive-light">
           <Ban className="h-8 w-8 text-destructive" />
         </div>
         <h1 className="text-xl font-semibold text-foreground">权限不足</h1>
-        <p className="max-w-sm text-sm text-muted-foreground">仅超级管理员可访问 AI 解析设置页面</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          需要超级管理员角色和 AI 设置读取权限
+        </p>
       </div>
     );
   }
@@ -169,21 +216,35 @@ function AISettingsContent() {
     <ManagementPage className="space-y-4 pb-0">
       <ManagementPageHeader
         title="AI 解析设置"
-        description="管理模型目录、能力绑定与 OCR / 向量解析配置。"
+        description="管理模型目录、能力绑定，以及后台导题与补全的 AI 运行边界。"
         actions={
           <span
             className={cn(
               "inline-flex items-center gap-1.5 text-[11px]",
-              current?.ai_parse_enabled ? "text-[#4f9b82]" : "text-[#b25d58]",
+              !current
+                ? "text-muted-foreground"
+                : current.ai_parse_enabled
+                  ? "text-[#4f9b82]"
+                  : "text-[#b25d58]",
             )}
           >
             <span
               className={cn(
                 "h-1.5 w-1.5 rounded-full",
-                current?.ai_parse_enabled ? "bg-[#4f9b82]" : "bg-[#c87872]",
+                !current
+                  ? "bg-muted-foreground/45"
+                  : current.ai_parse_enabled
+                    ? "bg-[#4f9b82]"
+                    : "bg-[#c87872]",
               )}
             />
-            {current?.ai_parse_enabled ? "解析开启" : "全局关闭"}
+            {!current
+              ? settings.isError
+                ? "状态读取失败"
+                : "状态加载中"
+              : current.ai_parse_enabled
+                ? "后台解析开启"
+                : "后台解析关闭"}
           </span>
         }
       />
@@ -222,20 +283,6 @@ function AISettingsContent() {
       {activeTab === "models" && (
         <div className="animate-rise-in">
           <ModelWorkbench />
-        </div>
-      )}
-
-      {activeTab === "overview" && (
-        <div className="admin-panel overflow-hidden rounded-2xl animate-rise-in">
-          <div className="p-5">
-            <div className="animate-rise-in">
-              <DashboardAiOverview
-                data={stats.data}
-                loading={stats.isLoading}
-                error={stats.isError}
-              />
-            </div>
-          </div>
         </div>
       )}
 
@@ -303,6 +350,8 @@ function AISettingsContent() {
             onSave={() => setConfirmOpen(true)}
             isPending={updateMutation.isPending}
             usageRate={usageRate}
+            canEdit={canWrite}
+            isSuperAdmin={isSuperAdmin}
           />
         </div>
       )}
@@ -310,7 +359,7 @@ function AISettingsContent() {
       <ConfirmDialog
         open={confirmOpen}
         title="确认修改 AI 解析设置"
-        description="该操作会立即影响后台 AI 解析任务创建，并记录审计日志。确认保存当前设置？"
+        description="该操作会立即影响后续后台导题、补全与富化调用，并记录审计日志。确认保存当前设置？"
         confirmText="确认保存"
         danger={!enabled}
         loading={updateMutation.isPending}

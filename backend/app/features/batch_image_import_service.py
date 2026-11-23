@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session
-from app.core.log_context import safe_text_preview
+from app.core.log_context import bind_log_context, safe_text_preview
 from app.core.time_utils import serialize_utc_datetime
 from app.models.import_batch_job import (
     BatchJobTraceEvent,
@@ -67,11 +67,8 @@ from app.services.batch_image_idempotency import (
 logger = logging.getLogger(__name__)
 
 try:
-    from app.core.log_context import bind_log_context, log_event
+    from app.core.log_context import log_event
 except ImportError:  # pragma: no cover
-
-    def bind_log_context(**_kw):
-        return []  # type: ignore[misc]
 
     def log_event(_lg, _ev, **_kw):
         pass  # type: ignore[misc]
@@ -685,6 +682,7 @@ async def _merge_image_texts(
 
     old_batch_ids = [r.review_batch_id for r in rows if r.review_batch_id]
     merged_text = "\n\n".join(r.ocr_cleaned_text for r in rows if r.ocr_cleaned_text)
+    created_by = job.created_by
 
     logger.info(
         "【MERGE-1】合并 %d 张图片 OCR 文本 | job=%s total_chars=%d",
@@ -724,6 +722,7 @@ async def _merge_image_texts(
                 subject_id=subject_id,
                 options=merge_opts,
                 db=pdb,
+                created_by=created_by,
             )
 
         merged_batch_id = result.get("batch_id")
@@ -1089,6 +1088,7 @@ async def _run_single_image(
                 subject_id=subject_id,
                 options=pipeline_opts,
                 db=pdb,
+                created_by=options.get("_created_by"),
                 page_images={1: content},
                 pre_extracted_blocks=pre_extracted_blocks,
             )
@@ -1330,6 +1330,7 @@ async def run_batch_job(
     options: dict,
     concurrency: int,
     execution_fence: tuple[str, str, int] | None = None,
+    created_by: str | None = None,
 ) -> None:
     """后台编排：信号量限并发逐张处理，全部结束后标记任务完成。
 
@@ -1342,6 +1343,15 @@ async def run_batch_job(
     """
     concurrency = clamp_concurrency(concurrency)
     job_options = dict(options or {})
+    if created_by:
+        job_options["_created_by"] = created_by
+        from app.services.admin_ai_usage_service import (
+            parse_admin_id_from_created_by,
+        )
+
+        admin_id = parse_admin_id_from_created_by(created_by)
+        if admin_id is not None:
+            bind_log_context(admin_id=admin_id)
     if job_options.get("ocr_mode") == "api":
         try:
             job_options["_ocr_vl_runtime"] = await _resolve_vl_ocr_runtime()
@@ -1844,6 +1854,7 @@ async def reparse_item_from_cache(
             subject_id=effective_subject_id,
             options=reparse_options,
             db=pdb,
+            created_by=job.created_by if job else None,
         )
 
     review_batch_id = result.get("batch_id") or None

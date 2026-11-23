@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.gateway import chat_with_db_model
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.time_utils import utcnow
 from app.models.admin import QuestionVersion, QuestionVersionKnowledgePoint, Subject
 from app.models.ai_chat import AiChat
@@ -571,6 +572,7 @@ async def generate_ai_suggestion(
             max_tokens=320,
             response_format={"type": "json_object"},
             prefer_direct_answer=True,
+            rate_limit=reservation.rpm_limit,
         )
         owned_wrong = await db.scalar(
             select(WrongQuestion)
@@ -642,6 +644,12 @@ async def generate_ai_suggestion(
         row.ai_suggested_at = utcnow()
         await db.commit()
         return {"processed": True, "suggested": True, "primary_type": primary}
+    except AIResourceRejectedError:
+        # Rate/policy/queue/circuit rejection occurs before provider transport,
+        # so release the full hold and let the task framework record the
+        # structured admission failure.
+        await cancel_token_reservation(reservation)
+        raise
     except Exception:
         logger.warning(
             "AI error diagnosis failed diagnosis_id=%s uid=%s",

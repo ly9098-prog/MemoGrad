@@ -1,6 +1,7 @@
 "use client";
 
 import { Save } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import type { AISettings } from "@/lib/api/types";
@@ -23,6 +24,8 @@ export function SystemSettingsSection({
   onSave,
   isPending,
   usageRate,
+  canEdit,
+  isSuperAdmin,
 }: {
   current?: AISettings | null;
   loading?: boolean;
@@ -35,18 +38,30 @@ export function SystemSettingsSection({
   onSave: () => void;
   isPending: boolean;
   usageRate: number;
+  canEdit: boolean;
+  isSuperAdmin: boolean;
 }) {
   const callCount = current?.current_usage.call_count ?? 0;
   const limit = current?.monthly_call_limit ?? 0;
   const limitLabel = limit > 0 ? limit.toLocaleString("zh-CN") : "不限";
   const progressWidth = limit > 0 ? Math.min(100, usageRate) : 0;
   const overLimit = isQuotaExhausted(callCount, limit);
+  const remainingCalls = current?.remaining_calls;
+  const statusLabel = !current
+    ? loading
+      ? "读取中"
+      : error
+        ? "不可用"
+        : "未加载"
+    : current.ai_parse_enabled
+      ? "已开启"
+      : "已关闭";
 
   return (
     <Section
       eyebrow="06 / 系统"
-      title="运行边界"
-      lead="设定整条 AI 链路什么时候可以工作。"
+      title="后台导题与补全控制"
+      lead="控制后台导题、补全及其现有富化准入是否允许继续调用模型。普通用户学习 AI 的额度在“普通用户”页面管理。"
       aside={
         <span className={styles.statusText}>
           {formatSavedAt(current?.updated_at)}
@@ -55,25 +70,38 @@ export function SystemSettingsSection({
     >
       {error ? <p className={styles.noticeError}>{error}</p> : null}
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <span className="text-xs leading-5 text-muted-foreground">
+          普通用户的学习 AI 额度由普通用户目录单独管理。
+        </span>
+        <Link
+          className="text-xs font-semibold text-primary hover:underline"
+          href="/app-users"
+        >
+          前往普通用户管理
+        </Link>
+      </div>
+
       <div className={styles.controlBand}>
         <div className={styles.controlCopy}>
           <h3 className={styles.controlTitle}>全局 AI 解析</h3>
           <p className={styles.controlDesc}>
-            关闭后，所有管理员都不能新建 AI 解析任务。
+            关闭后，所有管理员都不能发起新的后台 AI 解析调用；已开始的请求按本配置保存前版本执行。
           </p>
         </div>
         <div className={styles.controlAction}>
-          <span className={styles.controlActionLabel}>
-            {enabled ? "已开启" : "已关闭"}
-          </span>
+          <span className={styles.controlActionLabel}>{statusLabel}</span>
           <Toggle
             ariaLabel="全局 AI 解析"
             checked={enabled}
-            disabled={!current || isPending}
+            disabled={!current || isPending || !canEdit}
             onChange={() => onEnabledChange(!enabled)}
           />
         </div>
       </div>
+      {!canEdit ? (
+        <p className={styles.limitHint}>当前账号只有读取权限，所有修改控件已禁用。</p>
+      ) : null}
 
       {loading ? (
         <div className={styles.loadingBlock} aria-label="正在加载系统设置">
@@ -87,37 +115,59 @@ export function SystemSettingsSection({
       ) : (
         <div className={styles.systemGrid}>
           <div className={styles.systemPane}>
-            <span className={styles.statKicker}>本月累计 API 调用</span>
+            <span className={styles.statKicker}>
+              {current.current_usage.year_month} 后台模型调用
+            </span>
             <div className={styles.bigUsage}>
               {callCount.toLocaleString("zh-CN")}
               <span className={styles.usageLimit}>
                 {limit > 0 ? `/ ${limitLabel} 次` : "· 不限"}
               </span>
             </div>
-            <div className={styles.progressTrack}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${progressWidth}%` }}
-              />
-            </div>
+            {limit > 0 ? (
+              <div className={styles.progressTrack}>
+                <div
+                  className={styles.progressFill}
+                  style={{ width: `${progressWidth}%` }}
+                />
+              </div>
+            ) : null}
             <div className={styles.progressLabels}>
               <span>0</span>
               <span>{limit > 0 ? limitLabel : "不限制"}</span>
             </div>
             <div className={styles.usageStatus} data-over={overLimit ? "true" : "false"}>
-              {overLimit ? "已达月度上限" : "额度内"}
+              {overLimit
+                ? isSuperAdmin
+                  ? "已达普通管理员上限 · 当前账号可继续"
+                  : "已达月度上限"
+                : limit === 0
+                  ? "不限调用次数"
+                  : "额度内"}
               <span className={styles.usageStatusHint}>
-                使用率 {usageRate}%
+                {limit > 0
+                  ? overLimit
+                    ? "调用仍会继续累计"
+                    : remainingCalls == null
+                      ? "剩余额度暂不可用"
+                      : `剩余 ${remainingCalls.toLocaleString("zh-CN")} 次`
+                  : "不限次数，但仍按调用计量"}
               </span>
             </div>
 
             <div className={styles.impactBlock}>
               <h3 className={styles.impactTitle}>影响范围</h3>
               <p className={styles.impactText}>
-                全局关闭后，所有管理员都不能新建 AI 解析任务。
+                受控范围：后台导题与补全模型调用，以及现有 AI 富化准入。
               </p>
               <p className={styles.impactText}>
-                月度额度为全局 API 调用量，只限制非 super_admin。
+                月度额度只限制非 super_admin；调用仍会计入本月用量。
+              </p>
+              <p className={styles.impactText}>
+                普通用户错题复盘、学习问答等额度不在此处分流。
+              </p>
+              <p className={styles.impactText}>
+                月度计数从该计数链路启用后开始累计，启用前的历史调用未补账。
               </p>
             </div>
           </div>
@@ -130,7 +180,7 @@ export function SystemSettingsSection({
                 <input
                   aria-label="月度 API 调用额度"
                   className={styles.limitInput}
-                  disabled={isPending}
+                  disabled={!current || isPending || !canEdit}
                   min={0}
                   onChange={(event) => onMonthlyLimitChange(event.target.value)}
                   step={1}
@@ -141,7 +191,7 @@ export function SystemSettingsSection({
               </div>
             </div>
             <p className={styles.limitHint}>
-              0 = 不限制；只限制非 super_admin。
+              0 = 不限制次数；只限制非 super_admin。
             </p>
 
             <div className={styles.auditBlock}>
@@ -159,7 +209,7 @@ export function SystemSettingsSection({
             <div className={styles.systemActions}>
               <Button
                 className={styles.primaryButton}
-                disabled={!canSave || isPending}
+                disabled={!canSave || isPending || !canEdit}
                 onClick={onSave}
                 type="button"
                 variant="primary"

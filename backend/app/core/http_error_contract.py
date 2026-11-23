@@ -78,13 +78,17 @@ def _public_error_content(
     status_code: int,
     code: str,
     retryable: bool = False,
+    message: str | None = None,
+    details: dict[str, object] | None = None,
 ) -> dict:
     request_id, trace_id = _request_error_ids(request)
     error: dict[str, object] = {
         "code": code,
-        "message": _public_http_message(status_code),
+        "message": message or _public_http_message(status_code),
         "retryable": retryable,
     }
+    if details:
+        error["details"] = details
     if request_id:
         error["request_id"] = request_id
     if trace_id:
@@ -99,6 +103,7 @@ def _api_error_status(code: ErrorCode) -> int:
         ErrorCode.STAGING_UNAVAILABLE,
         ErrorCode.OCR_PROVIDER_ERROR,
         ErrorCode.AI_PROVIDER_UNAVAILABLE,
+        ErrorCode.AI_USER_POLICY_UNAVAILABLE,
         ErrorCode.RESOURCE_MEMORY_LOW,
         ErrorCode.RESOURCE_DISK_LOW,
     }
@@ -108,6 +113,7 @@ def _api_error_status(code: ErrorCode) -> int:
         ErrorCode.OCR_RATE_LIMIT,
         ErrorCode.AI_RATE_LIMIT,
         ErrorCode.AI_OVERLOADED,
+        ErrorCode.AI_ADMIN_QUOTA_EXHAUSTED,
         ErrorCode.RESOURCE_DB_POOL_BUSY,
     }
     codes_409 = {
@@ -123,6 +129,9 @@ def _api_error_status(code: ErrorCode) -> int:
     codes_422 = {
         ErrorCode.REVIEW_REQUIRED,
         ErrorCode.VALIDATION_ERROR,
+    }
+    codes_403 = {
+        ErrorCode.AI_PARSE_DISABLED,
     }
     codes_504 = {
         ErrorCode.OCR_TIMEOUT,
@@ -141,4 +150,6 @@ def _api_error_status(code: ErrorCode) -> int:
         return 422
     if code in codes_504:
         return 504
+    if code in codes_403:
+        return 403
     return 500

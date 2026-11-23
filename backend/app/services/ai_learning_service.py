@@ -16,6 +16,7 @@ from app.ai.fallback import (
     get_fallback_report,
 )
 from app.ai.gateway import chat_with_db_model
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.ai.prompts_learning import (
     build_explain_prompt,
     build_mistake_analysis_prompt,
@@ -94,8 +95,19 @@ async def check_token_limit(
     db: AsyncSession, user_id: int, tokens_needed: int = 0
 ) -> bool:
     """检查用户是否超出 token 限额（日 + 月）。返回 True 表示可以继续调用。"""
-    daily_limit = settings.AI_DAILY_TOKEN_LIMIT
-    monthly_limit = settings.AI_MONTHLY_TOKEN_LIMIT
+    from app.services.user_ai_policy_service import (
+        UserAIPolicyUnavailableError,
+        get_effective_user_ai_policy,
+    )
+
+    try:
+        policy = await get_effective_user_ai_policy(db, user_id)
+    except UserAIPolicyUnavailableError as exc:
+        raise AIResourceRejectedError(
+            "ai_user_policy_unavailable", retry_after_sec=5
+        ) from exc
+    daily_limit = policy.daily_token_limit
+    monthly_limit = policy.monthly_token_limit
 
     if daily_limit <= 0 and monthly_limit <= 0:
         return True
@@ -131,11 +143,18 @@ async def check_token_limit(
     return True
 
 
-async def _call_ai(messages: list, db: AsyncSession | None = None) -> dict | None:
+async def _call_ai(
+    messages: list,
+    db: AsyncSession | None = None,
+    *,
+    rate_limit: int | None = None,
+) -> dict | None:
     """调用配置模型；未配置返回 None，已尝试调用的失败交给配额边界处理。"""
     if db is None:
         return None
-    return await chat_with_db_model(db, messages, feature="analysis")
+    return await chat_with_db_model(
+        db, messages, feature="analysis", rate_limit=rate_limit
+    )
 
 
 async def _call_ai_reserved(
@@ -143,7 +162,12 @@ async def _call_ai_reserved(
 ) -> dict | None:
     """Preserve a hold on uncertain provider failure while retaining fallback."""
     try:
-        result = await _call_ai(messages, db)
+        result = await _call_ai(messages, db, rate_limit=reservation.rpm_limit)
+    except AIResourceRejectedError:
+        # The guard rejected the request before provider transport. This is a
+        # known zero-cost outcome, so the token hold must not leak.
+        await cancel_token_reservation(reservation)
+        return None
     except RuntimeError:
         return None
     if result is None:

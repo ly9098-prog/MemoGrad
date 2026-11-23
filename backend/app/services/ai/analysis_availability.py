@@ -10,6 +10,7 @@ from typing import Any
 from app.ai.gateway import LLMRuntimeConfig, resolve_llm_runtime_config
 from app.core.background_tasks import create_background_task
 from app.core.cache import CacheUnavailableError
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.services.ai import model_health
 
 logger = logging.getLogger(__name__)
@@ -159,7 +160,13 @@ async def require_runtime_verified(runtime: Any) -> None:
 
 
 async def availability_for_user(db: Any, user_id: int) -> dict:
-    if await _user_quota_exhausted(db, user_id):
+    try:
+        quota_exhausted = await _user_quota_exhausted(db, user_id)
+    except AIResourceRejectedError as exc:
+        if exc.reason == "ai_user_policy_unavailable":
+            return unavailable_state("status_unavailable")
+        raise
+    if quota_exhausted:
         return unavailable_state("user_quota")
     _, state = await resolve_available_runtime(db)
     return state

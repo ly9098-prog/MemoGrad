@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from math import ceil
 from time import time
 from typing import Any
 from uuid import uuid4
@@ -11,15 +13,35 @@ from app.ai.answer_grounding import merge_grounded_diagnosis
 from app.ai.fallback import get_fallback_analysis
 from app.core.cache import CacheUnavailableError
 from app.core.config import settings
+from app.models.user_ai_policy import POLICY_FIELD_MAX
 from app.services.ai.analysis_content import (
     _normalize_ai_analysis,
     is_valid_ai_analysis,
 )
 from app.services.ai.visual_cache import ai_analysis_generated_at
 from app.services.ai_token_budget import record_token_usage
+from app.services.user_ai_policy_service import (
+    EffectiveUserAIPolicy,
+    UserAIPolicyUnavailableError,
+    get_effective_user_ai_policy,
+    runtime_default_values,
+)
 
 
-def preserved_response(wrong_question: Any, *, code: str, message: str) -> dict:
+@dataclass(frozen=True, slots=True)
+class RegenerationLimit:
+    reason: str
+    retry_after_seconds: int | None
+    limit_value: int | None
+
+
+def preserved_response(
+    wrong_question: Any,
+    *,
+    code: str,
+    message: str,
+    limit: RegenerationLimit | None = None,
+) -> dict:
     stored = getattr(wrong_question, "ai_analysis", None)
     old = _normalize_ai_analysis(stored) if isinstance(stored, dict) else {}
     preserved = is_valid_ai_analysis(old)
@@ -35,24 +57,49 @@ def preserved_response(wrong_question: Any, *, code: str, message: str) -> dict:
         "generated_at": ai_analysis_generated_at(stored) if preserved else None,
         "error_code": code,
         "message": message,
+        "limit_dimension": limit.reason if limit else None,
+        "limit_value": limit.limit_value if limit else None,
+        "retry_after_seconds": limit.retry_after_seconds if limit else None,
         # Background recovery must not repeatedly spend attempts on a denial.
         "retryable": False,
     }
 
 
 async def admit_regeneration(
-    *, cache: Any, user_id: int, wrong_question: Any
+    *,
+    cache: Any,
+    db: Any = None,
+    user_id: int,
+    wrong_question: Any,
+    policy: EffectiveUserAIPolicy | None = None,
 ) -> dict | None:
+    try:
+        effective_policy = policy
+        if effective_policy is None:
+            effective_policy = (
+                await get_effective_user_ai_policy(db, user_id)
+                if db is not None
+                else EffectiveUserAIPolicy(**runtime_default_values().model_dump())
+            )
+    except UserAIPolicyUnavailableError:
+        return preserved_response(
+            wrong_question,
+            code="ai_regeneration_unavailable",
+            message="重新生成服务暂不可用，请稍后重试；已保留原复盘",
+        )
     prefix = f"memograd:{settings.APP_ENV}:ai:regeneration:user:{user_id}"
     owner = uuid4().hex
     lock = f"{prefix}:admission"
     try:
         acquired = await cache.acquire_lock_strict(lock, owner, ttl=10)
         if not acquired:
-            return _limited_response(wrong_question)
+            return _limited_response(
+                wrong_question,
+                RegenerationLimit("admission", 5, None),
+            )
         try:
-            admitted = await _reserve_rolling_attempt(
-                cache, prefix, lock, owner, wrong_question
+            reason = await _reserve_rolling_attempt(
+                cache, prefix, lock, owner, wrong_question, effective_policy
             )
         finally:
             await cache.release_lock(lock, owner)
@@ -62,35 +109,79 @@ async def admit_regeneration(
             code="ai_regeneration_unavailable",
             message="重新生成服务暂不可用，请稍后重试；已保留原复盘",
         )
-    return None if admitted else _limited_response(wrong_question)
+    return None if reason is None else _limited_response(wrong_question, reason)
 
 
-def _limited_response(wrong_question: Any) -> dict:
+def _limited_response(
+    wrong_question: Any,
+    limit: RegenerationLimit,
+) -> dict:
+    wait = (
+        f"，约 {limit.retry_after_seconds} 秒后重试"
+        if limit.retry_after_seconds is not None
+        else "，请稍后重试"
+    )
+    if limit.reason == "question":
+        message = f"该题 24 小时内最多重新生成 {limit.limit_value} 次{wait}"
+    elif limit.reason == "account":
+        message = f"账号 24 小时内最多重新生成 {limit.limit_value} 次{wait}"
+    elif limit.reason == "admission":
+        message = "已有重新生成请求正在处理，请稍后重试"
+    else:
+        message = f"重新生成冷却中{wait}"
     return preserved_response(
         wrong_question,
         code="ai_regeneration_limited",
-        message="重新生成次数受限：每分钟1次，每题24小时内3次，账号24小时内20次；请稍后再试",
+        message=message,
+        limit=limit,
     )
 
 
-async def _reserve_rolling_attempt(cache, prefix, lock, owner, wrong_question) -> bool:
+async def _reserve_rolling_attempt(
+    cache, prefix, lock, owner, wrong_question, policy
+) -> RegenerationLimit | None:
     now = time()
     key = f"{prefix}:rolling-day"
     stored = await cache.get_strict(key)
     try:
-        events = [
+        events = sorted([
             (float(at), int(qid))
             for at, qid in (stored or [])
             if float(at) > now - 86400
-        ]
+        ], key=lambda event: event[0])
     except (TypeError, ValueError) as exc:
         raise CacheUnavailableError("Invalid regeneration ledger") from exc
     question_id = int(wrong_question.question_id)
-    if any(at > now - 60 for at, _ in events):
-        return False
-    if len(events) >= 20 or sum(qid == question_id for _, qid in events) >= 3:
-        return False
+    cooldown = policy.regeneration_cooldown_seconds
+    if cooldown != -1 and events and events[-1][0] > now - cooldown:
+        return RegenerationLimit(
+            "cooldown",
+            max(1, ceil(events[-1][0] + cooldown - now)),
+            cooldown,
+        )
+    account_limit = policy.regeneration_account_24h_limit
+    if account_limit != -1 and len(events) >= account_limit:
+        reset_at = events[len(events) - account_limit][0] + 86400
+        return RegenerationLimit(
+            "account", max(1, ceil(reset_at - now)), account_limit
+        )
+    question_limit = policy.regeneration_question_24h_limit
+    question_events = [at for at, qid in events if qid == question_id]
+    if question_limit != -1 and len(question_events) >= question_limit:
+        reset_at = question_events[len(question_events) - question_limit] + 86400
+        return RegenerationLimit(
+            "question", max(1, ceil(reset_at - now)), question_limit
+        )
     events.append((now, question_id))
+    retention = max(
+        POLICY_FIELD_MAX["regeneration_account_24h_limit"]
+        if account_limit == -1
+        else account_limit,
+        POLICY_FIELD_MAX["regeneration_question_24h_limit"]
+        if question_limit == -1
+        else question_limit,
+    )
+    events = events[-retention:] if retention > 0 else events[-1:]
     committed = await cache.commit_guarded_strict(
         locks=[(lock, owner)],
         expected={},
@@ -98,7 +189,7 @@ async def _reserve_rolling_attempt(cache, prefix, lock, owner, wrong_question) -
     )
     if not committed:
         raise CacheUnavailableError("Regeneration admission lease expired")
-    return True
+    return None
 
 
 async def admit_recovery_enqueue(*, cache: Any, user_id: int) -> dict | None:

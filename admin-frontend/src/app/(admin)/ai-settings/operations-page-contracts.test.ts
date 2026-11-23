@@ -3,7 +3,6 @@ import { isValidElement, Suspense, type ReactElement } from "react";
 import AISettingsPage from "./page";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ModelWorkbench } from "./components/model-workbench";
-import { DashboardAiOverview } from "../dashboard/components/dashboard-ai-overview";
 import { OcrAccordion } from "./components/ocr-accordion";
 import { AiCompletionPreview } from "./components/ai-completion";
 import {
@@ -39,6 +38,7 @@ const h = vi.hoisted(() => ({
   }),
   invalidate: vi.fn(), setData: vi.fn(),
   search: "", roleName: "super_admin", mutationPending: false,
+  permissions: ["ai_setting:read", "ai_setting:write"] as string[],
   mutates: [] as ReturnType<typeof vi.fn>[],
 }));
 vi.mock("react", async (original) => ({
@@ -74,7 +74,10 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (s: unknown) => unknown) =>
-    select({ role: { name: h.roleName }, permissions: ["question:write"] }),
+    select({
+      role: { name: h.roleName },
+      permissions: h.permissions,
+    }),
 }));
 vi.mock("@/lib/api/client", () => ({ apiRequest: h.request, toQuery: h.toQuery }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(h.search) }));
@@ -113,6 +116,7 @@ beforeEach(() => {
   h.states = []; h.index = 0; h.setters = [];
   h.queries = []; h.mutations = []; h.data = {}; h.refetches = [];
   h.search = ""; h.roleName = "super_admin"; h.mutationPending = false; h.mutates = [];
+  h.permissions = ["ai_setting:read", "ai_setting:write"];
   h.request.mockReset().mockResolvedValue({});
   vi.stubGlobal("window", globalThis);
   vi.stubGlobal("document", {
@@ -129,7 +133,7 @@ describe("AI configuration request ownership", () => {
     expect(isQuotaExhausted(100, 0)).toBe(false);
   });
 
-  it("keeps settings reads pure and still loads statistics and model registration", async () => {
+  it("keeps settings reads pure while loading configurations and model registration", async () => {
     renderAiSettings();
     const settings = { ai_parse_enabled: false, monthly_call_limit: 42 };
     h.request.mockResolvedValue(settings);
@@ -138,12 +142,11 @@ describe("AI configuration request ownership", () => {
     expect(h.setters[1]).not.toHaveBeenCalled();
     await h.queries[1].queryFn();
     await h.queries[2].queryFn();
-    await h.queries[3].queryFn();
     expect(h.request.mock.calls.map(([url]) => url)).toEqual([
-      "/ai-settings", "/ai-settings/stats?fixture", "/ai-configs", "/ai-models",
+      "/ai-settings", "/ai-configs", "/ai-models",
     ]);
     expect(h.queries.map((query) => query.queryKey)).toEqual([
-      ["ai-settings"], ["ai-settings", "stats"], ["ai-configs"], ["ai-models"],
+      ["ai-settings"], ["ai-configs"], ["ai-models"],
     ]);
   });
 
@@ -164,15 +167,14 @@ describe("AI configuration request ownership", () => {
     expect(h.queries).toEqual([]);
   });
 
-  it.each(["", "tab=", "tab=unknown"])("defaults invalid or absent tabs to overview (%s)", (search) => {
+  it.each(["", "tab=", "tab=unknown", "tab=overview"])("defaults invalid, legacy, or absent tabs to models (%s)", (search) => {
     h.search = search;
     const tree = renderAiSettings();
-    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=overview");
-    expect(find(tree, (element) => element.type === ModelWorkbench)).toBeUndefined();
+    expect(selectedSettingsLink(tree)?.props.href).toBe("/ai-settings?tab=models");
+    expect(find(tree, (element) => element.type === ModelWorkbench)).toBeDefined();
   });
 
   it.each([
-    { tab: "overview", component: DashboardAiOverview },
     { tab: "models", component: ModelWorkbench },
     { tab: "ocr", component: OcrAccordion },
     { tab: "completion", component: AiCompletionPreview },
@@ -202,6 +204,23 @@ describe("AI configuration request ownership", () => {
     const tree = renderAiSettings();
     expect(h.queries.every((query) => query.enabled === false)).toBe(true);
     expect(find(tree, (element) => element.type === ModelWorkbench || element.type === ConfirmDialog)).toBeUndefined();
+  });
+
+  it("does not request AI settings when the read permission is missing", () => {
+    h.permissions = [];
+    const tree = renderAiSettings();
+    expect(h.queries.every((query) => query.enabled === false)).toBe(true);
+    expect(find(tree, (element) => element.props.href === "/app-users")).toBeUndefined();
+  });
+
+  it("links the system scope to ordinary-user policy management", () => {
+    h.search = "tab=system";
+    const tree = renderAiSettings();
+    const section = find(tree, (element) => element.type === SystemSettingsSection)!;
+    const content = (section.type as (props: Record<string, unknown>) => Element)(
+      section.props,
+    );
+    expect(find(content, (element) => element.props.href === "/app-users")).toBeDefined();
   });
 
   it("opens confirmation before writing and only submits the confirmed settings draft", () => {

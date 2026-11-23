@@ -1079,3 +1079,190 @@ class TestMergeStatusPersistence:
                 )
 
         _run(_go())
+
+
+class TestCachedReparseQuotaOwner:
+    """Cached text reparse must preserve the originating Admin quota owner."""
+
+    def test_reparse_passes_job_created_by_to_pipeline(self, tmp_path):
+        from app.features.batch_image_import_service import reparse_item_from_cache
+        from app.models.import_batch_job import ImportBatchJob, ImportBatchJobItem
+
+        async def _go():
+            sm, _ = await _make_session(tmp_path)
+            job_id = "reparse_quota_owner_001"
+            async with sm() as db:
+                db.add(
+                    ImportBatchJob(
+                        **_make_job(job_id, status="failed", created_by="admin:17")
+                    )
+                )
+                db.add(
+                    ImportBatchJobItem(
+                        **_make_item(
+                            job_id,
+                            seq=1,
+                            status="failed",
+                            ocr_cleaned_text="Question from cached OCR",
+                        )
+                    )
+                )
+                await db.commit()
+
+            async with sm() as db:
+                item = (
+                    await db.execute(
+                        select(ImportBatchJobItem).where(
+                            ImportBatchJobItem.job_id == job_id
+                        )
+                    )
+                ).scalar_one()
+                pipeline = AsyncMock(
+                    return_value={
+                        "status": "completed",
+                        "batch_id": "review-batch-1",
+                        "pipeline_id": "pipeline-1",
+                        "stats": {"to_review": 1},
+                    }
+                )
+                with (
+                    patch(
+                        "app.features.pipeline_orchestrator.run_import_pipeline",
+                        pipeline,
+                    ),
+                    patch(
+                        "app.features.batch_image_import_service."
+                        "_update_item_with_trace",
+                        AsyncMock(return_value=None),
+                    ),
+                ):
+                    await reparse_item_from_cache(db, item.id)
+
+            assert pipeline.await_args.kwargs["created_by"] == "admin:17"
+
+        _run(_go())
+
+
+class TestImagePipelineQuotaOwner:
+    def test_single_and_merge_pipelines_receive_job_owner(self, tmp_path):
+        from app.features.batch_image_import_service import (
+            _merge_image_texts,
+            _run_single_image,
+        )
+        from app.models.import_batch_job import ImportBatchJob, ImportBatchJobItem
+
+        async def _go():
+            sm, _ = await _make_session(tmp_path)
+            single_job = "image_quota_single_001"
+            merge_job = "image_quota_merge_001"
+            async with sm() as db:
+                db.add(
+                    ImportBatchJob(
+                        **_make_job(
+                            single_job,
+                            total=1,
+                            status="running",
+                            created_by="admin:17",
+                        )
+                    )
+                )
+                db.add(
+                    ImportBatchJobItem(
+                        **_make_item(single_job, seq=1, status="pending")
+                    )
+                )
+                db.add(
+                    ImportBatchJob(
+                        **_make_job(
+                            merge_job,
+                            status="running",
+                            created_by="admin:18",
+                        )
+                    )
+                )
+                for seq in (1, 2):
+                    db.add(
+                        ImportBatchJobItem(
+                            **_make_item(
+                                merge_job,
+                                seq=seq,
+                                status="succeeded",
+                                ocr_cleaned_text=f"Question {seq}",
+                                review_batch_id=f"OLD-{seq}",
+                            )
+                        )
+                    )
+                await db.commit()
+
+            async with sm() as db:
+                single_item = (
+                    await db.execute(
+                        select(ImportBatchJobItem).where(
+                            ImportBatchJobItem.job_id == single_job
+                        )
+                    )
+                ).scalar_one()
+            with (
+                patch(
+                    "app.services.import_pipeline_service."
+                    "_run_ocr_via_configured_backend",
+                    AsyncMock(
+                        return_value={
+                            "text": "Question 1",
+                            "execution_backend": "synthetic",
+                        }
+                    ),
+                ),
+                patch(
+                    "app.features.pipeline_coordinator_entry.run_pipeline",
+                    AsyncMock(
+                        return_value={
+                            "status": "completed",
+                            "batch_id": "single-review",
+                            "stats": {"to_review": 1},
+                        }
+                    ),
+                ) as single_pipeline,
+                patch(
+                    "app.features.batch_image_import_service."
+                    "_update_item_with_trace",
+                    AsyncMock(return_value=None),
+                ),
+            ):
+                await _run_single_image(
+                    item_id=single_item.id,
+                    source_file="single.png",
+                    content=b"synthetic-image",
+                    subject="math2",
+                    subject_id=None,
+                    options={"_created_by": "admin:17"},
+                    job_id=single_job,
+                    seq=1,
+                )
+            assert single_pipeline.await_args.kwargs["created_by"] == "admin:17"
+
+            with (
+                patch(
+                    "app.features.pipeline_coordinator_entry.run_pipeline",
+                    AsyncMock(
+                        return_value={
+                            "status": "completed",
+                            "batch_id": "merged-review",
+                            "stats": {"to_review": 2},
+                        }
+                    ),
+                ) as merge_pipeline,
+                patch(
+                    "app.features.batch_image_import_service."
+                    "_batch_merge_commit",
+                    AsyncMock(return_value=2),
+                ),
+            ):
+                await _merge_image_texts(
+                    job_id=merge_job,
+                    subject="math2",
+                    options={"_created_by": "admin:18"},
+                )
+            assert merge_pipeline.await_args.kwargs["created_by"] == "admin:18"
+
+        _run(_go())

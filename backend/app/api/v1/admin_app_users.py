@@ -18,6 +18,14 @@ from app.schemas.admin_app_users import (
     AdminAppUserUpdateRequest,
 )
 from app.schemas.common import PaginatedResponse, paginated_response
+from app.schemas.user_ai_policy import (
+    AdminUserAIPolicyDefaultResponse,
+    AdminUserAIPolicyDefaultUpdateRequest,
+    AdminUserAIPolicyDetailResponse,
+    AdminUserAIPolicyResetRequest,
+    AdminUserAIPolicyUnlimitedRequest,
+    AdminUserAIPolicyUpdateRequest,
+)
 from app.services.admin_app_user_service import (
     ban_app_user,
     bind_app_user_admin,
@@ -30,6 +38,15 @@ from app.services.admin_app_user_service import (
     unban_app_user,
     unbind_app_user_admin,
     update_app_user,
+)
+from app.services.user_ai_policy_service import (
+    UserAIPolicyConflictError,
+    get_default_policy,
+    get_user_policy,
+    reset_user_policy,
+    set_user_policy_unlimited,
+    update_default_policy,
+    update_user_policy,
 )
 
 router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/app-users", tags=["admin-app-users"])
@@ -77,6 +94,32 @@ async def list_users(
     return paginated_response(items, total, page, page_size)
 
 
+@router.get("/ai-policy", response_model=AdminUserAIPolicyDefaultResponse)
+async def read_user_ai_policy_defaults(
+    _=Depends(require_permissions("ai_setting:read")),
+    __=Depends(require_roles("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_default_policy(db)
+
+
+@router.patch("/ai-policy", response_model=AdminUserAIPolicyDefaultResponse)
+async def patch_user_ai_policy_defaults(
+    data: AdminUserAIPolicyDefaultUpdateRequest,
+    request: Request,
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("ai_setting:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await update_default_policy(db, data, current_admin, request)
+        await db.commit()
+        return result
+    except UserAIPolicyConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
 @router.get("/{user_id}", response_model=AdminAppUserDetail)
 async def get_user(
     user_id: int,
@@ -86,6 +129,91 @@ async def get_user(
     try:
         return await get_app_user_detail(db, user_id)
     except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.get("/{user_id}/ai-policy", response_model=AdminUserAIPolicyDetailResponse)
+async def read_user_ai_policy(
+    user_id: int,
+    _=Depends(require_permissions("app-user:read")),
+    __=Depends(require_permissions("ai_setting:read")),
+    ___=Depends(require_roles("super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await get_user_policy(db, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.patch("/{user_id}/ai-policy", response_model=AdminUserAIPolicyDetailResponse)
+async def patch_user_ai_policy(
+    user_id: int,
+    data: AdminUserAIPolicyUpdateRequest,
+    request: Request,
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("app-user:read")),
+    __=Depends(require_permissions("ai_setting:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await update_user_policy(db, user_id, data, current_admin, request)
+        await db.commit()
+        return result
+    except UserAIPolicyConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.patch(
+    "/{user_id}/ai-policy/unlimited",
+    response_model=AdminUserAIPolicyDetailResponse,
+)
+async def patch_user_ai_policy_unlimited(
+    user_id: int,
+    data: AdminUserAIPolicyUnlimitedRequest,
+    request: Request,
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("app-user:read")),
+    __=Depends(require_permissions("ai_setting:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await set_user_policy_unlimited(
+            db, user_id, data, current_admin, request
+        )
+        await db.commit()
+        return result
+    except UserAIPolicyConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.delete("/{user_id}/ai-policy", response_model=AdminUserAIPolicyDetailResponse)
+async def delete_user_ai_policy(
+    user_id: int,
+    data: AdminUserAIPolicyResetRequest,
+    request: Request,
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("app-user:read")),
+    __=Depends(require_permissions("ai_setting:write")),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await reset_user_policy(db, user_id, data, current_admin, request)
+        await db.commit()
+        return result
+    except UserAIPolicyConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ValueError as exc:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 

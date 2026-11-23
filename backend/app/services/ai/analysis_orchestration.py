@@ -70,6 +70,8 @@ class AnalysisOrchestrationRequest:
     visual_ack_failure: Callable[..., dict]
     grounding_repair: Callable[..., Awaitable[dict]]
     valid_outcome: Callable[..., Awaitable[dict]]
+    user_rpm_limit: int | None = None
+    user_ai_policy: Any = None
 
 
 async def execute_locked_analysis(request: AnalysisOrchestrationRequest) -> dict:
@@ -110,8 +112,10 @@ async def _execute_with_lease(
     if request.effective_force:
         denied = await admit_regeneration(
             cache=request.cache,
+            db=request.db,
             user_id=request.user_id,
             wrong_question=request.wrong_question,
+            policy=request.user_ai_policy,
         )
         if denied is not None:
             return denied

@@ -938,6 +938,8 @@ async def parse_text_questions_async(
     subject: str,
     db: AsyncSession | None = None,
     subject_id: int | None = None,
+    *,
+    admin_quota_admin_id: int | None = None,
 ) -> dict[str, Any]:
     """规则解析为主，结构完整度低时调用 LLM 结构化兜底。
 
@@ -985,11 +987,16 @@ async def parse_text_questions_async(
             candidate["text"],
             rule_hint=candidate["rule_hint"],
             db=db,
+            admin_quota_admin_id=admin_quota_admin_id,
         )
         if single is not None:
             llm_outputs[int(candidate["index"])] = single
     elif len(llm_candidates) > 1:
-        llm_outputs = await structure_text_blocks(llm_candidates, db=db)
+        llm_outputs = await structure_text_blocks(
+            llm_candidates,
+            db=db,
+            admin_quota_admin_id=admin_quota_admin_id,
+        )
 
     raw_questions: list[dict] = []
     for q_index, _block, raw, should_call, reason, _rule_hint in prepared:

@@ -21,6 +21,7 @@ from app.ai.prompts import (
     build_complete_question,
     build_repair_question,
 )
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.features.question_pipeline import (
     SUBJECT_VALUES,
     TYPE_VALUES,
@@ -264,6 +265,7 @@ async def _complete_import_repair(
         messages,
         {"error": "AI 修复不可用"},
         db,
+        admin_id=user_id,
     )
 
     if raw is None:
@@ -393,7 +395,10 @@ async def complete_import(db: AsyncSession, user_id: int, import_id: int) -> dic
     )
     prompt_text = json.dumps(messages, ensure_ascii=False)
     resp, raw, _ = await _call_or_fallback(
-        messages, fallback.get_fallback_complete(missing), db
+        messages,
+        fallback.get_fallback_complete(missing),
+        db,
+        admin_id=user_id,
     )
 
     if raw is None:
@@ -715,7 +720,10 @@ async def complete_import_with_strategy(
     )
     prompt_text = json.dumps(messages, ensure_ascii=False)
     resp, raw, _ = await _call_or_fallback(
-        messages, fallback.get_fallback_complete(to_complete), db
+        messages,
+        fallback.get_fallback_complete(to_complete),
+        db,
+        admin_id=user_id,
     )
 
     if raw is None:
@@ -928,6 +936,8 @@ async def batch_complete_questions(
                     api_key=runtime.api_key,
                     base_url=runtime.base_url,
                     provider=runtime.provider,
+                    admin_quota_scope="admin_import_ai",
+                    admin_quota_admin_id=user_id,
                 )
                 item["resp_raw"] = resp["content"]
                 item["parsed_raw"] = _normalize_completion_payload(
@@ -936,6 +946,17 @@ async def batch_complete_questions(
                 item["tokens_used"] = resp["tokens_used"]
                 item["duration_ms"] = resp["duration_ms"]
                 item["model"] = resp["model"]
+            except AIResourceRejectedError as e:
+                item["resp_raw"] = None
+                item["parsed_raw"] = item["fallback_value"]
+                item["error_code"] = e.reason
+                item["error"] = (
+                    "后台 AI 解析已全局关闭"
+                    if e.reason == "ai_parse_disabled"
+                    else "后台 AI 解析月度额度已用尽"
+                    if e.reason == "ai_admin_quota_exhausted"
+                    else "AI 服务准入失败，请稍后重试"
+                )
             except RuntimeError as e:
                 item["resp_raw"] = None
                 item["parsed_raw"] = item["fallback_value"]

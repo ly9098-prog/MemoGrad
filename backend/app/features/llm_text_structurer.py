@@ -23,6 +23,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.config import settings
 from app.features.token_budget import (
     check_token_limit,
@@ -381,6 +382,8 @@ async def structure_text_block(
     block_text: str,
     rule_hint: dict[str, Any] | None = None,
     db: AsyncSession | None = None,
+    *,
+    admin_quota_admin_id: int | None = None,
 ) -> dict[str, Any] | None:
     """对单个文本块调用 LLM 结构化。失败 / 不可用时返回 None（静默降级）。
 
@@ -427,9 +430,19 @@ async def structure_text_block(
             messages,
             capability=AICapability.TEXT_STRUCTURING,
             temperature=0.0,
+            **(
+                {
+                    "admin_quota_scope": "admin_import_ai",
+                    "admin_quota_admin_id": admin_quota_admin_id,
+                }
+                if admin_quota_admin_id is not None
+                else {}
+            ),
         )
         if result is None:
             return None
+    except AIResourceRejectedError:
+        raise
     except Exception as exc:
         logger.warning("text_structure llm call failed: %s", exc)
         return None
@@ -460,6 +473,8 @@ async def structure_text_block(
 async def structure_text_blocks(
     candidates: list[dict[str, Any]],
     db: AsyncSession | None = None,
+    *,
+    admin_quota_admin_id: int | None = None,
 ) -> dict[int, dict[str, Any]]:
     """一次 LLM 调用结构化多个可疑文本块。
 
@@ -490,9 +505,19 @@ async def structure_text_blocks(
             messages,
             capability=AICapability.TEXT_STRUCTURING,
             temperature=0.0,
+            **(
+                {
+                    "admin_quota_scope": "admin_import_ai",
+                    "admin_quota_admin_id": admin_quota_admin_id,
+                }
+                if admin_quota_admin_id is not None
+                else {}
+            ),
         )
         if result is None:
             return {}
+    except AIResourceRejectedError:
+        raise
     except Exception as exc:
         logger.warning("text_structure_batch llm call failed: %s", exc)
         return {}

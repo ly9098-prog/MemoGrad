@@ -32,6 +32,46 @@ from app.utils.sentry_utils import capture_exception, set_tag, start_span
 _ai_logger = logging.getLogger("app.ai")
 
 
+async def _reserve_admin_quota_call(
+    scope: str | None, admin_id: int | None = None
+) -> str | None:
+    if not scope:
+        return None
+    from app.services.admin_ai_usage_service import (
+        AdminAIUsageRejectedError,
+        reserve_admin_ai_parse_call,
+    )
+
+    try:
+        return await reserve_admin_ai_parse_call(scope=scope, admin_id=admin_id)
+    except AdminAIUsageRejectedError as exc:
+        raise AIResourceRejectedError(
+            exc.code, retry_after_sec=exc.retry_after_sec
+        ) from exc
+
+
+async def _release_admin_quota_call(
+    scope: str | None,
+    admin_id: int | None = None,
+    *,
+    year_month: str | None = None,
+) -> None:
+    """Undo a reservation when no provider transport was dispatched."""
+    if not scope:
+        return
+    from app.services.admin_ai_usage_service import (
+        release_admin_ai_parse_call_for,
+    )
+
+    # Keep the reserved month explicit so a pre-dispatch timeout that crosses
+    # midnight cannot refund the newly-created month's counter.
+    await release_admin_ai_parse_call_for(
+        scope=scope,
+        admin_id=admin_id,
+        year_month=year_month,
+    )
+
+
 class OpenAICompatibleAPIError(RuntimeError):
     """Typed upstream HTTP failure without embedding provider response bodies.
 
@@ -61,6 +101,18 @@ class ChatCompletionCancelled(asyncio.CancelledError):
         self.result = result
 
 
+class AITransportTimeout(TimeoutError):
+    """Timeout with enough state to decide whether it may have been billed."""
+
+    def __init__(self, *, dispatched: bool) -> None:
+        self.dispatched = dispatched
+        super().__init__(
+            "OpenAI-compatible request timeout after dispatch"
+            if dispatched
+            else "OpenAI-compatible request budget exhausted before dispatch"
+        )
+
+
 async def _request_remote_joined(
     url: str, *, deadline: float, **kwargs: Any
 ) -> tuple[RemoteResponse, bool]:
@@ -80,9 +132,12 @@ async def _request_remote_joined(
         with dispatch_lock:
             remaining = deadline - time.monotonic()
             if abandoned or remaining <= 0:
-                raise TimeoutError("OpenAI-compatible request budget exhausted")
+                raise AITransportTimeout(dispatched=False)
             started = True
-        return request_remote_bytes(url, timeout=remaining, **kwargs)
+        try:
+            return request_remote_bytes(url, timeout=remaining, **kwargs)
+        except TimeoutError as exc:
+            raise AITransportTimeout(dispatched=True) from exc
 
     transport = asyncio.create_task(asyncio.to_thread(request))
     cancelled = False
@@ -98,10 +153,14 @@ async def _request_remote_joined(
                 if not started:
                     abandoned = True
                     transport.cancel()
-                    raise
+                    raise AITransportTimeout(dispatched=False)
             if transport.done():
                 try:
                     return transport.result(), cancelled
+                except AITransportTimeout:
+                    raise
+                except TimeoutError as exc:
+                    raise AITransportTimeout(dispatched=True) from exc
                 except Exception as exc:
                     if cancelled:
                         raise ChatCompletionCancelled(None) from exc
@@ -588,6 +647,9 @@ class OpenAICompatibleClient:
         prefer_direct_answer: bool = False,
         connection_probe: bool = False,
         deadline: float | None = None,
+        rate_limit: int | None = None,
+        admin_quota_scope: str | None = None,
+        admin_quota_admin_id: int | None = None,
     ) -> dict[str, Any]:
         """Invoke a Chat Completions-compatible endpoint.
 
@@ -644,10 +706,15 @@ class OpenAICompatibleClient:
         ai_runtime_guard.validate_prompt(prompt_chars)
         if not connection_probe:
             if request_deadline is None:
-                await ai_runtime_guard.enforce_rate_limit()
+                await ai_runtime_guard.enforce_rate_limit(rate_limit)
             else:
-                async with asyncio.timeout_at(request_deadline):
-                    await ai_runtime_guard.enforce_rate_limit()
+                try:
+                    async with asyncio.timeout_at(request_deadline):
+                        await ai_runtime_guard.enforce_rate_limit(rate_limit)
+                except TimeoutError as exc:
+                    raise AIResourceRejectedError(
+                        "ai_overloaded", retry_after_sec=1
+                    ) from exc
             ai_runtime_guard.record_request()
 
         # Cap either token-field dialect, including explicit extra_body values.
@@ -708,8 +775,13 @@ class OpenAICompatibleClient:
                     if request_deadline is None:
                         sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
                     else:
-                        async with asyncio.timeout_at(request_deadline):
-                            sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
+                        try:
+                            async with asyncio.timeout_at(request_deadline):
+                                sem, queue_wait_ms = await ai_runtime_guard.acquire_slot()
+                        except TimeoutError as exc:
+                            raise AIResourceRejectedError(
+                                "ai_overloaded", retry_after_sec=1
+                            ) from exc
                 try:
                     if not connection_probe:
                         ai_runtime_guard.assert_circuit_available(endpoint_key)
@@ -757,19 +829,57 @@ class OpenAICompatibleClient:
                                 "Accept": "application/json",
                             },
                         }
+                        admin_quota_reserved = False
+                        admin_quota_month: str | None = None
                         if deadline is not None:
-                            remote, cancelled = await _request_remote_joined(
-                                url, deadline=request_deadline, **request_kwargs
+                            admin_quota_month = await _reserve_admin_quota_call(
+                                admin_quota_scope, admin_quota_admin_id
                             )
+                            admin_quota_reserved = True
+                            try:
+                                remote, cancelled = await _request_remote_joined(
+                                    url,
+                                    deadline=request_deadline,
+                                    **request_kwargs,
+                                )
+                            except AITransportTimeout as exc:
+                                if admin_quota_reserved and not exc.dispatched:
+                                    await _release_admin_quota_call(
+                                        admin_quota_scope,
+                                        admin_quota_admin_id,
+                                        year_month=admin_quota_month,
+                                    )
+                                raise
+                            except asyncio.CancelledError as exc:
+                                if admin_quota_reserved and not isinstance(
+                                    exc, ChatCompletionCancelled
+                                ):
+                                    await _release_admin_quota_call(
+                                        admin_quota_scope,
+                                        admin_quota_admin_id,
+                                        year_month=admin_quota_month,
+                                    )
+                                raise
                         else:
                             # Existing callers retain immediate cancellation;
                             # joining is opt-in for the teacher billing boundary.
-                            remote = await asyncio.to_thread(
-                                request_remote_bytes,
-                                url,
-                                timeout=max(0.05, remaining_timeout),
-                                **request_kwargs,
+                            admin_quota_month = await _reserve_admin_quota_call(
+                                admin_quota_scope, admin_quota_admin_id
                             )
+                            admin_quota_reserved = True
+                            try:
+                                remote = await asyncio.to_thread(
+                                    request_remote_bytes,
+                                    url,
+                                    timeout=max(0.05, remaining_timeout),
+                                    **request_kwargs,
+                                )
+                            except asyncio.CancelledError:
+                                # ``to_thread`` may already have dispatched the
+                                # provider call. Without a reliable dispatch
+                                # marker, retain the attempt rather than refund
+                                # a request that may be billed.
+                                raise
                             cancelled = False
                         cancellation_requested = cancellation_requested or cancelled
                         response_text = remote.data.decode("utf-8", errors="replace")

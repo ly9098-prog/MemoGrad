@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
+from app.ai.client import AITransportTimeout
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.ai.prompts import build_error_analysis
 from app.services.ai.analysis_availability import (
     AnalysisUnavailableError,
@@ -46,6 +48,7 @@ class ProviderInvocationInput:
     quarantine_runtime: Quarantiner
     failure_response: FailureResponse
     previous_analysis: dict | None = None
+    user_rpm_limit: int | None = None
 
 
 @dataclass(slots=True)
@@ -62,6 +65,13 @@ async def invoke_analysis_provider(
     invoke_started = time.monotonic()
     try:
         result = await _invoke_runtime(payload, runtime)
+    except AIResourceRejectedError:
+        raise
+    except AITransportTimeout as exc:
+        await note_failure(runtime, exc)
+        return _timeout_failure(
+            payload, int((time.monotonic() - invoke_started) * 1000)
+        )
     except TimeoutError as exc:
         await note_failure(runtime, exc)
         return _timeout_failure(
@@ -106,6 +116,7 @@ async def _invoke_runtime(payload: ProviderInvocationInput, selected_runtime):
             timeout=payload.model_timeout_sec,
             max_tokens=payload.max_tokens,
             prefer_direct_answer=True,
+            rate_limit=payload.user_rpm_limit,
         )
     await note_success(selected_runtime, started_at=started_at)
     return result
@@ -219,6 +230,12 @@ async def _invoke_fallback(
     failover_started = time.monotonic()
     try:
         result = await _invoke_runtime(payload, fallback_runtime)
+    except AIResourceRejectedError:
+        raise
+    except AITransportTimeout as exc:
+        await note_failure(fallback_runtime, exc)
+        elapsed_timeout_ms = int((time.monotonic() - failover_started) * 1000)
+        return _failover_timeout_failure(payload, fallback_runtime, elapsed_timeout_ms)
     except TimeoutError as exc:
         await note_failure(fallback_runtime, exc)
         elapsed_timeout_ms = int((time.monotonic() - failover_started) * 1000)

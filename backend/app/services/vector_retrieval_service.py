@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.cache import cache
 from app.core.config import settings
 from app.models.practice_record import PracticeRecord
@@ -399,7 +400,11 @@ async def is_vector_enabled(db: AsyncSession) -> bool:
 
 
 async def upsert_question_embedding(
-    db: AsyncSession, question: Question, force: bool = False
+    db: AsyncSession,
+    question: Question,
+    force: bool = False,
+    *,
+    rate_limit: int | None = None,
 ) -> dict:
     """为单个题目生成并存储 embedding。
 
@@ -454,6 +459,7 @@ async def upsert_question_embedding(
         embedding = await embedding_service.get_embedding(
             content_text,
             config=_vs.emb,
+            rate_limit=rate_limit,
         )
         if embedding is None:
             return {
@@ -776,7 +782,14 @@ async def _ensure_source_embedding(
     # fallback 仍可继续使用当前 Session。
     try:
         async with db.begin_nested():
-            res = await upsert_question_embedding(db, question)
+            res = await upsert_question_embedding(
+                db,
+                question,
+                rate_limit=reservation.rpm_limit,
+            )
+    except AIResourceRejectedError:
+        await ai_token_budget.cancel_token_reservation(reservation)
+        raise
     except SQLAlchemyError:
         # The provider may already have billed the request before a local
         # persistence failure. Retain the hold when its cost is uncertain.
@@ -1257,10 +1270,15 @@ async def vector_recall_by_text(
     reservation = await ai_token_budget.reserve_token_budget(db, user_id, estimated_tokens)
     if reservation is None:
         return []
-    query_embedding = await embedding_service.get_embedding(
-        query_text,
-        config=_vs.emb,
-    )
+    try:
+        query_embedding = await embedding_service.get_embedding(
+            query_text,
+            config=_vs.emb,
+            rate_limit=reservation.rpm_limit,
+        )
+    except AIResourceRejectedError:
+        await ai_token_budget.cancel_token_reservation(reservation)
+        raise
     if query_embedding is None:
         await ai_token_budget.cancel_token_reservation(reservation)
         logger.warning("smart 模式 query embedding 生成失败")

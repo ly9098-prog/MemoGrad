@@ -41,6 +41,19 @@ class _IdentityDb(_Db):
         return _Result()
 
 
+class _PolicyDb(_Db):
+    async def execute(self, _statement):
+        class _Result:
+            def scalar_one_or_none(self):
+                return "super_admin"
+
+        return _Result()
+
+
+async def _policy_db():
+    yield _PolicyDb()
+
+
 async def _override_db():
     yield _IdentityDb()
 
@@ -161,3 +174,125 @@ def test_list_app_users_requires_permission():
     resp = client.get("/api/admin/v1/app-users")
 
     assert resp.status_code in {401, 403}
+
+
+def test_user_ai_policy_routes_are_not_captured_by_user_id(monkeypatch):
+    from app.schemas.user_ai_policy import (
+        AdminUserAIPolicyDefaultResponse,
+        UserAIPolicyValues,
+    )
+
+    default = AdminUserAIPolicyDefaultResponse(
+        version=1,
+        values=UserAIPolicyValues(
+            regeneration_cooldown_seconds=60,
+            regeneration_question_24h_limit=3,
+            regeneration_account_24h_limit=20,
+            daily_token_limit=50000,
+            monthly_token_limit=500000,
+            rpm_limit=12,
+        ),
+    )
+    read_default = AsyncMock(return_value=default)
+    monkeypatch.setattr(admin_app_users, "get_default_policy", read_default)
+    monkeypatch.setattr(
+        admin_security,
+        "_get_permission_names",
+        AsyncMock(return_value={"ai_setting:read"}),
+    )
+    app.dependency_overrides[get_current_admin] = _allow_read
+    app.dependency_overrides[get_db] = _policy_db
+    try:
+        resp = client.get("/api/admin/v1/app-users/ai-policy")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()["scope"] == "default"
+    read_default.assert_awaited_once()
+
+
+def test_unlimited_policy_contract_uses_patch():
+    path = app.openapi()["paths"][
+        "/api/admin/v1/app-users/{user_id}/ai-policy/unlimited"
+    ]
+    assert "patch" in path
+    assert "post" not in path
+
+
+def test_patch_user_ai_policy_accepts_null_for_inherited_fields(monkeypatch):
+    from app.schemas.user_ai_policy import (
+        AdminUserAIPolicyDetailResponse,
+        UserAIPolicyEffectiveValues,
+        UserAIPolicySources,
+        UserAIPolicyValues,
+    )
+
+    defaults = UserAIPolicyValues(
+        regeneration_cooldown_seconds=60,
+        regeneration_question_24h_limit=3,
+        regeneration_account_24h_limit=20,
+        daily_token_limit=50000,
+        monthly_token_limit=500000,
+        rpm_limit=12,
+    )
+    detail = AdminUserAIPolicyDetailResponse(
+        user_id=1,
+        version=1,
+        defaults=defaults,
+        overrides={
+            "regeneration_cooldown_seconds": None,
+            "regeneration_question_24h_limit": -1,
+            "regeneration_account_24h_limit": 20,
+            "daily_token_limit": None,
+            "monthly_token_limit": 600000,
+            "rpm_limit": None,
+        },
+        effective=UserAIPolicyEffectiveValues(
+            regeneration_cooldown_seconds=60,
+            regeneration_question_24h_limit=-1,
+            regeneration_account_24h_limit=20,
+            daily_token_limit=50000,
+            monthly_token_limit=600000,
+            rpm_limit=12,
+        ),
+        sources=UserAIPolicySources(
+            regeneration_question_24h_limit="user",
+            regeneration_account_24h_limit="user",
+            monthly_token_limit="user",
+        ),
+        unlimited=False,
+    )
+    update_user_policy = AsyncMock(return_value=detail)
+    monkeypatch.setattr(admin_app_users, "update_user_policy", update_user_policy)
+    monkeypatch.setattr(
+        admin_security,
+        "_get_permission_names",
+        AsyncMock(
+            return_value={"app-user:read", "ai_setting:write"}
+        ),
+    )
+    app.dependency_overrides[get_current_admin] = _allow_write
+    app.dependency_overrides[get_db] = _policy_db
+    try:
+        resp = client.patch(
+            "/api/admin/v1/app-users/1/ai-policy",
+            json={
+                "version": 0,
+                "reason": "逐项覆盖",
+                "values": {
+                    "regeneration_cooldown_seconds": None,
+                    "regeneration_question_24h_limit": -1,
+                    "regeneration_account_24h_limit": 20,
+                    "daily_token_limit": None,
+                    "monthly_token_limit": 600000,
+                    "rpm_limit": None,
+                },
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()["sources"]["monthly_token_limit"] == "user"
+    update_user_policy.assert_awaited_once()

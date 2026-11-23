@@ -38,6 +38,7 @@ class AnalysisInvocationRequest:
     resolve_runtime: Callable[..., Awaitable[Any]]
     quarantine_runtime: Callable[[Any], Awaitable[None]]
     cached_response: Callable[..., dict | None]
+    user_rpm_limit: int | None = None
 
 
 async def invoke_prepared_analysis(
@@ -65,6 +66,7 @@ async def invoke_prepared_analysis(
             timeout_guard_sec=request.timeout_guard_sec,
             resolve_runtime=request.resolve_runtime,
             quarantine_runtime=request.quarantine_runtime,
+            user_rpm_limit=request.user_rpm_limit,
             failure_response=build_provider_failure_response(
                 wrong_question=request.wrong_question,
                 requires_visual=request.requires_visual,

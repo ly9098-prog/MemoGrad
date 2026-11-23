@@ -273,6 +273,13 @@ jobs:
             tests/test_api/test_question_detail_answer_boundaries.py \
             tests/test_api/test_query_admission_bounds.py \
             tests/test_services/test_ai_token_reservation_concurrency.py \
+            tests/core/test_ai_runtime_guard_policy.py \
+            tests/test_api/test_admin_ai_settings.py \
+            tests/test_services/test_admin_ai_settings_service.py \
+            tests/test_services/test_admin_ai_usage_service.py \
+            tests/test_services/test_user_ai_policy_service.py \
+            tests/test_features/test_admin_ai_quota_boundaries.py \
+            tests/test_services/test_embedding_rate_limit.py \
             tests/test_services/test_stats_ai_billing.py \
             tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_source_embedding_respects_user_budget_before_provider \
             tests/test_services/test_phase5_2_vector_acceptance.py::TestFaultInjection::test_failed_source_embedding_keeps_budget_when_provider_may_be_billed \

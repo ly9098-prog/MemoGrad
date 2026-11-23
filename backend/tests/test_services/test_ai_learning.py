@@ -557,9 +557,15 @@ class TestTokenControl:
 
         db = _make_mock_db()
 
-        with patch("app.services.ai_learning_service.settings") as mock_settings:
-            mock_settings.AI_DAILY_TOKEN_LIMIT = 0
-            mock_settings.AI_MONTHLY_TOKEN_LIMIT = 0
+        policy = type(
+            "Policy",
+            (),
+            {"daily_token_limit": -1, "monthly_token_limit": -1},
+        )()
+        with patch(
+            "app.services.user_ai_policy_service.get_effective_user_ai_policy",
+            return_value=policy,
+        ):
             result = _run(check_token_limit(db, user_id=1, tokens_needed=1000000))
             assert result is True
 

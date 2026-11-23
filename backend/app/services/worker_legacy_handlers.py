@@ -119,6 +119,7 @@ async def handle_admin_resume(context: LegacyTaskContext) -> None:
     subject = payload.get("subject")
     subject_id = payload.get("subject_id")
     options = payload.get("options", {})
+    created_by = payload.get("created_by")
 
     # Re-read checkpoint from shared Redis (cross-process accessible)
     checkpoint = await _get_stage_checkpoint(context.pipeline_id)
@@ -132,6 +133,7 @@ async def handle_admin_resume(context: LegacyTaskContext) -> None:
             options=options,
             db=resume_db,
             pipeline_id=context.pipeline_id,
+            created_by=created_by,
             resume_from_checkpoint=checkpoint,
         )
     try:
@@ -179,6 +181,7 @@ async def handle_batch_image(context: LegacyTaskContext) -> None:
     subject_id = payload.get("subject_id")
     options = payload.get("options", {})
     concurrency = payload.get("concurrency", 2)
+    created_by = payload.get("created_by")
     source_seqs = payload.get("source_seqs") or list(range(1, len(staging_ids) + 1))
     source_files = payload.get("source_files") or [
         f"image_{index + 1}.png" for index in range(len(staging_ids))
@@ -213,6 +216,7 @@ async def handle_batch_image(context: LegacyTaskContext) -> None:
         subject_id=subject_id,
         options=options,
         concurrency=concurrency,
+        created_by=created_by,
     )
 
 

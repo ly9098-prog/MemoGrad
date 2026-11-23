@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.models.user import User
 from app.services.ai_learning_service import (
     cancel_token_reservation,
@@ -32,7 +33,7 @@ async def call_metered_stats_ai(
     db: AsyncSession,
     user_id: int,
     messages: list[dict],
-    invoke: Callable[[], Awaitable[dict | None]],
+    invoke: Callable[[int | None], Awaitable[dict | None]],
     *,
     max_tokens: int,
     session_type: str,
@@ -42,8 +43,14 @@ async def call_metered_stats_ai(
     )
     if reservation is None:
         return None
-    # Exceptions retain the hold: a failed response or DB write can be billed.
-    response = await invoke()
+    try:
+        response = await invoke(reservation.rpm_limit)
+    except AIResourceRejectedError:
+        # Admission failures happen before provider transport, so release the
+        # known zero-cost hold. Other exceptions may follow a dispatched call
+        # and therefore retain it.
+        await cancel_token_reservation(reservation)
+        raise
     if response is None:
         await cancel_token_reservation(reservation)
         return None

@@ -15,7 +15,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from app.ai import client as client_module
 from app.ai.client import DeepSeekClient
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.ai_runtime_guard import AIRuntimeGuard
 from app.services.safe_remote_fetch import RemoteResponse
 
@@ -155,6 +157,49 @@ async def test_gateway_preserves_complete_content_and_finish_reason(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("dispatched", "released"),
+    [(False, True), (True, False)],
+)
+async def test_admin_quota_is_refunded_only_before_transport_dispatch(
+    isolated_guard, dispatched, released
+):
+    reserve = AsyncMock(return_value="2026-11")
+    release = AsyncMock()
+
+    async def reject_transport(*_args, **_kwargs):
+        raise client_module.AITransportTimeout(dispatched=dispatched)
+
+    with (
+        patch.object(client_module, "_reserve_admin_quota_call", reserve),
+        patch.object(client_module, "_release_admin_quota_call", release),
+        patch.object(
+            client_module,
+            "_request_remote_joined",
+            side_effect=reject_transport,
+        ),
+        pytest.raises(client_module.AITransportTimeout),
+    ):
+        await _make_client().chat(
+            messages=[{"role": "user", "content": "hi"}],
+            model="test-model",
+            deadline=time.monotonic() + 0.5,
+            admin_quota_scope="admin_import_ai",
+            admin_quota_admin_id=7,
+        )
+
+    reserve.assert_awaited_once_with("admin_import_ai", 7)
+    if released:
+        release.assert_awaited_once_with(
+            "admin_import_ai",
+            7,
+            year_month="2026-11",
+        )
+    else:
+        release.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("bounded", [False, True])
 async def test_only_explicit_deadline_includes_queue_wait(isolated_guard, bounded):
     sem, _ = await isolated_guard.acquire_slot()
@@ -184,7 +229,7 @@ async def test_only_explicit_deadline_includes_queue_wait(isolated_guard, bounde
 @pytest.mark.asyncio
 @pytest.mark.parametrize("bounded", [False, True])
 async def test_only_explicit_deadline_includes_rate_limit_wait(isolated_guard, bounded):
-    async def admission():
+    async def admission(_rate_limit=None):
         await asyncio.sleep(0.06)
 
     isolated_guard.enforce_rate_limit.side_effect = admission
@@ -242,17 +287,18 @@ async def test_legacy_cancellation_does_not_join_transport(isolated_guard):
 
 @pytest.mark.asyncio
 async def test_bounded_rate_limit_uses_deadline_without_dispatch(isolated_guard):
-    async def admission():
+    async def admission(_rate_limit=None):
         await asyncio.sleep(1)
 
     isolated_guard.enforce_rate_limit.side_effect = admission
     with patch("app.ai.client.request_remote_bytes") as remote:
-        with pytest.raises(TimeoutError):
+        with pytest.raises(AIResourceRejectedError) as exc:
             await _make_client().chat(
                 messages=[{"role": "user", "content": "hi"}],
                 model="test-model",
                 deadline=time.monotonic() + 0.01,
             )
+    assert exc.value.reason == "ai_overloaded"
     remote.assert_not_called()
 
 

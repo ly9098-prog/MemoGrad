@@ -27,7 +27,9 @@ class AdminAISettingsResponse(BaseModel):
 
 class AdminAISettingsPatchRequest(BaseModel):
     ai_parse_enabled: bool | None = None
-    monthly_call_limit: int | None = Field(default=None, ge=0)
+    monthly_call_limit: int | None = Field(
+        default=None, ge=0, le=1_000_000_000
+    )
 
 
 class DailyTrendPoint(BaseModel):

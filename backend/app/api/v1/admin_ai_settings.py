@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.admin_security import require_permissions
+from app.core.admin_security import require_permissions, require_roles
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
 from app.schemas.admin_ai_settings import (
@@ -23,6 +23,7 @@ router = APIRouter(prefix=f"{API_ADMIN_V1_PREFIX}/ai-settings", tags=["admin-ai-
 @router.get("", response_model=AdminAISettingsResponse)
 async def read_ai_settings(
     _=Depends(require_permissions("ai_setting:read")),
+    __=Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_ai_settings(db)
@@ -32,7 +33,8 @@ async def read_ai_settings(
 async def patch_ai_settings(
     data: AdminAISettingsPatchRequest,
     request: Request,
-    current_admin=Depends(require_permissions("ai_setting:write")),
+    current_admin=Depends(require_roles("super_admin")),
+    _=Depends(require_permissions("ai_setting:write")),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -52,6 +54,7 @@ async def read_ai_usage(
         default=None, pattern=r"^\d{4}-\d{2}$", alias="yearMonth"
     ),
     _=Depends(require_permissions("ai_setting:read")),
+    __=Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_ai_usage(db, year_month)
@@ -61,6 +64,7 @@ async def read_ai_usage(
 async def read_ai_stats(
     days: int = Query(default=7, ge=1, le=90),
     _=Depends(require_permissions("ai_setting:read")),
+    __=Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_ai_stats(db, days)

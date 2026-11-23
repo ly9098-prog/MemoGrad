@@ -11,6 +11,7 @@ import json
 import logging
 from typing import Any
 
+from app.core.ai_runtime_guard import AIResourceRejectedError, ai_runtime_guard
 from app.core.config import settings
 from app.core.log_context import get_trace_headers
 from app.services.embedding_endpoints import build_embeddings_url
@@ -148,7 +149,12 @@ async def _request_embeddings(url: str, payload: dict, cfg) -> tuple[int, dict]:
     return response.status, data
 
 
-async def get_embedding(text: str, *, config=None) -> list[float] | None:
+async def get_embedding(
+    text: str,
+    *,
+    config=None,
+    rate_limit: int | None = None,
+) -> list[float] | None:
     """调用 OpenAI-compatible embeddings API 获取单条文本的 embedding 向量。
 
     Args:
@@ -172,10 +178,13 @@ async def get_embedding(text: str, *, config=None) -> list[float] | None:
     }
 
     try:
+        await ai_runtime_guard.enforce_rate_limit(rate_limit)
         status_code, data = await _request_embeddings(url, payload, cfg)
         if status_code != 200:
             logger.warning("Embedding API 返回错误: status=%s", status_code)
             return None
+    except AIResourceRejectedError:
+        raise
     except Exception:
         logger.warning("Embedding API 请求失败", exc_info=True)
         return None
@@ -200,7 +209,10 @@ async def get_embedding(text: str, *, config=None) -> list[float] | None:
 
 
 async def get_embeddings_batch(
-    texts: list[str], *, config=None
+    texts: list[str],
+    *,
+    config=None,
+    rate_limit: int | None = None,
 ) -> list[list[float] | None]:
     """批量获取 embedding。按 batch_size 分批调用 API。
 
@@ -228,11 +240,17 @@ async def get_embeddings_batch(
 
         valid_texts = [batch_texts[i] for i in valid_indices]
 
-        batch_embeddings = await _fetch_batch_embeddings(valid_texts, cfg)
+        batch_embeddings = await _fetch_batch_embeddings(
+            valid_texts, cfg, rate_limit=rate_limit
+        )
 
         if batch_embeddings is None:
             for idx_pos, global_idx in enumerate(valid_indices):
-                single = await get_embedding(batch_texts[global_idx], config=cfg)
+                single = await get_embedding(
+                    batch_texts[global_idx],
+                    config=cfg,
+                    rate_limit=rate_limit,
+                )
                 results[batch_start + global_idx] = single
         else:
             for idx_pos, global_idx in enumerate(valid_indices):
@@ -242,7 +260,12 @@ async def get_embeddings_batch(
     return results
 
 
-async def _fetch_batch_embeddings(texts: list[str], cfg) -> list[list[float]] | None:
+async def _fetch_batch_embeddings(
+    texts: list[str],
+    cfg,
+    *,
+    rate_limit: int | None = None,
+) -> list[list[float]] | None:
     """尝试批量调用 embedding API。失败返回 None。"""
     url = build_embeddings_url(cfg.base_url)
     payload = {
@@ -251,10 +274,13 @@ async def _fetch_batch_embeddings(texts: list[str], cfg) -> list[list[float]] | 
     }
 
     try:
+        await ai_runtime_guard.enforce_rate_limit(rate_limit)
         status_code, data = await _request_embeddings(url, payload, cfg)
         if status_code != 200:
             logger.warning("Embedding 批量 API 返回错误: status=%s", status_code)
             return None
+    except AIResourceRejectedError:
+        raise
     except Exception:
         logger.warning("Embedding 批量 API 请求失败", exc_info=True)
         return None

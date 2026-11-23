@@ -2759,6 +2759,7 @@ class ImportPipeline:
             questions,
             options,
             db=_kw.get("db"),
+            admin_quota_admin_id=_kw.get("admin_quota_admin_id"),
         )
 
     def _run_classify_questions(self, questions: list[dict], **_kw) -> dict:
@@ -2859,6 +2860,7 @@ class ImportPipeline:
             options,
             db=_kw.get("db"),
             batch_validation_diagnostics=_kw.get("batch_validation_diagnostics"),
+            admin_quota_admin_id=_kw.get("admin_quota_admin_id"),
         )
 
     def _run_ai_validation(self, questions: list[dict], **_kw) -> dict:
@@ -3141,6 +3143,14 @@ class ImportPipeline:
             "strategy": strategy,
             "watermark_patterns": watermark_patterns,
         }
+        if self.created_by:
+            from app.services.admin_ai_usage_service import (
+                parse_admin_id_from_created_by,
+            )
+
+            shared["admin_quota_admin_id"] = parse_admin_id_from_created_by(
+                self.created_by
+            )
 
         _pipe_logger = logging.getLogger("app.pipeline")
         log_event(

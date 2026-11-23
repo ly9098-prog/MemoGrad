@@ -340,6 +340,18 @@ async def test_availability_with_unused_quota_does_not_start_probe(monkeypatch, 
 
 
 @pytest.mark.asyncio
+async def test_policy_failure_is_reported_as_status_unavailable(monkeypatch):
+    from app.core.ai_runtime_guard import AIResourceRejectedError
+
+    async def unavailable(_db, _user_id):
+        raise AIResourceRejectedError("ai_user_policy_unavailable")
+
+    monkeypatch.setattr(analysis_availability, "_user_quota_exhausted", unavailable)
+    state = await analysis_availability.availability_for_user(object(), 7)
+    assert state["reason"] == "status_unavailable"
+
+
+@pytest.mark.asyncio
 async def test_runtime_guard_refuses_unverified_model_without_business_call(runtime):
     await finish(runtime, success=False, status="auth_error")
     with pytest.raises(analysis_availability.AnalysisUnavailableError):

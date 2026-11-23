@@ -40,6 +40,47 @@ async def test_unavailable_atomic_ledger_rejects_admission(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_policy_unavailable_rejects_admission(monkeypatch):
+    from app.core.ai_runtime_guard import AIResourceRejectedError
+    from app.services.user_ai_policy_service import UserAIPolicyUnavailableError
+
+    async def unavailable_policy(_db, _user_id):
+        raise UserAIPolicyUnavailableError("policy unavailable")
+
+    monkeypatch.setattr(
+        budget, "get_effective_user_ai_policy", unavailable_policy
+    )
+    with pytest.raises(AIResourceRejectedError) as exc:
+        await service.reserve_token_budget(object(), 41, 600)
+    assert exc.value.reason == "ai_user_policy_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_unlimited_policy_bypasses_token_limits_but_keeps_reservation_contract(
+    monkeypatch,
+):
+    policy = type(
+        "Policy",
+        (),
+        {
+            "daily_token_limit": -1,
+            "monthly_token_limit": -1,
+            "rpm_limit": -1,
+        },
+    )()
+
+    async def effective_policy(_db, _user_id):
+        return policy
+
+    monkeypatch.setattr(budget, "get_effective_user_ai_policy", effective_policy)
+    reservation = await service.reserve_token_budget(object(), 41, 600)
+    assert reservation is not None
+    assert reservation.reserved_tokens == 0
+    assert reservation.rpm_limit == -1
+    assert reservation.policy is policy
+
+
+@pytest.mark.asyncio
 async def test_only_one_concurrent_request_can_reserve_last_tokens(tmp_path):
     engine = create_async_engine(
         f"sqlite+aiosqlite:///{tmp_path / 'token-reservation.db'}"
@@ -139,6 +180,29 @@ async def test_chat_refunds_only_a_known_unconfigured_provider(provider_failed):
         assert await service._call_ai_reserved([], None, reservation) is None
         assert client._local_get(reservation.day_key) == (600 if provider_failed else 0)
         assert reservation.active is provider_failed
+
+
+@pytest.mark.asyncio
+async def test_pretransport_guard_rejection_refunds_the_full_hold():
+    from app.core.ai_runtime_guard import AIResourceRejectedError
+
+    client = CacheClient()
+    client._enabled = False
+
+    async def rejected(*_args, **_kwargs):
+        raise AIResourceRejectedError("ai_rate_limited", retry_after_sec=3)
+
+    with patch.object(budget, "cache", client), patch.object(
+        budget.settings, "AI_DAILY_TOKEN_LIMIT", 1000
+    ), patch.object(budget.settings, "AI_MONTHLY_TOKEN_LIMIT", 5000), patch.object(
+        budget, "_load_token_usage", AsyncMock(return_value=(0, 0))
+    ), patch.object(service, "_call_ai", rejected):
+        reservation = await service.reserve_token_budget(None, 41, 600)
+        assert reservation is not None
+        assert await service._call_ai_reserved([], None, reservation) is None
+
+    assert client._local_get(reservation.day_key) == 0
+    assert reservation.active is False
 
 
 @pytest.mark.asyncio

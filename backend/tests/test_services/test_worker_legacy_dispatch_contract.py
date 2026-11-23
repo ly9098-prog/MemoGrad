@@ -246,6 +246,45 @@ async def test_resume_and_admin_checkpoint_order(harness, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_admin_resume_preserves_created_by(harness, monkeypatch):
+    from app.core import database
+    from app.features import pipeline_coordinator_entry, pipeline_orchestrator
+
+    captured = []
+
+    @asynccontextmanager
+    async def session():
+        yield object()
+
+    async def checkpoint(_pipeline_id):
+        return {"stage": "ocr"}
+
+    async def run_pipeline(**kwargs):
+        captured.append(kwargs)
+        return {"status": "done"}
+
+    async def store(*_args):
+        return None
+
+    monkeypatch.setattr(database, "async_session", session)
+    monkeypatch.setattr(pipeline_orchestrator, "_get_stage_checkpoint", checkpoint)
+    monkeypatch.setattr(pipeline_orchestrator, "_set_pipeline_store", store)
+    monkeypatch.setattr(pipeline_coordinator_entry, "run_pipeline", run_pipeline)
+
+    await worker._process_task(
+        harness.task(
+            worker.TASK_TYPE_ADMIN_RESUME,
+            pipeline_id="admin-owner",
+            staging_object_id="source",
+            source_type="pdf",
+            created_by="admin:17",
+        )
+    )
+
+    assert captured[0]["created_by"] == "admin:17"
+
+
+@pytest.mark.asyncio
 async def test_admin_resume_reads_payload_before_checkpoint_and_session(
     harness, monkeypatch
 ):
@@ -467,10 +506,12 @@ async def test_batch_image_preserves_original_sequence_and_cleanup(
         subject_id=2,
         options={"x": 1},
         concurrency=3,
+        created_by="admin:1",
     )
     await worker._process_task(task)
 
     assert [source.kwargs["seq"] for source in captured[0]["sources"]] == [2, 3]
+    assert captured[0]["created_by"] == "admin:1"
     assert [source.kwargs["temp_path"] for source in captured[0]["sources"]] == [
         "/work/one",
         "/work/two",

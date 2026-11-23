@@ -66,6 +66,7 @@ def prepare_pass_data(state: SinglePassState, *, ports: Callable[[str], Any]) ->
         "import_mode": state.request.shared["import_mode"],
         "strategy": state.request.shared["strategy"],
         "watermark_patterns": state.request.shared["watermark_patterns"],
+        "admin_quota_admin_id": state.request.shared.get("admin_quota_admin_id"),
         "page_images": state.request.page_images,
         "page_image_refs": state.request.page_image_refs,
         "pre_extracted_blocks": state.request.pre_extracted_blocks,

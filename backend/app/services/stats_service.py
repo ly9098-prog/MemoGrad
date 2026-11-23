@@ -401,9 +401,14 @@ async def get_ai_diagnosis(db: AsyncSession, user_id: int) -> dict:
     )
     try:
         ai_resp = await stats_ai_billing.call_metered_stats_ai(
-            db, user_id, diagnosis_messages,
-            lambda: _call_ai_diagnosis_provider(db, runtime, diagnosis_messages),
-            max_tokens=_AI_DIAGNOSIS_MAX_TOKENS, session_type="stats_ai_diagnosis",
+            db,
+            user_id,
+            diagnosis_messages,
+            lambda rate_limit: _call_ai_diagnosis_provider(
+                db, runtime, diagnosis_messages, rate_limit=rate_limit
+            ),
+            max_tokens=_AI_DIAGNOSIS_MAX_TOKENS,
+            session_type="stats_ai_diagnosis",
         )
         if ai_resp is None:
             return local()
@@ -456,6 +461,8 @@ async def _call_ai_diagnosis_provider(
     db: AsyncSession,
     runtime,
     messages: list[dict],
+    *,
+    rate_limit: int | None = None,
 ):
     from app.ai.client import llm
 
@@ -472,6 +479,7 @@ async def _call_ai_diagnosis_provider(
         max_tokens=_AI_DIAGNOSIS_MAX_TOKENS,
         response_format={"type": "json_object"},
         prefer_direct_answer=True,
+        rate_limit=rate_limit,
     )
 
 
@@ -528,9 +536,17 @@ async def get_dashboard_llm_analysis(
 
     try:
         ai_resp = await stats_ai_billing.call_metered_stats_ai(
-            db, user_id, prompt_messages,
-            lambda: _call_dashboard_ai(db, chat_with_db_model, prompt_messages),
-            max_tokens=_DASHBOARD_AI_MAX_TOKENS, session_type="stats_dashboard_analysis",
+            db,
+            user_id,
+            prompt_messages,
+            lambda rate_limit: _call_dashboard_ai(
+                db,
+                chat_with_db_model,
+                prompt_messages,
+                rate_limit=rate_limit,
+            ),
+            max_tokens=_DASHBOARD_AI_MAX_TOKENS,
+            session_type="stats_dashboard_analysis",
         )
         if ai_resp is None:
             return _rule_based_dashboard_analysis(data_payload, trend_days)
@@ -561,7 +577,11 @@ async def _load_dashboard_ai_payload(
 
 
 async def _call_dashboard_ai(
-    db: AsyncSession, chat_with_db_model, prompt_messages: list[dict]
+    db: AsyncSession,
+    chat_with_db_model,
+    prompt_messages: list[dict],
+    *,
+    rate_limit: int | None = None,
 ):
     # Resolve and invoke only once so the selected model cannot change between
     # configuration resolution and the actual provider call.
@@ -574,6 +594,7 @@ async def _call_dashboard_ai(
         max_tokens=_DASHBOARD_AI_MAX_TOKENS,
         response_format={"type": "json_object"},
         prefer_direct_answer=True,
+        rate_limit=rate_limit,
     )
 
 

@@ -382,6 +382,40 @@ export type AppUserDetail = AppUser & {
   login_identities?: AdminUserIdentitySummary[];
 };
 
+export type UserAIPolicyValues = {
+  regeneration_cooldown_seconds: number;
+  regeneration_question_24h_limit: number;
+  regeneration_account_24h_limit: number;
+  daily_token_limit: number;
+  monthly_token_limit: number;
+  rpm_limit: number;
+};
+
+export type UserAIPolicySources = {
+  [Key in keyof UserAIPolicyValues]: "default" | "user";
+};
+
+export type UserAIPolicyDefault = {
+  scope: "default";
+  version: number;
+  values: UserAIPolicyValues;
+  updated_by?: number | null;
+  updated_at?: string | null;
+};
+
+export type UserAIPolicyDetail = {
+  scope: "user";
+  user_id: number;
+  version: number;
+  defaults: UserAIPolicyValues;
+  overrides: Partial<Record<keyof UserAIPolicyValues, number | null>>;
+  effective: UserAIPolicyValues;
+  sources: UserAIPolicySources;
+  unlimited: boolean;
+  updated_by?: number | null;
+  updated_at?: string | null;
+};
+
 export type QuestionEditRequest = {
   subject_id?: number | null;
   question_type?: string;

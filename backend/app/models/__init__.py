@@ -91,6 +91,10 @@ from app.models.syllabus import (  # noqa: F401
 from app.models.tag import Tag  # noqa: F401
 from app.models.task_outbox import TaskOutbox  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.user_ai_policy import (  # noqa: F401
+    UserAIPolicyDefault,
+    UserAIPolicyOverride,
+)
 from app.models.user_auth import (  # noqa: F401
     UserAuthIdentity,
     UserConsentAcceptance,

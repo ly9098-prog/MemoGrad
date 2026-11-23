@@ -32,6 +32,7 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
     subject_id = state.payload.get("subject_id")
     options = state.payload.get("options", {})
     concurrency = state.payload.get("concurrency", 2)
+    created_by = state.payload.get("created_by")
     if state.fence_record_id:
         await state.namespace["_verify_fencing_or_cancel"](
             state.task, state.fence_record_id, state.task_type
@@ -65,5 +66,6 @@ async def run_batch_image_handler(state: WorkerTaskState) -> None:
         subject_id=subject_id,
         options=options,
         concurrency=concurrency,
+        created_by=created_by,
         execution_fence=(state.task.task_id, state.task.owner_token, state.task.generation),
     )

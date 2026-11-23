@@ -37,12 +37,11 @@ async def get_or_create_ai_settings(db: AsyncSession) -> AdminAISettings:
     settings = result.scalar_one_or_none()
     if settings:
         return settings
-    settings = AdminAISettings(
-        ai_parse_enabled=True, monthly_call_limit=DEFAULT_MONTHLY_CALL_LIMIT
+    await _insert_singleton_ai_settings(db)
+    result = await db.execute(
+        select(AdminAISettings).order_by(AdminAISettings.id.asc()).limit(1)
     )
-    db.add(settings)
-    await db.flush()
-    return settings
+    return result.scalar_one()
 
 
 async def get_or_create_monthly_usage(
@@ -52,12 +51,40 @@ async def get_or_create_monthly_usage(
     usage = await db.get(AdminAIUsageMonthly, month)
     if usage:
         return usage
-    usage = AdminAIUsageMonthly(
-        year_month=month, call_count=0, limit_snapshot=limit_snapshot
+    insert = _dialect_insert(db)
+    await db.execute(
+        insert(AdminAIUsageMonthly)
+        .values(
+            year_month=month,
+            call_count=0,
+            limit_snapshot=limit_snapshot,
+            updated_at=utcnow(),
+        )
+        .on_conflict_do_nothing(index_elements=["year_month"])
     )
-    db.add(usage)
-    await db.flush()
-    return usage
+    return await db.get(AdminAIUsageMonthly, month)
+
+
+async def _insert_singleton_ai_settings(db: AsyncSession) -> None:
+    insert = _dialect_insert(db)
+    await db.execute(
+        insert(AdminAISettings)
+        .values(
+            id=1,
+            ai_parse_enabled=True,
+            monthly_call_limit=DEFAULT_MONTHLY_CALL_LIMIT,
+            updated_at=utcnow(),
+        )
+        .on_conflict_do_nothing(index_elements=["id"])
+    )
+
+
+def _dialect_insert(db: AsyncSession):
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+    else:
+        from sqlalchemy.dialects.postgresql import insert
+    return insert
 
 
 async def _get_ai_settings_snapshot(db: AsyncSession) -> AdminAISettings | None:
@@ -93,9 +120,9 @@ def build_ai_settings_response(
 
 
 async def get_ai_settings(db: AsyncSession) -> AdminAISettingsResponse:
-    settings = await get_or_create_ai_settings(db)
-    usage = await get_or_create_monthly_usage(
-        db, limit_snapshot=settings.monthly_call_limit
+    settings = await _get_ai_settings_snapshot(db) or _transient_ai_settings()
+    usage = await _get_ai_usage_snapshot(db, current_year_month()) or _transient_usage(
+        settings.monthly_call_limit
     )
     return build_ai_settings_response(settings, usage)
 
@@ -156,11 +183,31 @@ async def update_ai_settings(
 async def get_ai_usage(
     db: AsyncSession, year_month: str | None = None
 ) -> AdminAIUsageMonthlyResponse:
-    settings = await get_or_create_ai_settings(db)
-    usage = await get_or_create_monthly_usage(
-        db, year_month=year_month, limit_snapshot=settings.monthly_call_limit
+    settings = await _get_ai_settings_snapshot(db) or _transient_ai_settings()
+    month = year_month or current_year_month()
+    usage = await _get_ai_usage_snapshot(db, month) or _transient_usage(
+        settings.monthly_call_limit, month
     )
     return AdminAIUsageMonthlyResponse.model_validate(usage)
+
+
+def _transient_ai_settings() -> AdminAISettings:
+    row = AdminAISettings(
+        ai_parse_enabled=True,
+        monthly_call_limit=DEFAULT_MONTHLY_CALL_LIMIT,
+    )
+    row.id = 0
+    return row
+
+
+def _transient_usage(
+    limit: int, year_month: str | None = None
+) -> AdminAIUsageMonthly:
+    return AdminAIUsageMonthly(
+        year_month=year_month or current_year_month(),
+        call_count=0,
+        limit_snapshot=limit,
+    )
 
 
 async def is_super_admin(db: AsyncSession, operator: AdminPrincipal) -> bool:

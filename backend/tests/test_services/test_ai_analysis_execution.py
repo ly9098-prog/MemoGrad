@@ -378,3 +378,101 @@ async def test_expired_regeneration_admission_lease_cannot_commit_a_paid_attempt
         wrong_question=SimpleNamespace(id=44, question_id=4, ai_analysis=None))
     assert result["error_code"] == "ai_regeneration_unavailable"
     client.release_lock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unlimited_regeneration_ledger_is_bounded_and_restores_finite_limits(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.core.config import settings
+    from app.services.ai import analysis_regeneration as module
+    from app.services.user_ai_policy_service import EffectiveUserAIPolicy
+
+    client = CacheClient()
+    client._enabled = False
+    clock = [100_000.0]
+    monkeypatch.setattr(module, "time", lambda: clock[0])
+    unlimited = EffectiveUserAIPolicy(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=-1,
+        regeneration_account_24h_limit=-1,
+        daily_token_limit=-1,
+        monthly_token_limit=-1,
+        rpm_limit=-1,
+    )
+    finite = EffectiveUserAIPolicy(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=1,
+        regeneration_account_24h_limit=3,
+        daily_token_limit=-1,
+        monthly_token_limit=-1,
+        rpm_limit=-1,
+    )
+
+    active = {"policy": unlimited}
+
+    async def policy_for(_db, _user_id):
+        return active["policy"]
+
+    monkeypatch.setattr(module, "get_effective_user_ai_policy", policy_for)
+    wrong_question = SimpleNamespace(id=44, question_id=4, ai_analysis=None)
+    for _ in range(1_005):
+        clock[0] += 1
+        assert (
+            await module.admit_regeneration(
+                cache=client,
+                db=object(),
+                user_id=51,
+                wrong_question=wrong_question,
+            )
+            is None
+        )
+
+    ledger_key = (
+        f"memograd:{settings.APP_ENV}:ai:regeneration:user:51:rolling-day"
+    )
+    assert len(await client.get_strict(ledger_key)) == 1_000
+
+    active["policy"] = finite
+    result = await module.admit_regeneration(
+        cache=client,
+        db=object(),
+        user_id=51,
+        wrong_question=wrong_question,
+    )
+    assert result["error_code"] == "ai_regeneration_limited"
+    assert result["limit_dimension"] == "account"
+    assert result["limit_value"] == 3
+    assert result["retry_after_seconds"] > 0
+
+
+@pytest.mark.asyncio
+async def test_regeneration_admission_uses_unlimited_user_policy(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core.cache import CacheClient
+    from app.services.ai import analysis_regeneration as module
+
+    policy = SimpleNamespace(
+        regeneration_cooldown_seconds=-1,
+        regeneration_question_24h_limit=-1,
+        regeneration_account_24h_limit=-1,
+    )
+
+    async def effective_policy(_db, _user_id):
+        return policy
+
+    monkeypatch.setattr(module, "get_effective_user_ai_policy", effective_policy)
+    client = CacheClient()
+    client._enabled = False
+    wrong = SimpleNamespace(id=44, question_id=4, ai_analysis=None)
+    for _ in range(8):
+        assert (
+            await module.admit_regeneration(
+                cache=client, db=object(), user_id=51, wrong_question=wrong
+            )
+            is None
+        )

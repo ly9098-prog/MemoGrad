@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai import fallback
 from app.ai.prompts import build_generate_questions
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.core.config import settings
 from app.models.ai_chat import AiChat
 from app.services.ai_learning_service import (
+    cancel_token_reservation,
     estimate_chat_token_reservation,
     reserve_token_budget,
     settle_token_reservation,
@@ -85,13 +87,23 @@ async def generate_drafts(
     if reservation is None:
         raise ValueError("今日 AI 调用额度已用尽")
 
-    resp, raw, _ = await _call_or_fallback(
-        messages, fallback.get_fallback_generation(count), db
-    )
+    try:
+        resp, raw, _ = await _call_or_fallback(
+            messages,
+            fallback.get_fallback_generation(count),
+            db,
+            user_rpm_limit=reservation.rpm_limit,
+            return_dispatch_state=True,
+        )
+    except AIResourceRejectedError:
+        await cancel_token_reservation(reservation)
+        raise
 
     if raw is None:
         # This helper also returns fallback after uncertain remote failures.
         # Do not treat an absent raw response as proof of zero provider cost.
+        if resp.get("provider_dispatched") is False:
+            await cancel_token_reservation(reservation)
         db.add(
             _build_log(
                 user_id=user_id,

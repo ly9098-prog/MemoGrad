@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Download,
   Eye,
+  Gauge,
   ListFilter,
   Monitor,
   RefreshCw,
@@ -43,6 +44,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Textarea } from "@/components/ui/textarea";
 import { WechatMark } from "@/components/icons/wechat-mark";
 import { apiRequest, toQuery } from "@/lib/api/client";
+import { useAuthStore } from "@/lib/auth/auth-store";
 import type { AppUser, AppUserDetail, PaginatedResponse } from "@/lib/api/types";
 import {
   chinaDateString,
@@ -67,6 +69,10 @@ import {
   type UserAction,
   type UserStatusFilter,
 } from "@/lib/app-user-utils";
+import {
+  UserAIPolicyDialog,
+  type UserAIPolicyTarget,
+} from "./components/user-ai-policy-dialog";
 
 type ConfirmState = {
   action: UserAction;
@@ -235,6 +241,8 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 
 export default function AppUsersPage() {
   const queryClient = useQueryClient();
+  const role = useAuthStore((state) => state.role);
+  const permissions = useAuthStore((state) => state.permissions);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -251,6 +259,11 @@ export default function AppUsersPage() {
   const [detailState, setDetailState] = useState<DetailState>(null);
   const [exporting, setExporting] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [policyTarget, setPolicyTarget] = useState<UserAIPolicyTarget | null>(null);
+  const canManageAIPolicy =
+    role?.name === "super_admin" &&
+    permissions.includes("ai_setting:read") &&
+    permissions.includes("ai_setting:write");
 
   const today = chinaDateString();
   const isBanned = statusToQueryValue(status);
@@ -615,6 +628,16 @@ export default function AppUsersPage() {
         }
         actions={
           <>
+            {canManageAIPolicy ? (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setPolicyTarget({ scope: "default" })}
+              >
+                <Gauge className="h-4 w-4" />
+                AI 默认额度
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
               size="md"
@@ -1393,11 +1416,43 @@ export default function AppUsersPage() {
                     ) : null}
                   </section>
                 </div>
+
+                {canManageAIPolicy ? (
+                  <section className="mt-6 rounded-xl border border-primary/15 bg-primary/5 px-4 py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-xs font-semibold text-foreground">AI 额度</h3>
+                        <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                          管理该用户的重新生成、Token 与通用频率额度；支持恢复默认或显式设为不限。
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() =>
+                          setPolicyTarget({ scope: "user", user: detailUser })
+                        }
+                      >
+                        <Gauge className="h-3.5 w-3.5" />
+                        管理 AI 额度
+                      </Button>
+                    </div>
+                  </section>
+                ) : null}
               </div>
             </>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <UserAIPolicyDialog
+        target={policyTarget}
+        open={policyTarget !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPolicyTarget(null);
+        }}
+      />
     </ManagementPage>
   );
 }

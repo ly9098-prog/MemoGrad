@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.client import llm
+from app.core.ai_runtime_guard import AIResourceRejectedError
 from app.features.question_normalizer import run_ocr_quality_gate
 from app.features.question_type import CANONICAL_TYPES
 from app.features.question_type import (
@@ -1320,6 +1321,9 @@ async def _call_or_fallback(
     api_key: str | None = None,
     base_url: str | None = None,
     model_name: str | None = None,
+    admin_id: int | None = None,
+    user_rpm_limit: int | None = None,
+    return_dispatch_state: bool = False,
 ) -> tuple[dict, str | None, dict | None]:
     provider: str | None = None
     if api_key is None and db is not None:
@@ -1333,43 +1337,65 @@ async def _call_or_fallback(
             provider = runtime.provider
 
     if not api_key:
-        return (
-            {
-                "content": "",
-                "tokens_used": 0,
-                "model": "fallback",
-                "duration_ms": 0,
-                "fallback_value": fallback_value,
-                "error": "AI模型API Key未配置",
-            },
-            None,
-            None,
-        )
+        fallback = {
+            "content": "",
+            "tokens_used": 0,
+            "model": "fallback",
+            "duration_ms": 0,
+            "fallback_value": fallback_value,
+            "error": "AI模型API Key未配置",
+        }
+        if return_dispatch_state:
+            fallback["provider_dispatched"] = False
+        return (fallback, None, None)
     try:
+        from app.ai.gateway import resolve_user_rpm_limit
+
+        rate_limit = (
+            user_rpm_limit
+            if user_rpm_limit is not None
+            else await resolve_user_rpm_limit(db)
+            if db is not None
+            else None
+        )
+        quota_arguments = (
+            {
+                "admin_quota_scope": "admin_import_ai",
+                "admin_quota_admin_id": admin_id,
+            }
+            if admin_id is not None
+            else {}
+        )
         resp = await llm.chat(
             messages,
             model=model_name,
             api_key=api_key,
             base_url=base_url,
             provider=provider,
+            rate_limit=rate_limit,
+            **quota_arguments,
         )
         return (resp, resp["content"], resp)
+    except AIResourceRejectedError:
+        raise
     except (OSError, ValueError, RuntimeError, TimeoutError) as e:
         # 网络/超时/URL 校验类故障 → 降级（UnsafeRemoteURLError 是 ValueError）。
         # 只捕这几类：KeyError/TypeError 等编程错误让调用方暴露，避免被伪装成
         # AI 降级静默吞掉。
-        return (
-            {
-                "content": "",
-                "tokens_used": 0,
-                "model": "fallback",
-                "duration_ms": 0,
-                "fallback_value": fallback_value,
-                "error": str(e),
-            },
-            None,
-            None,
-        )
+        fallback = {
+            "content": "",
+            "tokens_used": 0,
+            "model": "fallback",
+            "duration_ms": 0,
+            "fallback_value": fallback_value,
+            "error": str(e),
+        }
+        if return_dispatch_state:
+            # Runtime validation and ordinary request exceptions may occur
+            # before or after transport. Keep the hold unless the caller has
+            # explicit proof that the provider was never called.
+            fallback["provider_dispatched"] = None
+        return (fallback, None, None)
 
 
 async def list_logs(
