@@ -5,6 +5,7 @@ import { DashboardTrendChart } from "./components/dashboard-trend-chart";
 import { renderDashboardWorkbench } from "./components/dashboard-workbench";
 import { BodyPortal } from "@/components/ui/body-portal";
 import { ManagementPanel } from "@/components/admin/management-ui";
+import { LearnerComingSoon } from "@/components/learner/coming-soon";
 
 type Query = {
   queryKey: unknown[]; queryFn: () => Promise<unknown>;
@@ -15,6 +16,7 @@ const h = vi.hoisted(() => ({
   states: [] as unknown[], index: 0, setters: [] as ReturnType<typeof vi.fn>[],
   queries: [] as Query[], refetches: [] as ReturnType<typeof vi.fn>[],
   authenticated: true, bootstrapping: false,
+  accessMode: "admin" as "admin" | "user" | null,
   roleName: "admin",
   permissions: ["dashboard:read", "system:read"] as string[],
   request: vi.fn(), toQuery: vi.fn((query: Record<string, unknown>) => {
@@ -45,6 +47,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: unknown) => unknown) => select({
     isAuthenticated: h.authenticated, isBootstrapping: h.bootstrapping,
+    accessMode: h.accessMode,
     permissions: h.permissions,
     role: { name: h.roleName },
   }),
@@ -65,6 +68,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-29T18:00:00Z"));
   h.states = []; h.index = 0; h.setters = []; h.queries = []; h.refetches = [];
   h.authenticated = true; h.bootstrapping = false;
+  h.accessMode = "admin";
   h.roleName = "admin";
   h.permissions = ["dashboard:read", "system:read"];
   h.request.mockReset().mockResolvedValue({});
@@ -76,6 +80,18 @@ afterEach(() => {
 });
 
 describe("dashboard page request ownership", () => {
+  it("reserves the ordinary-user home without any Admin requests even with stale Admin permissions", () => {
+    h.accessMode = "user";
+    h.roleName = "super_admin";
+    h.permissions.push("ai_setting:read");
+    const tree = DashboardPage();
+    expect(tree.type).toBe(LearnerComingSoon);
+    expect(tree.props.title).toBe("工作台");
+    expect(h.queries).toHaveLength(8);
+    expect(h.queries.every((query) => query.enabled === false)).toBe(true);
+    expect(h.request).not.toHaveBeenCalled();
+  });
+
   it.each([
     { authenticated: false, bootstrapping: false },
     { authenticated: true, bootstrapping: true },

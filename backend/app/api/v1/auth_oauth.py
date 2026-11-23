@@ -77,11 +77,15 @@ def _with_verified_flag(target: str) -> str:
     return urlunsplit(("", "", parts.path, urlencode(query), parts.fragment))
 
 
-def _redirect_error(code: str) -> RedirectResponse:
-    return RedirectResponse(
-        f"{settings.USER_WEB_BASE_URL}/account/login?auth_error={quote(code)}",
-        status_code=303,
-    )
+def _redirect_error(code: str, mode: str | None = None) -> RedirectResponse:
+    if mode in {"link", "step_up"}:
+        key = "binding_error" if mode == "link" else "verification_error"
+        target = f"/account/settings?{key}={quote(code)}"
+    else:
+        target = f"/account/login?auth_error={quote(code)}"
+    response = RedirectResponse(f"{settings.USER_WEB_BASE_URL}{target}", status_code=303)
+    response.delete_cookie(_STATE_COOKIE, path="/api/v1/auth/github")
+    return response
 
 
 @router.post("/auth/github/start", response_model=GithubStartResponse)
@@ -177,21 +181,23 @@ async def github_callback(
         state, request.cookies.get(_STATE_COOKIE, "")
     ):
         return _redirect_error("github_failed")
-    if not code:
-        return _redirect_error("github_cancelled")
+    mode = None
     try:
         context = await github_oauth_service.consume_oauth_state(state)
+        mode = context.get("mode")
+        if not code:
+            return _redirect_error("github_cancelled", mode)
         data = await github_oauth_service.exchange_github_code(
             code, code_verifier=str(context["code_verifier"])
         )
     except github_oauth_service.GithubOAuthError:
-        return _redirect_error("github_failed")
+        return _redirect_error("github_failed", mode)
     try:
         user, identity = await github_identity_service.resolve_github_identity(
             db, context, data
         )
     except github_identity_service.GithubIdentityError as exc:
-        return _redirect_error(str(exc))
+        return _redirect_error(str(exc), mode)
     step_up = context.get("mode") == "step_up"
     target = _safe_return_to(str(context.get("return_to") or "/"))
     if step_up:

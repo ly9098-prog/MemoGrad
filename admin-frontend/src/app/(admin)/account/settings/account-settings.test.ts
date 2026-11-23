@@ -31,12 +31,14 @@ beforeEach(() => {
 });
 
 describe("Web identity management", () => {
-  it("keeps email and GitHub actions without offering the retired WeChat flow", () => {
+  it("offers email and GitHub binding and an inert WeChat placeholder", () => {
     const markup = renderToStaticMarkup(createElement(AccountSettingsPage));
 
     expect(markup).toContain("绑定邮箱");
     expect(markup).toContain("绑定 GitHub");
-    expect(markup).not.toMatch(/绑定微信|小程序码|绑定码|小程序确认/);
+    expect(markup).toContain("绑定微信账号");
+    expect(markup).toContain("敬请期待");
+    expect(markup).not.toMatch(/绑定码|小程序确认/);
   });
 
   it("still displays an existing WeChat identity without a new binding action", () => {

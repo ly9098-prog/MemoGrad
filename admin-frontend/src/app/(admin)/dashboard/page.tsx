@@ -17,17 +17,19 @@ import { hasPermission } from "@/lib/permissions/permissions";
 import { chinaDateString } from "@/lib/time";
 import { ManagementPage, ManagementPanel } from "@/components/admin/management-ui";
 import { renderDashboardWorkbench } from "./components/dashboard-workbench";
+import { LearnerComingSoon } from "@/components/learner/coming-soon";
 
 type Period = "7d" | "30d";
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
+  const accessMode = useAuthStore((state) => state.accessMode);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping);
   const permissions = useAuthStore((state) => state.permissions);
   const roleName = useAuthStore((state) => state.role?.name);
   const canReadDashboard = hasPermission(permissions, "dashboard:read");
-  const canRequestDashboard = isAuthenticated && !isBootstrapping && canReadDashboard;
+  const canRequestDashboard = accessMode === "admin" && isAuthenticated && !isBootstrapping && canReadDashboard;
   const canReadSystem = hasPermission(permissions, "system:read");
   const canReadAiSettings = roleName === "super_admin" && hasPermission(permissions, "ai_setting:read");
   const [period, setPeriod] = useState<Period>("7d");
@@ -109,6 +111,7 @@ export default function DashboardPage() {
   const importsHint = canReadImports ? "进入导入审核" : "无权限查看";
   const auditHint = canReadAudit ? "查看审计日志" : "无权限查看";
   const refreshAll = async (nextTime: number) => {
+    if (!canRequestDashboard) return;
     const nextDate = chinaDateString(0, nextTime);
     const dateChanged = nextDate !== dateLabel;
     const nextDailyRange = { from: chinaDateString(-(period === "7d" ? 6 : 29), nextTime), to: nextDate };
@@ -142,6 +145,10 @@ export default function DashboardPage() {
       setManualRefreshing(false);
     }
   };
+
+  if (accessMode === "user") {
+    return <LearnerComingSoon title="工作台" />;
+  }
 
   if (isAuthenticated && !isBootstrapping && !canReadDashboard) {
     return (

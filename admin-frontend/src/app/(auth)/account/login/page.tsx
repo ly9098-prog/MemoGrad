@@ -124,6 +124,9 @@ export default function LearnerLoginPage() {
     if (params.has("identity_unlinked")) {
       showToast("登录身份已解绑，请重新登录。", "info");
     }
+    if (params.has("email_changed")) {
+      showToast("邮箱已更换，请使用新的登录方式重新登录。", "info");
+    }
   }, [showToast]);
 
   useEffect(() => {

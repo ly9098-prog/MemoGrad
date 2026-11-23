@@ -60,6 +60,11 @@ export default function AccountSettingsPage() {
   const [stepUpToken, setStepUpToken] = useState("");
   const [stepUpProvider, setStepUpProvider] = useState<"email" | "github" | null>(null);
   const [pendingUnlink, setPendingUnlink] = useState<UserIdentity | null>(null);
+  const callbackFlight = useRef<Promise<LearnerAuthResponse> | null>(null);
+  const verificationFlight = useRef<Promise<{ step_up_token: string }> | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const bindCodeRef = useRef<HTMLInputElement>(null);
+  const [resendSeconds, setResendSeconds] = useState(0);
   const stepUpInputRef = useRef<HTMLInputElement>(null);
 
   const [emailBindOpen, setEmailBindOpen] = useState(false);
@@ -73,26 +78,74 @@ export default function AccountSettingsPage() {
 
   useEffect(() => {
     const url = new URL(window.location.href);
+    if (url.searchParams.get("bind") === "email") {
+      setEmailBindOpen(true);
+      url.searchParams.delete("bind");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    }
+    const callbackError = url.searchParams.get("binding_error") || url.searchParams.get("verification_error");
+    if (callbackError) {
+      setError(callbackError === "github_cancelled" ? "已取消 GitHub 授权，可重新发起绑定或验证" : callbackError === "identity_already_exists" ? "GitHub 绑定冲突，请确认当前账号和 GitHub 均未绑定其他身份" : "GitHub 操作未完成，请重试；若登录状态失效，请重新登录");
+      window.history.replaceState(null, "", "/account/settings");
+      return;
+    }
     if (url.searchParams.get("verified") !== "github" || !accessToken) return;
     let active = true;
-    void apiRequest<{ step_up_token: string }>(
+    verificationFlight.current ??= apiRequest<{ step_up_token: string }>(
       "/users/me/identities/github/step-up/result",
       {
         method: "POST",
         scope: "user",
         skipRefresh: true,
+        exposeErrorDetail: true,
       },
-    ).then((response) => {
+    );
+    void verificationFlight.current.then((response) => {
       if (!active) return;
       setStepUpToken(response.step_up_token);
       setStepUpProvider("github");
       setMessage("GitHub 安全验证已通过。");
       window.history.replaceState(null, "", "/account/settings");
     }).catch((reason: unknown) => {
-      if (active) setError(errorMessage(reason));
+      if (active) {
+        window.history.replaceState(null, "", "/account/settings");
+        setError(errorMessage(reason));
+      }
     });
     return () => { active = false; };
   }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken || new URL(window.location.href).searchParams.get("linked") !== "github") return;
+    callbackFlight.current ??= apiRequest<LearnerAuthResponse>("/auth/web/refresh", {
+      method: "POST", scope: "user", skipRefresh: true,
+    });
+    let active = true;
+    void callbackFlight.current.then((response) => {
+      if (!active) return;
+      window.history.replaceState(null, "", "/account/settings");
+      acceptLearnerLogin(response);
+      setMessage("GitHub 已绑定到当前账号。");
+    }).catch((reason: unknown) => {
+      if (active) {
+        window.history.replaceState(null, "", "/account/settings");
+        setError(errorMessage(reason));
+      }
+    });
+    return () => { active = false; };
+  }, [accessToken, acceptLearnerLogin]);
+
+  useEffect(() => {
+    if (!emailBindOpen) return;
+    if (emailChallenge) bindCodeRef.current?.focus();
+    else emailInputRef.current?.focus();
+  }, [emailBindOpen, emailChallenge]);
+
+  useEffect(() => {
+    if (!resendSeconds) return;
+    const timer = window.setTimeout(() => setResendSeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   useEffect(() => {
     if (!stepUpToken) return;
@@ -126,7 +179,7 @@ export default function AccountSettingsPage() {
     try {
       const response = await apiRequest<LearnerOtpStartResponse>(
         "/users/me/identities/email/step-up/start",
-        { method: "POST", scope: "user", skipRefresh: true },
+        { method: "POST", scope: "user", exposeErrorDetail: true },
       );
       setStepUpChallenge(response.challenge_id);
       setStepUpCode("");
@@ -149,7 +202,7 @@ export default function AccountSettingsPage() {
         {
           method: "POST",
           scope: "user",
-          skipRefresh: true,
+          exposeErrorDetail: true,
           body: JSON.stringify({
             challenge_id: stepUpChallenge,
             code: stepUpCode,
@@ -160,7 +213,7 @@ export default function AccountSettingsPage() {
       setStepUpProvider("email");
       setStepUpChallenge("");
       setStepUpCode("");
-      setMessage("安全验证已通过，可以继续解绑身份。");
+      setMessage("安全验证已通过，可以继续更换邮箱或解绑身份。");
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -176,7 +229,7 @@ export default function AccountSettingsPage() {
       const returnTo = encodeURIComponent("/account/settings");
       const response = await apiRequest<GithubStartResponse>(
         `/users/me/identities/github/step-up/start?return_to=${returnTo}`,
-        { method: "POST", scope: "user", skipRefresh: true },
+        { method: "POST", scope: "user", exposeErrorDetail: true },
       );
       window.location.assign(response.authorization_url);
     } catch (reason) {
@@ -195,8 +248,8 @@ export default function AccountSettingsPage() {
         {
           method: "POST",
           scope: "user",
-          skipRefresh: true,
-          body: JSON.stringify({ return_to: "/account/settings" }),
+          exposeErrorDetail: true,
+          body: JSON.stringify({ return_to: "/account/settings?linked=github" }),
         },
       );
       window.location.assign(response.authorization_url);
@@ -206,22 +259,33 @@ export default function AccountSettingsPage() {
     }
   }
 
-  async function startEmailBind(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || !targetEmail.trim()) return;
+  async function startEmailBind(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (busy || resendSeconds > 0 || !targetEmail.trim()) return;
+    if (emailIdentity && !stepUpToken && !emailChallenge) {
+      setError("更换邮箱前，请先完成“敏感操作验证”");
+      return;
+    }
     resetFeedback();
     setBusy(true);
     try {
       const response = await apiRequest<LearnerOtpStartResponse>(
-        "/users/me/identities/email/bind/start",
+        `/users/me/identities/email/${emailIdentity ? "change" : "bind"}/start`,
         {
           method: "POST",
           scope: "user",
-          skipRefresh: true,
-          body: JSON.stringify({ email: targetEmail.trim() }),
+          // A consumed step-up proof must not be retried as a session failure.
+          skipRefresh: Boolean(emailIdentity),
+          exposeErrorDetail: true,
+          body: JSON.stringify({ email: targetEmail.trim(), ...(emailIdentity ? { step_up_token: stepUpToken || undefined, challenge_id: emailChallenge || undefined } : {}) }),
         },
       );
       setEmailChallenge(response.challenge_id);
+      setResendSeconds(response.resend_after);
+      if (emailIdentity) {
+        setStepUpToken("");
+        setStepUpProvider(null);
+      }
       setEmailCode("");
       setMessage("验证码已发送到要绑定的邮箱。");
     } catch (reason) {
@@ -238,11 +302,11 @@ export default function AccountSettingsPage() {
     setBusy(true);
     try {
       const response = await apiRequest<LearnerAuthResponse>(
-        "/users/me/identities/email/bind/verify",
+        `/users/me/identities/email/${emailIdentity ? "change" : "bind"}/verify`,
         {
           method: "POST",
           scope: "user",
-          skipRefresh: true,
+          exposeErrorDetail: true,
           body: JSON.stringify({
             challenge_id: emailChallenge,
             code: emailCode,
@@ -250,6 +314,11 @@ export default function AccountSettingsPage() {
           }),
         },
       );
+      if (emailIdentity) {
+        clear();
+        router.replace("/account/login?email_changed=1");
+        return;
+      }
       acceptLearnerLogin(response);
       setEmailBindOpen(false);
       setEmailChallenge("");
@@ -297,6 +366,7 @@ export default function AccountSettingsPage() {
         method: "DELETE",
         scope: "user",
         skipRefresh: true,
+        exposeErrorDetail: true,
         body: JSON.stringify({ step_up_token: proof }),
       });
       clear();
@@ -348,7 +418,7 @@ export default function AccountSettingsPage() {
         </div>
       </div>
 
-      {error || message ? (
+      {(!emailBindOpen && error) || message ? (
         <div
           role={error ? "alert" : "status"}
           className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
@@ -378,7 +448,7 @@ export default function AccountSettingsPage() {
 
           <div className="mt-4 divide-y divide-border">
             {user.identities.map((identity) => (
-              <article key={identity.id} className="flex flex-wrap items-center gap-3 py-4">
+              <article key={identity.id} className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-3 py-4 sm:flex sm:flex-wrap">
                 <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-secondary text-muted-foreground">
                   {identityIcon(identity.provider)}
                 </span>
@@ -390,6 +460,10 @@ export default function AccountSettingsPage() {
                     {identityDescription(identity, user.email)}
                   </p>
                 </div>
+                <div className="col-start-2 flex flex-wrap items-center gap-3 sm:ml-auto">
+                {identity.provider === "email" ? (
+                  <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => { resetFeedback(); setEmailBindOpen(true); }}>更换邮箱</Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
@@ -401,6 +475,7 @@ export default function AccountSettingsPage() {
                   <Unlink className="h-3.5 w-3.5" aria-hidden="true" />
                   解绑
                 </Button>
+                </div>
               </article>
             ))}
           </div>
@@ -421,12 +496,12 @@ export default function AccountSettingsPage() {
           <section className="admin-panel rounded-[18px] p-5">
             <h2 className="font-semibold text-foreground">敏感操作验证</h2>
             {!stepUpChallenge ? (
-              <div className="mt-3 space-y-2">
+              <div className="mt-4 flex flex-wrap gap-3">
                 {emailIdentity ? (
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-full justify-start"
+                    className="justify-start"
                     disabled={busy}
                     onClick={() => void startEmailStepUp()}
                   >
@@ -438,7 +513,7 @@ export default function AccountSettingsPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full justify-start"
+                    className="justify-start"
                     disabled={busy}
                     onClick={() => void startGithubStepUp()}
                   >
@@ -481,49 +556,54 @@ export default function AccountSettingsPage() {
 
           <section className="admin-panel rounded-[18px] p-5">
             <h2 className="font-semibold text-foreground">连接新方式</h2>
-            <div className="mt-3 space-y-2">
+            {!emailIdentity || !githubIdentity ? <div className="mt-4 flex flex-wrap gap-3">
               {!emailIdentity ? (
                 <Button
                   type="button"
                   variant="secondary"
-                  className="w-full justify-between"
+                  className="justify-start"
                   disabled={busy}
-                  onClick={() => setEmailBindOpen(true)}
+                  onClick={() => { resetFeedback(); setEmailBindOpen(true); }}
                 >
                   <span className="inline-flex items-center gap-2"><Mail className="h-4 w-4" />绑定邮箱</span>
-                  <span className="text-xs text-muted-foreground">开始</span>
                 </Button>
               ) : null}
               {!githubIdentity ? (
                 <Button
                   type="button"
                   variant="secondary"
-                  className="w-full justify-between"
+                  className="justify-start"
                   disabled={busy}
                   onClick={() => void startGithubLink()}
                 >
                   <span className="inline-flex items-center gap-2"><GithubMark className="h-4 w-4" />绑定 GitHub</span>
-                  <span className="text-xs text-muted-foreground">开始</span>
                 </Button>
               ) : null}
-            </div>
+            </div> : null}
+            {!user.identities.some((identity) => identity.provider === "wechat") ? (
+              <div className="mt-4 border-t border-border pt-4">
+                <h3 className="flex items-center gap-2 text-sm font-medium"><MessageCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />绑定微信账号</h3>
+                <p className="mt-2 text-sm text-muted-foreground">敬请期待</p>
+              </div>
+            ) : null}
           </section>
         </aside>
       </div>
 
       {emailBindOpen ? (
-        <section className="admin-panel rounded-[18px] p-5">
+        <section className="admin-panel scroll-mt-6 rounded-[16px] p-5" aria-label="邮箱绑定设置">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-foreground">绑定邮箱</h2>
+              <h2 className="font-semibold text-foreground">{emailIdentity ? "更换邮箱" : "绑定邮箱"}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                验证完成后该邮箱可用于登录 Web。
+                {emailIdentity ? "先完成敏感操作验证，再验证新邮箱；更换后需要重新登录。" : "验证完成后，该邮箱可用于登录网页端。"}
               </p>
             </div>
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              disabled={busy}
               onClick={() => {
                 setEmailBindOpen(false);
                 setEmailChallenge("");
@@ -533,9 +613,14 @@ export default function AccountSettingsPage() {
               关闭
             </Button>
           </div>
+          {error ? <p role="alert" className="mt-4 text-sm leading-6 text-destructive">{error}</p> : null}
           {!emailChallenge ? (
-            <form className="mt-4 flex max-w-xl gap-2" onSubmit={startEmailBind}>
+            <form className="mt-4 flex max-w-xl flex-wrap items-end gap-3" onSubmit={startEmailBind}>
+              <label className="min-w-0 flex-1 space-y-2 text-sm font-medium">
+              <span>要绑定的邮箱</span>
               <Input
+                ref={emailInputRef}
+                required
                 type="email"
                 value={targetEmail}
                 onChange={(event) => setTargetEmail(event.target.value)}
@@ -543,14 +628,17 @@ export default function AccountSettingsPage() {
                 autoComplete="email"
                 disabled={busy}
               />
-              <Button type="submit" disabled={busy || !targetEmail.trim()}>
+              </label>
+              <Button type="submit" disabled={busy || resendSeconds > 0 || !targetEmail.trim()}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                发送验证码
+                {resendSeconds > 0 ? `${resendSeconds} 秒后重发` : "发送验证码"}
               </Button>
             </form>
           ) : (
             <form className="mt-4 max-w-xl space-y-3" onSubmit={verifyEmailBind}>
+              <p className="break-all text-sm text-muted-foreground">验证码已发送至 {targetEmail.trim()}</p>
               <OtpInput
+                inputRef={bindCodeRef}
                 id="email-bind-code"
                 name="email-bind-code"
                 value={emailCode}
@@ -565,11 +653,13 @@ export default function AccountSettingsPage() {
                 >
                   修改邮箱
                 </button>
-                <span className="text-xs text-muted-foreground">验证码已发送</span>
+                <Button type="button" variant="ghost" size="sm" disabled={busy || resendSeconds > 0} onClick={() => void startEmailBind()}>
+                  {resendSeconds > 0 ? `${resendSeconds} 秒后重发` : "重新发送验证码"}
+                </Button>
               </div>
               <Button type="submit" disabled={busy || emailCode.length !== 6}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                验证并绑定
+                {emailIdentity ? "验证并更换" : "验证并绑定"}
               </Button>
             </form>
           )}

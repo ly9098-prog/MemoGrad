@@ -8,6 +8,8 @@ import { OcrImportSessionProvider } from "./ocr-import-session-provider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAuthBootstrap } from "@/lib/auth/use-auth-bootstrap";
 import { useAuthStore } from "@/lib/auth/auth-store";
+import { resolveAuthHostMode } from "@/lib/auth/auth-host";
+import { DASHBOARD_PATH } from "@/lib/home-route";
 import { adminRoutes, getActiveAdminRoute, isLearnerPath } from "@/lib/routes";
 import styles from "./navigation.module.css";
 
@@ -100,12 +102,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {
-      const loginPath = isLearnerRoute ? "/account/login" : "/login";
+      const hostMode = typeof window === "undefined" ? null : resolveAuthHostMode(
+        window.location.origin,
+        process.env.NEXT_PUBLIC_ADMIN_WEB_BASE_URL,
+        process.env.NEXT_PUBLIC_USER_WEB_BASE_URL,
+      );
+      // On an unconfigured/shared host, preserve the existing Admin home entry.
+      const learnerLogin = hostMode === "user" || (
+        hostMode === null && isLearnerRoute && pathname !== DASHBOARD_PATH
+      );
+      const loginPath = learnerLogin ? "/account/login" : "/login";
       router.replace(`${loginPath}${redirectPath}`);
       return;
     }
     if (!isBootstrapping && accessMode === "user" && !isLearnerRoute) {
-      router.replace("/questions");
+      router.replace("/dashboard");
       return;
     }
     if (!isBootstrapping && accessMode === "admin" && !isAdminRouteAllowed) {

@@ -51,6 +51,7 @@ import {
   isBatchableStatus,
   computePageWindow,
 } from "@/lib/formula-list-utils";
+import { previewCategoryTree, previewFormulaParams, type PublicFormulaCategory } from "@/lib/learner-formulas";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { apiRequest, toQuery } from "@/lib/api/client";
 import type { PaginatedResponse, FormulaGraphAsset } from "@/lib/api/types";
@@ -247,18 +248,21 @@ const EMPTY_FORMULA_FILTERS: FormulaListFilters = {
 
 export default function FormulasPage() {
   const queryClient = useQueryClient();
+  const isLearner = useAuthStore((state) => state.accessMode === "user");
+  const readScope = isLearner ? "user" : "admin";
+  const readKey = isLearner ? "learner-formulas" : "admin-formulas";
   const searchParams = useSearchParams();
   const permissions = useAuthStore((state) => state.permissions);
 
   const [filters, setFilters] = useState<FormulaListFilters>(() => ({
     ...EMPTY_FORMULA_FILTERS,
-    status: searchParams.get("status") || "",
+    status: isLearner ? "" : searchParams.get("status") || "",
     category_id: String(positiveInt(searchParams.get("category_id")) || ""),
     q: searchParams.get("q") || "",
     tags: searchParams.get("tags") || "",
-    library_type: searchParams.get("library_type") || "",
+    library_type: isLearner && searchParams.get("library_type") !== "function_graph" ? "" : searchParams.get("library_type") || "",
     study_card_type: searchParams.get("study_card_type") || "",
-    graph_status: searchParams.get("graph_status") || "",
+    graph_status: isLearner ? "" : searchParams.get("graph_status") || "",
   }));
   const [page, setPage] = useState(() => positiveInt(searchParams.get("page"), 1) || 1);
   const [selectedId, setSelectedId] = useState<number | null>(() => positiveInt(searchParams.get("selected_id")));
@@ -277,15 +281,31 @@ export default function FormulasPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
 
-  const canWrite = hasPermission(permissions, "formula:create");
-  const canUpdate = hasPermission(permissions, "formula:update");
-  const canReview = hasPermission(permissions, "formula:review");
-  const canDelete = hasPermission(permissions, "formula:delete");
+  const canWrite = !isLearner && hasPermission(permissions, "formula:create");
+  const canUpdate = !isLearner && hasPermission(permissions, "formula:update");
+  const canReview = !isLearner && hasPermission(permissions, "formula:review");
+  const canDelete = !isLearner && hasPermission(permissions, "formula:delete");
 
   const currentFilterStatus = filters.status;
 
+  const categories = useQuery<{ items: AdminFormulaCategoryNode[] }>({
+    queryKey: [isLearner ? "learner-formula-categories" : "admin-formula-categories"],
+    queryFn: async () => {
+      if (!isLearner) return apiRequest<{ items: AdminFormulaCategoryNode[] }>("/formulas/categories");
+      const data = await apiRequest<{ items: PublicFormulaCategory[] }>("/formulas/catalog", { scope: "user" });
+      return { items: previewCategoryTree(data.items) };
+    },
+    staleTime: 60000,
+  });
+  const selectedCategory = useMemo(
+    () => findCategoryNode(categories.data?.items ?? [], filters.category_id ? Number(filters.category_id) : null),
+    [categories.data?.items, filters.category_id],
+  );
+
   // Load list
-  const queryParams = useMemo(() => ({
+  const queryParams = useMemo(() => isLearner
+    ? previewFormulaParams(selectedCategory, filters, page)
+    : ({
     page,
     page_size: 20,
     status: currentFilterStatus || undefined,
@@ -295,27 +315,22 @@ export default function FormulasPage() {
     library_type: filters.library_type || undefined,
     study_card_type: filters.study_card_type || undefined,
     graph_status: filters.graph_status || undefined,
-  }), [page, currentFilterStatus, filters.category_id, filters.q, filters.library_type, filters.study_card_type, filters.graph_status]);
+  }), [isLearner, selectedCategory, page, currentFilterStatus, filters]);
 
   const formulas = useQuery({
-    queryKey: ["admin-formulas", queryParams],
+    queryKey: [readKey, queryParams],
     queryFn: () => apiRequest<PaginatedResponse<FormulaCard>>(
-      `/formulas${toQuery(queryParams)}`,
+      `/formulas${toQuery(queryParams)}`, { scope: readScope },
     ),
+    enabled: !isLearner || !filters.category_id || categories.isSuccess,
     placeholderData: (previousData) => previousData,
     retry: false,
   });
 
-  const categories = useQuery({
-    queryKey: ["admin-formula-categories"],
-    queryFn: () => apiRequest<{ items: AdminFormulaCategoryNode[] }>("/formulas/categories"),
-    staleTime: 60000,
-  });
-
   // Detail
   const detail = useQuery({
-    queryKey: ["admin-formulas", selectedId],
-    queryFn: () => apiRequest<FormulaCard>(`/formulas/${selectedId}`),
+    queryKey: [readKey, selectedId],
+    queryFn: () => apiRequest<FormulaCard>(`/formulas/${selectedId}`, { scope: readScope }),
     enabled: selectedId !== null,
     retry: false,
   });
@@ -407,7 +422,7 @@ export default function FormulasPage() {
     animationKey: `${page}-${filters.category_id}-${filters.status}-${filters.q}`,
   });
   const selectedCard = detail.data;
-  const isBatchable = isBatchableStatus(currentFilterStatus);
+  const isBatchable = !isLearner && isBatchableStatus(currentFilterStatus);
 
   useEffect(() => {
     if (!categories.data?.items?.length) return;
@@ -538,10 +553,6 @@ export default function FormulasPage() {
     return pruneCategoryTree(categories.data?.items ?? [], categorySearch);
   }, [categories.data?.items, categorySearch]);
 
-  const selectedCategory = useMemo(
-    () => findCategoryNode(categories.data?.items ?? [], filters.category_id ? Number(filters.category_id) : null),
-    [categories.data?.items, filters.category_id],
-  );
   const totalCategoryFormulaCount = useMemo(
     () => sumCategoryFormulaCount(categories.data?.items ?? []),
     [categories.data?.items],
@@ -554,11 +565,11 @@ export default function FormulasPage() {
 
   const prefetchDetail = useCallback((id: number) => {
     void queryClient.prefetchQuery({
-      queryKey: ["admin-formulas", id],
-      queryFn: () => apiRequest<FormulaCard>(`/formulas/${id}`),
+      queryKey: [readKey, id],
+      queryFn: () => apiRequest<FormulaCard>(`/formulas/${id}`, { scope: readScope }),
       staleTime: 30_000,
     });
-  }, [queryClient]);
+  }, [queryClient, readKey, readScope]);
 
   const renderCategoryTree = (nodes: AdminFormulaCategoryNode[], depth = 0) =>
     nodes.map((node) => {
@@ -621,9 +632,9 @@ export default function FormulasPage() {
   return (
     <ManagementPage className="space-y-5 pb-24">
       <ManagementPageHeader
-        title="408 速记卡管理"
+        title={isLearner ? "公式库" : "408 速记卡管理"}
         description={
-          canReview
+          isLearner ? "只读预览已发布的公式与速记卡，选择列表内容查看详情" : canReview
             ? "统一管理公式、定义、易混点、陷阱与对比卡，审核通过后自动发布"
             : "分类、列表与详情同屏管理 408 速记卡"
         }
@@ -658,7 +669,7 @@ export default function FormulasPage() {
       <Card className="overflow-visible">
         {/* ── Workspace filters ── */}
         <div className="border-b border-border bg-card/72 p-4">
-          <div className="grid gap-2 lg:grid-cols-[minmax(240px,1fr)_140px_150px_170px_155px_auto]">
+          <div className={`grid gap-3 ${isLearner ? "lg:grid-cols-[minmax(240px,1fr)_160px_170px_auto]" : "lg:grid-cols-[minmax(240px,1fr)_140px_150px_170px_155px_auto]"}`}>
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
               <Input
@@ -683,17 +694,17 @@ export default function FormulasPage() {
                 ) : null}
               </div>
             </label>
-            <CustomSelect
+            {!isLearner && <CustomSelect
               value={currentFilterStatus}
               onChange={(v) => updateFilter("status", v)}
               options={STATUS_OPTIONS}
               placeholder="全部状态"
               clearable={false}
-            />
+            />}
             <CustomSelect
               value={filters.library_type}
               onChange={(v) => updateFilter("library_type", v)}
-              options={LIBRARY_TYPE_OPTIONS}
+              options={isLearner ? LIBRARY_TYPE_OPTIONS.filter((option) => option.value !== "pure_formula") : LIBRARY_TYPE_OPTIONS}
               placeholder="全部类型"
               clearable={false}
             />
@@ -704,13 +715,13 @@ export default function FormulasPage() {
               placeholder="全部速记类型"
               clearable={false}
             />
-            <CustomSelect
+            {!isLearner && <CustomSelect
               value={filters.graph_status}
               onChange={(v) => updateFilter("graph_status", v)}
               options={GRAPH_STATUS_OPTIONS}
               placeholder="图像状态"
               clearable={false}
-            />
+            />}
             <Button variant="secondary" onClick={clearFilters} className="whitespace-nowrap">
               <RotateCcw className="h-3.5 w-3.5" />
               重置筛选
@@ -768,14 +779,14 @@ export default function FormulasPage() {
                 <p className="py-8 text-center text-xs text-muted-foreground/70">无匹配分类</p>
               )}
             </div>
-            <div className="mt-4 border-t border-border pt-3">
+            {!isLearner && <div className="mt-4 border-t border-border pt-3">
               <Link href="/formulas/categories">
                 <Button variant="secondary" size="sm" className="w-full">
                   <FolderTree className="h-3.5 w-3.5" />
                   管理分类
                 </Button>
               </Link>
-            </div>
+            </div>}
             </div>
           </aside>
 
@@ -867,7 +878,12 @@ export default function FormulasPage() {
                         ) : null}
                         <button
                           type="button"
-                          onClick={() => { setSelectedId(card.id); }}
+                          onClick={() => {
+                            setSelectedId(card.id);
+                            if (isLearner && window.matchMedia("(max-width: 1279px)").matches) {
+                              document.getElementById("formula-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }}
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -959,7 +975,7 @@ export default function FormulasPage() {
           </main>
 
           {/* Detail / preview */}
-          <aside className="min-w-0 bg-card/62 p-4 xl:self-stretch">
+          <aside id="formula-preview" className="min-w-0 scroll-mt-4 bg-card/62 p-4 xl:self-stretch">
             <div className="xl:sticky xl:top-0 xl:h-dvh xl:min-h-0 xl:overflow-hidden">
             {detail.isLoading && selectedId !== null ? (
               <div className="space-y-3 animate-fade-in">
@@ -1030,7 +1046,7 @@ export default function FormulasPage() {
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-xs font-bold text-foreground">函数图像</p>
                       <span className={`rounded-md border px-1.5 py-0.5 text-[10px] ${GRAPH_STATUS_BADGE[selectedCard.graph_status || ""] || "bg-muted"}`}>
-                        {GRAPH_STATUS_LABEL[selectedCard.graph_status || ""] || selectedCard.graph_status}
+                        {isLearner ? "已发布图像" : GRAPH_STATUS_LABEL[selectedCard.graph_status || ""] || selectedCard.graph_status}
                       </span>
                     </div>
                     <img src={selectedCard.graph_asset.thumbnail_url} alt="函数图像" className="max-h-44 w-full rounded-[10px] bg-secondary/30 object-contain" />
@@ -1115,7 +1131,7 @@ export default function FormulasPage() {
               <div className="flex h-full min-h-64 flex-col items-center justify-center gap-2 text-center animate-fade-in">
                 <Eye className="h-9 w-9 text-muted-foreground/70" />
                 <p className="text-sm font-semibold text-muted-foreground">选择一条公式查看详情</p>
-                <p className="text-xs text-muted-foreground/70">详情、预览与审核操作将在此处展示</p>
+                <p className="text-xs text-muted-foreground/70">选择内容后在此查看完整预览</p>
               </div>
             )}
             </div>

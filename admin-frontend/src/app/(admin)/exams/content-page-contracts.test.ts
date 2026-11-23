@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   states: [] as unknown[], index: 0, setters: [] as ReturnType<typeof vi.fn>[],
   effects: [] as (() => unknown)[], queries: [] as Query[], mutations: [] as Mutation[],
   data: {} as Record<string, unknown>, id: "paper-a", search: "",
+  accessMode: "admin",
   request: vi.fn(), invalidate: vi.fn(), setData: vi.fn(), remove: vi.fn(),
   push: vi.fn(), replace: vi.fn(),
   toQuery: vi.fn((query: Record<string, unknown>) => {
@@ -62,6 +63,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: unknown) => unknown) => select({
+    accessMode: h.accessMode,
     role: { name: "super_admin" },
     permissions: ["question:write", "formula:create", "formula:update", "formula:review", "formula:delete"],
   }),
@@ -73,6 +75,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   h.states = []; h.index = 0; h.setters = []; h.effects = [];
   h.queries = []; h.mutations = []; h.data = {}; h.id = "paper-a"; h.search = "";
+  h.accessMode = "admin";
   h.request.mockReset().mockResolvedValue({});
   h.invalidate.mockReset().mockResolvedValue(undefined);
 });
@@ -215,14 +218,28 @@ describe("formula page and graph request lifecycle", () => {
   it("maps URL filters to list queries and enables only the selected detail", async () => {
     h.search = "q=integral&category_id=7&page=2&selected_id=19&status=draft";
     FormulasPage();
-    await h.queries[0].queryFn();
-    await h.queries[2].queryFn();
+    const list = h.queries.find((query) => query.queryKey[0] === "admin-formulas" && typeof query.queryKey[1] === "object")!;
+    const detail = h.queries.find((query) => query.queryKey[0] === "admin-formulas" && query.queryKey[1] === 19)!;
+    await list.queryFn();
+    await detail.queryFn();
     expect(h.toQuery).toHaveBeenCalledWith(expect.objectContaining({
       q: "integral", category_id: 7, include_descendants: true, page: 2, page_size: 20,
       status: "draft",
     }));
-    expect(h.queries[2].enabled).toBe(true);
-    expect(h.request).toHaveBeenCalledWith("/formulas/19");
+    expect(detail.enabled).toBe(true);
+    expect(h.request).toHaveBeenCalledWith("/formulas/19", { scope: "admin" });
+  });
+
+  it("uses only user formula read endpoints and ignores admin-only filters", async () => {
+    h.accessMode = "user";
+    h.request.mockResolvedValue({ items: [] });
+    h.search = "status=draft&graph_status=generating&selected_id=19";
+    FormulasPage();
+    for (const query of h.queries) await query.queryFn();
+    expect(h.request.mock.calls.every(([, options]) => options?.scope === "user")).toBe(true);
+    expect(h.request).toHaveBeenCalledWith("/formulas/catalog", { scope: "user" });
+    expect(h.request).toHaveBeenCalledWith("/formulas/19", { scope: "user" });
+    expect(h.toQuery).toHaveBeenCalledWith(expect.not.objectContaining({ status: "draft" }));
   });
 
   it("removes only successfully handled IDs from batch selection", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Infinity as InfinityIcon, RotateCcw, Save, ShieldAlert } from "lucide-react";
+import { Infinity as InfinityIcon, RotateCcw, Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -292,8 +292,12 @@ export function UserAIPolicyDialog({
 
   const updateValue = (key: UserAIPolicyField, value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
-  const updateMode = (key: UserAIPolicyField, mode: UserAIPolicyMode) =>
+  const updateMode = (key: UserAIPolicyField, mode: UserAIPolicyMode) => {
+    if (mode === "finite" && !(Number(values[key]) > 0)) {
+      setValues((current) => ({ ...current, [key]: "1" }));
+    }
     setModes((current) => ({ ...current, [key]: mode }));
+  };
   const handleOpenChange = (nextOpen: boolean) => {
     if (
       !nextOpen &&
@@ -321,10 +325,10 @@ export function UserAIPolicyDialog({
           <div className="shrink-0 border-b border-border/70 bg-secondary/30 px-6 py-5 pr-14">
             <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
             <DialogDescription className="mt-1 max-w-2xl text-xs leading-5">
-              不限额度只解除业务配额，仍保留并发、幂等、队列去重、超时和模型可用性等运行保护。
+              {target?.scope === "default" ? "用于新用户和继承默认的额度项，已有个人配置保持独立。" : "逐项选择继承默认、自定义或不限，保存后对后续请求生效。"}
             </DialogDescription>
           </div>
-          <div className="min-h-0 overflow-y-auto px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 sm:px-6">
             {policyView === "loading" ? (
               <p role="status" className="text-sm text-muted-foreground">
                 正在读取额度策略…
@@ -334,7 +338,7 @@ export function UserAIPolicyDialog({
                 {getErrorMessage(policy.error)}
               </div>
             ) : policy.data ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {policy.isError ? (
                   <div
                     role="alert"
@@ -379,9 +383,8 @@ export function UserAIPolicyDialog({
                     disabled={mutation.isPending}
                   />
                 </label>
-                <p className="flex items-start gap-2 rounded-xl border border-border/70 bg-secondary/30 px-3.5 py-3 text-[11px] leading-5 text-muted-foreground">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  选择“不限”可解除该维度的额度限制。全局默认只影响继承项，不会覆盖已经设置的个人配置。
+                <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+                  不限仅解除所选业务额度，仍保留并发与超时等运行保护；额度变更不会清空既有用量。
                 </p>
                 {notice ? (
                   <p
@@ -403,7 +406,7 @@ export function UserAIPolicyDialog({
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border/70 bg-card/95 px-6 py-4">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border/70 bg-card px-5 py-4 sm:px-6">
             {target?.scope === "default" ? (
               <Button variant="secondary" size="sm"
                 disabled={!policy.data || mutation.isPending || presetMutation.isPending}
@@ -445,11 +448,12 @@ export function UserAIPolicyDialog({
             <Button
               variant="primary"
               size="sm"
+              className="ml-auto"
               disabled={!valid || !policy.data || mutation.isPending || presetMutation.isPending}
               onClick={() => setPendingAction("save")}
             >
               <Save className="h-3.5 w-3.5" />
-              保存
+              保存配置
             </Button>
           </div>
         </DialogContent>

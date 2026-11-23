@@ -1,14 +1,13 @@
-const LEARNER_ROOTS = ["/questions", "/knowledge-graph", "/account"];
+import { isLearnerPath } from "../learner-routes";
+import { DASHBOARD_PATH } from "../home-route";
 
 export function safeLearnerNext(value: string | null | undefined): string {
-  const candidate = String(value || "/questions").trim();
-  if (!candidate.startsWith("/") || candidate.startsWith("//")) return "/questions";
-  if (candidate.includes("\\") || candidate.length > 2048) return "/questions";
-  if (/[\x00-\x1F]/.test(candidate)) return "/questions";
+  const candidate = String(value || DASHBOARD_PATH).trim();
+  if (!candidate.startsWith("/") || candidate.startsWith("//")) return DASHBOARD_PATH;
+  if (candidate.includes("\\") || candidate.length > 2048) return DASHBOARD_PATH;
+  if (/[\x00-\x1F]/.test(candidate)) return DASHBOARD_PATH;
   const path = candidate.split("?", 1)[0].split("#", 1)[0];
-  return LEARNER_ROOTS.some(
-    (root) => path === root || path.startsWith(`${root}/`),
-  )
+  return isLearnerPath(path)
     ? candidate
-    : "/questions";
+    : DASHBOARD_PATH;
 }

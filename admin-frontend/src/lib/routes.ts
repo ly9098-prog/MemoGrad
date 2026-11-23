@@ -18,6 +18,8 @@ import {
   Activity,
   ClipboardCheck,
   BookOpen,
+  BookMarked,
+  PencilLine,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -370,13 +372,13 @@ export const adminNavigation: AdminNavigationItem[] = [
 ];
 
 export const learnerRoutes: AdminRoute[] = [
+  { href: "/dashboard", label: "工作台", description: "用户学习工作台", icon: Gauge },
+  { href: "/practice", label: "刷题", description: "用户端刷题", icon: PencilLine },
+  { href: "/mistakes", label: "错题本", description: "用户端错题本", icon: BookMarked },
   questionsRoute,
+  { ...formulasRoute, description: "浏览已发布公式与速记卡", permission: undefined },
   knowledgeGraphRoute,
   accountRoute,
 ];
 
-export function isLearnerPath(pathname: string): boolean {
-  return learnerRoutes.some(
-    (route) => pathname === route.href || pathname.startsWith(`${route.href}/`),
-  );
-}
+export { isLearnerPath } from "./learner-routes";

@@ -212,14 +212,14 @@ export function Sidebar({
     >
       <div className={cn(styles.brand, variant === "mobile" && "pr-12")}>
         <Link
-          href={accessMode === "user" ? "/questions" : "/dashboard"}
-          aria-label={accessMode === "user" ? "MemoGrad 学习题库" : "MemoGrad 管理工作台"}
+          href="/dashboard"
+          aria-label={accessMode === "user" ? "MemoGrad 学习工作台" : "MemoGrad 管理工作台"}
           onClick={() => {
             setSearch("");
             navigate();
           }}
           className={styles.brandLink}
-          title={isRail ? (accessMode === "user" ? "MemoGrad 学习题库" : "MemoGrad 管理工作台") : undefined}
+          title={isRail ? (accessMode === "user" ? "MemoGrad 学习工作台" : "MemoGrad 管理工作台") : undefined}
         >
           <span className={styles.brandMark}>MG</span>
           <span className={styles.copy}>

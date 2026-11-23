@@ -21,9 +21,8 @@ const h = vi.hoisted(() => ({
   setters: [] as ReturnType<typeof vi.fn>[], effects: [] as (() => unknown)[],
   queries: [] as Query[], mutations: [] as Mutation[],
   data: {} as Record<string, unknown>,
-  auth: { role: { name: "super_admin" }, permissions: [] as string[], isBootstrapping: false, isAuthenticated: false },
+  auth: { role: { name: "super_admin" }, permissions: [] as string[], isBootstrapping: false, isAuthenticated: false, accessMode: "admin" as "admin" | "user" },
   next: "/admin-users", path: "/roles",
-  requestHost: "admin.example.com", adminHost: "admin.example.com",
   request: vi.fn(), toQuery: vi.fn(() => "?fixture"),
   invalidate: vi.fn(), replace: vi.fn(), redirect: vi.fn(), login: vi.fn(),
 }));
@@ -59,9 +58,6 @@ vi.mock("next/navigation", () => ({
   usePathname: () => h.path,
   redirect: (path: string) => { h.redirect(path); throw new Error("redirect"); },
 }));
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ host: h.requestHost }),
-}));
 vi.mock("@/lib/auth/auth-store", () => ({
   useAuthStore: (select: (state: typeof h.auth & { login: typeof h.login }) => unknown) =>
     select({ ...h.auth, login: h.login }),
@@ -96,10 +92,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.states = []; h.stateIndex = 0; h.setters = []; h.effects = [];
   h.queries = []; h.mutations = []; h.data = {};
-  h.auth = { role: { name: "super_admin" }, permissions: [], isBootstrapping: false, isAuthenticated: false };
+  h.auth = { role: { name: "super_admin" }, permissions: [], isBootstrapping: false, isAuthenticated: false, accessMode: "admin" };
   h.next = "/admin-users"; h.path = "/roles";
-  h.requestHost = "admin.example.com"; h.adminHost = "admin.example.com";
-  vi.stubEnv("ADMIN_WEB_HOST", h.adminHost);
+  vi.stubEnv("NEXT_PUBLIC_ADMIN_WEB_BASE_URL", "https://admin.example.com");
+  vi.stubEnv("NEXT_PUBLIC_USER_WEB_BASE_URL", "https://www.example.com");
+  vi.stubGlobal("window", { location: { origin: "http://localhost:3002" } });
   h.request.mockReset().mockResolvedValue({ id: 12 });
   h.invalidate.mockReset().mockResolvedValue(undefined);
   h.login.mockReset().mockResolvedValue({
@@ -109,15 +106,9 @@ beforeEach(() => {
 });
 
 describe("login and shell ownership", () => {
-  it("keeps the Admin root redirect on the Admin host", async () => {
-    await expect(Home()).rejects.toThrow("redirect");
+  it("sends both identities through the same root entry", () => {
+    expect(() => Home()).toThrow("redirect");
     expect(h.redirect).toHaveBeenCalledWith("/dashboard");
-  });
-
-  it("sends the ordinary-user root to the question browser", async () => {
-    h.requestHost = "www.example.com";
-    await expect(Home()).rejects.toThrow("redirect");
-    expect(h.redirect).toHaveBeenCalledWith("/questions");
   });
 
   it("waits for login before redirecting to a safe internal destination", async () => {
@@ -171,6 +162,29 @@ describe("login and shell ownership", () => {
     expect(AdminShell({ children: null })).toBeNull();
     h.effects[0]();
     expect(h.replace).toHaveBeenCalledWith("/login?next=%2Froles");
+  });
+
+  it.each([
+    ["https://admin.example.com", "/dashboard", "/login"],
+    ["https://www.example.com", "/dashboard", "/account/login"],
+    ["http://localhost:3002", "/dashboard", "/login"],
+    ["https://admin.example.com", "/formulas", "/login"],
+    ["http://localhost:3002", "/formulas", "/account/login"],
+  ])("selects the identity login for %s%s", (origin, pathname, loginPath) => {
+    vi.stubGlobal("window", { location: { origin } });
+    h.path = pathname;
+    expect(AdminShell({ children: null })).toBeNull();
+    h.effects[0]();
+    expect(h.replace).toHaveBeenCalledExactlyOnceWith(`${loginPath}?next=${encodeURIComponent(pathname)}`);
+  });
+
+  it("redirects a signed-in learner away from management pages to the shared home", () => {
+    h.auth.accessMode = "user";
+    h.auth.isAuthenticated = true;
+    h.path = "/app-users";
+    expect(AdminShell({ children: null })).toBeNull();
+    h.effects[0]();
+    expect(h.replace).toHaveBeenCalledExactlyOnceWith("/dashboard");
   });
 
   it.each(["/formulas/new", "/formulas/new/preview", "/formulas/42"])(

@@ -1,32 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { resolveHomePath } from "./home-route";
+import { describe, expect, it, vi } from "vitest";
+import Home from "@/app/page";
 
-describe("resolveHomePath", () => {
-  it("keeps the Admin dashboard on the configured Admin host", () => {
-    expect(resolveHomePath("admin.example.com", "admin.example.com")).toBe(
-      "/dashboard",
-    );
-  });
+vi.mock("next/navigation", () => ({
+  redirect: (path: string) => { throw new Error(`redirect:${path}`); },
+}));
 
-  it("sends the ordinary-user host to the question browser", () => {
-    expect(resolveHomePath("www.example.com", "admin.example.com")).toBe(
-      "/questions",
-    );
-  });
-
-  it("ignores ports, casing, and URL schemes when comparing hosts", () => {
-    expect(
-      resolveHomePath("ADMIN.Example.com:443", "https://admin.example.com"),
-    ).toBe("/dashboard");
-  });
-
-  it("uses the first host when a proxy appends a host list", () => {
-    expect(
-      resolveHomePath("www.example.com, admin.example.com", "admin.example.com"),
-    ).toBe("/questions");
-  });
-
-  it("keeps the historical Admin default when no Admin host is configured", () => {
-    expect(resolveHomePath("www.example.com", undefined)).toBe("/dashboard");
+describe("shared dashboard entry", () => {
+  it("redirects the root to the shared dashboard", () => {
+    expect(() => Home()).toThrow("redirect:/dashboard");
   });
 });

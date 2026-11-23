@@ -129,6 +129,41 @@ async def test_github_start_binds_browser_and_uses_pkce(flow):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["link", "step_up"])
+async def test_github_cancel_returns_to_account_settings_and_consumes_state(flow, mode):
+    client, _, user, *_ = flow
+    _, state = await github_oauth_service.start_github_oauth(
+        mode=mode, user_id=user.id, return_to="/account/settings"
+    )
+    client.cookies.set("github_oauth_state", state, path="/api/v1/auth/github")
+    response = await client.get("/api/v1/auth/github/callback", params={"state": state})
+    key = "binding_error" if mode == "link" else "verification_error"
+    assert response.status_code == 303
+    assert response.headers["location"] == (
+        f"http://user.test/account/settings?{key}=github_cancelled"
+    )
+    with pytest.raises(github_oauth_service.GithubOAuthError):
+        await github_oauth_service.consume_oauth_state(state)
+
+
+@pytest.mark.asyncio
+async def test_github_binding_conflict_returns_actionable_error_to_settings(flow, monkeypatch):
+    client, *_ = flow
+    start = await client.post("/api/v1/users/me/identities/github/start", json={})
+
+    async def exchange(*args, **kwargs):
+        return {"id": 99}
+
+    monkeypatch.setattr(github_oauth_service, "exchange_github_code", exchange)
+    callback = await client.get(
+        "/api/v1/auth/github/callback", params={"state": start.json()["state"], "code": "code"}
+    )
+    assert callback.headers["location"] == (
+        "http://user.test/account/settings?binding_error=identity_already_exists"
+    )
+
+
+@pytest.mark.asyncio
 async def test_github_callback_rejects_another_browser_before_exchange(
     flow, monkeypatch
 ):

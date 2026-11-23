@@ -109,7 +109,7 @@ export function LearnerProfile({ user }: { user: LearnerUser }) {
           <div className="grid gap-2 text-sm">
             <span className="font-medium text-foreground">邮箱</span>
             <p className="break-all text-muted-foreground">{user.email ?? "尚未绑定邮箱"}</p>
-            <Link href="/account/settings" className="w-fit text-primary underline underline-offset-4">前往安全设置修改邮箱</Link>
+            <Link href="/account/settings?bind=email" className="w-fit text-primary underline underline-offset-4">{user.email ? "更换绑定邮箱" : "绑定邮箱"}</Link>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={Boolean(busy) || !nickname.trim() || nickname.trim() === (user.nickname ?? "")}>

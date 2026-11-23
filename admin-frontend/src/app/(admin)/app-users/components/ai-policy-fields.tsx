@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { cn } from "@/lib/utils";
+import { useRef, type ReactNode } from "react";
 import type { UserAIPolicyValues } from "@/lib/api/types";
 
 export type UserAIPolicyField = keyof UserAIPolicyValues;
@@ -43,13 +43,13 @@ export const USER_AI_POLICY_FIELDS: Array<{
   },
   {
     key: "daily_token_limit",
-    label: "每日 Token",
+    label: "每日 AI 用量",
     unit: "Token",
     hint: "按北京时间自然日统计普通用户 AI 用量",
   },
   {
     key: "monthly_token_limit",
-    label: "每月 Token",
+    label: "每月 AI 用量",
     unit: "Token",
     hint: "按北京时间自然月统计普通用户 AI 用量",
   },
@@ -108,6 +108,43 @@ export function userPolicyFormIsValid(
   });
 }
 
+const POLICY_GROUPS = [
+  {
+    title: "重新生成",
+    description: "控制错题 AI 复盘的重新生成频率",
+    fields: USER_AI_POLICY_FIELDS.slice(0, 3),
+  },
+  {
+    title: "AI 总用量",
+    description: "日、月用量按北京时间统计，涵盖普通用户 AI 请求",
+    fields: USER_AI_POLICY_FIELDS.slice(3),
+  },
+];
+
+function PolicyGroups({
+  renderField,
+}: {
+  renderField: (field: (typeof USER_AI_POLICY_FIELDS)[number]) => ReactNode;
+}) {
+  return (
+    <div className="space-y-8">
+      {POLICY_GROUPS.map((group) => (
+        <section key={group.title} aria-label={group.title}>
+          <h3 className="text-sm font-semibold text-foreground">
+            {group.title}
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {group.description}
+          </p>
+          <div className="mt-3 divide-y divide-border border-y border-border">
+            {group.fields.map(renderField)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function FinitePolicyFields({
   values,
   onChange,
@@ -117,20 +154,21 @@ export function FinitePolicyFields({
   onChange: (key: UserAIPolicyField, value: string) => void;
   disabled?: boolean;
 }) {
+  const previousFinite = useRef<Partial<Record<UserAIPolicyField, string>>>({});
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {USER_AI_POLICY_FIELDS.map((field) => (
+    <PolicyGroups
+      renderField={(field) => (
         <div
           key={field.key}
-          className="rounded-xl border border-border/70 bg-card/70 p-3"
+          className="grid items-center gap-4 py-4 sm:grid-cols-[minmax(0,1fr)_300px]"
         >
-          <span className="text-xs font-semibold text-foreground">
-            {field.label}
-          </span>
-          <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
-            {field.hint}
-          </span>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">{field.label}</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+              {field.hint}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <CustomSelect
               aria-label={`${field.label}默认配置方式`}
               value={values[field.key] === "-1" ? "unlimited" : "finite"}
@@ -140,30 +178,36 @@ export function FinitePolicyFields({
               ]}
               clearable={false}
               disabled={disabled}
-              className="h-9 w-32 text-xs"
-              onChange={(mode) =>
-                onChange(field.key, mode === "unlimited" ? "-1" : "1")
-              }
+              className="h-10 w-32 text-sm"
+              onChange={(mode) => {
+                if (mode === "unlimited") previousFinite.current[field.key] = values[field.key];
+                onChange(field.key, mode === "unlimited" ? "-1" : previousFinite.current[field.key] ?? "1");
+              }}
             />
-            <Input
-              aria-label={`${field.label}（${field.unit}）`}
-              type="number"
-              min={1}
-              max={USER_AI_POLICY_FIELD_MAX[field.key]}
-              step={1}
-              value={values[field.key] === "-1" ? "" : values[field.key]}
-              placeholder={values[field.key] === "-1" ? "不限" : undefined}
-              disabled={disabled || values[field.key] === "-1"}
-              onChange={(event) => onChange(field.key, event.target.value)}
-              className="h-9 min-w-0 flex-1 bg-background/70 tabular-nums"
-            />
-            <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-              {field.unit}
-            </span>
+            {values[field.key] !== "-1" ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Input
+                  aria-label={`${field.label}（${field.unit}）`}
+                  type="number"
+                  min={1}
+                  max={USER_AI_POLICY_FIELD_MAX[field.key]}
+                  step={1}
+                  value={values[field.key]}
+                  disabled={disabled}
+                  onChange={(event) => onChange(field.key, event.target.value)}
+                  className="h-10 min-w-0 text-right tabular-nums"
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {field.unit}
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">不设限制</span>
+            )}
           </div>
         </div>
-      ))}
-    </div>
+      )}
+    />
   );
 }
 
@@ -185,86 +229,85 @@ export function UserPolicyRows({
   disabled?: boolean;
 }) {
   return (
-    <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card/60">
-      {USER_AI_POLICY_FIELDS.map((field) => {
+    <PolicyGroups
+      renderField={(field) => {
         const mode = modes[field.key];
-        const previewValue =
+        const preview =
           mode === "inherit"
             ? defaults[field.key]
             : mode === "unlimited"
               ? -1
               : Number(values[field.key]);
-        const sourceLabel =
-          mode === "inherit"
-            ? "继承默认"
-            : mode === "unlimited"
-              ? "个人不限"
-              : "个人覆盖";
+        const valid =
+          Number.isInteger(preview) &&
+          (preview === -1 ||
+            (preview > 0 && preview <= USER_AI_POLICY_FIELD_MAX[field.key]));
+        const changed = valid && preview !== effective[field.key];
         return (
           <div
             key={field.key}
-            className="grid gap-3 p-3.5 sm:grid-cols-[1fr_auto]"
+            className="grid items-start gap-4 py-4 sm:grid-cols-[minmax(0,1fr)_300px]"
           >
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-foreground">
-                  {field.label}
-                </span>
-                <span className="rounded-full border border-border bg-secondary/55 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {sourceLabel}
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+              <p className="text-sm font-medium text-foreground">
+                {field.label}
+              </p>
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
                 {field.hint}
               </p>
-              <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-                默认 {formatPolicyValue(defaults[field.key], field.unit)}
-                <span className="mx-2 text-border">·</span>
-                保存后生效{" "}
-                {formatPolicyValue(
-                  Number.isInteger(previewValue)
-                    ? previewValue
-                    : effective[field.key],
-                  field.unit,
-                )}
-              </p>
+              {mode !== "inherit" ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  全局默认：{formatPolicyValue(defaults[field.key], field.unit)}
+                </p>
+              ) : null}
             </div>
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <CustomSelect
-                aria-label={`${field.label}配置方式`}
-                value={mode}
-                disabled={disabled}
-                onChange={(value) =>
-                  onModeChange(field.key, value as UserAIPolicyMode)
-                }
-                clearable={false}
-                options={[
-                  { value: "inherit", label: "继承默认" },
-                  { value: "finite", label: "自定义" },
-                  { value: "unlimited", label: "不限" },
-                ]}
-                className="h-9 w-32 text-xs"
-              />
-              <Input
-                aria-label={`${field.label}自定义值`}
-                type="number"
-                min={1}
-                max={USER_AI_POLICY_FIELD_MAX[field.key]}
-                step={1}
-                value={values[field.key]}
-                disabled={disabled || mode !== "finite"}
-                onChange={(event) =>
-                  onValueChange(field.key, event.target.value)
-                }
-                className={cn(
-                  "h-9 w-28 bg-background/70 text-right tabular-nums",
-                  mode !== "finite" && "text-muted-foreground",
-                )}
-              />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <CustomSelect
+                  aria-label={`${field.label}配置方式`}
+                  value={mode}
+                  disabled={disabled}
+                  onChange={(value) =>
+                    onModeChange(field.key, value as UserAIPolicyMode)
+                  }
+                  clearable={false}
+                  options={[
+                    { value: "inherit", label: "继承默认" },
+                    { value: "finite", label: "自定义" },
+                    { value: "unlimited", label: "不限" },
+                  ]}
+                  className="h-10 w-32 text-sm"
+                />
+                {mode === "finite" ? (
+                  <Input
+                    aria-label={`${field.label}自定义值`}
+                    type="number"
+                    min={1}
+                    max={USER_AI_POLICY_FIELD_MAX[field.key]}
+                    step={1}
+                    value={values[field.key]}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onValueChange(field.key, event.target.value)
+                    }
+                    className="h-10 min-w-0 flex-1 text-right tabular-nums"
+                  />
+                ) : null}
+              </div>
+              <p
+                className={`text-sm tabular-nums ${valid ? "text-foreground" : "text-destructive"}`}
+              >
+                <span className="mr-2 text-xs text-muted-foreground">
+                  {changed ? "保存后" : "生效额度"}
+                </span>
+                {valid
+                  ? formatPolicyValue(preview, field.unit)
+                  : "请输入有效数值"}
+              </p>
             </div>
           </div>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

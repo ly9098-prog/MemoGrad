@@ -632,16 +632,6 @@ export default function AppUsersPage() {
         }
         actions={
           <>
-            {canManageAIPolicy ? (
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setPolicyTarget({ scope: "default" })}
-              >
-                <Gauge className="h-4 w-4" />
-                AI 默认额度
-              </Button>
-            ) : null}
             <Button
               variant="secondary"
               size="md"
