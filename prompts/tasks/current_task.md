@@ -275,7 +275,7 @@
 - 已提交 `9e070b80 feat(admin): add batch AI quota management and default presets`；生产 app／worker／scheduler／admin 已更新到该提交，无数据库迁移。七容器 running、restart=0，app healthy，公网 health/live 与容器内 readiness 正常；新增 API 路由存在，管理端系统页与普通用户页公网 200（未登录根入口 307 到登录属预期）。回滚标签 `deploy-*:before-quota-9e070b80`，证据 `/data/backups/admin-ai-quota-9e070b80-20261123/`。未推送；无关 clean-wsl-memory.sh 保留。
 
 
-## 2026-11-23 用户 Web 入口、身份绑定与额度交互优化（本地完成，未提交／未部署）
+## 2026-11-23 用户 Web 入口、身份绑定与额度交互优化（已提交并发布）
 
 - [x] 用户端公式库复用已发布内容接口及现有预览，隔离管理操作与编辑路由。
 - [x] 修复 GitHub 回调会话同步和绑定请求续期；补齐邮箱绑定步骤、验证码重发与更换邮箱流程。
@@ -283,22 +283,41 @@
 - [x] 新增工作台、刷题、错题本占位页及导航。
 - [x] 优化 AI 额度的分组、有效值、配置方式与移动端布局。
 - [x] 权限／账号／接口回归、类型检查、lint、测试、生产构建和桌面／移动浏览器验收。
-- 交付范围：本轮实现和验证；当前请求未包含提交或生产部署。
+- 交付范围：本轮实现、验证、提交与生产发布。
 
 - 验证：管理端 typecheck、lint、202 文件／2,341 项 Vitest、Next.js 生产构建通过；个人资料／绑定入口最后增量复验 5 项通过。后端身份回调 26 项、公式公开投影与微信绑定不可用边界 36 项通过，共 62 项；修改文件严格 Ruff、compileall、git diff --check、Impeccable detect（[]）通过。
 - 后端补充测试首次因本机 cloud_api 暂存目录与 APP_ENV 档案冲突无法收集；切换隔离 local_import 测试配置与内存 SQLite 后 36 项通过，未改生产配置或源码门禁。
 - 浏览器隔离 fixture 验证 1440×900 与 390×844：三页指定文案、公式仅请求用户 API、编辑页被拦截、邮箱绑定／更换／验证码重发、GitHub 401 续期重试与成功回调更新、微信静态占位、额度自定义 PATCH、有限值切换保留、弹层滚动到底和无横向溢出。截图 `.playwright-cli/learner-*.png`、`.playwright-cli/quota-refined-*.png`。
-- 真实 GitHub 第三方授权和真实邮箱收信／验码未执行；无数据库迁移。代码保持未提交、未部署，无关 clean-wsl-memory.sh 未改动。
+- 真实 GitHub 第三方授权和真实邮箱收信／验码未执行；无数据库迁移。实现已随 `f8d46d9b` 发布，无关 clean-wsl-memory.sh 未改动。
 
-## 2026-11-23 用户端与管理端共用工作台地址（本地完成）
+## 2026-11-23 用户端与管理端共用工作台地址（已提交并发布）
 
 - [x] 两种身份直接共用 `/dashboard` 页面入口：管理员继续显示运营工作台，普通用户复用既有“敬请期待”占位组件，为后续学习首页预留。
 - [x] 根路径、用户登录默认回跳、无权限页面回退、侧栏工作台及品牌入口统一到 `/dashboard`；按用户最新要求删除 `/workbench` 路由及其白名单，不保留重定向。
 - [x] 复用站点身份判定，未登录时管理站点进入 `/login`、用户站点进入 `/account/login`；未配置或共用主机的工作台沿用管理员默认入口。
 - [x] 管理工作台八项查询及手动刷新增加管理员身份门禁，普通用户即使残留管理权限也不请求管理端数据。
-- [x] 更新用户 Web 认证文档并完成回归。管理端 typecheck、ESLint、202 文件／2,350 项 Vitest、生产构建及 git diff --check 通过。
+- [x] 更新用户 Web 认证文档并完成回归。管理端 typecheck、ESLint、202 文件／2,349 项 Vitest、生产构建及 git diff --check 通过；后端身份流程 26 项、compileall 和修改文件 Ruff 通过。
 - 浏览器使用隔离 API fixture，在本地生产模式验证根路径／旧地址重定向、用户桌面与移动端占位、侧栏品牌目标、管理工作台及请求隔离；无 pageerror，移动端无横向溢出。截图 `.playwright-cli/shared-dashboard-*.png`。
 - 开发模式的旧地址重定向出现 React／Next 性能计时负时间戳异常；切换同一源码的本地生产构建后未复现。未为此调整业务代码或框架依赖。
-- 当前未提交、未部署；本轮无后端或数据库变更。
+- 已提交 `f8d46d9b feat(web): expand learner experience and shared dashboard` 并发布生产；本轮无数据库迁移。
 - 后续修订：移除 `/workbench` 页面，根入口回归只验证 `/dashboard`，增加旧路径不属于用户路由的断言；上方旧地址跳转的浏览器记录属于删除前的验证历史。
 - 删除后验证：生产构建、typecheck、ESLint、4 文件／68 项定向回归及 git diff --check 通过；构建路由清单确认 `/dashboard` 存在且无 `/workbench` 页面。
+- 生产发布：app／worker／scheduler／admin／web 已更新，七容器 running，替换服务 `restart=0`，app healthy；`/health` 与 `/health/live` 200。两域 `/` 307 到 `/dashboard`、`/dashboard` 200、`/workbench` 404；生产隔离 fixture 确认用户与管理工作台分流且普通用户无 Admin API 请求。数据库保持 `v27_user_ai_policy (head)`；证据 `/data/backups/user-web-f8d46d9b-20261123-2356`；回滚标签 `deploy-{app,worker,scheduler,admin,web}:before-web-f8d46d9b-20261123-2356`。
+
+
+## 2026-11-24 GitHub 分支清理、CI 修复与 v5.2.1
+
+- [x] GitHub 比较 codex/auth-domain-platform：ahead=0、behind=78；提交 1078720b 已被 main 吸收，已删除远端分支，保留本地旧 worktree。
+- [x] 修复向量集成测试旧额度模拟，使用真实 TokenReservation 并断言 RPM 传递。
+- [x] 移除错题本重复 noop，恢复 478 行预算，强化只允许单一方法声明；11 个相关测试文件通过。
+- [x] main 生命周期新增后台任务停机清理对应 6 行，更新入口预算 474→480、lifespan 180→185，补充清理调用断言。
+- [x] 本地与 GitHub Actions 验证、提交推送。
+- [x] 参照已有 Release 正式发布 v5.2.1；镜像发布验证成功。
+
+- 第二轮：GitHub 向量身份 45 项通过，后续发现身份迁移测试硬编码 v25、前端 CI 绝对 URL 与同源契约不一致；改为动态唯一 head 对比及 /api/admin/v1。本地私有 PostgreSQL 身份迁移/备份恢复与并发保护 2 项通过。
+
+- 最终修复已提交推送 dabc3e60；本地前端 check：202 文件/2349 项、typecheck/lint/build 全通过。GitHub CI 45222129867、Reliability 45222129894，v5.2.1 草稿目标锁定 dabc3e60148b9db7c536652afbf0d8707af81a4c。
+
+- 最终77f38c05：GitHub CI 45226342565通过，固定回归9418 passed/40 skipped，readiness69、cloud OCR30通过；Reliability45226342772、CodeQL45226343730通过。Release v5.2.1已正式发布为latest，tag精确指向77f38c05aa0c3fd84bea1128375d201f656ea60d；镜像发布45229099052运行中。无生产部署/迁移。
+
+- 镜像发布45229099052已成功：后端与Admin均构建并推送完成；三项请求全部完成。https://github.com/ly9098-prog/MemoGrad/actions/runs/45229099052
