@@ -748,5 +748,5 @@ jobs:
         if: steps.admin-manifest.outputs.present == 'true'
         working-directory: admin-frontend
         env:
-          NEXT_PUBLIC_ADMIN_API_BASE_URL: http://127.0.0.1:8000/api/admin/v1
+          NEXT_PUBLIC_ADMIN_API_BASE_URL: /api/admin/v1
         run: npm run check
