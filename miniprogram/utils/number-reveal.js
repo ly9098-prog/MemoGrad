@@ -164,7 +164,10 @@ function start(page, options) {
 }
 
 function hasDisplaySegments(data, field) {
-  return Array.isArray(data[field.segmentsKey]) && data[field.segmentsKey].length > 0
+  const segments = data[field.segmentsKey]
+  return Array.isArray(segments) && segments.length > 0 &&
+    segments.map(segment => segment.text).join('') ===
+      buildDisplay(field, data[field.name]).map(segment => segment.text).join('')
 }
 
 module.exports = {

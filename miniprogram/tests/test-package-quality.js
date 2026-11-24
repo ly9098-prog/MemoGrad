@@ -6,6 +6,8 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
+const vm = require('node:vm')
+const { createRequire } = require('node:module')
 const { matchesPackIgnore, collectPackageSizes, checkBudgets } = require('./test-main-package-size')
 const { inspectPackageDependencies, checkPackageDependencies } = require('../scripts/architecture/package-dependencies')
 
@@ -107,5 +109,32 @@ assert.equal(
   false,
   'do not retain a second teacher request implementation inside study',
 )
+const mainRequire = createRequire(path.join(miniRoot, 'app.js'))
+const mainLoads = []
+let appDefinition
+const requestArgs = []
+vm.runInNewContext(fs.readFileSync(path.join(miniRoot, 'app.js'), 'utf8'), {
+  App: definition => { appDefinition = definition },
+  require: specifier => {
+    mainLoads.push(specifier)
+    if (specifier === './utils/ai-teacher-request') return {
+      requestTeacher: (...args) => { requestArgs.push(args); return 'lesson' },
+    }
+    return mainRequire(specifier)
+  },
+})
+assert.equal(mainLoads.includes('./utils/ai-teacher-408'), false,
+  'shared teacher code must not load during application startup')
+const teacher = appDefinition.getAiTeacher()
+assert.equal(teacher.normalizeResult, mainRequire('./utils/ai-teacher-408').normalizeResult)
+assert.equal(teacher.presentTeacherResult, mainRequire('./utils/teacher-presentation').presentTeacherResult)
+assert.equal(mainLoads.includes('./utils/ai-teacher-request'), false,
+  'opening a result page must not load the AI request module')
+const teacherArgs = [{ post() {} }, { question_id: 7 }, { timeout: 55000 }]
+assert.equal(appDefinition.requestAiTeacher(...teacherArgs), 'lesson')
+assert.deepEqual(requestArgs, [teacherArgs])
+for (const helper of ['ai-teacher-408', 'teacher-presentation', 'ai-teacher-request']) {
+  assert.ok(mainLoads.includes('./utils/' + helper), helper + ' must be reachable from the App service')
+}
 checkBudgets(collectPackageSizes(miniRoot, app, config))
 console.log('Package quality regression checks passed')

@@ -517,3 +517,22 @@ test('review completion immediately refetches a stale home hub snapshot', async 
     ])
   })
 })
+
+test('returning from review replaces the visible due digits when the fresh count is zero', async () => {
+  await withHomePage(async ({ page }) => {
+    const numberReveal = require('../utils/number-reveal')
+    const growthMethods = require('../pages/home/utils/growth-page-controller')
+    page.data._animDueReviewCount = 10
+    page.data._animDueReviewSegments = numberReveal.buildNumberSegments(10)
+    page._growthSeq = 1
+    page._animateNumbers = growthMethods.growthPageMethods._animateNumbers
+    page._applyGrowthResponses({
+      dashboard: { overview: { due_review_count: 0 }, subject_stats: [] },
+      hub: { scope_ready: true, review: { remaining_count: 0 } },
+    }, 1)
+    assert.equal(page.data._animDueReviewCount, 0)
+    assert.equal(page.data._animDueReviewSegments.map(segment => segment.text).join(''), '0')
+    numberReveal.clear(page)
+    growthAnimation.clear(page)
+  })
+})

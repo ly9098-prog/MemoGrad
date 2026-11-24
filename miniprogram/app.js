@@ -90,6 +90,17 @@ App({
 
   animationLoader: animationLoader,
 
+  getAiTeacher() {
+    return {
+      ...require('./utils/ai-teacher-408'),
+      ...require('./utils/teacher-presentation'),
+    }
+  },
+
+  requestAiTeacher(api, payload, options) {
+    return require('./utils/ai-teacher-request').requestTeacher(api, payload, options)
+  },
+
   onShow() {
     this._tryRestoreLogin()
     this._guardPersonalRoute()

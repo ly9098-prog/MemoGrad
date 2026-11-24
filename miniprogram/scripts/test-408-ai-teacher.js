@@ -87,6 +87,7 @@ const surfaces = [
     js: 'subpackages/exam/result/index.js',
     wxml: 'subpackages/exam/result/index.wxml',
     handler: 'open408Teacher',
+    requestCall: 'getApp().requestAiTeacher(api, payload, {',
     extra: 'exam_attempt_id',
     contextSource: 'subpackages/exam/utils/exam-408-teacher-controller.js',
   },
@@ -102,7 +103,7 @@ surfaces.forEach(surface => {
     ? fs.readFileSync(path.join(miniRoot, surface.apiSource), 'utf8') : js
   const contextSource = surface.contextSource
     ? fs.readFileSync(path.join(miniRoot, surface.contextSource), 'utf8') : js
-  assert(apiSource.includes('requestTeacher(api, payload, {'), `${surface.js} 未调用共享老师请求流程`)
+  assert(apiSource.includes(surface.requestCall || 'requestTeacher(api, payload, {'), `${surface.js} 未调用共享老师请求流程`)
   assert(contextSource.includes(surface.extra), `${surface.js} 未携带 ${surface.extra} 上下文`)
   assert(js.includes(`${surface.handler}(`), `${surface.js} 缺少 ${surface.handler}`)
   assert(wxml.includes(surface.handler), `${surface.wxml} 未绑定 ${surface.handler}`)
@@ -143,7 +144,7 @@ const practiceWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/study/prac
 const examJs = fs.readFileSync(path.join(miniRoot, 'subpackages/exam/result/index.js'), 'utf8')
 assert(practiceJs.includes('teacherActions: aiTeacher408.ACTIONS'), '普通练习结果页必须使用自定义 7 动作面板')
 assert(examJs.includes('teacherActions: aiTeacher408.ACTIONS'), '考试结果页必须使用自定义 7 动作面板')
-assert(examJs.includes("require('../../../utils/ai-teacher-request')"), '考试结果页必须复用主包中的老师请求模块')
+assert(examJs.includes('getApp().requestAiTeacher(api, payload, {'), '考试结果页必须通过 App 复用主包中的老师请求模块')
 assert(practiceWxml.includes('select408TeacherAction'), '普通练习结果页缺少自定义动作选择处理')
 assert(examWxml.includes('select408TeacherAction'), '考试结果页缺少自定义动作选择处理')
 assert(helper.submitFeedback === undefined, '408 AI helper 不再导出已移除的反馈能力')

@@ -123,7 +123,7 @@ test('exam 408 teacher wiring exposes the exact controller port set', () => {
 
 test('exam 408 teacher ports are wired to exact page helpers', () => {
   const source = method('exam408TeacherController')
-  assert.ok(source.includes('requestTeacher(api, payload, {'))
+  assert.ok(source.includes('getApp().requestAiTeacher(api, payload, {'))
   assert.ok(source.includes('this._teacherRequestSeq === sequence'))
   assert.ok(source.includes('Number(this.data.attemptId) === Number(payload.exam_attempt_id)'))
   assert.ok(source.includes('presentTeacherResult(aiTeacher408.normalizeResult(raw))'))
@@ -158,13 +158,19 @@ function loadPage() {
     getErrorMessage: error => error.message,
   }
   vm.runInNewContext(pageSource, {
+    getApp: () => ({
+      getAiTeacher: () => ({
+        ...localRequire('../../../utils/ai-teacher-408'),
+        ...localRequire('../../../utils/teacher-presentation'),
+      }),
+      requestAiTeacher: () => {
+        teacherLoads += 1
+        throw new Error('AI 服务暂不可用')
+      },
+    }),
     Page: definition => { page = definition },
     require: specifier => {
       if (specifier === '../../../utils/api') return api
-      if (specifier === '../../../utils/ai-teacher-request') {
-        teacherLoads += 1
-        throw new Error('AI 服务暂不可用')
-      }
       assert.ok(!specifier.includes('../../study/'), 'exam must load without the study package')
       return localRequire(specifier)
     },

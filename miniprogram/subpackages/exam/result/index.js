@@ -1,6 +1,6 @@
 const api = require('../../../utils/api')
-const aiTeacher408 = require('../../../utils/ai-teacher-408')
-const { presentTeacherResult } = require('../../../utils/teacher-presentation')
+const aiTeacher408 = getApp().getAiTeacher()
+const { presentTeacherResult } = aiTeacher408
 const { createExamResultLoadController } = require('../utils/exam-result-load-controller')
 const { createExam408TeacherController } = require('../utils/exam-408-teacher-controller')
 const { clamp, percentNumber, compactDuration, compactScore, encouragement, encouragementTail, firstWrongIdByQuestion, buildKnowledgeMetrics, buildRadar, buildScoreRing, buildTopItems, collectWrongIds } = require('../utils/exam-result-view')
@@ -279,9 +279,8 @@ Page({
         nextRequestSequence: () => ++this._teacherRequestSeq,
         getRequestSequence: () => this._teacherRequestSeq,
         postTeacher: async payload => {
-          const { requestTeacher } = require('../../../utils/ai-teacher-request')
           const sequence = this._teacherRequestSeq
-          return requestTeacher(api, payload, {
+          return getApp().requestAiTeacher(api, payload, {
             isCurrent: () => this._pageAlive && this._teacherRequestSeq === sequence &&
               Number(this.data.attemptId) === Number(payload.exam_attempt_id),
           })
