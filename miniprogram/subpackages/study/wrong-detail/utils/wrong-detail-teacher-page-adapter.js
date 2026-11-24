@@ -1,4 +1,4 @@
-const { requestTeacher } = require('../../utils/ai-teacher-request')
+const { requestTeacher } = require('../../../../utils/ai-teacher-request')
 
 function buildTeacherActionPageCapabilities(page, { api, aiTeacher408, presentTeacherResult, AI_REQUEST_TIMEOUT_MS }) {
 return {

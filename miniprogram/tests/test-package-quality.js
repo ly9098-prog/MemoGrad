@@ -7,6 +7,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
 const { matchesPackIgnore, collectPackageSizes, checkBudgets } = require('./test-main-package-size')
+const { inspectPackageDependencies, checkPackageDependencies } = require('../scripts/architecture/package-dependencies')
 
 assert.equal(matchesPackIgnore('tests/a.js', { type: 'folder', value: 'tests' }), true)
 assert.equal(matchesPackIgnore('tests-extra/a.js', { type: 'folder', value: 'tests' }), false)
@@ -78,15 +79,33 @@ assert.equal(config.setting.ignoreCodeQuality, undefined, 'quality checks must n
 // Every subpackage vendor copy, including the Babel exclusions, must satisfy upload grammar.
 require('./test-katex-upload-syntax')
 const app = readJson('app.json')
+const boundaryConfig = { subPackages: [
+  { root: 'subpackages/study' }, { root: 'subpackages/exam' },
+  { root: 'subpackages/independent', independent: true },
+] }
+for (const source of [
+  "require('../../study/utils/ai-teacher-request')",
+  "require('/subpackages/study/utils/ai-teacher-408')",
+  "import helper from '../../study/utils/ai-teacher-408'",
+  "export { helper } from '../../study/utils/ai-teacher-408'",
+]) {
+  assert.equal(inspectPackageDependencies(source, 'subpackages/exam/result/index.js', boundaryConfig).length, 1)
+}
+assert.equal(inspectPackageDependencies("require('../utils/local')", 'subpackages/exam/result/index.js', boundaryConfig).length, 0)
+assert.equal(inspectPackageDependencies("require('../../../utils/shared')", 'subpackages/exam/result/index.js', boundaryConfig).length, 0)
+assert.equal(inspectPackageDependencies("require('./subpackages/exam/utils/local')", 'app.js', boundaryConfig).length, 1)
+assert.equal(inspectPackageDependencies("require('../../utils/shared')", 'subpackages/independent/index.js', boundaryConfig).length, 1)
+assert.deepEqual(checkPackageDependencies(miniRoot, app, relative =>
+  (config.packOptions.ignore || []).some(rule => matchesPackIgnore(relative, rule))), [])
 assert.equal(app.usingComponents['app-dialog'], '/components/app-dialog/index')
 assert.equal(app.usingComponents['premium-nav'], '/components/premium-nav/premium-nav')
 const routeTeacherRequest = path.join(miniRoot, 'utils/ai-teacher-request.js')
-assert.equal(fs.existsSync(routeTeacherRequest), false,
-  'subpackage-only teacher request helper must not remain in the main package')
+assert.equal(fs.existsSync(routeTeacherRequest), true,
+  'study and exam must share the teacher request helper through the main package')
 assert.equal(
   fs.existsSync(path.join(miniRoot, 'subpackages/study/utils/ai-teacher-request.js')),
-  true,
-  'the shared teacher request helper must stay inside the study subpackage',
+  false,
+  'do not retain a second teacher request implementation inside study',
 )
 checkBudgets(collectPackageSizes(miniRoot, app, config))
 console.log('Package quality regression checks passed')

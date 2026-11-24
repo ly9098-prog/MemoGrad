@@ -45,7 +45,7 @@ async function applyResultResponse(options, response) {
   const scoreRing = options.buildScoreRing(scoreRatePct)
   const radar = options.buildRadar(metrics)
   const topItems = options.buildTopItems(metrics)
-  const weakCount = metrics.filter(item => Number(item.accuracyPct) < 70).length
+  const weakCount = metrics.filter(item => item.answeredCount !== 0 && item.source !== 'fallback' && Number(item.accuracyPct) < 70).length
   options.setWrongIds(options.collectWrongIds(response))
   options.resetDiagnosisIndex()
   const resultQuestions = Array.isArray(response.questions) ? response.questions : []
@@ -73,6 +73,7 @@ function buildResultPatch(options, response, computed) {
     loading: false,
     result: {
       scoreValue: options.compactScore(score),
+      totalScoreValue: options.compactScore(response.total_choice_score),
       scoreRatePct,
       accuracyPct,
       correctCount: Number(response.correct_count || 0),
@@ -91,6 +92,12 @@ function buildResultPatch(options, response, computed) {
     radarEdges: radar.radarEdges,
     radarPolygonStyle: radar.radarPolygonStyle,
     topItems,
+    reviewQuestionIndex: 0,
+    reviewQuestions: (response.questions || []).filter(question => Number(question.question_id) > 0)
+      .map((question, index) => ({
+        questionId: Number(question.question_id),
+        title: `第 ${index + 1} 题 · ${question.status === 'correct' ? '答对' : question.status === 'wrong' ? '答错' : '未作答'}`,
+      })),
     weakCount,
     wrongDetailCount: options.getWrongIdsLength(),
   }

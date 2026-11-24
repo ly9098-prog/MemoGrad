@@ -10,7 +10,7 @@ const { getQuestionListHeightRpx: _getQuestionListHeightRpx, buildErrorDonutGrad
 const { stripLevelPrefix: _stripLevelPrefix, growthFromTotalExp: _growthFromTotalExp, normalizeGrowthProfile: _normalizeGrowthProfile, growthFromOverview: _growthFromOverview } = require('./utils/growth-helpers');
 const { buildRecoveredResultPayload: _buildRecoveredResultPayload } = require('./utils/recovered-payload-builder');
 const { normalizePracticeReturnRoute: _normalizePracticeReturnRoute, safeDecodeJson: _safeDecodeJson } = require('./utils/route-helpers');
-const aiTeacher408 = require('../utils/ai-teacher-408');
+const aiTeacher408 = require('../../../utils/ai-teacher-408');
 const { safeDecodeURIComponent } = require('../utils/route-params');
 const { formatMathPreviewText, formatAnswerPreview, normalizeReviewStatus, pad2, getQuestionTitle, normalizeKpList } = require('./utils/review-preview-format');
 const { buildReviewAnalysisView } = require('./utils/review-analysis-view');

@@ -4,6 +4,6 @@
   "backgroundColor": "#F3F4F1",
   "usingComponents": {
     "quiz-runner": "/subpackages/exam/components/quiz-runner/quiz-runner",
-    "app-dialog": "/components/app-dialog/index"
+    "submit-confirm": "/components/submit-confirm/submit-confirm"
   }
 }

@@ -5,7 +5,7 @@
   "usingComponents": {
     "loading-lottie": "/subpackages/study/components/loading-lottie/loading-lottie",
     "premium-nav": "/components/premium-nav/premium-nav",
-    "submit-confirm": "/subpackages/study/components/submit-confirm/submit-confirm",
+    "submit-confirm": "/components/submit-confirm/submit-confirm",
     "app-dialog": "/components/app-dialog/index",
     "wrong-book-empty": "../components/wrong-book-empty/index",
     "question-filter-panel": "/components/question-filter-panel/index"

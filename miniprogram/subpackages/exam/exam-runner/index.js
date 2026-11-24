@@ -490,7 +490,7 @@ Page({
   goQuestion(e) { this._moveTo(e.detail.index) },
 
   _showAppDialog(opts) {
-    const dialog = this.selectComponent('#appDialog')
+    const dialog = this.selectComponent('#submitConfirm')
     if (!dialog || typeof dialog.show !== 'function') return Promise.resolve(false)
     return dialog.show(opts || {})
   },

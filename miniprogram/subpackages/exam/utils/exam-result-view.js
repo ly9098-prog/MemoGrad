@@ -92,9 +92,11 @@ function buildKnowledgeStats(questions) {
       : []
     names.forEach(function(name) {
       var item = stats.get(name)
-      if (!item) { item = { name: name, questionCount: 0, correctCount: 0, wrongQuestionId: 0, source: "knowledge" }; stats.set(name, item) }
+      if (!item) { item = { name: name, questionCount: 0, correctCount: 0, answeredCount: 0, unansweredCount: 0, wrongQuestionId: 0, source: "knowledge" }; stats.set(name, item) }
       item.questionCount += 1
       if (question.status === "correct") item.correctCount += 1
+      if (question.status === 'correct' || question.status === 'wrong') item.answeredCount += 1
+      else item.unansweredCount += 1
       if (!item.wrongQuestionId && question.status !== "correct") item.wrongQuestionId = firstWrongIdByQuestion(question)
     })
   })
@@ -135,7 +137,7 @@ function fillOverallAndFallback(metrics, result) {
   }
   while (metrics.length < RADAR_SIZE) {
     var index = metrics.length + 1
-    metrics.push({ name: "能力维度" + index, questionCount: Number(result && result.question_count || 0), correctCount: Number(result && result.correct_count || 0), accuracyPct: overallAccuracy, wrongQuestionId: 0, source: "fallback" })
+    metrics.push({ name: "暂无数据 " + index, questionCount: 0, correctCount: 0, accuracyPct: 0, wrongQuestionId: 0, source: "fallback" })
   }
 }
 
@@ -150,12 +152,14 @@ function buildRadar(items) {
     const radius = maxRadius * ratio
     const x = center + Math.cos(angle) * radius
     const y = center + Math.sin(angle) * radius
-    const tag = masteryTag(item.accuracyPct)
+    const tag = item.source === 'fallback' ? { label: '无数据', tone: 'unknown' }
+      : item.answeredCount === 0 ? { label: '未作答', tone: 'unknown' } : masteryTag(item.accuracyPct)
     points.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`)
     return {
       ...item,
       index,
       displayName: shortName(item.name),
+      axisName: shortName(item.name, 6),
       tagLabel: tag.label,
       tagTone: tag.tone,
       pointX: x,
@@ -202,7 +206,7 @@ function buildScoreRing(ratePct) {
 
 function buildTopItems(metrics) {
   return (metrics || [])
-    .filter(item => item && item.source !== 'fallback')
+    .filter(item => item && item.source !== 'fallback' && item.answeredCount !== 0)
     .slice()
     .sort((a, b) => {
       if (b.accuracyPct !== a.accuracyPct) return b.accuracyPct - a.accuracyPct

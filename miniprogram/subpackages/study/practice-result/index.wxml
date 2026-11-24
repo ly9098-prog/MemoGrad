@@ -1,4 +1,4 @@
-<import src="../components/ai-teacher-content/content.wxml" />
+<import src="../../../components/ai-teacher-content/content.wxml" />
 <root-back-guard />
 <view class="page">
 <app-dialog id="appDialog" theme="mint"></app-dialog>

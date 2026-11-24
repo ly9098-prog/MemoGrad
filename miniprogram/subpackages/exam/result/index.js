@@ -1,6 +1,6 @@
 const api = require('../../../utils/api')
-const { requestTeacher } = require('../../study/utils/ai-teacher-request')
-const aiTeacher408 = require('../../study/utils/ai-teacher-408')
+const aiTeacher408 = require('../../../utils/ai-teacher-408')
+const { presentTeacherResult } = require('../../../utils/teacher-presentation')
 const { createExamResultLoadController } = require('../utils/exam-result-load-controller')
 const { createExam408TeacherController } = require('../utils/exam-408-teacher-controller')
 const { clamp, percentNumber, compactDuration, compactScore, encouragement, encouragementTail, firstWrongIdByQuestion, buildKnowledgeMetrics, buildRadar, buildScoreRing, buildTopItems, collectWrongIds } = require('../utils/exam-result-view')
@@ -21,13 +21,19 @@ Page({
     weakCount: 0,
     wrongDetailCount: 0,
     teacherActions: aiTeacher408.ACTIONS,
+    teacherPrimaryActions: aiTeacher408.PRIMARY_ACTIONS,
+    teacherMoreActions: aiTeacher408.MORE_ACTIONS,
+    teacherActionsExpanded: false,
+    teacherLastAction: '',
+    reviewQuestions: [],
+    reviewQuestionIndex: 0,
     teacherLoading: false,
     teacherResult: null,
     teacherErrorText: '',
     teacherSheetVisible: false,
     icons: {
       sprout: '/subpackages/exam/result/assets/sprout.png',
-      radarGrid: '/subpackages/exam/result/assets/radar-grid.png',
+      radarGrid: '/subpackages/exam/result/assets/radar-grid.svg',
     },
   },
 
@@ -227,14 +233,25 @@ Page({
   },
 
   open408Teacher() {
-    if (!this.data.attemptId) return
-    const questionId = Number(this._firstQuestionId || 0)
-    if (!questionId) {
-      wx.showToast({ title: '本次暂无可复盘题目', icon: 'none' })
-      return
-    }
-    const action = this.data.result && this.data.result.wrongCount > 0 ? 'core_concept' : 'explain_correct'
-    this.run408Teacher(action, questionId)
+    if (this.data.attemptId && this._firstQuestionId) this.setData({ teacherSheetVisible: true })
+    else wx.showToast({ title: '本次暂无可复盘题目', icon: 'none' })
+  },
+
+  selectTeacherQuestion(e) {
+    const index = Number(e.detail.value)
+    const question = this.data.reviewQuestions[index]
+    if (!question || this.data.teacherLoading) return
+    this._firstQuestionId = question.questionId
+    this._teacherRequestSeq += 1
+    this.setData({ reviewQuestionIndex: index, teacherResult: null, teacherErrorText: '', teacherLastAction: '' })
+  },
+
+  toggleTeacherActions() {
+    this.setData({ teacherActionsExpanded: !this.data.teacherActionsExpanded })
+  },
+
+  retry408Teacher() {
+    if (this.data.teacherLastAction) this.run408Teacher(this.data.teacherLastAction)
   },
 
   select408TeacherAction(e) {
@@ -242,7 +259,8 @@ Page({
     if (action) this.run408Teacher(action)
   },
 
-  async run408Teacher(action, questionId) {
+  async run408Teacher(action, questionId = this._firstQuestionId) {
+    if (!this.data.teacherLoading) this.setData({ teacherLastAction: action })
     return this._exam408TeacherController().run(action, questionId)
   },
 
@@ -260,14 +278,15 @@ Page({
         deleteInflight: key => { delete this._teacherInflight[key] },
         nextRequestSequence: () => ++this._teacherRequestSeq,
         getRequestSequence: () => this._teacherRequestSeq,
-        postTeacher: payload => {
+        postTeacher: async payload => {
+          const { requestTeacher } = require('../../../utils/ai-teacher-request')
           const sequence = this._teacherRequestSeq
           return requestTeacher(api, payload, {
             isCurrent: () => this._pageAlive && this._teacherRequestSeq === sequence &&
               Number(this.data.attemptId) === Number(payload.exam_attempt_id),
           })
         },
-        normalizeResult: raw => aiTeacher408.normalizeResult(raw),
+        normalizeResult: raw => presentTeacherResult(aiTeacher408.normalizeResult(raw)),
         errorMessage: error => aiTeacher408.errorMessage(error, api),
       })
     }
@@ -277,5 +296,6 @@ Page({
   close408Teacher() {
     this.setData({ teacherSheetVisible: false })
   },
+  noop() {},
 
 })

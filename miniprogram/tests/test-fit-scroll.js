@@ -131,7 +131,7 @@ test('all teacher surfaces fit their body while ordinary review keeps its fixed 
 })
 
 test('old summary-only responses become truthful uncached failures', () => {
-  const teacher = require('../subpackages/study/utils/ai-teacher-408')
+  const teacher = require('../utils/ai-teacher-408')
   for (const action of ['explain_correct', 'core_concept', 'connect_knowledge', 'high_frequency_traps']) {
     const result = teacher.normalizeResult({ action, title: '编码能力', summary: '再由公式', from_fallback: false })
     assert.equal(result.fromFallback, true)

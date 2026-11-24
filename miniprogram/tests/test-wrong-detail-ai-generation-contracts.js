@@ -329,6 +329,16 @@ function availabilityPage() {
   return page
 }
 
+function withFrozenNow(now, run) {
+  const originalNow = Date.now
+  Date.now = () => now
+  try {
+    return run()
+  } finally {
+    Date.now = originalNow
+  }
+}
+
 test('availability maps disabled state and all three user-facing reasons', () => {
   const page = availabilityPage()
   for (const [state, reason] of [
@@ -380,18 +390,20 @@ test('silent failed checks retain cooldown retries until a later successful prob
   const page = availabilityPage()
   const delays = []
   page._scheduleAiAvailabilityRetry = delay => delays.push(delay)
-  for (let attempt = 0; attempt < 3; attempt++) {
-    assert.equal(availability._applyAvailability(page, {
-      status: 'unavailable', enabled: false, reason: 'quota',
-      retry_after_ms: 300000,
-    }, { silent: true }), false)
-  }
-  assert.deepEqual(delays, [300000, 300000, 300000])
+  withFrozenNow(1_700_000_000_000, () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      assert.equal(availability._applyAvailability(page, {
+        status: 'unavailable', enabled: false, reason: 'quota',
+        retry_after_ms: 300000,
+      }, { silent: true }), false)
+    }
+    assert.deepEqual(delays, [300000, 300000, 300000])
 
-  assert.equal(availability._applyAvailability(page, {
-    status: 'available', enabled: true, reason: '', retry_after_ms: 30000,
-  }, { silent: true }), true)
-  assert.deepEqual(delays, [300000, 300000, 300000])
+    assert.equal(availability._applyAvailability(page, {
+      status: 'available', enabled: true, reason: '', retry_after_ms: 30000,
+    }, { silent: true }), true)
+    assert.deepEqual(delays, [300000, 300000, 300000])
+  })
 })
 
 test('availability timeout ends the five-second check but keeps action disabled', async () => {

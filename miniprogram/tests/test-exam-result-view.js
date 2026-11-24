@@ -94,7 +94,7 @@ test('buildKnowledgeStats aggregates per knowledge point and keeps the first wro
   ]
   assert.deepEqual([...buildKnowledgeStats(questions).entries()], [[
     '同',
-    { name: '同', questionCount: 2, correctCount: 1, wrongQuestionId: 7, source: 'knowledge' },
+    { name: '同', questionCount: 2, correctCount: 1, answeredCount: 2, unansweredCount: 0, wrongQuestionId: 7, source: 'knowledge' },
   ]])
   // The original page implementation reads the array directly, so null still throws.
   assert.throws(() => buildKnowledgeStats(null), TypeError)
@@ -115,14 +115,15 @@ test('sortAndSliceMetrics ranks by question count, accuracy and name, then caps 
   assert.deepEqual(sortAndSliceMetrics(new Map()), [])
 })
 
-test('buildKnowledgeMetrics fills overall and fallback dimensions to the radar size', () => {
+test('missing dimensions stay empty instead of inventing mastery from overall accuracy', () => {
   const metrics = buildKnowledgeMetrics({ score: 20, total_score: 30, accuracy: 0.66, duration_sec: 600, questions: [] })
   assert.equal(metrics.length, 5)
-  assert.deepEqual(metrics.map(item => item.name), ['综合表现', '能力维度2', '能力维度3', '能力维度4', '能力维度5'])
+  assert.deepEqual(metrics.map(item => item.name), ['综合表现', '暂无数据 2', '暂无数据 3', '暂无数据 4', '暂无数据 5'])
   assert.ok(metrics.every(item => item.source === 'overall' || item.source === 'fallback'))
   assert.equal(metrics[0].accuracyPct, 66)
   assert.deepEqual(buildKnowledgeMetrics(null).map(item => item.name),
-    ['综合表现', '能力维度2', '能力维度3', '能力维度4', '能力维度5'])
+    ['综合表现', '暂无数据 2', '暂无数据 3', '暂无数据 4', '暂无数据 5'])
+  assert.ok(metrics.slice(1).every(item => item.accuracyPct === 0 && item.questionCount === 0))
 })
 
 test('buildTopItems filters fallbacks, ranks at most three and adds display fields', () => {
@@ -148,7 +149,7 @@ test('buildTopItems filters fallbacks, ranks at most three and adds display fiel
 })
 
 test('buildRadar projects item coordinates and keeps the polygon contract', () => {
-  const metrics = buildKnowledgeMetrics({ score: 20, total_score: 30, accuracy: 0.66, duration_sec: 600, questions: [] })
+  const metrics = Array.from({ length: 5 }, (_, index) => ({ name: index ? `维度${index}` : '综合表现', questionCount: 0, correctCount: 0, accuracyPct: 66, wrongQuestionId: 0, source: 'overall' }))
   const radar = buildRadar(metrics)
   assert.equal(radar.radarItems.length, 5)
   assert.equal(radar.radarEdges.length, 5)
@@ -161,7 +162,7 @@ test('buildRadar projects item coordinates and keeps the polygon contract', () =
   assert.deepEqual([first.tagLabel, first.tagTone], ['\u5f85\u63d0\u5347', 'weak'])
   assert.deepEqual(first, {
     name: '\u7efc\u5408\u8868\u73b0', questionCount: 0, correctCount: 0, accuracyPct: 66,
-    wrongQuestionId: 0, source: 'overall', index: 0, displayName: '\u7efc\u5408\u8868\u73b0',
+    wrongQuestionId: 0, source: 'overall', index: 0, displayName: '\u7efc\u5408\u8868\u73b0', axisName: '综合表现',
     tagLabel: '\u5f85\u63d0\u5347', tagTone: 'weak', pointX: 50, pointY: 21.95,
     pointStyle: 'left:50.00%;top:21.95%;',
   })
@@ -171,6 +172,30 @@ test('buildRadar projects item coordinates and keeps the polygon contract', () =
     'polygon(50.00% 21.95%,76.68% 41.33%,66.49% 72.69%,33.51% 72.69%,23.32% 41.33%)')
   assert.equal(buildRadar([]).radarPolygonStyle, 'clip-path:polygon();-webkit-clip-path:polygon();')
   assert.deepEqual(buildRadar(undefined).radarItems, [])
+})
+
+test('zero and sparse radar values stay truthful while the grid supplies the pentagon', () => {
+  for (const values of [[0, 0, 0, 0, 0], [100, 0, 0, 0, 0], [40, 60, 80, 20, 100]]) {
+    const items = values.map((accuracyPct, index) => ({ name: `知识点${index}`, accuracyPct, answeredCount: accuracyPct ? 1 : 0 }))
+    const radar = buildRadar(items)
+    assert.equal(radar.radarItems.length, 5)
+    radar.radarItems.forEach((item, index) => {
+      const distance = Math.hypot(item.pointX - 50, item.pointY - 50)
+      assert.ok(Math.abs(distance - values[index] * .425) < 1e-8)
+      if (!values[index]) assert.equal(item.tagLabel, '未作答')
+    })
+  }
+})
+
+test('unanswered knowledge points are labeled without being ranked as good performance', () => {
+  const metrics = buildKnowledgeMetrics({ questions: [
+    { question_id: 1, status: 'correct', knowledge_points: ['栈'] },
+    { question_id: 2, status: 'unanswered', knowledge_points: ['图'] },
+  ] })
+  const unanswered = metrics.find(item => item.name === '图')
+  assert.equal(unanswered.answeredCount, 0)
+  assert.equal(unanswered.unansweredCount, 1)
+  assert.ok(!buildTopItems(metrics).some(item => item.name === '图'))
 })
 
 test('buildScoreRing only shows caps for partial scores', () => {

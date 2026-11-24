@@ -275,6 +275,6 @@ test('review-today registers the confirm component the exit prompt selects', () 
     path.join(root, 'subpackages/study/review-today/review-today.json'), 'utf8'))
   assert.equal(
     config.usingComponents['submit-confirm'],
-    '/subpackages/study/components/submit-confirm/submit-confirm'
+    '/components/submit-confirm/submit-confirm'
   )
 })

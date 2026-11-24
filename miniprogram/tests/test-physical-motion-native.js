@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process')
 const { test } = require('node:test')
 const root = path.resolve(__dirname, '..')
 const compiler = '/mnt/d/Code/WeixinDev/微信web开发者工具/resources/app.asar.unpacked/node_modules/wcc-exec/wcc.exe'
-const teacherContent = 'subpackages/study/components/ai-teacher-content/content.wxml'
+const teacherContent = 'components/ai-teacher-content/content.wxml'
 
 test('native result template paints one reader for review, teacher and guest states', t => {
   if (!fs.existsSync(compiler)) return t.skip('WeChat WXML compiler is unavailable')
@@ -65,7 +65,7 @@ test('both teacher pages render shared lessons without losing raw or presented k
   if (!fs.existsSync(compiler)) return t.skip('WeChat WXML compiler is unavailable')
   const files = ['subpackages/study/practice-result/index.wxml',
     'subpackages/study/wrong-detail/wrong-detail.wxml']
-  const compiled = spawnSync(compiler, [...files, teacherContent],
+  const compiled = spawnSync(compiler, [...files, teacherContent, 'components/ai-teacher-content/actions.wxml'],
     { cwd: root, encoding: 'utf8', timeout: 30000, maxBuffer: 4e6 })
   assert.equal(compiled.status, 0, compiled.stderr)
   const context = vm.createContext({ window: { __webview_engine_version__: .02 }, console })

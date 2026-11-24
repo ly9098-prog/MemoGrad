@@ -33,13 +33,13 @@ function buildExamSubmitEntryPageCapabilities(page) {
     showConfirmDialog: dialog => page._showAppDialog(dialog),
     buildConfirmDialog: () => {
       const unanswered = Math.max(0, page.data.totalCount - page.data.answeredCount)
-      const marked = (page.data.questions || []).filter((q) => q._marked).length
       return {
         scenario: unanswered ? 'unanswered' : 'all-done',
+        layout: 'minimal',
         title: '确认交卷',
-        message: `${unanswered ? `还有 ${unanswered} 题未作答。` : '所有题目均已作答。'}${marked ? `\n另有 ${marked} 题待检查。` : ''}\n交卷后不可修改。`,
+        message: `${unanswered ? `还有 ${unanswered} 题未作答。` : '所有题目均已作答。'}\n交卷后不可修改。`,
         confirmText: '确认交卷',
-        cancelText: '继续检查',
+        cancelText: '继续作答',
         hideEyebrow: true,
       }
     },

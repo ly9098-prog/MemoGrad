@@ -4,7 +4,7 @@ const path = require('node:path')
 
 const teacher = require(process.env.STUDY_RESULT_BASELINE
   ? path.join(process.env.STUDY_RESULT_BASELINE, 'ai-teacher-408.js')
-  : '../subpackages/study/utils/ai-teacher-408')
+  : '../utils/ai-teacher-408')
 const test = (name, ...args) => nodeTest(`study: ${name}`, ...args)
 
 test('teacher retains exports and the complete empty result shape and text', () => {

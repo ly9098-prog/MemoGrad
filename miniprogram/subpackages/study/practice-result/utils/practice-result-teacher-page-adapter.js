@@ -1,9 +1,9 @@
 // Page capability assembly for miniprogram/subpackages/study/practice-result/index.js.
 // Assemble live page ports here; the page keeps lazy controller memoisation.
 
-const aiTeacher408 = require('../../utils/ai-teacher-408')
-const { presentTeacherResult } = require('../../utils/teacher-presentation')
-const { requestTeacher } = require('../../utils/ai-teacher-request')
+const aiTeacher408 = require('../../../../utils/ai-teacher-408')
+const { presentTeacherResult } = require('../../../../utils/teacher-presentation')
+const { requestTeacher } = require('../../../../utils/ai-teacher-request')
 
 function buildReview408TeacherPageCapabilities(page, deps) {
   const { api } = deps

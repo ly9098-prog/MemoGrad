@@ -281,7 +281,7 @@ async function main() {
   assert.strictEqual(concurrent._exitConfirmInFlight, false)
 
   let confirmDefinition
-  vm.runInNewContext(read('subpackages/study/components/submit-confirm/submit-confirm.js'), { Component: definition => { confirmDefinition = definition } })
+  vm.runInNewContext(read('components/submit-confirm/submit-confirm.js'), { Component: definition => { confirmDefinition = definition } })
   const confirm = Object.assign({ data: {}, setData(patch) { Object.assign(this.data, patch) } }, confirmDefinition.methods)
   const choice = confirm.show({ layout: 'minimal' })
   assert.strictEqual(confirm.data.layout, 'minimal')
@@ -331,7 +331,7 @@ async function main() {
       assert.strictEqual(byClass(tree, 'runner-q-wrap').length, 1)
       assert.strictEqual(byClass(tree, 'runner-question-motion').length, 1, 'normal and fallback renderers isolate content from card paint')
     }
-    const renderConfirm = compiled.$gwx('subpackages/study/components/submit-confirm/submit-confirm.wxml')
+    const renderConfirm = compiled.$gwx('components/submit-confirm/submit-confirm.wxml')
     const minimal = renderConfirm({ theme: 'mint', visible: true, layout: 'minimal', title: '退出练习？', message: '本组尚未提交', confirmText: '退出', cancelText: '继续作答', scenario: 'info' })
     for (const decoration of ['sc-top-accent', 'sc-icon-circle', 'sc-eyebrow', 'sc-confirm-arrow']) {
       assert.strictEqual(byClass(minimal, decoration).length, 0, 'minimal exit omits ' + decoration)

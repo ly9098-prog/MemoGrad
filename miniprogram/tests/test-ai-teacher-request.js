@@ -4,7 +4,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 const { test } = require('node:test')
 
-const requestModulePath = path.join(__dirname, '../subpackages/study/utils/ai-teacher-request.js')
+const requestModulePath = path.join(__dirname, '../utils/ai-teacher-request.js')
 
 function fixture(states) {
   let clock = 0, current = true
@@ -98,7 +98,7 @@ test('a repeatedly checking POST is bounded and a failed status query never send
 })
 
 test('teacher explains structured availability failures using their specific recovery message', () => {
-  const teacher = require('../subpackages/study/utils/ai-teacher-408')
+  const teacher = require('../utils/ai-teacher-408')
   assert.equal(teacher.errorMessage({ detail: {
     code: 'ai_service_unavailable', message: 'AI 服务检查超时，请稍后重新尝试',
   } }, { getErrorMessage: () => '服务器不可用' }), 'AI 服务检查超时，请稍后重新尝试')

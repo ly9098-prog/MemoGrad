@@ -27,11 +27,11 @@ function buildExamExitRequestPageCapabilities(page) {
     settleCurrentTime: options => page._settleCurrentTime(options),
     showExitDialog: () => page._showAppDialog({
       scenario: 'all-done',
+      layout: 'minimal',
       title: '暂时退出考试？',
       message: '60 分钟内回来可继续作答；超过 60 分钟草稿将被清除，需要重新作答。',
       confirmText: '退出',
       cancelText: '继续作答',
-      hideEyebrow: true,
     }),
     navigateBack: options => wx.navigateBack(options),
   }

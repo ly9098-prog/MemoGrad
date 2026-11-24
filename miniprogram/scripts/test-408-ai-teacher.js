@@ -7,7 +7,7 @@ const assert = require('assert')
 const miniRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(miniRoot, '..')
 const backendRoot = path.join(repoRoot, 'backend')
-const helper = require(path.join(miniRoot, 'subpackages/study/utils/ai-teacher-408.js'))
+const helper = require(path.join(miniRoot, 'utils/ai-teacher-408.js'))
 
 const expectedActions = [
   'explain_correct',
@@ -92,7 +92,7 @@ const surfaces = [
   },
 ]
 
-const teacherRequest = fs.readFileSync(path.join(miniRoot, 'subpackages/study/utils/ai-teacher-request.js'), 'utf8')
+const teacherRequest = fs.readFileSync(path.join(miniRoot, 'utils/ai-teacher-request.js'), 'utf8')
 assert(teacherRequest.includes("api.get('/ai/error-analysis/availability'"), '老师请求必须先等待共享健康门禁')
 assert(teacherRequest.includes("api.post('/ai/408-teacher'"), '共享老师请求必须调用固定 API')
 surfaces.forEach(surface => {
@@ -111,7 +111,7 @@ surfaces.forEach(surface => {
 })
 
 const wrongDetailJs = fs.readFileSync(path.join(miniRoot, 'subpackages/study/wrong-detail/wrong-detail.js'), 'utf8')
-const wrongDetailWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/study/wrong-detail/wrong-detail.wxml'), 'utf8')
+const wrongDetailWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/study/wrong-detail/wrong-detail.wxml'), 'utf8') + fs.readFileSync(path.join(miniRoot, 'components/ai-teacher-content/actions.wxml'), 'utf8')
 const wrongDetailWxss = fs.readFileSync(path.join(miniRoot, 'subpackages/study/wrong-detail/wrong-detail.wxss'), 'utf8')
 assert(wrongDetailWxml.includes('AI 复盘'), '错题详情必须将 AI 能力统一为 AI 复盘入口')
 assert(wrongDetailWxml.includes('teacherPrimaryActions'), 'AI 复盘必须展示精简后的首屏专项动作')
@@ -136,14 +136,14 @@ assert(!/min-height:\s*(?:620|650|660|686|704|820|860)rpx/.test(wrongDetailWxss)
 assert(!/\/\*\s*v(?:8|9|10|11|22|23)\b/.test(wrongDetailWxss), '错因样式不得继续依赖多版本级联覆盖')
 
 const examWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/exam/result/index.wxml'), 'utf8')
-assert(examWxml.includes('交卷后专项 AI 老师'), '考试 AI 入口必须明确位于交卷后结果页')
+assert(examWxml.includes('AI 复盘'), '考试 AI 入口必须明确位于交卷后结果页')
 
 const practiceJs = fs.readFileSync(path.join(miniRoot, 'subpackages/study/practice-result/index.js'), 'utf8')
 const practiceWxml = fs.readFileSync(path.join(miniRoot, 'subpackages/study/practice-result/index.wxml'), 'utf8')
 const examJs = fs.readFileSync(path.join(miniRoot, 'subpackages/exam/result/index.js'), 'utf8')
 assert(practiceJs.includes('teacherActions: aiTeacher408.ACTIONS'), '普通练习结果页必须使用自定义 7 动作面板')
 assert(examJs.includes('teacherActions: aiTeacher408.ACTIONS'), '考试结果页必须使用自定义 7 动作面板')
-assert(examJs.includes("require('../../study/utils/ai-teacher-request')"), '考试结果页必须复用 study 分包中的老师请求模块')
+assert(examJs.includes("require('../../../utils/ai-teacher-request')"), '考试结果页必须复用主包中的老师请求模块')
 assert(practiceWxml.includes('select408TeacherAction'), '普通练习结果页缺少自定义动作选择处理')
 assert(examWxml.includes('select408TeacherAction'), '考试结果页缺少自定义动作选择处理')
 assert(helper.submitFeedback === undefined, '408 AI helper 不再导出已移除的反馈能力')

@@ -1,4 +1,5 @@
-<import src="../components/ai-teacher-content/content.wxml" />
+<import src="../../../components/ai-teacher-content/content.wxml" />
+<import src="../../../components/ai-teacher-content/actions.wxml" />
 <page-meta page-style="{{diagnosisSheetVisible || teacherSheetVisible ? 'overflow: hidden;' : ''}}"></page-meta>
 <template name="ai-loading-sections">
 <view class="ai-skeleton-section {{index === 0 ? 'is-first' : ''}}" wx:for="{{sections}}" wx:key="*this">
@@ -210,22 +211,7 @@
 </button>
 </view>
 <text wx:if="{{!aiAvailabilityEnabled && !aiAvailabilityChecking && aiAvailabilityMessage && !aiFallback}}" class="ai-service-unavailable" aria-live="polite">{{aiAvailabilityMessage}}</text>
-<view class="ai-deep-dive {{aiCards && !aiFallback ? 'has-review' : ''}}">
-<view class="ai-deep-head">
-<view class="ai-deep-copy">
-<text class="ai-deep-title">{{aiCards && !aiFallback ? '继续追问' : '直接提问'}}</text>
-<text class="ai-deep-desc">选择一个方向，获取针对性讲解</text>
-</view>
-<button class="ai-deep-more" hover-class="ai-more-pressed" hover-stay-time="70" disabled="{{teacherLoadingAction || aiLoading || aiRegenerating}}" bindtap="toggleTeacherActions" aria-label="{{teacherActionsExpanded ? '收起更多追问方向' : '查看更多追问方向'}}"><text>{{teacherActionsExpanded ? '收起' : '更多'}}</text><image class="ai-deep-more-arrow-icon {{teacherActionsExpanded ? 'is-up' : ''}}" src="/assets/icons/wrong-detail/chevron-down.svg" mode="aspectFit" aria-hidden="true" /></button>
-</view>
-<view class="ai-deep-actions">
-<button wx:for="{{teacherPrimaryActions}}" wx:key="action" class="ai-deep-action {{teacherLoadingAction === item.action ? 'is-loading' : ''}}" data-action="{{item.action}}" hover-class="ai-deep-action-pressed" hover-stay-time="100" disabled="{{teacherLoadingAction || aiLoading || aiRegenerating || !aiAvailabilityEnabled}}" bindtap="run408TeacherAction" aria-label="{{item.label}}"><view wx:if="{{teacherLoadingAction === item.action}}" class="ai-action-loading-spinner" aria-hidden="true"></view><image wx:else class="ai-deep-action-icon" src="{{item.icon}}" mode="aspectFit" /><text class="ai-deep-action-label">{{teacherLoadingAction === item.action ? '正在生成' : item.shortLabel}}</text><image class="ai-deep-action-arrow-icon" src="/assets/icons/wrong-detail/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></button>
-</view>
-<view class="ai-deep-extra {{teacherActionsExpanded ? 'is-expanded' : 'is-collapsed'}}" aria-hidden="{{!teacherActionsExpanded}}">
-<text class="ai-deep-extra-label">更多方向</text>
-<view class="ai-deep-actions is-extra"><button wx:for="{{teacherMoreActions}}" wx:key="action" class="ai-deep-action secondary {{teacherLoadingAction === item.action ? 'is-loading' : ''}}" data-action="{{item.action}}" hover-class="ai-deep-action-pressed" hover-stay-time="100" disabled="{{teacherLoadingAction || aiLoading || aiRegenerating || !aiAvailabilityEnabled}}" bindtap="run408TeacherAction" aria-label="{{item.label}}"><view wx:if="{{teacherLoadingAction === item.action}}" class="ai-action-loading-spinner" aria-hidden="true"></view><image wx:else class="ai-deep-action-icon" src="{{item.icon}}" mode="aspectFit" /><text class="ai-deep-action-label">{{teacherLoadingAction === item.action ? '正在生成' : item.shortLabel}}</text><image class="ai-deep-action-arrow-icon" src="/assets/icons/wrong-detail/chevron-right.svg" mode="aspectFit" aria-hidden="true" /></button></view>
-</view>
-</view>
+<template is="ai-teacher-actions" data="{{aiCards, aiFallback, teacherPrimaryActions, teacherMoreActions, teacherActionsExpanded, teacherLoadingAction, aiLoading, aiRegenerating, aiAvailabilityEnabled, actionHandler: 'run408TeacherAction'}}" />
 <view class="ai-card-decoration" aria-hidden="true">
 <view class="ai-card-wave wave-1"></view>
 <view class="ai-card-wave wave-2"></view>

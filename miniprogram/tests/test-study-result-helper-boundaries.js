@@ -8,7 +8,7 @@ const { inspectSource } = require('../scripts/architecture/learning-controller-b
 const ROOT = path.resolve(__dirname, '..')
 const ts = createRequire(path.resolve(ROOT, '../admin-frontend/package.json'))('typescript')
 const FILES = [
-  'subpackages/study/utils/ai-teacher-408.js',
+  'utils/ai-teacher-408.js',
   'subpackages/study/practice-result/utils/trend-plot-builder.js',
 ]
 

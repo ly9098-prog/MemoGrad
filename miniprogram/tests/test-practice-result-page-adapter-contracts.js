@@ -28,7 +28,7 @@ if (process.argv[2]) test('native teacher chooser, loading, result and failure r
   assert.doesNotMatch(classes(failed), /teacher-footnote/)
   assert.ok(all(failed).some(node => (node.attr || {}).bindtap === 'retry408Teacher'))
   assert.match(classes(render(base)), /teacher-footnote/)
-  const { presentTeacherResult } = require('../subpackages/study/utils/teacher-presentation')
+  const { presentTeacherResult } = require('../utils/teacher-presentation')
   const variables = render({ ...base, teacherResult: presentTeacherResult({ ...base.teacherResult,
     knowledgePoints: [{ name: 'KMP', relation: 'prerequisite: KMP 使用 next[j] 回退；并查集使用 parent[i]；child = next[j]。' }],
   }) })
@@ -340,7 +340,7 @@ test('practice teacher reuses the wrong-detail knowledge presentation', async ()
 })
 
 test('shared teacher presentation preserves algorithm variables in all teaching text', () => {
-  const { presentTeacherResult } = require('../subpackages/study/utils/teacher-presentation')
+  const { presentTeacherResult } = require('../utils/teacher-presentation')
   const text = 'KMP 使用 next[j] 回退；并查集使用 parent[i] 表示父节点；child = next[j]。'
   const result = presentTeacherResult({ title: 'next 数组', summary: text,
     sections: [{ heading: 'parent[i] 的含义', points: [text] }],
