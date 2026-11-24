@@ -62,8 +62,8 @@ const growthPageMethods = {
       user: {},
       studyLevel: '游客',
       subjectMastery: [],
-      displayName: '同学',
-      userInitial: '研',
+      displayName: '游客',
+      userInitial: '游',
       primaryTaskKicker: 'GUEST PREVIEW',
       primaryTaskTitle: '先体验随机练习',
       primaryTaskDesc: '可完成整组练习并查看答案解析，体验结果仅保存在本机。',
@@ -97,7 +97,8 @@ const growthPageMethods = {
 
   getDisplayName(user) {
     const name = user && (user.nickName || user.nickname || user.name)
-    return name ? String(name).trim().slice(0, 8) : '研友'
+    const normalized = name ? String(name).trim().slice(0, 8) : ''
+    return normalized || '研究生'
   },
 
   getUserInitial(user) {

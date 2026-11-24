@@ -14,7 +14,7 @@ Page({
   data: {
     guestMode: true,
     user: {},
-    displayName: '研友',
+    displayName: '研究生',
     userInitial: '研',
     showProfileSheet: false,
     profileNickname: '',
