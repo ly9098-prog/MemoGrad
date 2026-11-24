@@ -80,6 +80,16 @@ MemoGrad 是一套完整的考研刷题平台，覆盖微信小程序端、管�
 ## 界面预览
 
 <p align="center">
+  <img src="assets/miniprogram-home.webp" alt="MemoGrad 小程序首页，显示晚上好、研究生问候语、今日学习进度和四科掌握概览" width="260" />
+  <img src="assets/miniprogram-practice.webp" alt="MemoGrad 小程序刷题页，显示数据结构 10 题随机练习配置与最近使用科目" width="260" />
+  <img src="assets/miniprogram-formula.webp" alt="MemoGrad 小程序速记页，显示两个重要极限与常用等价无穷小公式" width="260" />
+</p>
+
+<p align="center">
+  <sub>微信小程序 · 首页、刷题、速记公式（示例数据）</sub>
+</p>
+
+<p align="center">
   <img src="assets/admin-dashboard.webp" alt="MemoGrad 管理工作台，包含运营趋势、待办队列、年度题库热力图、AI 解析总览与系统运行状态" width="100%" />
 </p>
 
@@ -87,7 +97,7 @@ MemoGrad 是一套完整的考研刷题平台，覆盖微信小程序端、管�
   <sub>管理工作台 · 题库运营、审核队列、年度活动、AI 用量与系统健康集中查看（示例数据）</sub>
 </p>
 
-管理工作台将用户与题库增长、待审核队列、年度 2D/3D 活动分布、AI 调用质量和系统运行状态集中到同一视图，帮助管理员快速定位待处理事项与运行异常。
+小程序提供游客体验、今日学习、刷题配置和速记公式等核心入口；管理工作台将用户与题库增长、待审核队列、年度 2D/3D 活动分布、AI 调用质量和系统运行状态集中到同一视图，帮助管理员快速定位待处理事项与运行异常。
 
 ## 系统架构
 

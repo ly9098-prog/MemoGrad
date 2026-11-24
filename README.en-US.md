@@ -66,6 +66,16 @@ MemoGrad is a complete postgraduate-exam study platform that combines a WeChat M
 ## Product Preview
 
 <p align="center">
+  <img src="assets/miniprogram-home.webp" alt="MemoGrad Mini Program home with a good evening greeting, daily learning progress, and subject mastery overview" width="260" />
+  <img src="assets/miniprogram-practice.webp" alt="MemoGrad Mini Program practice setup for a 10-question data structures session" width="260" />
+  <img src="assets/miniprogram-formula.webp" alt="MemoGrad Mini Program formula review showing two important limits and common equivalent infinitesimals" width="260" />
+</p>
+
+<p align="center">
+  <sub>WeChat Mini Program · Home, practice setup, and formula review (sample data)</sub>
+</p>
+
+<p align="center">
   <img src="assets/admin-dashboard.webp" alt="MemoGrad admin dashboard with operations trends, review queues, annual question heatmap, AI usage overview, and system health" width="100%" />
 </p>
 
@@ -73,7 +83,7 @@ MemoGrad is a complete postgraduate-exam study platform that combines a WeChat M
   <sub>Admin console · Question operations, review queues, annual activity, AI usage, and system health in one view (sample data)</sub>
 </p>
 
-The admin workspace combines user and question growth, pending review queues, annual 2D/3D activity distribution, AI usage quality, and runtime health so operators can quickly locate work that needs attention.
+The Mini Program provides guest access, daily learning, practice setup, and formula review; the admin workspace combines user and question growth, pending review queues, annual 2D/3D activity distribution, AI usage quality, and runtime health so operators can quickly locate work that needs attention.
 
 ## Architecture
 
