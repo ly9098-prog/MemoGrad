@@ -379,11 +379,13 @@ test('checking responses schedule a short retry instead of leaving the page stuc
   const page = availabilityPage()
   const delays = []
   page._scheduleAiAvailabilityRetry = delay => delays.push(delay)
-  availability._applyAvailability(page, {
-    status: 'checking', enabled: false, reason: 'checking',
-    message: '正在检查 AI 服务', retry_after_ms: 2000,
-  }, { silent: true })
-  assert.deepEqual(delays, [2000])
+  withFrozenNow(1_700_000_000_000, () => {
+    availability._applyAvailability(page, {
+      status: 'checking', enabled: false, reason: 'checking',
+      message: '正在检查 AI 服务', retry_after_ms: 2000,
+    }, { silent: true })
+    assert.deepEqual(delays, [2000])
+  })
 })
 
 test('silent failed checks retain cooldown retries until a later successful probe', () => {
