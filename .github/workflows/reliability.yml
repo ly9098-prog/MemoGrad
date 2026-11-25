@@ -414,6 +414,7 @@ jobs:
           node miniprogram/scripts/architecture/pomodoro-stats-boundaries.js
           node miniprogram/scripts/architecture/wrong-book-boundaries.js
           node miniprogram/scripts/architecture/wrong-detail-boundaries.js
+          node miniprogram/tests/test-component-paths.js
           node --test miniprogram/tests/test-page-budgets.js
           node --test miniprogram/tests/test-learning-controller-budgets.js
           node --test miniprogram/tests/test-home-mastery-fallback.js
