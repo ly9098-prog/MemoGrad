@@ -3025,7 +3025,7 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
   position: relative;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 28rpx calc(24rpx + env(safe-area-inset-bottom));
+  padding: 0 28rpx calc(32rpx + env(safe-area-inset-bottom));
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -3044,9 +3044,11 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
 .knowledge-subject-sheet .knowledge-subject-sheet-close { color: #53665D; }
 .knowledge-subject-close-icon { width: 34rpx; height: 34rpx; }
 .knowledge-subject-grid {
-  gap: 16rpx;
+  gap: 20rpx;
 }
 .knowledge-subject-grid .knowledge-subject-tile {
+  width: auto;
+  min-width: 0;
   flex-direction: row;
   align-items: center;
   justify-content: center;
@@ -3064,7 +3066,6 @@ page { background:#F2F3EF; background-color:#F2F3EF; }
   background: #EAF9F4;
   box-shadow: 0 6rpx 18rpx rgba(58, 111, 91, .07);
 }
-.knowledge-subject-grid .knowledge-subject-tile.has-trailing { padding-right: 64rpx; }
 .knowledge-subject-tile-main { justify-content: flex-start; gap: 16rpx; }
 .knowledge-subject-tile-icon { display: block; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; }
 .knowledge-subject-tile-name {

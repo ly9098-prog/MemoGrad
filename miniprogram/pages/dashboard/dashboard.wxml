@@ -742,9 +742,10 @@
       </button>
     </view>
     <view class="knowledge-subject-grid mini-choice-grid">
-      <button wx:for="{{knowledgeDiagnosisSubjects}}" wx:key="subjectId"
-        class="knowledge-subject-tile mini-choice-option {{knowledgeSubjectSheetSelectedId === item.subjectId ? 'is-selected has-trailing' : ''}}"
+      <view wx:for="{{knowledgeDiagnosisSubjects}}" wx:key="subjectId"
+        class="knowledge-subject-tile mini-choice-option {{knowledgeSubjectSheetSelectedId === item.subjectId ? 'is-selected' : ''}}"
         bindtap="selectKnowledgeDiagnosisSubject" data-subject-id="{{item.subjectId}}"
+        role="button"
         aria-label="{{item.name}}{{knowledgeSubjectSheetSelectedId === item.subjectId ? '，当前已选' : ''}}"
         aria-pressed="{{knowledgeSubjectSheetSelectedId === item.subjectId}}"
         hover-class="surface-pressed mini-choice-pressed">
@@ -752,12 +753,7 @@
           <image class="knowledge-subject-tile-icon" src="{{knowledgeSubjectSheetSelectedId === item.subjectId ? item.selectedIcon : item.icon}}" mode="aspectFit" aria-hidden="true" />
           <text class="knowledge-subject-tile-name mini-choice-option-title">{{item.name}}</text>
         </view>
-        <view wx:if="{{knowledgeSubjectSheetSelectedId === item.subjectId}}"
-          class="mini-choice-selection-mark" aria-hidden="true">
-          <image class="mini-choice-selection-icon" src="/assets/icons/mobile-controls/check.svg"
-            mode="aspectFit" />
-        </view>
-      </button>
+      </view>
     </view>
   </view>
 </motion-sheet>

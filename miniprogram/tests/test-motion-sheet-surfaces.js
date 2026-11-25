@@ -101,3 +101,38 @@ test('result review and AI teacher share a single reader surface', () => {
   assert.match(hosts[0].markup, /reviewDialogVisible \|\| \(!guestMode && teacherSheetVisible\)/)
   assert.match(hosts[0].content, /class="result-reader-sheet/)
 })
+
+test('paired drawer actions allow both native buttons to shrink inside the sheet', () => {
+  const pairs = [
+    ['subpackages/formulas/library/index.wxss', 'fl-filter-footer'],
+    ['subpackages/study/review-today/review-today.wxss', 'decision-actions'],
+    ['subpackages/study/wrong-detail/wrong-detail.wxss', 'decision-actions'],
+    ['subpackages/study/practice-result/index.wxss', 'review-dialog-footer-ai'],
+  ]
+  for (const [file, selector] of pairs) {
+    const rules = [...read(file).matchAll(new RegExp('\\.' + selector + '\\s*\\{([^}]*)\\}', 'g'))]
+    assert.ok(rules.length > 0, `${file}: missing ${selector}`)
+    assert.match(rules.at(-1)[1], /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+      `${file}: ${selector} must cap both tracks to the available width`)
+  }
+})
+
+test('learning report subject tiles and AI teacher actions keep visible gutters', () => {
+  const dashboardSheets = sheetHosts().filter(host =>
+    host.file === 'pages/dashboard/dashboard.wxml' && /label="选择学科"/.test(host.markup))
+  assert.equal(dashboardSheets.length, 1)
+  assert.doesNotMatch(dashboardSheets[0].content, /mini-choice-selection-mark/)
+  assert.match(dashboardSheets[0].content, /<view wx:for="\{\{knowledgeDiagnosisSubjects\}\}"/)
+  const dashboardStyles = read('pages/dashboard/dashboard.wxss')
+  assert.match(dashboardStyles, /\.knowledge-subject-grid\s*\{[^}]*gap:\s*20rpx/)
+  assert.match(dashboardStyles,
+    /\.knowledge-subject-grid \.knowledge-subject-tile\s*\{[^}]*width:\s*auto;[^}]*min-width:\s*0;/)
+
+  const teacherStyles = read('subpackages/study/practice-result/index.wxss')
+  const footer = teacherStyles.match(/\.teacher-sheet-footer\s*\{([^}]*)\}/)
+  assert.ok(footer)
+  assert.match(footer[1], /gap:\s*32rpx/)
+  assert.doesNotMatch(teacherStyles, /\.teacher-sheet-footer \.mini-choice-sheet-action-primary\s*\{[^}]*margin-left:\s*24rpx/)
+  assert.match(teacherStyles,
+    /\.teacher-action-panel \.mini-choice-option\s*\{[^}]*calc\(50% - 14rpx\)[^}]*margin:\s*0 0 24rpx;/)
+})

@@ -68,3 +68,14 @@ page, .page, .overview-page, .empty-page { background:#F3FBF8; color:#23483C; }
 .batch-sheet-head {
   padding-top: 4rpx;
 }
+
+.decision-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.decision-actions .decision-primary,
+.decision-actions .decision-secondary {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}

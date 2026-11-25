@@ -320,6 +320,11 @@ for (const [styles, control] of [[cardWxss, 'fc-flip-action'], [cardWxss, 'fc-ex
   assert.match(styles, new RegExp('\\.' + control + '\\s*\\{[^}]*min-height:\\s*44px;'),
     control + ' keeps a 44px target on a 320px phone instead of shrinking with rpx')
 }
+assert.match(libraryStyles,
+  /\.fl-filter-footer\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  'filter actions stay inside the sheet even when the native buttons reach their intrinsic width')
+assert.match(libraryStyles, /\.fl-filter-reset\s*\{[^}]*min-width:\s*0;/)
+assert.match(libraryStyles, /\.fl-filter-done\s*\{[^}]*min-width:\s*0;/)
 for (const control of ['fc-flip-front-scroll', 'fc-flip-back-scroll']) {
   const tag = template.match(new RegExp('<scroll-view[^>]*class="' + control + '"[^>]*>'))[0]
   assert.doesNotMatch(tag, /(?:bind|catch)touch(?:start|end|cancel)/,

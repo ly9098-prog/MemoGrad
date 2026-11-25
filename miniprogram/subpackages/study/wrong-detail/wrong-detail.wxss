@@ -339,3 +339,15 @@
     padding: 0 10rpx !important;
   }
 }
+
+.decision-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.decision-actions .decision-primary,
+.decision-actions .decision-secondary,
+.decision-actions .decision-danger {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
