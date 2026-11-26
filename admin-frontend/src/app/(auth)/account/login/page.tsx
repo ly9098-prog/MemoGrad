@@ -8,6 +8,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   ArrowRight,
@@ -57,6 +58,48 @@ const AUTH_ERRORS: Record<string, string> = {
   identity_already_exists: "该 GitHub 身份已绑定到其他账号",
 };
 
+// Redirect notices arrive as query parameters. Reading them through an
+// external store keeps hydration deterministic (server snapshot is null) and
+// avoids the cascading render of setting toast state inside an effect.
+let cachedSearch: string | undefined;
+let cachedUrlToast: AuthToastState | null = null;
+
+function subscribeToLocation(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  return () => window.removeEventListener("popstate", onChange);
+}
+
+function readUrlToast(): AuthToastState | null {
+  if (typeof window === "undefined") return null;
+  const search = window.location.search;
+  if (search === cachedSearch) return cachedUrlToast;
+  cachedSearch = search;
+  const params = new URLSearchParams(search);
+  let notice: { message: string; tone: AuthToastTone } | null = null;
+  if (params.has("email_changed")) {
+    notice = {
+      message: "邮箱已更换，请使用新的登录方式重新登录。",
+      tone: "info",
+    };
+  } else if (params.has("identity_unlinked")) {
+    notice = { message: "登录身份已解绑，请重新登录。", tone: "info" };
+  } else if (params.has("password_changed")) {
+    notice = {
+      message: "登录密码已更新，请使用新密码重新登录。",
+      tone: "info",
+    };
+  } else {
+    const authError = AUTH_ERRORS[params.get("auth_error") || ""];
+    if (authError) notice = { message: authError, tone: "danger" };
+  }
+  cachedUrlToast = notice ? { id: Date.now(), ...notice } : null;
+  return cachedUrlToast;
+}
+
+function serverUrlToast(): AuthToastState | null {
+  return null;
+}
+
 type LoginMode = "password" | "email";
 type PendingAction = "password" | "register" | "github";
 
@@ -98,7 +141,19 @@ export default function LearnerLoginPage() {
     },
     [],
   );
-  const closeToast = useCallback(() => setToast(null), []);
+  const [dismissedUrlToastId, setDismissedUrlToastId] = useState<number | null>(null);
+  const urlToast = useSyncExternalStore(
+    subscribeToLocation,
+    readUrlToast,
+    serverUrlToast,
+  );
+  const visibleToast = toast
+    ?? (urlToast && urlToast.id !== dismissedUrlToastId ? urlToast : null);
+  const closeToast = useCallback(() => {
+    setToast(null);
+    const currentUrlToast = readUrlToast();
+    if (currentUrlToast) setDismissedUrlToastId(currentUrlToast.id);
+  }, []);
 
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -116,18 +171,6 @@ export default function LearnerLoginPage() {
   const [captchaOpen, setCaptchaOpen] = useState(false);
 
   const registrationCodeSent = Boolean(registerChallengeId);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const authError = AUTH_ERRORS[params.get("auth_error") || ""];
-    if (authError) showToast(authError, "danger");
-    if (params.has("identity_unlinked")) {
-      showToast("登录身份已解绑，请重新登录。", "info");
-    }
-    if (params.has("email_changed")) {
-      showToast("邮箱已更换，请使用新的登录方式重新登录。", "info");
-    }
-  }, [showToast]);
 
   useEffect(() => {
     if (loginFinishingRef.current) return;
@@ -176,10 +219,7 @@ export default function LearnerLoginPage() {
     setCaptchaOpen(false);
   }
 
-  async function loginWithPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || !account.trim() || !password) return;
-    if (!requireConsent()) return;
+  async function runPasswordLogin() {
     begin("password");
     try {
       const response = await apiRequest<LearnerAuthResponse>(
@@ -204,6 +244,13 @@ export default function LearnerLoginPage() {
     }
   }
 
+  async function loginWithPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !account.trim() || !password) return;
+    if (!requireConsent(() => void runPasswordLogin())) return;
+    await runPasswordLogin();
+  }
+
   function openRegisterCaptcha(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || captchaOpen) return;
@@ -211,13 +258,13 @@ export default function LearnerLoginPage() {
     if (!registerEmail.trim()) return showToast("请输入邮箱地址", "danger");
     if (registerPassword.length < 12) return showToast("密码至少需要 12 位", "danger");
     if (registerPassword !== confirmPassword) return showToast("两次输入的密码不一致", "danger");
-    if (!requireConsent()) return;
+    if (!requireConsent(() => setCaptchaOpen(true))) return;
     setCaptchaOpen(true);
   }
 
   async function sendRegisterCode(ticket: string) {
     setCaptchaOpen(false);
-    if (!requireConsent()) return;
+    if (!requireConsent(() => void sendRegisterCode(ticket))) return;
     begin("register");
     try {
       const response = await apiRequest<LearnerOtpStartResponse>(
@@ -250,10 +297,7 @@ export default function LearnerLoginPage() {
     }
   }
 
-  async function verifyRegistration(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy || registerCode.length !== 6) return;
-    if (!requireConsent()) return;
+  async function runVerifyRegistration() {
     begin("register");
     try {
       const response = await apiRequest<LearnerAuthResponse>(
@@ -276,6 +320,13 @@ export default function LearnerLoginPage() {
     } finally {
       finish();
     }
+  }
+
+  async function verifyRegistration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || registerCode.length !== 6) return;
+    if (!requireConsent(() => void runVerifyRegistration())) return;
+    await runVerifyRegistration();
   }
 
   function startEmailCode(input: { email: string; captchaTicket: string }) {
@@ -309,8 +360,7 @@ export default function LearnerLoginPage() {
     });
   }
 
-  async function startGithub() {
-    if (busy || !requireConsent()) return;
+  async function runGithubStart() {
     begin("github");
     try {
       const response = await apiRequest<GithubStartResponse>("/auth/github/start", {
@@ -332,6 +382,12 @@ export default function LearnerLoginPage() {
       showToast(messageFor(submitError), "danger");
       finish();
     }
+  }
+
+  async function startGithub() {
+    if (busy) return;
+    if (!requireConsent(() => void runGithubStart())) return;
+    await runGithubStart();
   }
 
   const disabled = busy || captchaOpen || emailBusy || finishing;
@@ -359,11 +415,11 @@ export default function LearnerLoginPage() {
             <h1 id="learner-login-title">
               {registering ? "创建学习账号" : "登录学习中心"}
             </h1>
-            <p className={styles.subtitle}>
-              {registering
-                ? "验证邮箱后创建账号，学习记录与小程序保持同步。"
-                : "继续你的学习记录，Web 与小程序共用同一个账号。"}
-            </p>
+            {registering ? (
+              <p className={styles.subtitle}>
+                验证邮箱后创建账号，学习记录与小程序保持同步。
+              </p>
+            ) : null}
           </div>
 
           <div className={styles.modeTabs} role="group" aria-label="普通用户登录方式">
@@ -758,7 +814,7 @@ export default function LearnerLoginPage() {
           />
         </DialogContent>
       </Dialog>
-      <AuthToast toast={toast} onClose={closeToast} />
+      <AuthToast toast={visibleToast} onClose={closeToast} />
     </div>
   );
 }

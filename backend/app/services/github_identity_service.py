@@ -39,6 +39,8 @@ async def resolve_github_identity(
                 if identity is None or identity.user_id != user.id:
                     raise GithubIdentityError("github_verification_failed")
                 return user, identity
+            if context.get("step_up_verified") is not True:
+                raise GithubIdentityError("github_verification_failed")
             identity = await identity_service.bind_identity(
                 db,
                 user=user,

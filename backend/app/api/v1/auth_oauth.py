@@ -115,17 +115,25 @@ async def start_github_login(
 async def start_github_link(
     request: Request,
     response: Response,
-    data: GithubLinkStartRequest | None = None,
+    data: GithubLinkStartRequest,
     current_user: User = Depends(get_current_user),
 ):
     enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
-    return_to = _safe_return_to(data.return_to if data else "/settings")
+    # Adding a new login method requires proof of an existing one; otherwise a
+    # stolen access token can be turned into persistent account access.
+    await user_auth_service.consume_step_up_token(
+        data.step_up_token, current_user.id
+    )
+    return_to = _safe_return_to(data.return_to or "/settings")
     try:
         url, state = await github_oauth_service.start_github_oauth(
             mode="link",
             user_id=current_user.id,
             return_to=return_to,
-            extra={"nbf": await read_user_nbf(current_user.id)},
+            extra={
+                "nbf": await read_user_nbf(current_user.id),
+                "step_up_verified": True,
+            },
         )
     except github_oauth_service.GithubOAuthError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

@@ -113,24 +113,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async logout() {
     const revision = ++authRevision;
     const mode = get().accessMode;
+    const hostMode =
+      typeof window === "undefined"
+        ? null
+        : resolveAuthHostMode(
+            window.location.origin,
+            process.env.NEXT_PUBLIC_ADMIN_WEB_BASE_URL,
+            process.env.NEXT_PUBLIC_USER_WEB_BASE_URL,
+          );
+    // Logout must reach the server even when the in-memory access token is
+    // missing or expired: the HttpOnly refresh cookie is the long-lived
+    // credential and only the server can revoke it.
+    const target = mode === "user" || (mode === null && hostMode === "user")
+      ? "user"
+      : "admin";
     try {
-      if (get().accessToken) {
-        if (mode === "user") {
-          await apiRequest<{ status: string }>("/auth/web/logout", {
-            method: "POST",
-            scope: "user",
-            skipRefresh: true,
-          });
-        } else {
-          await apiRequest<{ status: string }>("/auth/logout", {
-            method: "POST",
-            scope: "admin",
-            skipRefresh: true,
-          });
-        }
-      }
+      await apiRequest<{ status: string }>(
+        target === "user" ? "/auth/web/logout" : "/auth/logout",
+        {
+          method: "POST",
+          scope: target,
+          skipRefresh: true,
+        },
+      );
     } catch (error) {
-      if (!(error instanceof ApiError && error.status === 401)) throw error;
+      // A rejected/expired access token still left the refresh cookie intact
+      // server-side; the backend now accepts cookie-only logout, so only
+      // infrastructure failures are surfaced.
+      if (
+        !(
+          error instanceof ApiError
+          && (error.status === 401 || error.status === 403)
+        )
+      ) {
+        throw error;
+      }
     } finally {
       if (authRevision === revision) get().clear();
     }

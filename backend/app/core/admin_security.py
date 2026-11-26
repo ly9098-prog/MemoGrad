@@ -22,6 +22,7 @@ from app.core.time_utils import unix_timestamp, utcnow
 from app.models.admin import AdminUser, Permission, Role, RolePermission
 
 admin_security = HTTPBearer()
+optional_admin_security = HTTPBearer(auto_error=False)
 # bcrypt rounds=12/prefix=2b 与旧 passlib 默认一致，存量 $2b$ 哈希可直接验证
 password_context = PasswordHash((BcryptHasher(),))
 
@@ -522,6 +523,30 @@ async def get_current_admin_any_scope(
     db: AsyncSession = Depends(get_db),
 ) -> AdminPrincipal:
     return await _resolve_current_admin(credentials, db, allow_restricted=True)
+
+
+async def get_current_admin_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_admin_security),
+    db: AsyncSession = Depends(get_db),
+) -> AdminPrincipal | None:
+    """Resolve an admin bearer when present, without blocking cookie-only logout.
+
+    Missing, expired or user-domain credentials yield ``None`` so logout can
+    still revoke the refresh cookie server-side.  Infrastructure failures
+    (Redis/database unavailable) keep propagating: silent downgrade would leave
+    a refresh token valid after logout.
+    """
+    if credentials is None:
+        return None
+    try:
+        return await _resolve_current_admin(credentials, db, allow_restricted=True)
+    except HTTPException as exc:
+        if exc.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ):
+            return None
+        raise
 
 
 def require_roles(*role_names: str):

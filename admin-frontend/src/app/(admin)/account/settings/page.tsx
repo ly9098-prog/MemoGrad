@@ -71,6 +71,11 @@ export default function AccountSettingsPage() {
   const [targetEmail, setTargetEmail] = useState("");
   const [emailChallenge, setEmailChallenge] = useState("");
   const [emailCode, setEmailCode] = useState("");
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordResetMode, setPasswordResetMode] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (accessMode === "admin") router.replace("/profile");
@@ -165,7 +170,18 @@ export default function AccountSettingsPage() {
 
   const emailIdentity = user.identities.find((identity) => identity.provider === "email");
   const githubIdentity = user.identities.find((identity) => identity.provider === "github");
+  const passwordIdentity = user.identities.find((identity) => identity.provider === "password");
   const canUnlink = user.identities.length > 1;
+
+  function passwordReady(value: string) {
+    return (
+      value.length >= 12
+      && /[A-Z]/.test(value)
+      && /[a-z]/.test(value)
+      && /\d/.test(value)
+      && new TextEncoder().encode(value).length <= 72
+    );
+  }
 
   function resetFeedback() {
     setError("");
@@ -221,14 +237,14 @@ export default function AccountSettingsPage() {
     }
   }
 
-  async function startGithubStepUp() {
+  async function startGithubStepUp(returnTo = "/account/settings") {
     if (busy) return;
     resetFeedback();
     setBusy(true);
     try {
-      const returnTo = encodeURIComponent("/account/settings");
+      const target = encodeURIComponent(returnTo);
       const response = await apiRequest<GithubStartResponse>(
-        `/users/me/identities/github/step-up/start?return_to=${returnTo}`,
+        `/users/me/identities/github/step-up/start?return_to=${target}`,
         { method: "POST", scope: "user", exposeErrorDetail: true },
       );
       window.location.assign(response.authorization_url);
@@ -240,8 +256,20 @@ export default function AccountSettingsPage() {
 
   async function startGithubLink() {
     if (busy) return;
+    if (!stepUpToken) {
+      if (emailIdentity) {
+        await startEmailStepUp();
+        setMessage("请先完成邮箱安全验证，再点击“绑定 GitHub”。");
+      } else {
+        setError("绑定 GitHub 前需要先完成邮箱或 GitHub 安全验证");
+      }
+      return;
+    }
     resetFeedback();
     setBusy(true);
+    const proof = stepUpToken;
+    setStepUpToken("");
+    setStepUpProvider(null);
     try {
       const response = await apiRequest<GithubStartResponse>(
         "/users/me/identities/github/start",
@@ -249,7 +277,10 @@ export default function AccountSettingsPage() {
           method: "POST",
           scope: "user",
           exposeErrorDetail: true,
-          body: JSON.stringify({ return_to: "/account/settings?linked=github" }),
+          body: JSON.stringify({
+            return_to: "/account/settings?linked=github",
+            step_up_token: proof,
+          }),
         },
       );
       window.location.assign(response.authorization_url);
@@ -259,15 +290,36 @@ export default function AccountSettingsPage() {
     }
   }
 
+  async function openEmailBind() {
+    if (busy) return;
+    resetFeedback();
+    if (!emailIdentity && !stepUpToken) {
+      if (githubIdentity) {
+        await startGithubStepUp("/account/settings?bind=email");
+      } else {
+        setError("绑定邮箱前需要先完成 GitHub 安全验证；当前账号暂无可用验证方式");
+      }
+      return;
+    }
+    setEmailBindOpen(true);
+  }
+
   async function startEmailBind(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (busy || resendSeconds > 0 || !targetEmail.trim()) return;
-    if (emailIdentity && !stepUpToken && !emailChallenge) {
-      setError("更换邮箱前，请先完成“敏感操作验证”");
+    if (!stepUpToken && !emailChallenge) {
+      if (emailIdentity) {
+        setError("更换邮箱前，请先完成“敏感操作验证”");
+      } else if (githubIdentity) {
+        await startGithubStepUp("/account/settings?bind=email");
+      } else {
+        setError("绑定邮箱前，请先完成“敏感操作验证”");
+      }
       return;
     }
     resetFeedback();
     setBusy(true);
+    const proof = stepUpToken;
     try {
       const response = await apiRequest<LearnerOtpStartResponse>(
         `/users/me/identities/email/${emailIdentity ? "change" : "bind"}/start`,
@@ -275,19 +327,110 @@ export default function AccountSettingsPage() {
           method: "POST",
           scope: "user",
           // A consumed step-up proof must not be retried as a session failure.
-          skipRefresh: Boolean(emailIdentity),
+          skipRefresh: Boolean(proof),
           exposeErrorDetail: true,
-          body: JSON.stringify({ email: targetEmail.trim(), ...(emailIdentity ? { step_up_token: stepUpToken || undefined, challenge_id: emailChallenge || undefined } : {}) }),
+          body: JSON.stringify({
+            email: targetEmail.trim(),
+            step_up_token: proof || undefined,
+            challenge_id: emailChallenge || undefined,
+          }),
         },
       );
       setEmailChallenge(response.challenge_id);
       setResendSeconds(response.resend_after);
-      if (emailIdentity) {
+      if (proof) {
         setStepUpToken("");
         setStepUpProvider(null);
       }
       setEmailCode("");
       setMessage("验证码已发送到要绑定的邮箱。");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startPasswordReset() {
+    if (busy) return;
+    resetFeedback();
+    if (!stepUpToken) {
+      setError("请先在“敏感操作验证”中完成邮箱或 GitHub 验证");
+      return;
+    }
+    setPasswordResetMode(true);
+    setPasswordOpen(true);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
+
+  async function submitPasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    if (!passwordReady(newPassword)) {
+      setError("新密码需至少 12 位，并同时包含大写字母、小写字母和数字");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("两次输入的新密码不一致");
+      return;
+    }
+    resetFeedback();
+    setBusy(true);
+    try {
+      await apiRequest("/auth/password/change", {
+        method: "POST",
+        scope: "user",
+        skipRefresh: true,
+        exposeErrorDetail: true,
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      clear();
+      router.replace("/account/login?password_changed=1");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    if (!stepUpToken) {
+      setError("安全验证已失效，请重新完成验证");
+      return;
+    }
+    if (!passwordReady(newPassword)) {
+      setError("新密码需至少 12 位，并同时包含大写字母、小写字母和数字");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("两次输入的新密码不一致");
+      return;
+    }
+    resetFeedback();
+    setBusy(true);
+    const proof = stepUpToken;
+    try {
+      await apiRequest("/auth/password/reset", {
+        method: "POST",
+        scope: "user",
+        skipRefresh: true,
+        exposeErrorDetail: true,
+        body: JSON.stringify({
+          step_up_token: proof,
+          new_password: newPassword,
+        }),
+      });
+      setStepUpToken("");
+      setStepUpProvider(null);
+      clear();
+      router.replace("/account/login?password_changed=1");
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -462,7 +605,7 @@ export default function AccountSettingsPage() {
                 </div>
                 <div className="col-start-2 flex flex-wrap items-center gap-3 sm:ml-auto">
                 {identity.provider === "email" ? (
-                  <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => { resetFeedback(); setEmailBindOpen(true); }}>更换邮箱</Button>
+                  <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void openEmailBind()}>更换邮箱</Button>
                 ) : null}
                 <Button
                   type="button"
@@ -563,7 +706,7 @@ export default function AccountSettingsPage() {
                   variant="secondary"
                   className="justify-start"
                   disabled={busy}
-                  onClick={() => { resetFeedback(); setEmailBindOpen(true); }}
+                  onClick={() => void openEmailBind()}
                 >
                   <span className="inline-flex items-center gap-2"><Mail className="h-4 w-4" />绑定邮箱</span>
                 </Button>
@@ -586,6 +729,108 @@ export default function AccountSettingsPage() {
                 <p className="mt-2 text-sm text-muted-foreground">敬请期待</p>
               </div>
             ) : null}
+          </section>
+
+          <section className="admin-panel rounded-[18px] p-5">
+            <h2 className="flex items-center gap-2 font-semibold text-foreground">
+              <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              登录密码
+            </h2>
+            {!passwordIdentity ? (
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                当前账号未设置登录密码，可使用邮箱验证码或已绑定的第三方身份登录。
+              </p>
+            ) : !passwordOpen ? (
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    resetFeedback();
+                    setPasswordResetMode(false);
+                    setPasswordOpen(true);
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  修改密码
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={startPasswordReset}
+                >
+                  忘记密码
+                </Button>
+              </div>
+            ) : (
+              <form
+                className="mt-3 space-y-3"
+                onSubmit={passwordResetMode ? submitPasswordReset : submitPasswordChange}
+              >
+                {passwordResetMode ? (
+                  <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
+                    已通过安全验证，直接设置新密码。验证 5 分钟内有效。
+                  </p>
+                ) : (
+                  <label className="block space-y-1.5 text-sm font-medium">
+                    <span>当前密码</span>
+                    <Input
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      disabled={busy}
+                      required
+                    />
+                  </label>
+                )}
+                <label className="block space-y-1.5 text-sm font-medium">
+                  <span>新密码（至少 12 位，含大小写字母和数字）</span>
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    disabled={busy}
+                    required
+                  />
+                </label>
+                <label className="block space-y-1.5 text-sm font-medium">
+                  <span>确认新密码</span>
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    disabled={busy}
+                    required
+                  />
+                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setPasswordOpen(false);
+                      setPasswordResetMode(false);
+                      setCurrentPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                    }}
+                  >
+                    取消
+                  </button>
+                  <Button type="submit" disabled={busy}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                    {passwordResetMode ? "重置密码" : "更新密码"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </section>
         </aside>
       </div>

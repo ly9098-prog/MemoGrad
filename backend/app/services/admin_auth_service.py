@@ -1,3 +1,7 @@
+import asyncio
+import secrets
+from functools import lru_cache
+
 from fastapi import Request
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +26,12 @@ from app.schemas.admin_auth import (
 from app.services.admin_audit_service import write_admin_audit
 
 
+@lru_cache(maxsize=1)
+def _dummy_password_hash() -> str:
+    """Pre-computed bcrypt hash used to equalize unknown-username timing."""
+    return hash_admin_password(secrets.token_urlsafe(24))
+
+
 async def authenticate_admin(db: AsyncSession, data: AdminLoginRequest) -> AdminUser:
     result = await db.execute(
         select(AdminUser)
@@ -30,11 +40,28 @@ async def authenticate_admin(db: AsyncSession, data: AdminLoginRequest) -> Admin
     )
     admin_user = result.scalar_one_or_none()
     if not admin_user:
+        # Spend the same bcrypt cost as an existing account so response timing
+        # does not reveal whether the username exists.
+        dummy_hash = await asyncio.to_thread(_dummy_password_hash)
+        try:
+            await asyncio.to_thread(
+                verify_admin_password,
+                data.password,
+                dummy_hash,
+            )
+        except ValueError:
+            pass
         raise ValueError("用户名或密码错误")
     try:
-        password_ok = verify_admin_password(data.password, admin_user.password_hash)
+        password_ok = await asyncio.to_thread(
+            verify_admin_password,
+            data.password,
+            admin_user.password_hash,
+        )
     except ValueError:
-        raise ValueError("密码长度不能超过72字节")
+        # The schema already rejects over-length credentials; keep the
+        # contract uniform if a caller bypasses it.
+        raise ValueError("用户名或密码错误")
     if not password_ok:
         raise ValueError("用户名或密码错误")
     return admin_user

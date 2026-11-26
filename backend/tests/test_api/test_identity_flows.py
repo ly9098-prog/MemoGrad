@@ -148,8 +148,13 @@ async def test_github_cancel_returns_to_account_settings_and_consumes_state(flow
 
 @pytest.mark.asyncio
 async def test_github_binding_conflict_returns_actionable_error_to_settings(flow, monkeypatch):
-    client, *_ = flow
-    start = await client.post("/api/v1/users/me/identities/github/start", json={})
+    client, _, user, email, *_ = flow
+    proof = await user_auth_service.issue_step_up_token(user.id, email.id)
+    start = await client.post(
+        "/api/v1/users/me/identities/github/start",
+        json={"return_to": "/account/settings", "step_up_token": proof},
+    )
+    assert start.status_code == 200
 
     async def exchange(*args, **kwargs):
         return {"id": 99}
@@ -161,6 +166,15 @@ async def test_github_binding_conflict_returns_actionable_error_to_settings(flow
     assert callback.headers["location"] == (
         "http://user.test/account/settings?binding_error=identity_already_exists"
     )
+
+
+@pytest.mark.asyncio
+async def test_github_link_start_requires_step_up(flow):
+    client, *_ = flow
+    response = await client.post(
+        "/api/v1/users/me/identities/github/start", json={}
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -242,6 +256,61 @@ async def test_change_challenge_cannot_be_used_to_add_a_second_email(flow):
             )
         ).all()
         assert [item.subject for item in emails] == ["old@example.com"]
+
+
+@pytest.mark.asyncio
+async def test_email_bind_start_requires_step_up(flow):
+    client, factory, user, email, *_ = flow
+
+    # Without proof, an existing and a free address must look identical.
+    for candidate in ("other@example.com", "free@example.com"):
+        response = await client.post(
+            "/api/v1/users/me/identities/email/bind/start",
+            json={"email": candidate},
+        )
+        assert response.status_code == 400
+
+    # A user with an existing email must use the change flow even with proof.
+    proof = await user_auth_service.issue_step_up_token(user.id, email.id)
+    duplicate = await client.post(
+        "/api/v1/users/me/identities/email/bind/start",
+        json={"email": "free@example.com", "step_up_token": proof},
+    )
+    assert duplicate.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_email_bind_works_for_a_user_without_email(flow, monkeypatch):
+    client, factory, _, _, _ = flow
+    async with factory() as db:
+        user, github = await identity_service.authenticate_identity(
+            db,
+            provider="github",
+            namespace="github.com",
+            subject="other-github-77",
+            allow_register=True,
+        )
+    token, _ = create_token(user.id)
+    headers = {"Authorization": f"Bearer {token}"}
+    proof = await user_auth_service.issue_step_up_token(user.id, github.id)
+
+    start = await client.post(
+        "/api/v1/users/me/identities/email/bind/start",
+        json={"email": "new@example.com", "step_up_token": proof},
+        headers=headers,
+    )
+    assert start.status_code == 200
+
+    verify = await client.post(
+        "/api/v1/users/me/identities/email/bind/verify",
+        json={
+            "challenge_id": start.json()["challenge_id"],
+            "code": "123456",
+            "client": "web",
+        },
+        headers=headers,
+    )
+    assert verify.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -421,10 +490,15 @@ async def test_unlink_wechat_clears_the_legacy_login_alias(flow):
 async def test_github_link_rejects_sessions_revoked_during_authorization(
     flow, monkeypatch
 ):
-    client, _, user, *_ = flow
+    client, _, user, email, *_ = flow
     from app.core.security import set_user_nbf
 
-    start = await client.post("/api/v1/users/me/identities/github/start", json={})
+    proof = await user_auth_service.issue_step_up_token(user.id, email.id)
+    start = await client.post(
+        "/api/v1/users/me/identities/github/start",
+        json={"return_to": "/account/settings", "step_up_token": proof},
+    )
+    assert start.status_code == 200
     await set_user_nbf(user.id)
 
     async def exchange(*args, **kwargs):

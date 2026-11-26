@@ -4,6 +4,7 @@ import secrets
 from datetime import timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_security import (
@@ -57,7 +58,13 @@ async def activate_admin_email(
     admin_user.email_normalized = normalized
     admin_user.email_verified_at = utcnow()
     await set_admin_user_nbf(admin_user.id)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        # Two concurrent activations can pass the pre-check and collide on the
+        # unique index; surface the same conflict as the normal path.
+        await db.rollback()
+        raise ValueError("该邮箱已被其他管理员使用") from exc
     await db.refresh(admin_user)
     return admin_user
 

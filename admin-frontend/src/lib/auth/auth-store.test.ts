@@ -404,6 +404,20 @@ describe("auth store — API token synchronization", () => {
     expect(getApiAccessToken()).toBe(FRESH_TOKEN);
   });
 
+  it("calls cookie-only logout without an in-memory access token", async () => {
+    useAuthStore.getState().clear();
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ status: "ok" }),
+    );
+
+    await useAuthStore.getState().logout();
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [input, init] = fetch.mock.calls[0];
+    expect(String(input)).toMatch(/\/auth\/logout$/);
+    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+  });
+
   it.each(["login", "clear"] as const)("rejects a late Admin login after %s replaces the session", async (action) => {
     let resolveLogin!: (response: Response) => void;
     vi.spyOn(globalThis, "fetch").mockImplementation(

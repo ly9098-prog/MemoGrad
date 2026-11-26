@@ -102,14 +102,6 @@ async def start_email_change(
         email = normalize_email(data.email)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    try:
-        existing, _owner = await identity_service.find_identity_user(
-            db, provider="email", namespace="user", subject=email
-        )
-    except identity_service.IdentityUnavailableError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    if existing is not None:
-        raise HTTPException(status_code=409, detail="该邮箱已绑定到其他账号")
     identities = await identity_service.list_user_identities(db, current_user.id)
     current_email = next(
         (item for item in identities if item.provider == "email"), None
@@ -117,6 +109,9 @@ async def start_email_change(
     if current_email is None:
         raise HTTPException(status_code=409, detail="当前账号未绑定邮箱")
     try:
+        # Verify the step-up proof before touching the target address so an
+        # unauthenticated-for-sensitive-actions caller cannot use the 409/400
+        # difference to enumerate registered emails.
         await user_auth_service.authorize_email_change(
             user_id=current_user.id,
             email=email,
@@ -124,6 +119,16 @@ async def start_email_change(
             step_up_token=data.step_up_token,
             challenge_id=data.challenge_id,
         )
+        existing, _owner = await identity_service.find_identity_user(
+            db, provider="email", namespace="user", subject=email
+        )
+    except email_otp_service.OtpError as exc:
+        _raise_otp(exc)
+    except identity_service.IdentityUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="该邮箱已绑定到其他账号")
+    try:
         issued = await email_otp_service.issue_otp(
             domain="user",
             email=email,

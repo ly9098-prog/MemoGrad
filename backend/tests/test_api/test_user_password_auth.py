@@ -14,6 +14,7 @@ from app.core.database import Base, get_db
 from app.services import (
     email_otp_service,
     slider_captcha_service,
+    user_auth_service,
     user_password_service,
 )
 
@@ -511,3 +512,91 @@ async def test_password_login_reserves_rate_limit_before_concurrent_verification
     statuses = [response.status_code for response in responses]
     assert statuses.count(401) == 5
     assert statuses.count(429) == 7
+
+
+async def _register_and_get_session(client, *, username="rotate-user", email="rotate@example.com"):
+    started = await client.post(
+        "/api/v1/auth/password/register/start",
+        json=registration_payload(username=username, email=email),
+    )
+    assert started.status_code == 200
+    verified = await client.post(
+        "/api/v1/auth/password/register/verify",
+        json={
+            "challenge_id": started.json()["challenge_id"],
+            "code": "123456",
+            "client": "web",
+        },
+    )
+    assert verified.status_code == 200
+    return verified.json()
+
+
+@pytest.mark.asyncio
+async def test_user_password_change_rotates_and_revokes_sessions(password_client):
+    client, _factory = password_client
+    session = await _register_and_get_session(client)
+    headers = {"Authorization": f"Bearer {session['access_token']}"}
+    new_password = "2026#Test" + "Rotated"
+
+    changed = await client.post(
+        "/api/v1/auth/password/change",
+        json={
+            "current_password": TEST_PASSWORD,
+            "new_password": new_password,
+        },
+        headers=headers,
+    )
+    assert changed.status_code == 200, changed.json()
+    assert changed.json()["reauthentication_required"] is True
+
+    old_login = await client.post(
+        "/api/v1/auth/password/login",
+        json={"account": "rotate-user", "password": TEST_PASSWORD, "client": "web"},
+    )
+    new_login = await client.post(
+        "/api/v1/auth/password/login",
+        json={"account": "rotate-user", "password": new_password, "client": "web"},
+    )
+    assert old_login.status_code == 401
+    assert new_login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_user_password_reset_requires_step_up(password_client):
+    client, _factory = password_client
+    session = await _register_and_get_session(client, username="reset-user", email="reset@example.com")
+    headers = {"Authorization": f"Bearer {session['access_token']}"}
+    email_identity = next(
+        item for item in session["user"]["identities"] if item["provider"] == "email"
+    )
+    proof = await user_auth_service.issue_step_up_token(
+        session["user"]["id"], email_identity["id"]
+    )
+
+    missing = await client.post(
+        "/api/v1/auth/password/reset",
+        json={"new_password": "2026#Test" + "Reset"},
+        headers=headers,
+    )
+    assert missing.status_code == 422
+
+    reset = await client.post(
+        "/api/v1/auth/password/reset",
+        json={
+            "step_up_token": proof,
+            "new_password": "2026#Test" + "Reset",
+        },
+        headers=headers,
+    )
+    assert reset.status_code == 200, reset.json()
+
+    login = await client.post(
+        "/api/v1/auth/password/login",
+        json={
+            "account": "reset-user",
+            "password": "2026#Test" + "Reset",
+            "client": "web",
+        },
+    )
+    assert login.status_code == 200

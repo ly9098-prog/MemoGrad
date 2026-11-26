@@ -1,7 +1,9 @@
 import hashlib
+import hmac
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_security import (
@@ -14,6 +16,7 @@ from app.core.admin_security import (
     delete_refresh_cookie,
     get_current_admin,
     get_current_admin_any_scope,
+    get_current_admin_optional,
     set_refresh_cookie,
 )
 from app.core.browser_origin import enforce_trusted_browser_origin
@@ -22,6 +25,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.runtime_paths import API_ADMIN_V1_PREFIX
 from app.core.time_utils import utcnow
+from app.models.admin import AdminUser
 from app.schemas.admin_auth import (
     AdminChangePasswordRequest,
     AdminLoginRequest,
@@ -48,21 +52,88 @@ def _enforce_trusted_browser_origin(request: Request) -> None:
     enforce_trusted_browser_origin(request, settings.ADMIN_WEB_BASE_URL)
 
 
+def _username_digest(username: str) -> str:
+    """Stable digest for account-scoped cache keys.
+
+    Usernames are case-sensitive for authentication, so the digest must be
+    too.  HMAC keeps key names fixed-length and prevents arbitrary usernames
+    from becoming arbitrary Redis keys.
+    """
+    return hmac.new(
+        settings.APP_SECRET.encode("utf-8"),
+        f"admin-login-account\0{username.strip()}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def _login_rate_key(request: Request, username: str) -> str:
     client_ip = request.client.host if request.client else "unknown"
-    identity = f"{client_ip}|{username.strip().lower()}"
+    identity = f"{client_ip}|{username.strip()}"
     digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
     return f"admin:login:fail:{digest}"
 
 
 def _account_fail_key(username: str) -> str:
-    """Account-level consecutive-failure counter (independent of client IP)."""
-    return f"admin:login:account_fail:{username.strip().lower()}"
+    """Account-level failure counter used for attack monitoring.
+
+    This counter deliberately does not lock the account: a hard global lock
+    lets any unauthenticated caller deny service to a known administrator
+    (OWASP Authentication Cheat Sheet discourages lockout for this reason).
+    Throttling is enforced per (client IP, username) below, with nginx/IP-level
+    limits in front.
+    """
+    return f"admin:login:account_fail:{_username_digest(username)}"
 
 
-def _account_lock_key(username: str) -> str:
-    """Temporary lock flag for an account that exceeded the failure threshold."""
-    return f"admin:login:account_lock:{username.strip().lower()}"
+async def _report_login_failure_burst(
+    db: AsyncSession, request: Request, username: str
+) -> None:
+    """Emit one alert per window when an account sees cross-IP failures."""
+    digest = _username_digest(username)
+    try:
+        first = await cache.acquire_lock_strict(
+            f"admin:login:alert:{digest}",
+            "1",
+            ttl=settings.ADMIN_LOGIN_WINDOW_SEC,
+        )
+    except CacheUnavailableError:
+        logger.warning("Admin login failure burst could not be recorded")
+        return
+    if not first:
+        return
+    logger.warning(
+        "Admin login failure threshold reached across sources",
+        extra={"admin_username": username.strip()},
+    )
+    if not hasattr(db, "execute"):
+        return
+    try:
+        admin_id = await db.scalar(
+            select(AdminUser.id).where(
+                AdminUser.username == username.strip(),
+                AdminUser.is_active.is_(True),
+            )
+        )
+        if admin_id is None:
+            return
+        await write_admin_audit(
+            db,
+            None,
+            "system.login_failure_burst",
+            "admin_user",
+            admin_id,
+            severity="high",
+            detail={"username": username.strip()},
+            request=request,
+            status="failure",
+        )
+        await db.commit()
+    except Exception:
+        logger.exception("Failed to persist admin login failure burst audit")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
 
 async def _read_fail_count(rate_key: str) -> int:
@@ -107,50 +178,29 @@ async def login(
     _enforce_trusted_browser_origin(request)
     rate_key = _login_rate_key(request, data.username)
     account_fail_key = _account_fail_key(data.username)
-    account_lock_key = _account_lock_key(data.username)
 
-    # Per-IP + per-username rate limit (existing).
+    # Per-IP + per-username throttle. Account-wide lockout is intentionally
+    # absent: it would let any caller deny service to a known administrator.
     if await _read_fail_count(rate_key) >= settings.ADMIN_LOGIN_MAX_FAILURES:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="登录尝试过于频繁，请稍后重试",
             headers={"Retry-After": str(settings.ADMIN_LOGIN_WINDOW_SEC)},
         )
-    # A locked account is rejected before any credential comparison so the lock
-    # actually throttles guessing; the window is bounded by ADMIN_LOGIN_WINDOW_SEC.
-    account_locked = await _read_fail_count(account_lock_key) > 0
-    if account_locked:
-        logger.warning("Admin login rejected: account locked")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="该账号登录失败次数过多，请稍后重试",
-            headers={"Retry-After": str(settings.ADMIN_LOGIN_WINDOW_SEC)},
-        )
 
     try:
         admin_user = await authenticate_admin(db, data)
-    except ValueError as exc:
+    except ValueError:
         await _increment_fail_count(rate_key)
         account_fails = await _increment_fail_count(account_fail_key)
         if account_fails >= settings.ADMIN_LOGIN_MAX_FAILURES:
-            await cache.set_strict(
-                account_lock_key, 1, ttl=settings.ADMIN_LOGIN_WINDOW_SEC
-            )
-            account_locked = True
-        msg = str(exc)
-        if "72字节" in msg:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
-        if account_locked:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="该账号登录失败次数过多，请稍后重试",
-                headers={"Retry-After": str(settings.ADMIN_LOGIN_WINDOW_SEC)},
-            )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=msg)
+            await _report_login_failure_burst(db, request, data.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误"
+        )
 
     await _clear_fail_count(rate_key)
     await _clear_fail_count(account_fail_key)
-    await _clear_fail_count(account_lock_key)
 
     token, refresh_token, user, role, permissions = await build_admin_login_response(
         db, admin_user
@@ -202,11 +252,19 @@ async def refresh(
 async def logout(
     request: Request,
     response: Response,
-    current_admin=Depends(get_current_admin_any_scope),
+    current_admin: AdminPrincipal | None = Depends(get_current_admin_optional),
 ):
+    """Revoke the session even when the access token is missing or expired.
+
+    Logout must be idempotent: the refresh cookie is the long-lived credential
+    (7 days), so failing to delete/blacklist it when the 2-hour access token is
+    stale would silently restore the session on the next page load.
+    """
     _enforce_trusted_browser_origin(request)
-    payload = current_admin.token_payload
-    await blacklist_admin_token(payload["jti"], int(payload["exp"]))
+
+    if current_admin is not None:
+        payload = current_admin.token_payload
+        await blacklist_admin_token(payload["jti"], int(payload["exp"]))
 
     refresh_token = request.cookies.get(REFRESH_COOKIE_KEY)
     if refresh_token:
@@ -261,9 +319,8 @@ async def update_password(
     except PasswordPolicyError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except ValueError as exc:
-        msg = str(exc)
-        if "72字节" in msg:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=msg)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
+        )
     delete_refresh_cookie(response, request=request)
     return {"status": "ok"}

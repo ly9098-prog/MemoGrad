@@ -386,11 +386,11 @@ def test_admin_logout_blacklists_token(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_optional] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_optional, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -634,11 +634,11 @@ def test_admin_logout_deletes_refresh_cookie(monkeypatch):
         return AdminPrincipal(user, payload)
 
     monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
-    app.dependency_overrides[admin_auth.get_current_admin_any_scope] = override_current_admin
+    app.dependency_overrides[admin_auth.get_current_admin_optional] = override_current_admin
     try:
         resp = client.post("/api/admin/v1/auth/logout")
     finally:
-        app.dependency_overrides.pop(admin_auth.get_current_admin_any_scope, None)
+        app.dependency_overrides.pop(admin_auth.get_current_admin_optional, None)
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -648,6 +648,52 @@ def test_admin_logout_deletes_refresh_cookie(monkeypatch):
     assert REFRESH_COOKIE_KEY in cookie_header
     assert "Max-Age=0" in cookie_header
     assert "Path=/api/admin/v1/auth" in cookie_header
+
+
+def test_admin_logout_revokes_cookie_without_access_token(monkeypatch):
+    """Logout cannot depend on a live access token (2h vs 7d cookie)."""
+    blacklist = AsyncMock()
+    monkeypatch.setattr(admin_auth, "blacklist_admin_token", blacklist)
+    monkeypatch.setattr(
+        admin_auth,
+        "decode_admin_refresh_token",
+        MagicMock(return_value={"jti": "refresh-id", "exp": 4102444800}),
+    )
+    app.dependency_overrides[get_db] = _override_db
+    logout_client = TestClient(app)
+    logout_client.cookies.set(
+        REFRESH_COOKIE_KEY, "valid-refresh-token", path="/api/admin/v1/auth"
+    )
+    try:
+        resp = logout_client.post("/api/admin/v1/auth/logout")
+    finally:
+        logout_client.cookies.clear()
+        app.dependency_overrides.pop(get_db, None)
+
+    assert resp.status_code == 200
+    blacklist.assert_awaited_once_with("refresh-id", 4102444800)
+    cookie_header = resp.headers.get("set-cookie", "")
+    assert REFRESH_COOKIE_KEY in cookie_header
+    assert "Max-Age=0" in cookie_header
+
+
+def test_login_rejects_oversized_password_uniformly():
+    """The >72-byte request must not distinguish existing from unknown users."""
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        known = client.post(
+            "/api/admin/v1/auth/login",
+            json={"username": "admin", "password": "A" * 73},
+        )
+        missing = client.post(
+            "/api/admin/v1/auth/login",
+            json={"username": "definitely-not-an-admin", "password": "A" * 73},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert known.status_code == 422
+    assert missing.status_code == 422
 
 
 # ── Bootstrap simulation: refresh after losing in-memory token ──
@@ -682,40 +728,24 @@ def test_admin_bootstrap_refresh_after_token_loss(monkeypatch):
     assert data["role"]["name"] == "super_admin"
 
 
-# ── 账号级登录锁定 ──
+# ── 登录限流与账号 DoS 防护 ──
 
 
 def _ip_rate_key(username: str = "admin") -> str:
     import hashlib
 
-    identity = f"testclient|{username.strip().lower()}"
+    identity = f"testclient|{username.strip()}"
     return "admin:login:fail:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
-def test_login_consecutive_failures_set_account_lock(monkeypatch):
-    """Repeated failures on the same account set the temporary lock flag."""
-    import asyncio
+def test_login_failures_do_not_globally_lock_the_account(monkeypatch):
+    """Failures from one source must not deny service to the real owner.
 
-    from app.core.cache import cache
-
-    monkeypatch.setattr(admin_auth, "authenticate_admin", AsyncMock(side_effect=ValueError("用户名或密码错误")))
-    app.dependency_overrides[get_db] = _override_db
-    asyncio.run(cache.delete_strict(_ip_rate_key("admin")))
-    try:
-        for _ in range(settings.ADMIN_LOGIN_MAX_FAILURES):
-            client.post("/api/admin/v1/auth/login", json={"username": "admin", "password": "x"})
-    finally:
-        app.dependency_overrides.pop(get_db, None)
-
-    locked = asyncio.run(cache.get_strict("admin:login:account_lock:admin"))
-    asyncio.run(cache.delete_strict("admin:login:account_fail:admin"))
-    asyncio.run(cache.delete_strict("admin:login:account_lock:admin"))
-    asyncio.run(cache.delete_strict(_ip_rate_key("admin")))
-    assert locked is not None
-
-
-def test_login_blocked_when_account_locked(monkeypatch):
-    """Locked accounts are rejected before any credential comparison."""
+    Account-wide hard lockout is an unauthenticated DoS primitive: five bad
+    passwords from any IP would block the administrator everywhere.  The
+    per-IP+username throttle stays, and a correct login from another source
+    must still succeed.
+    """
     import asyncio
 
     from app.core.cache import cache
@@ -723,43 +753,64 @@ def test_login_blocked_when_account_locked(monkeypatch):
     authenticate = AsyncMock(side_effect=ValueError("用户名或密码错误"))
     monkeypatch.setattr(admin_auth, "authenticate_admin", authenticate)
     app.dependency_overrides[get_db] = _override_db
-    asyncio.run(cache.set_strict("admin:login:account_lock:admin", 1, ttl=900))
     try:
-        resp = client.post("/api/admin/v1/auth/login", json={"username": "admin", "password": "x"})
+        for _ in range(settings.ADMIN_LOGIN_MAX_FAILURES):
+            response = client.post(
+                "/api/admin/v1/auth/login",
+                json={"username": "admin", "password": "wrong"},
+            )
+            assert response.status_code == 401
+        blocked = client.post(
+            "/api/admin/v1/auth/login",
+            json={"username": "admin", "password": "wrong"},
+        )
+        assert blocked.status_code == 429
+
+        user = _admin_user()
+        token = create_admin_token(user)
+        monkeypatch.setattr(
+            admin_auth,
+            "authenticate_admin",
+            AsyncMock(return_value=user),
+        )
+        monkeypatch.setattr(
+            admin_auth,
+            "build_admin_login_response",
+            AsyncMock(return_value=(token, "refresh", user, _role(), ["dashboard:read"])),
+        )
+        other_source = TestClient(app, client=("198.51.100.7", 50000))
+        allowed = other_source.post(
+            "/api/admin/v1/auth/login",
+            json={"username": "admin", "password": "right"},
+        )
     finally:
-        asyncio.run(cache.delete_strict("admin:login:account_lock:admin"))
-        asyncio.run(cache.delete_strict("admin:login:account_fail:admin"))
-        asyncio.run(cache.delete_strict(_ip_rate_key("admin")))
         app.dependency_overrides.pop(get_db, None)
+        asyncio.run(cache.delete_strict(_ip_rate_key("admin")))
+        asyncio.run(cache.delete_strict(admin_auth._account_fail_key("admin")))
 
-    authenticate.assert_not_awaited()
-    assert resp.status_code == 429
-    error = resp.json()["error"]
-    assert error["code"] == "HTTP_429"
-    assert error["retryable"] is True
-    assert "临时锁定" not in str(resp.json())
+    assert allowed.status_code == 200
 
 
-def test_login_locked_account_rejects_even_with_correct_password(monkeypatch):
-    """The lock throttles guessing: no verification, even for a valid credential."""
-    import asyncio
-
-    from app.core.cache import cache
-
-    authenticate = AsyncMock(return_value=object())
-    monkeypatch.setattr(admin_auth, "authenticate_admin", authenticate)
+def test_login_failure_burst_is_reported(monkeypatch):
+    """Cross-IP failure bursts are alerted once instead of hard-locking."""
+    monkeypatch.setattr(
+        admin_auth,
+        "authenticate_admin",
+        AsyncMock(side_effect=ValueError("用户名或密码错误")),
+    )
+    report = AsyncMock()
+    monkeypatch.setattr(admin_auth, "_report_login_failure_burst", report)
     app.dependency_overrides[get_db] = _override_db
-    asyncio.run(cache.set_strict("admin:login:account_lock:admin", 1, ttl=900))
     try:
-        resp = client.post("/api/admin/v1/auth/login", json={"username": "admin", "password": "right"})
+        for _ in range(settings.ADMIN_LOGIN_MAX_FAILURES):
+            client.post(
+                "/api/admin/v1/auth/login",
+                json={"username": "admin", "password": "wrong"},
+            )
     finally:
-        asyncio.run(cache.delete_strict("admin:login:account_lock:admin"))
-        asyncio.run(cache.delete_strict("admin:login:account_fail:admin"))
-        asyncio.run(cache.delete_strict(_ip_rate_key("admin")))
         app.dependency_overrides.pop(get_db, None)
 
-    authenticate.assert_not_awaited()
-    assert resp.status_code == 429
+    report.assert_awaited_once()
 
 
 # ── 密码策略 ──

@@ -4,15 +4,41 @@ from pydantic import ConfigDict, Field, field_validator
 
 from app.schemas.base import BaseModel
 
+# bcrypt only consumes the first 72 bytes and the hasher rejects longer input.
+# Validate on bytes (not characters) at the schema boundary so oversized
+# credentials are rejected identically for existing and unknown usernames.
+BCRYPT_MAX_BYTES = 72
+
+
+def _bcrypt_bytes(value: str) -> str:
+    if len(value.encode("utf-8")) > BCRYPT_MAX_BYTES:
+        raise ValueError(f"密码长度不能超过 {BCRYPT_MAX_BYTES} 字节")
+    return value
+
 
 class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
 
+    @field_validator("password")
+    @classmethod
+    def limit_password_bytes(cls, value: str) -> str:
+        return _bcrypt_bytes(value)
+
 
 class AdminChangePasswordRequest(BaseModel):
     old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("old_password")
+    @classmethod
+    def limit_old_password_bytes(cls, value: str) -> str:
+        return _bcrypt_bytes(value)
+
+    @field_validator("new_password")
+    @classmethod
+    def limit_new_password_bytes(cls, value: str) -> str:
+        return _bcrypt_bytes(value)
 
 
 class AdminRoleResponse(BaseModel):
@@ -89,6 +115,11 @@ class AdminEmailActivationRequest(AdminEmailStartRequest):
     current_password: str = Field(min_length=1, max_length=128)
     captcha_ticket: str = Field(min_length=32, max_length=64)
 
+    @field_validator("current_password")
+    @classmethod
+    def limit_current_password_bytes(cls, value: str) -> str:
+        return _bcrypt_bytes(value)
+
 
 class AdminEmailVerifyRequest(BaseModel):
     challenge_id: str = Field(min_length=32, max_length=64)
@@ -103,3 +134,8 @@ class AdminRecoveryVerifyResponse(BaseModel):
 class AdminPasswordRecoveryRequest(BaseModel):
     reset_token: str = Field(min_length=32, max_length=256)
     new_password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def limit_new_password_bytes(cls, value: str) -> str:
+        return _bcrypt_bytes(value)

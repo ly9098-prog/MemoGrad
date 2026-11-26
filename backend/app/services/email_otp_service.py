@@ -355,8 +355,9 @@ async def _consume_otp(
             enforce_ip_lock,
         )
         deletes = [key, f"{key}:attempts", active_key]
-        if enforce_ip_lock:
-            deletes.append(_ip_failure_key(domain, purpose, client_ip))
+        # The IP failure counter is shared across challenges for this
+        # domain/purpose.  Deleting it on any successful verification would let
+        # an attacker reset the IP lock with their own mailbox between guesses.
         await attempt.commit(deletes=deletes)
         return challenge
     except CacheUnavailableError as exc:

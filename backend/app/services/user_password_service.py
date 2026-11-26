@@ -195,6 +195,69 @@ async def authenticate_password_record(
     return user
 
 
+async def _get_user_credential(
+    db: AsyncSession, user_id: int
+) -> UserPasswordCredential | None:
+    row = (
+        await db.execute(
+            select(UserPasswordCredential)
+            .join(
+                UserAuthIdentity,
+                UserAuthIdentity.id == UserPasswordCredential.identity_id,
+            )
+            .where(
+                UserAuthIdentity.user_id == user_id,
+                UserAuthIdentity.provider == "password",
+                UserAuthIdentity.namespace == "user",
+            )
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+async def change_user_password(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """Rotate the credential after re-checking the current password."""
+    credential = await _get_user_credential(db, user_id)
+    if credential is None:
+        raise PasswordAuthError("当前账号未设置登录密码")
+    if not await verify_user_password_async(
+        current_password, credential.password_hash
+    ):
+        raise PasswordAuthError("当前密码错误")
+    credential.password_hash = await hash_user_password_async(
+        new_password
+    )
+    credential.password_changed_at = utcnow()
+    await db.commit()
+
+
+async def reset_user_password(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    new_password: str,
+) -> None:
+    """Replace the credential after an out-of-band step-up proof.
+
+    Callers must consume a step-up token first; this function only enforces
+    that a credential exists and stores the new hash.
+    """
+    credential = await _get_user_credential(db, user_id)
+    if credential is None:
+        raise PasswordAuthError("当前账号未设置登录密码")
+    credential.password_hash = await hash_user_password_async(
+        new_password
+    )
+    credential.password_changed_at = utcnow()
+    await db.commit()
+
+
 async def list_password_login_aliases(
     db: AsyncSession,
     *,

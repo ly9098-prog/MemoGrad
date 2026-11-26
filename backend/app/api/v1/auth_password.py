@@ -11,11 +11,17 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.email_address import normalize_email
 from app.core.runtime_paths import API_V1_PREFIX
+from app.core.security import get_current_user
+from app.core.user_web_auth import delete_user_refresh_cookie
+from app.models.user import User
 from app.schemas.user import (
     OtpStartResponse,
+    PasswordChangedResponse,
+    PasswordChangeRequest,
     PasswordLoginRequest,
     PasswordRegisterStartRequest,
     PasswordRegisterVerifyRequest,
+    PasswordResetRequest,
     TokenResponse,
     WebTokenResponse,
 )
@@ -54,6 +60,15 @@ def _register_start_rate_key(client_ip: str) -> str:
         hashlib.sha256,
     ).hexdigest()
     return f"user:password-register-start:ip:{digest}"
+
+
+def _password_change_ip_rate_key(client_ip: str) -> str:
+    digest = hmac.new(
+        settings.APP_SECRET.encode("utf-8"),
+        f"password-change-ip\0{client_ip}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"user:password-change:ip:{digest}"
 
 
 async def _reserve_password_limits(limits: list[tuple[str, int, int]]) -> None:
@@ -342,3 +357,79 @@ async def verify_password_registration(
         response=response,
         request=request,
     )
+
+
+@router.post(
+    "/auth/password/change", response_model=PasswordChangedResponse
+)
+async def change_password(
+    data: PasswordChangeRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
+    await _reserve_password_limits(
+        [
+            (
+                _password_rate_key(f"change:{current_user.id}"),
+                min(settings.USER_LOGIN_MAX_FAILURES, 5),
+                settings.USER_LOGIN_WINDOW_SEC,
+            ),
+            (
+                _password_change_ip_rate_key(_ip(request)),
+                settings.USER_LOGIN_MAX_FAILURES,
+                settings.USER_LOGIN_WINDOW_SEC,
+            ),
+        ]
+    )
+    try:
+        await user_password_service.change_user_password(
+            db,
+            user_id=current_user.id,
+            current_password=data.current_password,
+            new_password=data.new_password,
+        )
+    except user_password_service.PasswordAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await user_auth_service.invalidate_user_sessions(db, current_user.id)
+    delete_user_refresh_cookie(response, request)
+    return PasswordChangedResponse()
+
+
+@router.post(
+    "/auth/password/reset", response_model=PasswordChangedResponse
+)
+async def reset_password(
+    data: PasswordResetRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Rotate a forgotten password after an existing-mode step-up.
+
+    The account must stay logged in via any working method (email OTP, GitHub,
+    WeChat, or a known password); the step-up token proves control of an
+    existing identity, so a stolen access token alone cannot reset it.
+    """
+    enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
+    await user_auth_service.consume_step_up_token(
+        data.step_up_token, current_user.id
+    )
+    try:
+        await user_password_service.reset_user_password(
+            db,
+            user_id=current_user.id,
+            new_password=data.new_password,
+        )
+    except user_password_service.PasswordAuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await user_auth_service.invalidate_user_sessions(db, current_user.id)
+    delete_user_refresh_cookie(response, request)
+    return PasswordChangedResponse()

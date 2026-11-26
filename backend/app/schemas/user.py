@@ -84,6 +84,42 @@ class PasswordLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
     client: str = Field(default="web", pattern="^web$")
 
+    @field_validator("password")
+    @classmethod
+    def limit_password_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码长度不能超过 72 字节")
+        return value
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def limit_password_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码长度不能超过 72 字节")
+        return value
+
+
+class PasswordResetRequest(BaseModel):
+    step_up_token: str = Field(min_length=32, max_length=2048)
+    new_password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def limit_new_password_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码长度不能超过 72 字节")
+        return value
+
+
+class PasswordChangedResponse(BaseModel):
+    status: str = "ok"
+    reauthentication_required: bool = True
+
 
 class PasswordRegisterStartRequest(BaseModel):
     username: str = Field(min_length=3, max_length=32)
@@ -116,6 +152,8 @@ class WebTokenResponse(BaseModel):
 
 class IdentityEmailStartRequest(BaseModel):
     email: str | None = Field(default=None, max_length=254)
+    step_up_token: str | None = Field(default=None, min_length=32, max_length=2048)
+    challenge_id: str | None = Field(default=None, min_length=32, max_length=64)
 
 
 class IdentityEmailVerifyRequest(BaseModel):
@@ -141,6 +179,7 @@ class GithubStartResponse(BaseModel):
 
 class GithubLinkStartRequest(BaseModel):
     return_to: str = Field(default="/settings", max_length=512)
+    step_up_token: str = Field(min_length=32, max_length=2048)
 
 
 class GithubStartRequest(BaseModel):
