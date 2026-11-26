@@ -11,49 +11,52 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border: 1px solid rgb(37 99 138 / 14%);
-  border-radius: 14px;
-  background: rgb(255 255 255 / 94%);
-  box-shadow: 0 18px 48px rgb(9 30 45 / 28%), 0 1px 0 rgb(255 255 255 / 80%) inset;
-  padding: 12px 10px 12px 14px;
-  color: #143243;
+  border: 1px solid rgb(255 255 255 / 58%);
+  border-radius: 16px;
+  background: rgb(245 245 247 / 78%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 72%) inset,
+    0 10px 32px rgb(6 22 34 / 18%);
+  padding: 12px 12px 12px 14px;
+  color: #1d1d1f;
   font-size: 13px;
   line-height: 20px;
-  -webkit-backdrop-filter: blur(18px) saturate(135%);
-  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   animation: toastIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: auto;
 }
 
+@supports not (backdrop-filter: blur(1px)) {
+  .toast {
+    background: rgb(245 245 247 / 96%);
+  }
+}
+
 .icon {
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex: none;
-  margin-top: 1px;
-  border-radius: 9px;
   place-items: center;
 }
 
 .icon svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 1.9;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
 }
 
 .info .icon {
-  background: #eaf3f9;
-  color: #25638a;
+  color: #5a5a5f;
 }
 
 .success .icon {
-  background: #e5f2ec;
-  color: #24735b;
+  color: #1d7a46;
 }
 
 .danger .icon {
-  background: #fbe9ed;
-  color: #b33e50;
+  color: #c0352b;
 }
 
 .message {
@@ -69,10 +72,12 @@
   width: 28px;
   height: 28px;
   flex: none;
-  border-radius: 8px;
+  border-radius: 14px;
   place-items: center;
-  color: #6d8595;
-  transition: background-color 160ms ease, color 160ms ease;
+  color: #6e6e73;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .close svg {
@@ -81,8 +86,8 @@
 }
 
 .close:hover {
-  background: #eef5fa;
-  color: #143243;
+  background: rgb(0 0 0 / 6%);
+  color: #1d1d1f;
 }
 
 .close:focus-visible {
@@ -93,12 +98,12 @@
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translate3d(10px, -4px, 0);
+    transform: translate3d(0, -6px, 0) scale(0.98);
   }
 
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
