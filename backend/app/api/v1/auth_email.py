@@ -10,6 +10,7 @@ from app.core.runtime_paths import API_V1_PREFIX
 from app.models.user import User
 from app.models.user_auth import UserAuthIdentity
 from app.schemas.captcha import (
+    SliderCaptchaStartRequest,
     SliderCaptchaStartResponse,
     SliderCaptchaVerifyRequest,
     SliderCaptchaVerifyResponse,
@@ -45,33 +46,36 @@ async def _email_identity_user(
         return None, None
 
 
-@router.post(
-    "/auth/captcha/slider/start", response_model=SliderCaptchaStartResponse
-)
-async def start_login_slider_captcha(request: Request):
+@router.post("/auth/captcha/slider/start", response_model=SliderCaptchaStartResponse)
+async def start_login_slider_captcha(
+    data: SliderCaptchaStartRequest,
+    request: Request,
+):
     enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
     try:
         challenge = await slider_captcha_service.issue_challenge(
             domain="user",
+            purpose=data.purpose,
+            email=data.email,
             client_ip=_ip(request),
         )
     except slider_captcha_service.SliderCaptchaError as exc:
         _raise_slider_captcha(exc)
     return SliderCaptchaStartResponse(
         captcha_id=challenge.captcha_id,
-        background_image=challenge.background_image,
-        puzzle_image=challenge.puzzle_image,
+        image=challenge.image,
+        thumb=challenge.thumb,
         width=challenge.width,
         height=challenge.height,
-        piece_size=challenge.piece_size,
-        piece_y=challenge.piece_y,
+        thumb_width=challenge.thumb_width,
+        thumb_height=challenge.thumb_height,
+        thumb_x=challenge.thumb_x,
+        thumb_y=challenge.thumb_y,
         expires_in=challenge.expires_in,
     )
 
 
-@router.post(
-    "/auth/captcha/slider/verify", response_model=SliderCaptchaVerifyResponse
-)
+@router.post("/auth/captcha/slider/verify", response_model=SliderCaptchaVerifyResponse)
 async def verify_login_slider_captcha(
     data: SliderCaptchaVerifyRequest,
     request: Request,
@@ -80,10 +84,10 @@ async def verify_login_slider_captcha(
     try:
         ticket = await slider_captcha_service.verify_challenge(
             captcha_id=data.captcha_id,
-            offset=data.offset,
+            x=data.x,
+            y=data.y,
             trajectory=[
-                {"x": point.x, "y": point.y, "t": point.t}
-                for point in data.trajectory
+                {"x": point.x, "y": point.y, "t": point.t} for point in data.trajectory
             ],
             domain="user",
             client_ip=_ip(request),
@@ -119,6 +123,8 @@ async def start_email_login(
         await slider_captcha_service.consume_ticket(
             ticket=data.captcha_ticket,
             domain="user",
+            purpose="login",
+            email=email,
             client_ip=_ip(request),
         )
         issued = await email_otp_service.issue_otp(

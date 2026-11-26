@@ -3,14 +3,21 @@ from pydantic import Field
 from app.schemas.base import BaseModel
 
 
+class SliderCaptchaStartRequest(BaseModel):
+    purpose: str = Field(min_length=4, max_length=16, pattern=r"^[a-z]+$")
+    email: str = Field(min_length=3, max_length=254)
+
+
 class SliderCaptchaStartResponse(BaseModel):
     captcha_id: str
-    background_image: str
-    puzzle_image: str
+    image: str
+    thumb: str
     width: int
     height: int
-    piece_size: int
-    piece_y: int
+    thumb_width: int
+    thumb_height: int
+    thumb_x: int
+    thumb_y: int
     expires_in: int
 
 
@@ -22,7 +29,8 @@ class SliderTrajectoryPoint(BaseModel):
 
 class SliderCaptchaVerifyRequest(BaseModel):
     captcha_id: str = Field(min_length=32, max_length=64)
-    offset: int = Field(ge=0, le=1000)
+    x: int = Field(ge=0, le=1000)
+    y: int = Field(ge=-200, le=1000)
     trajectory: list[SliderTrajectoryPoint] = Field(min_length=2, max_length=64)
 
 

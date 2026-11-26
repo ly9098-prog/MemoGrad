@@ -22,6 +22,8 @@ def owned_redis(monkeypatch):
     monkeypatch.setattr(cache, "_enabled", True)
     monkeypatch.setattr(settings, "REDIS_URL", server.url)
     monkeypatch.setattr(settings, "OTP_IP_LOCK_MAX_FAILURES", 2)
+    monkeypatch.setattr(settings, "SLIDER_CAPTCHA_IP_LOCK_MAX_FAILURES", 2)
+    monkeypatch.setattr(settings, "SLIDER_CAPTCHA_VERIFY_IP_HOURLY_LIMIT", 1000)
     monkeypatch.setattr(otp, "send_auth_email", AsyncMock())
     monkeypatch.setattr(otp.secrets, "randbelow", lambda _: 654321)
     try:
@@ -61,7 +63,12 @@ def test_ip_attempt_limit_is_shared_across_concurrent_challenges(
                 lock_key = otp._ip_lock_key("user", "login", "192.0.2.1")
             else:
                 issued = [
-                    await slider.issue_challenge(domain="user", client_ip="192.0.2.1")
+                    await slider.issue_challenge(
+                        domain="user",
+                        purpose="login",
+                        email="user@example.com",
+                        client_ip="192.0.2.1",
+                    )
                     for _ in range(4)
                 ]
 
@@ -70,10 +77,11 @@ def test_ip_attempt_limit_is_shared_across_concurrent_challenges(
                         domain="user",
                         client_ip="192.0.2.1",
                         captcha_id=challenge.captcha_id,
-                        offset=0,
+                        x=0,
+                        y=challenge.thumb_y,
                         trajectory=[
-                            {"x": 0, "y": 0, "t": 0},
-                            {"x": 0, "y": 0, "t": 400},
+                            {"x": challenge.thumb_x, "y": challenge.thumb_y, "t": 0},
+                            {"x": 0, "y": challenge.thumb_y, "t": 400},
                         ],
                     )
 
@@ -88,7 +96,12 @@ def test_ip_attempt_limit_is_shared_across_concurrent_challenges(
             assert all(isinstance(result, ValueError) for result in results)
             assert await cache.get_strict(failure_key) == 2
             assert await cache.get_strict(lock_key) == "1"
-            assert 0 < await client.ttl(lock_key) <= settings.OTP_IP_LOCK_SEC
+            lock_ttl = (
+                settings.OTP_IP_LOCK_SEC
+                if kind == "otp"
+                else settings.SLIDER_CAPTCHA_IP_LOCK_SEC
+            )
+            assert 0 < await client.ttl(lock_key) <= lock_ttl
             delivery_count = otp.send_auth_email.await_count
             if kind == "otp":
                 with pytest.raises(otp.OtpIpLockedError):
@@ -101,7 +114,12 @@ def test_ip_attempt_limit_is_shared_across_concurrent_challenges(
                 assert otp.send_auth_email.await_count == delivery_count
             else:
                 with pytest.raises(slider.SliderCaptchaRateLimitError):
-                    await slider.issue_challenge(domain="user", client_ip="192.0.2.1")
+                    await slider.issue_challenge(
+                        domain="user",
+                        purpose="login",
+                        email="user@example.com",
+                        client_ip="192.0.2.1",
+                    )
 
     asyncio.run(run())
 
@@ -110,20 +128,35 @@ def test_real_redis_ticket_single_use_expiry_and_outage(owned_redis, monkeypatch
     async def run():
         async with Redis.from_url(owned_redis.url) as client:
             monkeypatch.setattr(cache, "_client", client)
-            issued = await slider.issue_challenge(domain="admin", client_ip="192.0.2.2")
+            issued = await slider.issue_challenge(
+                domain="admin",
+                purpose="login",
+                email="admin@example.com",
+                client_ip="192.0.2.2",
+            )
             stored = await cache.get_strict(slider._challenge_key(issued.captcha_id))
-            target = stored["target_x"]
+            target_x = stored["target_x"]
+            target_y = stored["target_y"]
+            start_x = stored["thumb_x"]
             ticket = await slider.verify_challenge(
                 domain="admin",
                 client_ip="192.0.2.2",
                 captcha_id=issued.captcha_id,
-                offset=target,
-                trajectory=[{"x": 0, "y": 0, "t": 0}, {"x": target, "y": 0, "t": 400}],
+                x=target_x,
+                y=target_y,
+                trajectory=[
+                    {"x": start_x, "y": target_y, "t": 0},
+                    {"x": target_x, "y": target_y, "t": 400},
+                ],
             )
             results = await asyncio.gather(
                 *(
                     slider.consume_ticket(
-                        ticket=ticket.ticket, domain="admin", client_ip="192.0.2.2"
+                        ticket=ticket.ticket,
+                        domain="admin",
+                        purpose="login",
+                        email="admin@example.com",
+                        client_ip="192.0.2.2",
                     )
                     for _ in range(12)
                 ),
@@ -136,7 +169,13 @@ def test_real_redis_ticket_single_use_expiry_and_outage(owned_redis, monkeypatch
             )
 
             expiring = await slider.issue_challenge(
-                domain="admin", client_ip="192.0.2.2"
+                domain="admin",
+                purpose="login",
+                email="admin@example.com",
+                client_ip="192.0.2.2",
+            )
+            expiring_data = await cache.get_strict(
+                slider._challenge_key(expiring.captcha_id)
             )
             await client.pexpire(slider._challenge_key(expiring.captcha_id), 1)
             await asyncio.sleep(0.02)
@@ -145,36 +184,64 @@ def test_real_redis_ticket_single_use_expiry_and_outage(owned_redis, monkeypatch
                     domain="admin",
                     client_ip="192.0.2.2",
                     captcha_id=expiring.captcha_id,
-                    offset=target,
+                    x=expiring_data["target_x"],
+                    y=expiring_data["target_y"],
                     trajectory=[
-                        {"x": 0, "y": 0, "t": 0},
-                        {"x": target, "y": 0, "t": 400},
+                        {
+                            "x": expiring_data["thumb_x"],
+                            "y": expiring_data["target_y"],
+                            "t": 0,
+                        },
+                        {
+                            "x": expiring_data["target_x"],
+                            "y": expiring_data["target_y"],
+                            "t": 400,
+                        },
                     ],
                 )
 
             pending = await slider.issue_challenge(
-                domain="admin", client_ip="192.0.2.2"
+                domain="admin",
+                purpose="login",
+                email="admin@example.com",
+                client_ip="192.0.2.2",
             )
-            target = (
-                await cache.get_strict(slider._challenge_key(pending.captcha_id))
-            )["target_x"]
+            pending_data = await cache.get_strict(
+                slider._challenge_key(pending.captcha_id)
+            )
+            target_x = pending_data["target_x"]
+            target_y = pending_data["target_y"]
+            start_x = pending_data["thumb_x"]
             expiring_ticket = await slider.verify_challenge(
                 domain="admin",
                 client_ip="192.0.2.2",
                 captcha_id=pending.captcha_id,
-                offset=target,
-                trajectory=[{"x": 0, "y": 0, "t": 0}, {"x": target, "y": 0, "t": 400}],
+                x=target_x,
+                y=target_y,
+                trajectory=[
+                    {"x": start_x, "y": target_y, "t": 0},
+                    {"x": target_x, "y": target_y, "t": 400},
+                ],
             )
             await client.pexpire(slider._ticket_key(expiring_ticket.ticket), 1)
             await asyncio.sleep(0.02)
             with pytest.raises(slider.SliderCaptchaError, match="已失效"):
                 await slider.consume_ticket(
-                    ticket=expiring_ticket.ticket, domain="admin", client_ip="192.0.2.2"
+                    ticket=expiring_ticket.ticket,
+                    domain="admin",
+                    purpose="login",
+                    email="admin@example.com",
+                    client_ip="192.0.2.2",
                 )
 
             owned_redis.stop()
             with pytest.raises(slider.SliderCaptchaUnavailableError):
-                await slider.issue_challenge(domain="user", client_ip="192.0.2.3")
+                await slider.issue_challenge(
+                    domain="user",
+                    purpose="login",
+                    email="user@example.com",
+                    client_ip="192.0.2.3",
+                )
             with pytest.raises(otp.OtpUnavailableError):
                 await otp.issue_otp(
                     domain="user",
@@ -187,15 +254,20 @@ def test_real_redis_ticket_single_use_expiry_and_outage(owned_redis, monkeypatch
                     domain="admin",
                     client_ip="192.0.2.2",
                     captcha_id=pending.captcha_id,
-                    offset=target,
+                    x=target_x,
+                    y=target_y,
                     trajectory=[
-                        {"x": 0, "y": 0, "t": 0},
-                        {"x": target, "y": 0, "t": 400},
+                        {"x": start_x, "y": target_y, "t": 0},
+                        {"x": target_x, "y": target_y, "t": 400},
                     ],
                 )
             with pytest.raises(slider.SliderCaptchaUnavailableError):
                 await slider.consume_ticket(
-                    ticket=expiring_ticket.ticket, domain="admin", client_ip="192.0.2.2"
+                    ticket=expiring_ticket.ticket,
+                    domain="admin",
+                    purpose="login",
+                    email="admin@example.com",
+                    client_ip="192.0.2.2",
                 )
             with pytest.raises(otp.OtpUnavailableError):
                 await otp.consume_otp(
@@ -284,24 +356,29 @@ def test_expired_lease_cannot_commit_after_a_successor_acquires_it(
 
                 error_type = otp.OtpRateLimitError
             else:
-                issued = await slider.issue_challenge(domain="user", client_ip=address)
+                issued = await slider.issue_challenge(
+                    domain="user",
+                    purpose="login",
+                    email="user@example.com",
+                    client_ip=address,
+                )
                 challenge_key = slider._challenge_key(issued.captcha_id)
                 failure_key = slider._failure_key("user", address)
-                target = (
-                    (await cache.get_strict(challenge_key))["target_x"]
-                    if correct
-                    else 0
-                )
+                stored = await cache.get_strict(challenge_key)
+                target_x = stored["target_x"] if correct else 0
+                target_y = stored["target_y"] if correct else 0
+                start_x = stored["thumb_x"] if correct else 0
 
                 async def verify():
                     return await slider.verify_challenge(
                         domain="user",
                         client_ip=address,
                         captcha_id=issued.captcha_id,
-                        offset=target,
+                        x=target_x,
+                        y=target_y,
                         trajectory=[
-                            {"x": 0, "y": 0, "t": 0},
-                            {"x": target, "y": 0, "t": 400},
+                            {"x": start_x, "y": target_y, "t": 0},
+                            {"x": target_x, "y": target_y, "t": 400},
                         ],
                     )
 

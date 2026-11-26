@@ -16,13 +16,14 @@ from app.models.admin import AdminUser
 from app.schemas.admin_auth import (
     AdminEmailActivationRequest,
     AdminEmailLoginStartRequest,
-    AdminEmailStartRequest,
+    AdminEmailRecoveryStartRequest,
     AdminEmailVerifyRequest,
     AdminPasswordRecoveryRequest,
     AdminRecoveryVerifyResponse,
     AdminTokenResponse,
 )
 from app.schemas.captcha import (
+    SliderCaptchaStartRequest,
     SliderCaptchaStartResponse,
     SliderCaptchaVerifyRequest,
     SliderCaptchaVerifyResponse,
@@ -60,33 +61,36 @@ async def _issue_admin_start(
     )
 
 
-@router.post(
-    "/captcha/slider/start", response_model=SliderCaptchaStartResponse
-)
-async def start_admin_slider_captcha(request: Request):
+@router.post("/captcha/slider/start", response_model=SliderCaptchaStartResponse)
+async def start_admin_slider_captcha(
+    data: SliderCaptchaStartRequest,
+    request: Request,
+):
     _enforce_trusted_browser_origin(request)
     try:
         challenge = await slider_captcha_service.issue_challenge(
             domain="admin",
+            purpose=data.purpose,
+            email=data.email,
             client_ip=_ip(request),
         )
     except slider_captcha_service.SliderCaptchaError as exc:
         _raise_slider_captcha(exc)
     return SliderCaptchaStartResponse(
         captcha_id=challenge.captcha_id,
-        background_image=challenge.background_image,
-        puzzle_image=challenge.puzzle_image,
+        image=challenge.image,
+        thumb=challenge.thumb,
         width=challenge.width,
         height=challenge.height,
-        piece_size=challenge.piece_size,
-        piece_y=challenge.piece_y,
+        thumb_width=challenge.thumb_width,
+        thumb_height=challenge.thumb_height,
+        thumb_x=challenge.thumb_x,
+        thumb_y=challenge.thumb_y,
         expires_in=challenge.expires_in,
     )
 
 
-@router.post(
-    "/captcha/slider/verify", response_model=SliderCaptchaVerifyResponse
-)
+@router.post("/captcha/slider/verify", response_model=SliderCaptchaVerifyResponse)
 async def verify_admin_slider_captcha(
     data: SliderCaptchaVerifyRequest,
     request: Request,
@@ -95,10 +99,10 @@ async def verify_admin_slider_captcha(
     try:
         ticket = await slider_captcha_service.verify_challenge(
             captcha_id=data.captcha_id,
-            offset=data.offset,
+            x=data.x,
+            y=data.y,
             trajectory=[
-                {"x": point.x, "y": point.y, "t": point.t}
-                for point in data.trajectory
+                {"x": point.x, "y": point.y, "t": point.t} for point in data.trajectory
             ],
             domain="admin",
             client_ip=_ip(request),
@@ -127,6 +131,8 @@ async def start_admin_email_login(
         await slider_captcha_service.consume_ticket(
             ticket=data.captcha_ticket,
             domain="admin",
+            purpose="login",
+            email=email,
             client_ip=_ip(request),
         )
     except slider_captcha_service.SliderCaptchaError as exc:
@@ -208,6 +214,8 @@ async def start_admin_email_activation(
         await slider_captcha_service.consume_ticket(
             ticket=data.captcha_ticket,
             domain="admin",
+            purpose="activate",
+            email=normalized,
             client_ip=_ip(request),
         )
     except slider_captcha_service.SliderCaptchaError as exc:
@@ -268,7 +276,7 @@ async def verify_admin_email_activation(
 
 @router.post("/email/recover/start", response_model=OtpStartResponse)
 async def start_admin_email_recovery(
-    data: AdminEmailStartRequest,
+    data: AdminEmailRecoveryStartRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -278,6 +286,16 @@ async def start_admin_email_recovery(
         admin = await admin_email_auth_service.find_active_admin_by_email(db, email)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        await slider_captcha_service.consume_ticket(
+            ticket=data.captcha_ticket,
+            domain="admin",
+            purpose="recover",
+            email=email,
+            client_ip=_ip(request),
+        )
+    except slider_captcha_service.SliderCaptchaError as exc:
+        _raise_slider_captcha(exc)
     return await _issue_admin_start(
         email=email,
         purpose="recover",

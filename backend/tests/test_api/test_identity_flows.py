@@ -496,6 +496,7 @@ async def test_browser_email_login_requires_a_slider_ticket(flow):
     challenge_response = await client.post(
         "/api/v1/auth/captcha/slider/start",
         headers={"Origin": "http://user.test"},
+        json={"purpose": "login", "email": "reader@example.com"},
     )
     assert challenge_response.status_code == 200
     challenge_id = challenge_response.json()["captcha_id"]
@@ -503,16 +504,19 @@ async def test_browser_email_login_requires_a_slider_ticket(flow):
         slider_captcha_service._challenge_key(challenge_id)
     )
     target_x = int(stored["target_x"])
+    target_y = int(stored["target_y"])
+    start_x = int(stored["thumb_x"])
     verification = await client.post(
         "/api/v1/auth/captcha/slider/verify",
         headers={"Origin": "http://user.test"},
         json={
             "captcha_id": challenge_id,
-            "offset": target_x,
+            "x": target_x,
+            "y": target_y,
             "trajectory": [
-                {"x": 0, "y": 16, "t": 0},
-                {"x": target_x // 2, "y": 18, "t": 250},
-                {"x": target_x, "y": 16, "t": 610},
+                {"x": start_x, "y": target_y, "t": 0},
+                {"x": (start_x + target_x) // 2, "y": target_y, "t": 250},
+                {"x": target_x, "y": target_y, "t": 610},
             ],
         },
     )

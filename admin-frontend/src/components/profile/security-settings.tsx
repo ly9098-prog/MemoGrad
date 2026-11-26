@@ -307,6 +307,8 @@ export function SecuritySettings() {
           )}
           {captchaOpen ? (
             <SliderCaptcha
+              purpose="activate"
+              email={activationEmail.trim()}
               onVerified={(ticket) => void sendActivationCode(ticket)}
               onCancel={() => setCaptchaOpen(false)}
             />

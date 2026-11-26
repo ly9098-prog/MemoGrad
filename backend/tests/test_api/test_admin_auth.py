@@ -111,9 +111,7 @@ def test_admin_email_rejects_oversized_normalized_address(operation):
     email = "x@" + ".".join(["例" * 20] * 5) + ".com"
     assert len(email) < 128
     app.dependency_overrides[get_db] = _override_db
-    payload = {"email": email}
-    if operation == "login":
-        payload["captcha_ticket"] = "a" * 32
+    payload = {"email": email, "captcha_ticket": "a" * 32}
     try:
         response = client.post(
             f"/api/admin/v1/auth/email/{operation}/start", json=payload
@@ -150,15 +148,24 @@ def test_admin_email_login_consumes_slider_ticket_once(monkeypatch):
     )
     app.dependency_overrides[get_db] = _override_db
     try:
-        issued = client.post("/api/admin/v1/auth/captcha/slider/start")
+        issued = client.post(
+            "/api/admin/v1/auth/captcha/slider/start",
+            json={"purpose": "login", "email": "admin@example.com"},
+        )
         assert issued.status_code == 200
         challenge_id = issued.json()["captcha_id"]
         challenge = asyncio.run(cache.get_strict(slider_captcha_service._challenge_key(challenge_id)))
-        target = challenge["target_x"]
+        target_x = challenge["target_x"]
+        target_y = challenge["target_y"]
+        start_x = challenge["thumb_x"]
         verified = client.post("/api/admin/v1/auth/captcha/slider/verify", json={
             "captcha_id": challenge_id,
-            "offset": target,
-            "trajectory": [{"x": 0, "y": 0, "t": 0}, {"x": target, "y": 0, "t": 400}],
+            "x": target_x,
+            "y": target_y,
+            "trajectory": [
+                {"x": start_x, "y": target_y, "t": 0},
+                {"x": target_x, "y": target_y, "t": 400},
+            ],
         })
         assert verified.status_code == 200
         payload = {"email": "admin@example.com", "captcha_ticket": verified.json()["ticket"]}
@@ -207,21 +214,27 @@ def test_admin_email_activation_requires_a_fresh_slider_ticket(monkeypatch):
         )
         assert missing_ticket.status_code == 422
 
-        issued = client.post("/api/admin/v1/auth/captcha/slider/start")
+        issued = client.post(
+            "/api/admin/v1/auth/captcha/slider/start",
+            json={"purpose": "activate", "email": "verified@example.com"},
+        )
         assert issued.status_code == 200
         challenge_id = issued.json()["captcha_id"]
         challenge = asyncio.run(
             cache.get_strict(slider_captcha_service._challenge_key(challenge_id))
         )
-        target = challenge["target_x"]
+        target_x = challenge["target_x"]
+        target_y = challenge["target_y"]
+        start_x = challenge["thumb_x"]
         verified = client.post(
             "/api/admin/v1/auth/captcha/slider/verify",
             json={
                 "captcha_id": challenge_id,
-                "offset": target,
+                "x": target_x,
+                "y": target_y,
                 "trajectory": [
-                    {"x": 0, "y": 0, "t": 0},
-                    {"x": target, "y": 0, "t": 400},
+                    {"x": start_x, "y": target_y, "t": 0},
+                    {"x": target_x, "y": target_y, "t": 400},
                 ],
             },
         )
@@ -243,6 +256,74 @@ def test_admin_email_activation_requires_a_fresh_slider_ticket(monkeypatch):
         assert replay.status_code == 400
     finally:
         app.dependency_overrides.pop(admin_auth.get_current_admin, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_admin_email_recovery_requires_and_consumes_slider_ticket(monkeypatch):
+    import asyncio
+
+    from app.core.cache import cache
+    from app.services import (
+        admin_email_auth_service,
+        email_otp_service,
+        slider_captcha_service,
+    )
+
+    monkeypatch.setattr(cache, "_enabled", False)
+    monkeypatch.setattr(
+        admin_email_auth_service,
+        "find_active_admin_by_email",
+        AsyncMock(return_value=None),
+    )
+    delivery = AsyncMock()
+    monkeypatch.setattr(email_otp_service, "send_auth_email", delivery)
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        missing_ticket = client.post(
+            "/api/admin/v1/auth/email/recover/start",
+            json={"email": "admin@example.com"},
+        )
+        assert missing_ticket.status_code == 422
+
+        issued = client.post(
+            "/api/admin/v1/auth/captcha/slider/start",
+            json={"purpose": "recover", "email": "admin@example.com"},
+        )
+        assert issued.status_code == 200
+        challenge_id = issued.json()["captcha_id"]
+        challenge = asyncio.run(
+            cache.get_strict(slider_captcha_service._challenge_key(challenge_id))
+        )
+        target_x = challenge["target_x"]
+        target_y = challenge["target_y"]
+        start_x = challenge["thumb_x"]
+        verified = client.post(
+            "/api/admin/v1/auth/captcha/slider/verify",
+            json={
+                "captcha_id": challenge_id,
+                "x": target_x,
+                "y": target_y,
+                "trajectory": [
+                    {"x": start_x, "y": target_y, "t": 0},
+                    {"x": target_x, "y": target_y, "t": 400},
+                ],
+            },
+        )
+        assert verified.status_code == 200
+        payload = {
+            "email": "admin@example.com",
+            "captcha_ticket": verified.json()["ticket"],
+        }
+        started = client.post(
+            "/api/admin/v1/auth/email/recover/start", json=payload
+        )
+        assert started.status_code == 200
+        replay = client.post(
+            "/api/admin/v1/auth/email/recover/start", json=payload
+        )
+        assert replay.status_code == 400
+        assert delivery.await_count == 1
+    finally:
         app.dependency_overrides.pop(get_db, None)
 
 

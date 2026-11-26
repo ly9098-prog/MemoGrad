@@ -47,11 +47,44 @@
   gap: 7px;
 }
 
-.keyboardToggle {
+.refresh {
+  display: inline-grid;
   flex: none;
+  width: 36px;
+  min-height: 36px;
+  place-items: center;
   border: 0;
   background: transparent;
+  padding: 0;
+  color: #bfeaff;
+  cursor: pointer;
+}
+
+.refresh svg {
+  width: 16px;
+  height: 16px;
+}
+
+.refresh:hover,
+.refresh:focus-visible {
+  color: #f5fbff;
+}
+
+.refresh:focus-visible {
+  outline: 2px solid #b8e7fb;
+  outline-offset: 2px;
+}
+
+.refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.keyboardToggle {
+  flex: none;
   min-height: 36px;
+  border: 0;
+  background: transparent;
   padding: 4px;
   color: #bfeaff;
   font-size: 12px;
@@ -69,69 +102,80 @@
   outline-offset: 3px;
 }
 
+.captchaArea {
+  width: 100%;
+  min-width: 0;
+}
+
 .captcha {
-  --rcsc-primary: #8fd4ff;
-  --rcsc-primary-light: rgb(143 212 255 / 24%);
-  --rcsc-error: #ff9fb1;
-  --rcsc-error-light: rgb(255 159 177 / 16%);
-  --rcsc-success: #88dec8;
-  --rcsc-success-light: rgb(136 222 200 / 18%);
-  --rcsc-border-color: rgb(177 215 234 / 22%);
-  --rcsc-bg-color: rgb(1 9 15 / 32%);
-  --rcsc-text-color: rgb(214 234 244 / 74%);
-  --rcsc-button-color: #17384b;
-  --rcsc-button-hover-color: #0a1b26;
-  --rcsc-button-bg-color: #dff4fc;
-  --rcsc-panel-border-radius: 10px;
-  --rcsc-control-border-radius: 10px;
-  --rcsc-control-height: 48px;
-  width: 100% !important;
-  margin-inline: auto;
+  --go-captcha-theme-text-color: #eaf7fd;
+  --go-captcha-theme-bg-color: transparent;
+  --go-captcha-theme-icon-color: #bfeaff;
+  --go-captcha-theme-active-color: #8fd4ff;
+  --go-captcha-theme-border-color: rgb(177 215 234 / 22%);
+  --go-captcha-theme-body-bg-color: #06121b;
+  --go-captcha-theme-drag-bar-color: rgb(177 215 234 / 20%);
+  --go-captcha-theme-drag-bg-color: #dff4fc;
+  --go-captcha-theme-drag-icon-color: #17384b;
+  --go-captcha-theme-round-color: rgb(177 215 234 / 20%);
+  --go-captcha-theme-loading-icon-color: #8fd4ff;
+  display: flex;
+  width: 100%;
+  justify-content: center;
 }
 
-.captcha :global(.rc-slider-captcha-panel) {
-  padding-bottom: 10px;
+.captcha :global([class*="gocaptcha-module_wrapper"]) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.captcha :global(.rc-slider-captcha-jigsaw) {
-  overflow: hidden;
-  border: 1px solid rgb(189 222 239 / 18%);
+.captcha :global([class*="gocaptcha-module_header"]) {
+  display: none;
 }
 
-.captcha :global(.rc-slider-captcha-jigsaw-puzzle) {
-  border-radius: 7px;
-  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 34%));
+.captcha :global([class*="gocaptcha-module_body"]:not([class*="Inner"])) {
+  margin-top: 0;
+  border-radius: 10px;
+  background: #06121b;
+  box-shadow: inset 0 0 0 1px rgb(189 222 239 / 18%);
 }
 
-.captcha :global(.rc-slider-captcha-control) {
-  overflow: hidden;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+.captcha :global([class*="gocaptcha-module_footer"]) {
+  height: 48px;
+  padding-top: 10px;
 }
 
-.captcha :global(.rc-slider-captcha-control-button) {
-  width: 48px;
+.captcha :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])) {
   border: 1px solid rgb(225 246 255 / 76%);
   box-shadow: 0 4px 12px rgb(0 0 0 / 24%);
 }
 
-.captcha :global(.rc-slider-captcha-control-tips) {
-  padding-inline: 46px;
-  font-size: 13px;
+.keyboardPreviewWrap {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
 }
 
-.captcha :global(.rc-slider-captcha-jigsaw-refresh) {
-  border-radius: 6px;
-  background: rgb(3 16 25 / 48%);
+.keyboardPreview {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #06121b;
+  box-shadow: inset 0 0 0 1px rgb(189 222 239 / 18%);
 }
 
-.captcha :global(.rc-slider-captcha-loading) {
-  color: rgb(214 234 244 / 74%);
-  font-size: 11px;
+.keyboardPreview > img:first-child {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-.root[data-keyboard-mode] .captcha :global(.rc-slider-captcha-control) {
-  opacity: 0.55;
+.keyboardPiece {
+  position: absolute;
+  display: block;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 34%));
   pointer-events: none;
 }
 
@@ -140,6 +184,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px 10px;
+  width: 100%;
+  max-width: 300px;
   border: 1px solid rgb(177 215 234 / 18%);
   border-radius: 9px;
   background: rgb(1 9 15 / 24%);
@@ -247,6 +293,11 @@
   color: #f5fbff;
 }
 
+.cancel:focus-visible {
+  outline: 2px solid #b8e7fb;
+  outline-offset: 2px;
+}
+
 @media (max-width: 480px) {
   .root {
     gap: 12px;
@@ -256,11 +307,6 @@
   .hint {
     display: none;
   }
-}
-
-.cancel:focus-visible {
-  outline: 2px solid #b8e7fb;
-  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -86,26 +86,53 @@ def _budget_keys(
         f"auth:otp:ip:{domain}:{purpose}:{ip_digest}",
         f"auth:otp:total:{domain}:{day}",
         email_key,
+        f"auth:otp:ip-day:{domain}:{day}:{ip_digest}",
     )
 
 
+def _unknown_recipient_key(domain: str) -> str:
+    day = datetime.now(UTC).strftime("%Y%m%d")
+    return f"auth:otp:unknown:{domain}:{day}"
+
+
 async def _enforce_budgets(
-    domain: str, purpose: str, email: str, client_ip: str
+    domain: str,
+    purpose: str,
+    email: str,
+    client_ip: str,
+    *,
+    known_recipient: bool,
 ) -> None:
-    ip_key, total_key, email_key = _budget_keys(domain, purpose, email, client_ip)
+    ip_key, total_key, email_key, ip_day_key = _budget_keys(
+        domain, purpose, email, client_ip
+    )
     daily_limit = (
         settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT
         if domain == "admin"
         else settings.OTP_USER_DOMAIN_DAILY_LIMIT
     )
-    try:
-        reserved = await cache.reserve_rate_limits_strict(
-            [
-                (ip_key, settings.OTP_IP_HOURLY_LIMIT, 3600),
-                (email_key, settings.OTP_EMAIL_HOURLY_LIMIT, 3600),
-                (total_key, daily_limit, 86400),
-            ]
+    ip_daily_limit = (
+        settings.OTP_ADMIN_IP_DAILY_LIMIT
+        if domain == "admin"
+        else settings.OTP_USER_IP_DAILY_LIMIT
+    )
+    limits = [
+        (ip_key, settings.OTP_IP_HOURLY_LIMIT, 3600),
+        (email_key, settings.OTP_EMAIL_HOURLY_LIMIT, 3600),
+        (total_key, daily_limit, 86400),
+        (ip_day_key, ip_daily_limit, 86400),
+    ]
+    if not known_recipient:
+        unknown_daily_limit = (
+            settings.OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT
+            if domain == "admin"
+            else settings.OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT
         )
+        limits.append(
+            (_unknown_recipient_key(domain), unknown_daily_limit, 86400)
+        )
+    try:
+        reserved = await cache.reserve_rate_limits_strict(limits)
     except CacheUnavailableError as exc:
         raise OtpUnavailableError("验证码服务暂时不可用，请稍后重试") from exc
     if not reserved:
@@ -190,7 +217,13 @@ async def issue_otp(
     if not acquired:
         raise OtpRateLimitError("请稍后再获取验证码")
     try:
-        await _enforce_budgets(domain, purpose, email, client_ip)
+        await _enforce_budgets(
+            domain,
+            purpose,
+            email,
+            client_ip,
+            known_recipient=user_id is not None,
+        )
     except OtpError:
         await cache.release_lock(resend_key, owner)
         raise

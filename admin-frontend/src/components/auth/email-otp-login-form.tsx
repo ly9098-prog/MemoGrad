@@ -277,6 +277,8 @@ export function EmailOtpLoginForm<TVerify>({
           </DialogDescription>
           <SliderCaptcha
             scope={scope}
+            purpose="login"
+            email={email.trim()}
             onCancel={() => setCaptchaOpen(false)}
             onVerified={(ticket) => void handleCaptchaVerified(ticket)}
           />

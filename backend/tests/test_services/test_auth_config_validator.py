@@ -78,6 +78,22 @@ def test_auth_delivery_validates_github_and_smtp_configuration(monkeypatch):
     assert any("SMTP_FROM_EMAIL" in item for item in errors)
 
 
+def test_auth_delivery_rejects_daily_limits_above_the_domain_pool(monkeypatch):
+    monkeypatch.setattr(settings, "AUTH_EMAIL_ENABLED", False)
+    monkeypatch.setattr(settings, "OTP_USER_IP_DAILY_LIMIT", 200)
+    monkeypatch.setattr(settings, "OTP_ADMIN_IP_DAILY_LIMIT", 40)
+    monkeypatch.setattr(settings, "OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT", 200)
+    monkeypatch.setattr(settings, "OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT", 40)
+    errors: list[str] = []
+
+    _check_auth_delivery(errors)
+
+    assert any("OTP_USER_IP_DAILY_LIMIT" in item for item in errors)
+    assert any("OTP_ADMIN_IP_DAILY_LIMIT" in item for item in errors)
+    assert any("OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT" in item for item in errors)
+    assert any("OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT" in item for item in errors)
+
+
 def test_github_callback_uses_the_cookie_owning_web_origin(monkeypatch):
     _configure_domains(monkeypatch)
     monkeypatch.setattr(settings, "GITHUB_CLIENT_ID", "test-client")

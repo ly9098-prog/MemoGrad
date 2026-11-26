@@ -170,7 +170,9 @@ async def test_password_login_rejects_wrong_password_without_exposing_account_st
 
 
 @pytest.mark.asyncio
-async def test_registration_rejects_an_existing_username(password_client):
+async def test_registration_conflict_is_only_revealed_after_verification(
+    password_client,
+):
     client, _factory = password_client
     first = await client.post(
         "/api/v1/auth/password/register/start",
@@ -186,12 +188,80 @@ async def test_registration_rejects_an_existing_username(password_client):
     )
     assert verified.status_code == 200
 
-    duplicate = await client.post(
+    # 起始接口对已存在的用户名也返回 200，避免注册接口枚举账号。
+    duplicate_start = await client.post(
         "/api/v1/auth/password/register/start",
         json=registration_payload(email="another@example.com"),
     )
+    assert duplicate_start.status_code == 200
+
+    duplicate = await client.post(
+        "/api/v1/auth/password/register/verify",
+        json={
+            "challenge_id": duplicate_start.json()["challenge_id"],
+            "code": "123456",
+            "client": "web",
+        },
+    )
     assert duplicate.status_code == 409
-    assert "账号名称" in duplicate.json()["detail"]
+    # 冲突原因不区分用户名/邮箱。
+    assert duplicate.json()["detail"] == "注册信息不可用，请检查后重试"
+
+
+@pytest.mark.asyncio
+async def test_registration_start_does_not_reveal_an_existing_email(password_client):
+    client, _factory = password_client
+    first = await client.post(
+        "/api/v1/auth/password/register/start",
+        json=registration_payload(),
+    )
+    verified = await client.post(
+        "/api/v1/auth/password/register/verify",
+        json={
+            "challenge_id": first.json()["challenge_id"],
+            "code": "123456",
+            "client": "web",
+        },
+    )
+    assert verified.status_code == 200
+    await cache.delete_strict(
+        email_otp_service._resend_key("user", "register", "study@example.com")
+    )
+
+    duplicate_start = await client.post(
+        "/api/v1/auth/password/register/start",
+        json=registration_payload(username="other-user"),
+    )
+    assert duplicate_start.status_code == 200
+
+    duplicate = await client.post(
+        "/api/v1/auth/password/register/verify",
+        json={
+            "challenge_id": duplicate_start.json()["challenge_id"],
+            "code": "123456",
+            "client": "web",
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"] == "注册信息不可用，请检查后重试"
+
+
+@pytest.mark.asyncio
+async def test_registration_start_is_rate_limited_per_ip(password_client, monkeypatch):
+    client, _factory = password_client
+    monkeypatch.setattr(settings, "PASSWORD_REGISTER_START_IP_HOURLY_LIMIT", 1)
+
+    first = await client.post(
+        "/api/v1/auth/password/register/start",
+        json=registration_payload(),
+    )
+    assert first.status_code == 200
+
+    limited = await client.post(
+        "/api/v1/auth/password/register/start",
+        json=registration_payload(username="other-user", email="other@example.com"),
+    )
+    assert limited.status_code == 429
 
 
 @pytest.mark.asyncio

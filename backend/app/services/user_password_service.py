@@ -112,10 +112,8 @@ async def assert_registration_available(
         )
     except identity_service.IdentityUnavailableError as exc:
         raise PasswordRegistrationConflictError(str(exc)) from exc
-    if password_identity is not None:
-        raise PasswordRegistrationConflictError("该账号名称已被使用")
-    if email_identity is not None:
-        raise PasswordRegistrationConflictError("该邮箱已注册，请直接登录")
+    if password_identity is not None or email_identity is not None:
+        raise PasswordRegistrationConflictError("注册信息不可用，请检查后重试")
 
 
 async def find_password_credential(

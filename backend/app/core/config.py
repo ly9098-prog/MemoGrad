@@ -119,11 +119,26 @@ class Settings(BaseSettings):
     OTP_IP_HOURLY_LIMIT: int = 20
     OTP_USER_DOMAIN_DAILY_LIMIT: int = 100
     OTP_ADMIN_DOMAIN_DAILY_LIMIT: int = 30
+    # Per-IP contribution cap to the domain daily pool: prevents a single IP
+    # from exhausting the shared quota and locking out other users.
+    OTP_USER_IP_DAILY_LIMIT: int = 30
+    OTP_ADMIN_IP_DAILY_LIMIT: int = 10
+    # Sends to recipients without an existing account draw from this smaller
+    # pool, so spraying arbitrary addresses cannot exhaust the room reserved
+    # for existing accounts' login/activation emails.
+    OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT: int = 40
+    OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT: int = 10
     OTP_IP_LOCK_MAX_FAILURES: int = 5
     OTP_IP_LOCK_SEC: int = 900
     SLIDER_CAPTCHA_EXPIRE_SEC: int = 120
     SLIDER_CAPTCHA_MAX_ATTEMPTS: int = 3
     SLIDER_CAPTCHA_IP_HOURLY_LIMIT: int = 40
+    # Flood guard only: brute-force guesses are bounded by the slider failure
+    # lock (SLIDER_CAPTCHA_IP_LOCK_MAX_FAILURES / _SEC), not by this budget.
+    SLIDER_CAPTCHA_VERIFY_IP_HOURLY_LIMIT: int = 60
+    SLIDER_CAPTCHA_IP_LOCK_MAX_FAILURES: int = 5
+    SLIDER_CAPTCHA_IP_LOCK_SEC: int = 900
+    PASSWORD_REGISTER_START_IP_HOURLY_LIMIT: int = 10
     USER_AGREEMENT_VERSION: str = "2026-11-20"
     PRIVACY_POLICY_VERSION: str = "2026-11-20"
 

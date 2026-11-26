@@ -14,6 +14,13 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AdminFooter } from "@/components/layout/admin-footer";
+import { SliderCaptcha } from "@/components/security/slider-captcha";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api/client";
 import { isPasswordReady } from "@/lib/admin-user-utils";
@@ -41,6 +48,7 @@ export default function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resendIn, setResendIn] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const [error, setError] = useState("");
 
   const stage = resetToken ? "reset" : challengeId ? "verify" : "email";
@@ -54,8 +62,18 @@ export default function ForgotPasswordPage() {
     return () => window.clearInterval(timer);
   }, [resendIn]);
 
-  async function startRecovery(event?: FormEvent<HTMLFormElement>) {
+  function openRecoveryCaptcha(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (loading || captchaOpen) return;
+    if (!email.trim()) {
+      setError("请输入管理员邮箱");
+      return;
+    }
+    setError("");
+    setCaptchaOpen(true);
+  }
+
+  async function startRecovery(ticket: string) {
     if (loading) return;
     setError("");
     setLoading(true);
@@ -64,7 +82,10 @@ export default function ForgotPasswordPage() {
         method: "POST",
         skipRefresh: true,
         exposeErrorDetail: true,
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({
+          email: email.trim(),
+          captcha_ticket: ticket,
+        }),
       });
       setChallengeId(response.challenge_id);
       setResendIn(response.resend_after);
@@ -152,7 +173,7 @@ export default function ForgotPasswordPage() {
             </div>
 
             {stage === "email" ? (
-              <form onSubmit={startRecovery} className={styles.form} aria-busy={loading}>
+              <form onSubmit={openRecoveryCaptcha} className={styles.form} aria-busy={loading}>
                 <div className={styles.emailIntro}>
                   <Mail aria-hidden="true" />
                   <p>仅已验证邮箱可用于自助恢复；没有已验证邮箱的普通管理员请联系超级管理员。</p>
@@ -162,7 +183,7 @@ export default function ForgotPasswordPage() {
                   <div className={styles.inputShell} data-invalid={hasError || undefined}>
                     <Mail className={styles.fieldIcon} aria-hidden="true" />
                     <Input
-                      disabled={loading}
+                      disabled={loading || captchaOpen}
                       id="recovery-email"
                       type="email"
                       variant="ghost"
@@ -215,7 +236,7 @@ export default function ForgotPasswordPage() {
                   <button type="button" className={styles.backButton} disabled={loading} onClick={() => setChallengeId("")}>
                     <ArrowLeft /> 修改邮箱
                   </button>
-                  <button type="button" className={styles.resendButton} disabled={loading || resendIn > 0} onClick={() => void startRecovery()}>
+                  <button type="button" className={styles.resendButton} disabled={loading || resendIn > 0} onClick={() => openRecoveryCaptcha()}>
                     {resendIn > 0 ? `${resendIn} 秒后可重发` : "重新发送"}
                   </button>
                 </div>
@@ -287,6 +308,27 @@ export default function ForgotPasswordPage() {
         </div>
       </main>
       <div className={styles.footer}><AdminFooter variant="auth" /></div>
+      <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
+        <DialogContent
+          className={styles.captchaDialog}
+          overlayClassName={styles.loginDialogOverlay}
+          showCloseButton={false}
+        >
+          <DialogTitle className="sr-only">完成安全验证</DialogTitle>
+          <DialogDescription className="sr-only">
+            拖动滑块，将拼图移到图片缺口处。
+          </DialogDescription>
+          <SliderCaptcha
+            purpose="recover"
+            email={email.trim()}
+            onCancel={() => setCaptchaOpen(false)}
+            onVerified={(ticket) => {
+              setCaptchaOpen(false);
+              void startRecovery(ticket);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

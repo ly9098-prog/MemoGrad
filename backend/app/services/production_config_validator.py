@@ -320,15 +320,55 @@ def _check_auth_delivery(errors: list[str]) -> None:
         errors.append("SLIDER_CAPTCHA_EXPIRE_SEC 必须在 30~600 秒之间")
     if not 1 <= settings.SLIDER_CAPTCHA_MAX_ATTEMPTS <= 10:
         errors.append("SLIDER_CAPTCHA_MAX_ATTEMPTS 必须在 1~10 之间")
+    if not 1 <= settings.SLIDER_CAPTCHA_IP_LOCK_MAX_FAILURES <= 20:
+        errors.append("SLIDER_CAPTCHA_IP_LOCK_MAX_FAILURES 必须在 1~20 之间")
+    if not 60 <= settings.SLIDER_CAPTCHA_IP_LOCK_SEC <= 86400:
+        errors.append("SLIDER_CAPTCHA_IP_LOCK_SEC 必须在 60~86400 秒之间")
     for name, value in (
         ("OTP_EMAIL_HOURLY_LIMIT", settings.OTP_EMAIL_HOURLY_LIMIT),
         ("OTP_IP_HOURLY_LIMIT", settings.OTP_IP_HOURLY_LIMIT),
         ("OTP_USER_DOMAIN_DAILY_LIMIT", settings.OTP_USER_DOMAIN_DAILY_LIMIT),
         ("OTP_ADMIN_DOMAIN_DAILY_LIMIT", settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT),
+        ("OTP_USER_IP_DAILY_LIMIT", settings.OTP_USER_IP_DAILY_LIMIT),
+        ("OTP_ADMIN_IP_DAILY_LIMIT", settings.OTP_ADMIN_IP_DAILY_LIMIT),
+        (
+            "OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT",
+            settings.OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT,
+        ),
+        (
+            "OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT",
+            settings.OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT,
+        ),
         ("SLIDER_CAPTCHA_IP_HOURLY_LIMIT", settings.SLIDER_CAPTCHA_IP_HOURLY_LIMIT),
+        (
+            "SLIDER_CAPTCHA_VERIFY_IP_HOURLY_LIMIT",
+            settings.SLIDER_CAPTCHA_VERIFY_IP_HOURLY_LIMIT,
+        ),
+        (
+            "PASSWORD_REGISTER_START_IP_HOURLY_LIMIT",
+            settings.PASSWORD_REGISTER_START_IP_HOURLY_LIMIT,
+        ),
     ):
         if value <= 0:
             errors.append(f"{name} 必须大于 0")
+    if settings.OTP_USER_IP_DAILY_LIMIT > settings.OTP_USER_DOMAIN_DAILY_LIMIT:
+        errors.append("OTP_USER_IP_DAILY_LIMIT 不能大于 OTP_USER_DOMAIN_DAILY_LIMIT")
+    if settings.OTP_ADMIN_IP_DAILY_LIMIT > settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT:
+        errors.append("OTP_ADMIN_IP_DAILY_LIMIT 不能大于 OTP_ADMIN_DOMAIN_DAILY_LIMIT")
+    if (
+        settings.OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT
+        > settings.OTP_USER_DOMAIN_DAILY_LIMIT
+    ):
+        errors.append(
+            "OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT 不能大于 OTP_USER_DOMAIN_DAILY_LIMIT"
+        )
+    if (
+        settings.OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT
+        > settings.OTP_ADMIN_DOMAIN_DAILY_LIMIT
+    ):
+        errors.append(
+            "OTP_ADMIN_UNKNOWN_EMAIL_DAILY_LIMIT 不能大于 OTP_ADMIN_DOMAIN_DAILY_LIMIT"
+        )
 
     if not settings.AUTH_EMAIL_ENABLED:
         return

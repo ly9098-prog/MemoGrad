@@ -47,6 +47,15 @@ def _password_ip_rate_key(client_ip: str) -> str:
     return f"user:password-login:ip:{digest}"
 
 
+def _register_start_rate_key(client_ip: str) -> str:
+    digest = hmac.new(
+        settings.APP_SECRET.encode("utf-8"),
+        f"password-register-start\0{client_ip}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"user:password-register-start:ip:{digest}"
+
+
 async def _reserve_password_limits(limits: list[tuple[str, int, int]]) -> None:
     try:
         allowed = await cache.reserve_rate_limits_strict(limits)
@@ -186,7 +195,6 @@ async def password_login(
 async def start_password_registration(
     data: PasswordRegisterStartRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
     enforce_trusted_browser_origin(request, settings.USER_WEB_BASE_URL)
     try:
@@ -203,24 +211,41 @@ async def start_password_registration(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    client_ip = _ip(request)
+    try:
+        allowed = await cache.reserve_rate_limits_strict(
+            [
+                (
+                    _register_start_rate_key(client_ip),
+                    settings.PASSWORD_REGISTER_START_IP_HOURLY_LIMIT,
+                    3600,
+                )
+            ]
+        )
+    except CacheUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="注册服务暂时不可用，请稍后重试",
+        ) from exc
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="注册尝试过于频繁，请稍后再试",
+        )
+
     try:
         await slider_captcha_service.consume_ticket(
             ticket=data.captcha_ticket,
             domain="user",
-            client_ip=_ip(request),
+            purpose="register",
+            email=email,
+            client_ip=client_ip,
         )
     except slider_captcha_service.SliderCaptchaError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    try:
-        await user_password_service.assert_registration_available(
-            db,
-            username=username,
-            email=email,
-        )
-    except user_password_service.PasswordRegistrationConflictError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
+    # Conflict detection is deferred to /register/verify so the start endpoint
+    # cannot be used to enumerate existing usernames or emails.
     password_hash = await user_password_service.hash_user_password_async(data.password)
     try:
         issued = await email_otp_service.issue_otp(
@@ -287,6 +312,15 @@ async def verify_password_registration(
         or not isinstance(consent, dict)
     ):
         raise HTTPException(status_code=422, detail="注册信息已失效，请重新提交")
+
+    try:
+        await user_password_service.assert_registration_available(
+            db,
+            username=username,
+            email=str(challenge["email"]),
+        )
+    except user_password_service.PasswordRegistrationConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     try:
         user, _identity = await user_password_service.create_password_account(

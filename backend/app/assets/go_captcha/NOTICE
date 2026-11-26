@@ -1,0 +1,10 @@
+go-captcha visual assets
+=======================
+
+The background images and puzzle tile images in this directory are derived
+from the go-captcha-assets project:
+
+  https://github.com/wenlng/go-captcha-assets
+
+Copyright (c) 2024 Awen
+Licensed under the Apache License, Version 2.0. See LICENSE in this directory.

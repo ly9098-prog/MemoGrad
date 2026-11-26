@@ -81,6 +81,10 @@ class AdminEmailLoginStartRequest(AdminEmailStartRequest):
     captcha_ticket: str = Field(min_length=32, max_length=64)
 
 
+class AdminEmailRecoveryStartRequest(AdminEmailStartRequest):
+    captcha_ticket: str = Field(min_length=32, max_length=64)
+
+
 class AdminEmailActivationRequest(AdminEmailStartRequest):
     current_password: str = Field(min_length=1, max_length=128)
     captcha_ticket: str = Field(min_length=32, max_length=64)

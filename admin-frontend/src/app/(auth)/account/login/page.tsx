@@ -748,6 +748,8 @@ export default function LearnerLoginPage() {
           <DialogDescription className="sr-only">拖动滑块，将拼图移到图片缺口处。</DialogDescription>
           <SliderCaptcha
             scope="user"
+            purpose="register"
+            email={registerEmail.trim()}
             onCancel={() => setCaptchaOpen(false)}
             onVerified={(ticket) => {
               setCaptchaOpen(false);

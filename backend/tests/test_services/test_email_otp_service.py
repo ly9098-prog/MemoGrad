@@ -306,6 +306,88 @@ async def test_parallel_sends_reserve_the_domain_budget_atomically(monkeypatch):
     assert await cache.get_strict(total_key) == 3
 
 
+@pytest.mark.asyncio
+async def test_single_ip_cannot_exhaust_the_domain_daily_budget(monkeypatch):
+    async def deliver(**_kwargs):
+        return None
+
+    monkeypatch.setattr(email_otp_service, "send_auth_email", deliver)
+    monkeypatch.setattr(
+        email_otp_service.settings, "OTP_USER_IP_DAILY_LIMIT", 2
+    )
+
+    for index in range(2):
+        issued = await email_otp_service.issue_otp(
+            domain="user",
+            email=f"reader{index}@example.com",
+            purpose="login",
+            client_ip="burst-ip",
+        )
+        assert issued.challenge_id
+
+    with pytest.raises(email_otp_service.OtpRateLimitError):
+        await email_otp_service.issue_otp(
+            domain="user",
+            email="reader2@example.com",
+            purpose="login",
+            client_ip="burst-ip",
+        )
+
+    # 被拒绝的请求不应计入域日配额。
+    total_key = email_otp_service._budget_keys(
+        "user", "login", "unused@example.com", "unused"
+    )[1]
+    assert await cache.get_strict(total_key) == 2
+
+    other_ip = await email_otp_service.issue_otp(
+        domain="user",
+        email="reader3@example.com",
+        purpose="login",
+        client_ip="other-ip",
+    )
+    assert other_ip.challenge_id
+    assert await cache.get_strict(total_key) == 3
+
+
+@pytest.mark.asyncio
+async def test_unknown_recipients_have_a_separate_daily_pool(monkeypatch):
+    async def deliver(**_kwargs):
+        return None
+
+    monkeypatch.setattr(email_otp_service, "send_auth_email", deliver)
+    monkeypatch.setattr(
+        email_otp_service.settings, "OTP_USER_UNKNOWN_EMAIL_DAILY_LIMIT", 1
+    )
+
+    anonymous = await email_otp_service.issue_otp(
+        domain="user",
+        email="spray1@example.com",
+        purpose="login",
+        client_ip="spray-ip-1",
+    )
+    assert anonymous.challenge_id
+
+    with pytest.raises(email_otp_service.OtpRateLimitError):
+        await email_otp_service.issue_otp(
+            domain="user",
+            email="spray2@example.com",
+            purpose="login",
+            client_ip="spray-ip-2",
+        )
+
+    # 已知账号不占用 unknown 池，域日配额仍有余额。
+    known = await email_otp_service.issue_otp(
+        domain="user",
+        email="member@example.com",
+        purpose="login",
+        client_ip="member-ip",
+        user_id=7,
+    )
+    assert known.challenge_id
+    unknown_key = email_otp_service._unknown_recipient_key("user")
+    assert await cache.get_strict(unknown_key) == 1
+
+
 def test_otp_email_ships_matching_html_and_plain_text():
     from app.services.email_delivery import build_otp_email
 
