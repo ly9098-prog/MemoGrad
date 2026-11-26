@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GoCaptcha from "go-captcha-react";
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { apiRequest, type ApiScope } from "@/lib/api/client";
@@ -70,12 +70,9 @@ export function SliderCaptcha({
   email,
   scope = "admin",
 }: SliderCaptchaProps) {
-  const keyboardInputId = useId();
   const [challenge, setChallenge] = useState<SlideChallenge | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const challengeRef = useRef<SlideChallenge | null>(null);
   const movesRef = useRef<SlideMove[]>([]);
   const startedAtRef = useRef(0);
@@ -129,7 +126,6 @@ export function SliderCaptcha({
       challengeRef.current = next;
       movesRef.current = [];
       startedAtRef.current = 0;
-      setKeyboardOffset(next.thumb_x);
       setChallenge(next);
       setReady(true);
       return next;
@@ -250,12 +246,6 @@ export function SliderCaptcha({
     void request().catch(() => undefined);
   }, [request]);
 
-  const verifyWithKeyboard = useCallback(() => {
-    const current = challengeRef.current;
-    if (!current) return;
-    void verifyPoint({ x: keyboardOffset, y: current.thumb_y });
-  }, [keyboardOffset, verifyPoint]);
-
   const displayThumbWidth = challenge
     ? Math.max(1, Math.round(challenge.thumb_width * scaleX))
     : 0;
@@ -315,9 +305,6 @@ export function SliderCaptcha({
     [handleConfirm, handleMove, onCancel, refresh],
   );
 
-  const thumbWidth = challenge?.thumb_width ?? 0;
-  const maxOffset = Math.max(0, imageWidth - thumbWidth);
-
   return (
     <section
       className={styles.root}
@@ -329,115 +316,27 @@ export function SliderCaptcha({
           <ShieldCheck aria-hidden="true" />
           安全验证
         </span>
-        <span className={styles.headingActions}>
-          {!keyboardOpen ? (
-            <span className={styles.hint}>拖动下方滑块对齐缺口</span>
-          ) : null}
-          <button
-            type="button"
-            className={styles.refresh}
-            aria-label="换一张验证图片"
-            title="换一张验证图片"
-            disabled={!ready}
-            onClick={refresh}
-          >
-            <RefreshCw aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={styles.keyboardToggle}
-            aria-expanded={keyboardOpen}
-            aria-controls={keyboardOpen ? keyboardInputId : undefined}
-            onClick={() => {
-              setKeyboardOpen((open) => !open);
-              resetTrajectory();
-            }}
-          >
-            {keyboardOpen ? "收起" : "键盘验证"}
-          </button>
-        </span>
+        <button
+          type="button"
+          className={styles.refresh}
+          aria-label="换一张验证图片"
+          title="换一张验证图片"
+          disabled={!ready}
+          onClick={refresh}
+        >
+          <RefreshCw aria-hidden="true" />
+        </button>
       </div>
 
       <div ref={containerRef} className={styles.captchaArea}>
-        {keyboardOpen ? (
-          <div className={styles.keyboardPreviewWrap} id={keyboardInputId}>
-            <div
-              className={styles.keyboardPreview}
-              style={{ width: displayWidth, height: displayHeight }}
-            >
-              {challenge ? (
-                <>
-                  {/* Data-URI CAPTCHA art must render unoptimized. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={challenge.image}
-                    alt="验证码背景图"
-                    width={displayWidth}
-                    height={displayHeight}
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={challenge.thumb}
-                    alt=""
-                    className={styles.keyboardPiece}
-                    style={{
-                      left: Math.round(keyboardOffset * scaleX),
-                      top: displayThumbY,
-                      width: displayThumbWidth,
-                      height: displayThumbHeight,
-                    }}
-                  />
-                </>
-              ) : null}
-            </div>
-            <div className={styles.keyboardPanel}>
-              <label htmlFor={`${keyboardInputId}-input`}>拼图位置</label>
-              <input
-                id={`${keyboardInputId}-input`}
-                type="range"
-                min={0}
-                max={maxOffset}
-                step={1}
-                value={keyboardOffset}
-                aria-label="拼图水平位置"
-                aria-describedby={`${keyboardInputId}-hint`}
-                onChange={(event) => {
-                  setKeyboardOffset(Number(event.target.value));
-                  setError("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    verifyWithKeyboard();
-                  }
-                }}
-              />
-              <span
-                id={`${keyboardInputId}-hint`}
-                className={styles.keyboardHint}
-              >
-                方向键移动，Enter 确认
-              </span>
-              <button
-                type="button"
-                className={styles.keyboardConfirm}
-                disabled={!ready}
-                onClick={verifyWithKeyboard}
-              >
-                确认位置
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.captcha}>
-            <GoCaptcha.Slide
-              key={challenge?.captcha_id ?? "empty"}
-              data={data}
-              config={config}
-              events={events}
-            />
-          </div>
-        )}
+        <div className={styles.captcha}>
+          <GoCaptcha.Slide
+            key={challenge?.captcha_id ?? "empty"}
+            data={data}
+            config={config}
+            events={events}
+          />
+        </div>
       </div>
 
       {error ? (

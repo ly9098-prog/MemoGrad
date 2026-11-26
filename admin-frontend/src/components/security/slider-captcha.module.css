@@ -4,17 +4,18 @@
   gap: 16px;
   width: 100%;
   min-width: 0;
+  max-width: 380px;
   margin-inline: auto;
-  border: 1px solid rgb(163 206 231 / 30%);
-  border-radius: 14px;
-  background: #0b1b28;
-  padding: 24px;
-  box-shadow: inset 0 1px rgb(255 255 255 / 7%);
+  border: 1px solid #e5e6eb;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgb(15 23 32 / 6%);
 }
 
 .heading {
   display: flex;
-  min-height: 24px;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -23,41 +24,36 @@
 .title {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  color: #eaf7fd;
-  font-size: 16px;
+  gap: 8px;
+  color: #1f2329;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .title svg {
-  width: 20px;
-  height: 20px;
-}
-
-.hint {
-  color: #adc9d9;
-  font-size: 12px;
-}
-
-.headingActions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: #25638a;
+  stroke-width: 1.9;
 }
 
 .refresh {
   display: inline-grid;
   flex: none;
-  width: 36px;
-  min-height: 36px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   padding: 0;
-  color: #bfeaff;
+  color: #6b7785;
   cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
 }
 
 .refresh svg {
@@ -67,39 +63,19 @@
 
 .refresh:hover,
 .refresh:focus-visible {
-  color: #f5fbff;
+  background: #f2f3f5;
+  color: #1f2329;
 }
 
 .refresh:focus-visible {
-  outline: 2px solid #b8e7fb;
+  outline: 2px solid #25638a;
   outline-offset: 2px;
 }
 
 .refresh:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.keyboardToggle {
-  flex: none;
-  min-height: 36px;
-  border: 0;
   background: transparent;
-  padding: 4px;
-  color: #bfeaff;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.keyboardToggle:hover,
-.keyboardToggle:focus-visible {
-  color: #f5fbff;
-}
-
-.keyboardToggle:focus-visible {
-  outline: 2px solid #b8e7fb;
-  outline-offset: 3px;
+  color: #c9cdd4;
+  cursor: default;
 }
 
 .captchaArea {
@@ -108,17 +84,17 @@
 }
 
 .captcha {
-  --go-captcha-theme-text-color: #eaf7fd;
-  --go-captcha-theme-bg-color: transparent;
-  --go-captcha-theme-icon-color: #bfeaff;
-  --go-captcha-theme-active-color: #8fd4ff;
-  --go-captcha-theme-border-color: rgb(177 215 234 / 22%);
-  --go-captcha-theme-body-bg-color: #06121b;
-  --go-captcha-theme-drag-bar-color: rgb(177 215 234 / 20%);
-  --go-captcha-theme-drag-bg-color: #dff4fc;
-  --go-captcha-theme-drag-icon-color: #17384b;
-  --go-captcha-theme-round-color: rgb(177 215 234 / 20%);
-  --go-captcha-theme-loading-icon-color: #8fd4ff;
+  --go-captcha-theme-text-color: #1f2329;
+  --go-captcha-theme-bg-color: #ffffff;
+  --go-captcha-theme-icon-color: #4e5969;
+  --go-captcha-theme-active-color: #25638a;
+  --go-captcha-theme-border-color: #e5e6eb;
+  --go-captcha-theme-body-bg-color: #f2f3f5;
+  --go-captcha-theme-drag-bar-color: #f7f8fa;
+  --go-captcha-theme-drag-bg-color: #ffffff;
+  --go-captcha-theme-drag-icon-color: #25638a;
+  --go-captcha-theme-round-color: #e5e6eb;
+  --go-captcha-theme-loading-icon-color: #25638a;
   display: flex;
   width: 100%;
   justify-content: center;
@@ -137,164 +113,135 @@
 
 .captcha :global([class*="gocaptcha-module_body"]:not([class*="Inner"])) {
   margin-top: 0;
-  border-radius: 10px;
-  background: #06121b;
-  box-shadow: inset 0 0 0 1px rgb(189 222 239 / 18%);
+  border-radius: 8px;
+  background: #f2f3f5;
+  box-shadow: inset 0 0 0 1px #e5e6eb;
+  overflow: hidden;
+}
+
+.captcha :global([class*="gocaptcha-module_picture"]) {
+  display: block;
+}
+
+.captcha :global([class*="index-module_tile"] img) {
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%));
 }
 
 .captcha :global([class*="gocaptcha-module_footer"]) {
-  height: 48px;
-  padding-top: 10px;
+  height: 44px;
+  margin-top: 12px;
+  padding-top: 0;
+}
+
+.captcha :global([class*="gocaptcha-module_dragSlideBar"]) {
+  height: 44px;
+}
+
+.captcha :global([class*="gocaptcha-module_dragLine"]) {
+  top: 0;
+  height: 44px;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #f7f8fa;
+}
+
+.captcha :global([class*="gocaptcha-module_dragLine"])::after {
+  content: "向右拖动滑块填充拼图";
+  color: #5f6b7a;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .captcha :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])) {
-  border: 1px solid rgb(225 246 255 / 76%);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 24%);
-}
-
-.keyboardPreviewWrap {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-}
-
-.keyboardPreview {
-  position: relative;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #06121b;
-  box-shadow: inset 0 0 0 1px rgb(189 222 239 / 18%);
-}
-
-.keyboardPreview > img:first-child {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.keyboardPiece {
-  position: absolute;
-  display: block;
-  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 34%));
-  pointer-events: none;
-}
-
-.keyboardPanel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px 10px;
-  width: 100%;
-  max-width: 300px;
-  border: 1px solid rgb(177 215 234 / 18%);
-  border-radius: 9px;
-  background: rgb(1 9 15 / 24%);
-  padding: 9px 10px;
-}
-
-.keyboardPanel label {
-  color: rgb(226 242 250 / 82%);
-  font-size: 12px;
-}
-
-.keyboardPanel input[type="range"] {
-  grid-column: 1 / -1;
-  width: 100%;
-  margin: 0;
-  accent-color: #8fd4ff;
-  cursor: pointer;
-}
-
-.keyboardPanel input[type="range"]:focus-visible {
-  outline: 2px solid #b8e7fb;
-  outline-offset: 3px;
-}
-
-.keyboardHint {
-  color: rgb(208 231 242 / 66%);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.keyboardConfirm {
-  min-height: 44px;
-  border: 1px solid rgb(225 246 255 / 52%);
+  width: 44px;
+  height: 36px;
+  margin-top: -18px;
+  border: 1px solid #d9dce0;
   border-radius: 7px;
-  background: #dff4fc;
-  padding: 0 10px;
-  color: #17384b;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  background: #ffffff;
+  box-shadow:
+    0 1px 3px rgb(15 23 32 / 14%),
+    0 4px 10px rgb(15 23 32 / 6%);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
-.keyboardConfirm:hover,
-.keyboardConfirm:focus-visible {
-  background: #f5fbff;
+.captcha :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])):hover,
+.captcha :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])):active {
+  border-color: #25638a;
+  box-shadow:
+    0 1px 3px rgb(15 23 32 / 16%),
+    0 4px 12px rgb(37 99 138 / 18%);
 }
 
-.keyboardConfirm:focus-visible {
-  outline: 2px solid #b8e7fb;
-  outline-offset: 2px;
-}
-
-.keyboardConfirm:disabled {
-  opacity: 0.55;
-  cursor: default;
+.captcha :global([class*="gocaptcha-module_dragBlock"]) svg {
+  width: 18px;
+  height: 18px;
+  color: #25638a;
+  fill: #25638a;
 }
 
 .errorRow {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .error {
   margin: 0;
-  color: #ffb8c8;
+  color: #d93026;
   font-size: 13px;
   line-height: 1.5;
 }
 
 .retry {
   justify-self: start;
-  min-height: 44px;
+  min-height: 32px;
   border: 0;
+  border-radius: 4px;
   background: transparent;
-  padding: 2px 0;
-  color: #c8edff;
-  font-size: 12px;
+  padding: 0;
+  color: #25638a;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .retry:hover,
 .retry:focus-visible {
-  color: #f5fbff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .retry:focus-visible {
-  outline: 2px solid #b8e7fb;
+  outline: 2px solid #25638a;
   outline-offset: 2px;
 }
 
 .cancel {
   justify-self: end;
-  min-height: 44px;
+  min-height: 32px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 4px;
   background: transparent;
-  padding: 0 5px;
-  color: rgb(207 230 240 / 66%);
+  padding: 0 4px;
+  color: #6b7785;
   font-size: 13px;
   cursor: pointer;
+  transition: color 150ms ease;
 }
 
 .cancel:hover,
 .cancel:focus-visible {
-  color: #f5fbff;
+  color: #1f2329;
 }
 
 .cancel:focus-visible {
-  outline: 2px solid #b8e7fb;
+  outline: 2px solid #25638a;
   outline-offset: 2px;
 }
 
@@ -302,10 +249,6 @@
   .root {
     gap: 12px;
     padding: 16px;
-  }
-
-  .hint {
-    display: none;
   }
 }
 
