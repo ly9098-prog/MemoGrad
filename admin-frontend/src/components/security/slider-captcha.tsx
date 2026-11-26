@@ -54,10 +54,21 @@ const EMPTY_SLIDE_DATA = {
   thumbHeight: 0,
 };
 
-function messageFor(error: unknown) {
-  if (error instanceof ApiError) return error.message;
-  return "安全验证未完成，请稍后重试";
-}
+// Aliyun/Tencent-style slider feedback: failures are reported inside the
+// slider bar and the handle returns to the start, instead of a separate
+// error panel. The challenge is refreshed automatically after repeated
+// failures (the server allows three attempts per challenge).
+type SliderFeedback = "verifying" | "failed" | "expired" | "rate" | "network" | null;
+
+const MAX_CHALLENGE_ATTEMPTS = 2;
+
+const FEEDBACK_TEXT: Record<Exclude<SliderFeedback, null>, string> = {
+  verifying: "正在验证…",
+  failed: "验证失败，请重新拖动",
+  expired: "验证失败，已刷新图片",
+  rate: "操作过于频繁，请稍后重试",
+  network: "网络异常，请刷新后重试",
+};
 
 function abortError(message: string) {
   return new DOMException(message, "AbortError");
@@ -72,8 +83,11 @@ export function SliderCaptcha({
 }: SliderCaptchaProps) {
   const [challenge, setChallenge] = useState<SlideChallenge | null>(null);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<SliderFeedback>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const challengeRef = useRef<SlideChallenge | null>(null);
+  const attemptsRef = useRef(0);
+  const issuedAtRef = useRef(0);
   const movesRef = useRef<SlideMove[]>([]);
   const startedAtRef = useRef(0);
   const mountedRef = useRef(false);
@@ -107,7 +121,10 @@ export function SliderCaptcha({
     requestControllerRef.current?.abort();
     requestControllerRef.current = controller;
     setReady(false);
-    setError("");
+    setLoadFailed(false);
+    // A manual reload clears transient feedback; the "expired" notice stays
+    // until the next drag because it explains the refreshed image.
+    setFeedback((current) => (current === "expired" ? current : null));
     try {
       const next = await apiRequest<SlideChallenge>(
         "/auth/captcha/slider/start",
@@ -124,6 +141,8 @@ export function SliderCaptcha({
         throw abortError("Captcha request cancelled");
       }
       challengeRef.current = next;
+      attemptsRef.current = 0;
+      issuedAtRef.current = Date.now();
       movesRef.current = [];
       startedAtRef.current = 0;
       setChallenge(next);
@@ -132,7 +151,7 @@ export function SliderCaptcha({
     } catch (loadError) {
       if (!controller.signal.aborted && mountedRef.current) {
         setReady(false);
-        setError(messageFor(loadError));
+        setLoadFailed(true);
       }
       throw loadError;
     }
@@ -166,12 +185,18 @@ export function SliderCaptcha({
   const scaleX = displayWidth / imageWidth;
   const scaleY = displayHeight / imageHeight;
 
+  const refresh = useCallback(() => {
+    verifyControllerRef.current?.abort();
+    void request().catch(() => undefined);
+  }, [request]);
+
   const verifyPoint = useCallback(
     async (end: SlidePoint, reset?: () => void) => {
       if (!mountedRef.current) return;
       const current = challengeRef.current;
       if (!current) {
-        setError("安全验证已失效，请刷新后重试");
+        setFeedback("expired");
+        refresh();
         reset?.();
         return;
       }
@@ -190,7 +215,7 @@ export function SliderCaptcha({
       verifyControllerRef.current?.abort();
       verifyControllerRef.current = controller;
 
-      setError("");
+      setFeedback("verifying");
       try {
         const response = await apiRequest<SlideTicket>(
           "/auth/captcha/slider/verify",
@@ -212,12 +237,30 @@ export function SliderCaptcha({
         onVerified(response.ticket);
       } catch (verifyError) {
         if (controller.signal.aborted || !mountedRef.current) return;
-        setError(messageFor(verifyError));
+        const status = verifyError instanceof ApiError ? verifyError.status : null;
+        const expired = Date.now() > issuedAtRef.current + current.expires_in * 1000;
         reset?.();
         resetTrajectory();
+        if (status === 429) {
+          setFeedback("rate");
+          return;
+        }
+        if (status === null || status === 0 || status >= 500) {
+          setFeedback("network");
+          return;
+        }
+        attemptsRef.current += 1;
+        // Keep the same image for the first retry, then refresh: the server
+        // invalidates a challenge after three failed attempts.
+        if (expired || attemptsRef.current >= MAX_CHALLENGE_ATTEMPTS) {
+          setFeedback("expired");
+          refresh();
+          return;
+        }
+        setFeedback("failed");
       }
     },
-    [onVerified, resetTrajectory, scaleX, scaleY, scope],
+    [onVerified, refresh, resetTrajectory, scaleX, scaleY, scope],
   );
 
   const handleConfirm = useCallback(
@@ -229,6 +272,9 @@ export function SliderCaptcha({
 
   const handleMove = useCallback((x: number, y: number) => {
     if (!mountedRef.current) return;
+    setFeedback((current) =>
+      current === null || current === "verifying" ? current : null,
+    );
     const now = performance.now();
     if (startedAtRef.current === 0) startedAtRef.current = now;
     movesRef.current.push({
@@ -240,11 +286,6 @@ export function SliderCaptcha({
       movesRef.current.splice(1, 1);
     }
   }, []);
-
-  const refresh = useCallback(() => {
-    verifyControllerRef.current?.abort();
-    void request().catch(() => undefined);
-  }, [request]);
 
   const displayThumbWidth = challenge
     ? Math.max(1, Math.round(challenge.thumb_width * scaleX))
@@ -305,6 +346,15 @@ export function SliderCaptcha({
     [handleConfirm, handleMove, onCancel, refresh],
   );
 
+  const feedbackText = feedback
+    ? FEEDBACK_TEXT[feedback]
+    : "向右拖动滑块填充拼图";
+  const errorTone =
+    feedback === "failed" ||
+    feedback === "expired" ||
+    feedback === "rate" ||
+    feedback === "network";
+
   return (
     <section
       className={styles.root}
@@ -321,7 +371,7 @@ export function SliderCaptcha({
           className={styles.refresh}
           aria-label="换一张验证图片"
           title="换一张验证图片"
-          disabled={!ready}
+          disabled={!ready && !loadFailed}
           onClick={refresh}
         >
           <RefreshCw aria-hidden="true" />
@@ -329,24 +379,41 @@ export function SliderCaptcha({
       </div>
 
       <div ref={containerRef} className={styles.captchaArea}>
-        <div className={styles.captcha}>
-          <GoCaptcha.Slide
-            key={challenge?.captcha_id ?? "empty"}
-            data={data}
-            config={config}
-            events={events}
-          />
-        </div>
+        {loadFailed ? (
+          <div className={styles.captcha}>
+            <button
+              type="button"
+              className={styles.loadRetry}
+              style={{ width: displayWidth, height: displayHeight }}
+              onClick={refresh}
+            >
+              <RefreshCw aria-hidden="true" />
+              <span>加载失败，点击重试</span>
+            </button>
+          </div>
+        ) : (
+          <div
+            className={styles.captcha}
+            data-error={errorTone ? "true" : undefined}
+          >
+            <span
+              className={styles.sliderStatus}
+              data-tone={errorTone ? "error" : "idle"}
+              role="status"
+              aria-live="polite"
+            >
+              {feedbackText}
+            </span>
+            <GoCaptcha.Slide
+              key={challenge?.captcha_id ?? "empty"}
+              data={data}
+              config={config}
+              events={events}
+            />
+          </div>
+        )}
       </div>
 
-      {error ? (
-        <div className={styles.errorRow} role="alert">
-          <p className={styles.error}>{error}</p>
-          <button type="button" className={styles.retry} onClick={refresh}>
-            重新加载验证
-          </button>
-        </div>
-      ) : null}
       <button
         type="button"
         className={styles.cancel}

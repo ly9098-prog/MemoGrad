@@ -95,9 +95,28 @@
   --go-captcha-theme-drag-icon-color: #25638a;
   --go-captcha-theme-round-color: #e5e6eb;
   --go-captcha-theme-loading-icon-color: #25638a;
+  position: relative;
   display: flex;
   width: 100%;
   justify-content: center;
+}
+
+.sliderStatus {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 1;
+  transform: translate(-50%, 50%);
+  color: #5f6b7a;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: color 150ms ease;
+}
+
+.sliderStatus[data-tone="error"] {
+  color: #d93026;
 }
 
 .captcha :global([class*="gocaptcha-module_wrapper"]) {
@@ -149,12 +168,9 @@
   background: #f7f8fa;
 }
 
-.captcha :global([class*="gocaptcha-module_dragLine"])::after {
-  content: "向右拖动滑块填充拼图";
-  color: #5f6b7a;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
+.captcha[data-error] :global([class*="gocaptcha-module_dragLine"]) {
+  border-color: #f3c6c2;
+  background: #fff6f5;
 }
 
 .captcha :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])) {
@@ -180,6 +196,10 @@
     0 4px 12px rgb(37 99 138 / 18%);
 }
 
+.captcha[data-error] :global([class*="gocaptcha-module_dragBlock"]:not([class*="Inline"])) {
+  border-color: #e8a9a3;
+}
+
 .captcha :global([class*="gocaptcha-module_dragBlock"]) svg {
   width: 18px;
   height: 18px;
@@ -187,39 +207,42 @@
   fill: #25638a;
 }
 
-.errorRow {
-  display: grid;
-  gap: 6px;
-}
-
-.error {
-  margin: 0;
+.captcha[data-error] :global([class*="gocaptcha-module_dragBlock"]) svg {
   color: #d93026;
-  font-size: 13px;
-  line-height: 1.5;
+  fill: #d93026;
 }
 
-.retry {
-  justify-self: start;
-  min-height: 32px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
+.loadRetry {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #f7f8fa;
   padding: 0;
-  color: #25638a;
+  color: #6b7785;
   font-size: 13px;
   cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
-.retry:hover,
-.retry:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.loadRetry:hover,
+.loadRetry:focus-visible {
+  border-color: #25638a;
+  color: #1f2329;
 }
 
-.retry:focus-visible {
+.loadRetry:focus-visible {
   outline: 2px solid #25638a;
   outline-offset: 2px;
+}
+
+.loadRetry svg {
+  width: 20px;
+  height: 20px;
 }
 
 .cancel {
